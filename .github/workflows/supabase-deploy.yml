@@ -23,6 +23,7 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       LINEAR_WEBHOOK_SECRET: ${{ secrets.LINEAR_WEBHOOK_SECRET }}
+      LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +37,7 @@ jobs:
         run: supabase db push --yes
 
       - name: Set Edge Function secrets
-        run: supabase secrets set LINEAR_WEBHOOK_SECRET="$LINEAR_WEBHOOK_SECRET" --project-ref "$SUPABASE_PROJECT_REF"
+        run: supabase secrets set LINEAR_WEBHOOK_SECRET="$LINEAR_WEBHOOK_SECRET" LINEAR_API_KEY="$LINEAR_API_KEY" --project-ref "$SUPABASE_PROJECT_REF"
 
       - name: Deploy Edge Functions
         run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF"
