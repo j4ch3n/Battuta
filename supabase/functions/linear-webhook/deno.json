@@ -1,6 +1,7 @@
 {
   "imports": {
     "@linear/sdk": "npm:@linear/sdk@95.1.0",
-    "@linear/sdk/webhooks": "npm:@linear/sdk@95.1.0/webhooks"
+    "@linear/sdk/webhooks": "npm:@linear/sdk@95.1.0/webhooks",
+    "postgres": "npm:postgres@3.4.7"
   }
 }

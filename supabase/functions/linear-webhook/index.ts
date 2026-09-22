@@ -2,9 +2,20 @@ import { Buffer } from "node:buffer";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { LinearClient } from "@linear/sdk";
 import type { EntityWebhookPayloadWithIssueData } from "@linear/sdk/webhooks";
+import postgres from "postgres";
 
 const signaturePattern = /^[0-9a-f]{64}$/i;
 const replayWindowMs = 60_000;
+const queueName = "engineer_tasks";
+
+type EngineerTask = {
+  issueId: string;
+  identifier: string;
+  teamId: string;
+  title: string;
+  url: string;
+  webhookTimestamp: number;
+};
 
 function verifySignature(
   headerSignature: string | null,
@@ -37,15 +48,63 @@ function isIssueWebhookPayload(
   const { data } = payload;
   return (
     typeof data.id === "string" &&
+    typeof data.identifier === "string" &&
     typeof data.teamId === "string" &&
+    typeof data.title === "string" &&
+    typeof data.url === "string" &&
     isRecord(data.state) &&
     typeof data.state.name === "string" &&
     typeof data.state.type === "string"
   );
 }
 
-function isBacklogIssue(payload: EntityWebhookPayloadWithIssueData) {
-  return payload.action !== "remove" && payload.data.state.type === "backlog";
+function isNewBacklogIssue(payload: EntityWebhookPayloadWithIssueData) {
+  return payload.action === "create" && payload.data.state.type === "backlog";
+}
+
+async function enqueueEngineerTask(task: EngineerTask) {
+  const databaseUrl = Deno.env.get("SUPABASE_DB_URL");
+  if (!databaseUrl) {
+    throw new Error("SUPABASE_DB_URL is not configured");
+  }
+
+  const sql = postgres(databaseUrl, { max: 1, prepare: false });
+
+  try {
+    return await sql.begin(async (transaction) => {
+      const dispatches = await transaction<{ issue_id: string }[]>`
+        insert into public.linear_issue_dispatches (issue_id, queue_message_id)
+        values (${task.issueId}, 0)
+        on conflict (issue_id) do nothing
+        returning issue_id
+      `;
+
+      if (dispatches.length === 0) {
+        return null;
+      }
+
+      const messages = await transaction<{ message_id: string }[]>`
+        select pgmq.send(
+          ${queueName},
+          ${transaction.typed(task, 3802)}
+        ) as message_id
+      `;
+      const messageId = messages[0]?.message_id;
+      if (typeof messageId !== "string") {
+        throw new Error("Could not enqueue engineer task");
+      }
+
+      await transaction`
+        update public.linear_issue_dispatches
+        set queue_message_id = ${messageId}
+        where issue_id = ${task.issueId}
+      `;
+
+      return messageId;
+    });
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
 }
 
 async function moveIssueToTodo(issueId: string, teamId: string) {
@@ -77,11 +136,28 @@ async function moveIssueToTodo(issueId: string, teamId: string) {
 }
 
 async function handleIssueWebhook(payload: EntityWebhookPayloadWithIssueData) {
-  if (!isBacklogIssue(payload)) {
+  if (!isNewBacklogIssue(payload)) {
+    console.info("Ignoring Linear issue webhook", {
+      issueId: payload.data.id,
+      action: payload.action,
+      stateType: payload.data.state.type,
+    });
     return;
   }
 
-  console.info("New task in Backlog", { issueId: payload.data.id });
+  const messageId = await enqueueEngineerTask({
+    issueId: payload.data.id,
+    identifier: payload.data.identifier,
+    teamId: payload.data.teamId,
+    title: payload.data.title,
+    url: payload.data.url,
+    webhookTimestamp: payload.webhookTimestamp,
+  });
+
+  console.info("Engineer task queued", {
+    issueId: payload.data.id,
+    messageId,
+  });
   await moveIssueToTodo(payload.data.id, payload.data.teamId);
 }
 
@@ -126,6 +202,10 @@ Deno.serve(async (request) => {
   }
 
   if (!isIssueWebhookPayload(payload)) {
+    console.info("Ignoring unsupported Linear webhook", {
+      type: payload.type,
+      action: payload.action,
+    });
     return new Response(null, { status: 200 });
   }
 
