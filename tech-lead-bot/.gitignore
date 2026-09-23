@@ -1,0 +1,9 @@
+# Pi runtime state is local; explicitly allow versioned bot configuration and code.
+.pi/*
+!.pi/settings.json
+!.pi/skills/
+.pi/skills/*
+!.pi/skills/communicate-with-pm/
+!.pi/skills/define-implementation-tasks/
+!.pi/skills/use-subagent/
+!.pi/skills/coordinate-workers/

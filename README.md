@@ -31,9 +31,10 @@ cp .env.example .env
 cp supabase/.env.example supabase/.env
 # Fill in .env and supabase/.env following their respective .env.example files.
 supabase start
-make setup-pm-bot
-make setup-tech-lead-bot
+make setup-bot
 make run-dev
 ```
 
 In each Pi pane, use `/login` to connect your model provider, then message the corresponding bot on Telegram. Each bot has separate Pi state and Telegram credentials; both use the same Linear API key. `make run-dev` opens PM (upper left), tech lead (upper right), and local Supabase functions (bottom) in a tmux session; detach with `Ctrl-b d` and run it again to reattach. If an older two-pane session is running, stop it before running `make run-dev` to get the new layout.
+
+The PM and tech lead share the [agent-mail extension](agent-mail/README.md) for durable, direct communication. Keep one Pi process per role and resume each bot's persistent Pi session after restart.

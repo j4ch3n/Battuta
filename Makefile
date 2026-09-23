@@ -1,7 +1,7 @@
 SUPABASE_DIR := supabase
 ENV_FILE := $(SUPABASE_DIR)/.env
 
-.PHONY: help db-diff functions-serve setup-pm-bot setup-tech-lead-bot run-dev
+.PHONY: help db-diff functions-serve setup-bot setup-pm-bot setup-tech-lead-bot run-dev
 
 help:
 	@printf '%s\n' \
@@ -10,6 +10,7 @@ help:
 		'  make functions-serve   Serve Edge Functions with supabase/.env loaded' \
 		'  make setup-pm-bot     Install Pi, Telegram, and project-management MCP' \
 		'  make setup-tech-lead-bot  Install tech-lead Pi, Telegram, and Linear MCP' \
+		'  make setup-bot        Set up both PM and tech-lead bots' \
 		'  make run-dev          Attach to the PM + tech-lead + Supabase tmux session' \
 		'  uv run python pm-bot/scripts/configure-bot.py --help  PM bot setup options' \
 		'  uv run python tech-lead-bot/scripts/configure-bot.py --help  Tech-lead setup options'
@@ -24,9 +25,13 @@ functions-serve:
 
 setup-pm-bot:
 	uv run --locked python pm-bot/scripts/configure-bot.py
+	pnpm --dir agent-mail install
 
 setup-tech-lead-bot:
 	uv run --locked python tech-lead-bot/scripts/configure-bot.py
+	pnpm --dir agent-mail install
+
+setup-bot: setup-pm-bot setup-tech-lead-bot
 
 run-dev:
 	bash pm-bot/scripts/run-dev.sh

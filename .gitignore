@@ -1,23 +1,16 @@
+# Local environment
 .env
+.env.*
+!.env.example
+
+# Python
 .venv/
 __pycache__/
-pm-bot/node_modules/
-tech-lead-bot/node_modules/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Pi runtime state is local; explicitly allow versioned bot configuration and code.
-pm-bot/.pi/*
-!pm-bot/.pi/settings.json
-!pm-bot/.pi/skills/
-pm-bot/.pi/skills/*
-!pm-bot/.pi/skills/problem-framing/
-!pm-bot/.pi/skills/user-story/
-!pm-bot/.pi/skills/prd/
-!pm-bot/.pi/skills/project-management/
-!pm-bot/.pi/extensions/
-pm-bot/.pi/extensions/*
-!pm-bot/.pi/extensions/pm-bot/
-pm-bot/.pi/extensions/pm-bot/*
-!pm-bot/.pi/extensions/pm-bot/index.ts
-
-tech-lead-bot/.pi/*
-!tech-lead-bot/.pi/settings.json
+# Node.js
+node_modules/
