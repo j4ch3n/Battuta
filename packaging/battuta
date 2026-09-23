@@ -12,11 +12,33 @@ case "${1:-}" in
     set +a
     exec "$root/bin/node" "$root/bin/configure.mjs"
     ;;
-  start-prod)
+  start-prod-screen)
     exec bash "$root/bots/pm-bot/scripts/run-dev.sh" prod
     ;;
+  pm|tech-lead)
+    role="$1"
+    bot_dir="$root/bots/$role-bot"
+    [[ -f "$root/.env.prod" ]] || { printf 'Missing %s/.env.prod\n' "$root" >&2; exit 1; }
+    [[ -x "$bot_dir/node_modules/.bin/pi" && -f "$bot_dir/AGENTS.md" && -f "$bot_dir/.pi/telegram.json" && -f "$bot_dir/.pi/mcp.json" ]] || {
+      printf 'Configure %s first with bin/battuta configure\n' "$role" >&2
+      exit 1
+    }
+    [[ -d "$root/agent-mail/node_modules" ]] || { printf 'Missing agent-mail dependencies\n' >&2; exit 1; }
+    set -a
+    source "$root/.env.prod"
+    set +a
+    for key in LINEAR_API_KEY SUPABASE_URL SUPABASE_SECRET_KEY; do
+      [[ -n "${!key:-}" ]] || { printf 'Set %s in .env.prod\n' "$key" >&2; exit 1; }
+    done
+    export AGENT_MAIL_IDENTITY="$role" PI_CODING_AGENT_DIR="$bot_dir/.pi"
+    cd "$bot_dir"
+    exec "$bot_dir/node_modules/.bin/pi" --approve --session-id "$role" --extension "$root/agent-mail/index.ts"
+    ;;
+  install-services)
+    exec "$root/bin/node" "$root/bin/install-services.mjs"
+    ;;
   *)
-    printf 'Usage: %s configure|start-prod\n' "$0" >&2
+    printf 'Usage: %s configure|start-prod-screen|pm|tech-lead|install-services\n' "$0" >&2
     exit 2
     ;;
 esac

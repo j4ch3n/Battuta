@@ -41,7 +41,10 @@ jobs:
           cp "$(command -v node)" dist/stage/battuta/bin/node
           cp packaging/battuta dist/stage/battuta/bin/battuta
           cp packaging/configure.mjs dist/stage/battuta/bin/configure.mjs
+          cp packaging/install-services.mjs dist/stage/battuta/bin/install-services.mjs
           chmod +x dist/stage/battuta/bin/*
+          bash -n dist/stage/battuta/bin/battuta
+          node --check dist/stage/battuta/bin/install-services.mjs
           for bot in pm-bot tech-lead-bot; do
             bot_dir="$PWD/dist/stage/battuta/bots/$bot"
             pnpm --dir "$bot_dir" install --frozen-lockfile --prod
