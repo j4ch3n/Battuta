@@ -38,3 +38,5 @@ make run-dev
 In each Pi pane, use `/login` to connect your model provider, then message the corresponding bot on Telegram. Each bot has separate Pi state and Telegram credentials; both use the same Linear API key. `make run-dev` opens PM (upper left), tech lead (upper right), and local Supabase functions (bottom) in a tmux session; detach with `Ctrl-b d` and run it again to reattach. If an older two-pane session is running, stop it before running `make run-dev` to get the new layout.
 
 The PM and tech lead share the [agent-mail extension](agent-mail/README.md) for durable, direct communication. Keep one Pi process per role and resume each bot's persistent Pi session after restart.
+
+Bot workspaces live in `bots/pm-bot` and `bots/tech-lead-bot`. Each setup command assembles its runtime `AGENTS.md` from `bots/AGENTS_shared.md` and the bot's `AGENTS_dedicated.md`; rerun setup after changing either instruction file.

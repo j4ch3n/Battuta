@@ -30,7 +30,7 @@ def install_packages(bot_dir: Path, telegram_package: str, mcp_package: str) -> 
 
 
 def warn_running_session(bot_dir: Path) -> None:
-    session = f"{bot_dir.parent.name.lower()}-{bot_dir.name}"
+    session = "battuta-pm-bot"
     if shutil.which("tmux") and subprocess.run(
         ["tmux", "has-session", "-t", f"={session}"], capture_output=True
     ).returncode == 0:

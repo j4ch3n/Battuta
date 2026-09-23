@@ -2,8 +2,8 @@
 set -euo pipefail
 
 bot_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-repo_dir="$(dirname "$bot_dir")"
-tech_lead_dir="$repo_dir/tech-lead-bot"
+repo_dir="$(dirname "$(dirname "$bot_dir")")"
+tech_lead_dir="$repo_dir/bots/tech-lead-bot"
 session="battuta-pm-bot"
 pm_pi_session_id="pm"
 tech_lead_pi_session_id="tech-lead"
@@ -25,9 +25,11 @@ fi
 [[ -x "$bot_dir/node_modules/.bin/pi" ]] || { printf 'Pi is not installed; run make setup-pm-bot\n' >&2; exit 1; }
 [[ -f "$bot_dir/.pi/telegram.json" ]] || { printf 'Telegram is not configured; run make setup-pm-bot\n' >&2; exit 1; }
 [[ -f "$bot_dir/.pi/mcp.json" ]] || { printf 'Project management MCP is not configured; run make setup-pm-bot\n' >&2; exit 1; }
+[[ -f "$bot_dir/AGENTS.md" ]] || { printf 'PM instructions are not configured; run make setup-pm-bot\n' >&2; exit 1; }
 [[ -x "$tech_lead_dir/node_modules/.bin/pi" ]] || { printf 'Tech-lead Pi is not installed; run make setup-tech-lead-bot\n' >&2; exit 1; }
 [[ -f "$tech_lead_dir/.pi/telegram.json" ]] || { printf 'Tech-lead Telegram is not configured; run make setup-tech-lead-bot\n' >&2; exit 1; }
 [[ -f "$tech_lead_dir/.pi/mcp.json" ]] || { printf 'Tech-lead Linear MCP is not configured; run make setup-tech-lead-bot\n' >&2; exit 1; }
+[[ -f "$tech_lead_dir/AGENTS.md" ]] || { printf 'Tech-lead instructions are not configured; run make setup-tech-lead-bot\n' >&2; exit 1; }
 [[ -f "$repo_dir/.env" ]] || { printf 'Missing .env; copy .env.example\n' >&2; exit 1; }
 
 set -a
