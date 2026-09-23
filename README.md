@@ -22,15 +22,14 @@ Reviews changes and provides feedback before they are accepted.
 
 ## Setup
 
-Currently, local setup runs the PM bot. Install Node.js, pnpm, Python 3.12+, uv, tmux, and the Supabase CLI. Get a Telegram bot token from [@BotFather](https://t.me/BotFather) and your numeric Telegram user ID.
+Currently, local setup runs the PM bot. Install Node.js, pnpm, Python 3.12+, uv, tmux, and the Supabase CLI. Get a Telegram bot token from [@BotFather](https://t.me/BotFather), your numeric Telegram user ID, and a Linear API key.
 
 From the repository root:
 
 ```sh
 cp .env.example .env
 cp supabase/.env.example supabase/.env
-# Set PM_TELEGRAM_TOKEN and TELEGRAM_ALLOWED_USER_ID in .env.
-# Set the required Supabase values in supabase/.env.
+# Fill in .env and supabase/.env following their respective .env.example files.
 supabase start
 make setup-pm-bot
 make run-dev

@@ -1,4 +1,4 @@
-"""Set up this bot's Pi installation and private Telegram profile."""
+"""Set up the PM bot's Pi installation, Telegram profile, and MCP connection."""
 
 import json
 import os
@@ -14,6 +14,7 @@ import click
 BOT_DIR = Path(__file__).resolve().parents[1]
 ROOT = BOT_DIR.parent
 TELEGRAM_PACKAGE = "npm:@llblab/pi-telegram@0.50.1"
+MCP_PACKAGE = "npm:pi-mcp-adapter@2.37.0"
 
 
 def read_env(path: Path) -> dict[str, str]:
@@ -48,8 +49,7 @@ def positive_id(value: str, name: str, path: Path) -> int:
     return int(value)
 
 
-def configure_telegram(bot_dir: Path, env_file: Path, prefix: str) -> None:
-    values = read_env(env_file)
+def configure_telegram(bot_dir: Path, env_file: Path, prefix: str, values: dict[str, str]) -> None:
 
     def field(name: str) -> str:
         return f"{prefix}_TELEGRAM_{name}"
@@ -96,6 +96,38 @@ def configure_telegram(bot_dir: Path, env_file: Path, prefix: str) -> None:
     click.echo(f"Configured {config} from {env_file}.")
 
 
+def configure_mcp(bot_dir: Path, env_file: Path, values: dict[str, str]) -> None:
+    required(values, "LINEAR_API_KEY", env_file)
+    config = bot_dir / ".pi" / "mcp.json"
+    try:
+        data = json.loads(config.read_text()) if config.exists() else {}
+    except (OSError, json.JSONDecodeError) as error:
+        raise click.ClickException(f"Cannot read {config}: {error}") from error
+    if not isinstance(data, dict):
+        raise click.ClickException(f"Expected a JSON object in {config}")
+    servers = data.setdefault("mcpServers", {})
+    if not isinstance(servers, dict):
+        raise click.ClickException("mcpServers must be a JSON object")
+    servers["linear"] = {
+        "url": "https://mcp.linear.app/mcp",
+        "auth": "bearer",
+        "bearerTokenEnv": "LINEAR_API_KEY",
+    }
+
+    config.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=".mcp-", dir=config.parent)
+    try:
+        with os.fdopen(fd, "w") as output:
+            json.dump(data, output, indent=2)
+            output.write("\n")
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, config)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    click.echo(f"Configured {config} from {env_file}.")
+
+
 def run(*args: str, **kwargs: object) -> None:
     try:
         subprocess.run(args, check=True, **kwargs)
@@ -108,8 +140,9 @@ def run(*args: str, **kwargs: object) -> None:
 @click.option("--env-file", type=click.Path(dir_okay=False, path_type=Path), default=ROOT / ".env", show_default=True)
 @click.option("--env-prefix", default="PM", show_default=True, help="Prefix for bot-specific Telegram environment keys.")
 @click.option("--telegram-package", default=TELEGRAM_PACKAGE, show_default=True)
-def main(bot_dir: Path, env_file: Path, env_prefix: str, telegram_package: str) -> None:
-    """Configure Telegram and install Pi dependencies for one bot."""
+@click.option("--mcp-package", default=MCP_PACKAGE, show_default=True)
+def main(bot_dir: Path, env_file: Path, env_prefix: str, telegram_package: str, mcp_package: str) -> None:
+    """Configure Telegram and project management MCP for one bot."""
     if shutil.which("pnpm") is None:
         raise click.ClickException("pnpm is required")
     if not re.fullmatch(r"[A-Z][A-Z0-9_]*", env_prefix):
@@ -119,10 +152,16 @@ def main(bot_dir: Path, env_file: Path, env_prefix: str, telegram_package: str) 
     if not (bot_dir / "package.json").is_file():
         raise click.ClickException(f"Missing {bot_dir / 'package.json'}")
 
-    configure_telegram(bot_dir, env_file, env_prefix)
+    values = read_env(env_file)
+    required(values, f"{env_prefix}_TELEGRAM_TOKEN", env_file)
+    required(values, "TELEGRAM_ALLOWED_USER_ID", env_file)
+    required(values, "LINEAR_API_KEY", env_file)
+    configure_telegram(bot_dir, env_file, env_prefix, values)
+    configure_mcp(bot_dir, env_file, values)
     run("pnpm", "install", "--frozen-lockfile", cwd=bot_dir)
     agent_env = {**os.environ, "PI_CODING_AGENT_DIR": str(bot_dir / ".pi")}
     run("pnpm", "exec", "pi", "install", "-l", "--approve", telegram_package, cwd=bot_dir, env=agent_env)
+    run("pnpm", "exec", "pi", "install", "-l", "--approve", mcp_package, cwd=bot_dir, env=agent_env)
     run("pnpm", "exec", "pi", "list", cwd=bot_dir, env=agent_env)
 
     session = f"{ROOT.name.lower()}-{bot_dir.name}"

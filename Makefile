@@ -8,9 +8,9 @@ help:
 		'Available targets:' \
 		'  make db-diff NAME=name Create a migration from local schema changes' \
 		'  make functions-serve   Serve Edge Functions with supabase/.env loaded' \
-		'  make setup-pm-bot     Install Pi and the project-local Telegram extension' \
+		'  make setup-pm-bot     Install Pi, Telegram, and project-management MCP' \
 		'  make run-dev          Attach to the PM bot + Supabase tmux session' \
-		'  uv run python pm-bot/scripts/configure-telegram.py --help  Telegram setup options'
+		'  uv run python pm-bot/scripts/configure-bot.py --help  PM bot setup options'
 
 db-diff:
 	@test -n "$(NAME)" || (printf '%s\n' 'Set NAME, for example: make db-diff NAME=create_tasks' >&2; exit 1)
@@ -21,7 +21,7 @@ functions-serve:
 	supabase functions serve --env-file "$(ENV_FILE)" --no-verify-jwt
 
 setup-pm-bot:
-	uv run --locked python pm-bot/scripts/configure-telegram.py
+	uv run --locked python pm-bot/scripts/configure-bot.py
 
 run-dev:
 	bash pm-bot/scripts/run-dev.sh
