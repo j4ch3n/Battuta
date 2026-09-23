@@ -41,7 +41,7 @@ For a remote Supabase project, copy `.env.example` to `.env.prod`, set its `SUPA
 
 ### Raspberry Pi release (64-bit Linux ARM)
 
-Push a `v*` tag whose commit is on `main` to build and publish a GitHub Release containing `battuta-<tag>-linux-arm64.tar.gz` and its SHA-256 checksum. The archive bundles Node and the bots' pinned dependencies; the Pi needs `tmux` and a remote Supabase project with the migrations and functions deployed.
+Push a `v*` tag whose commit is on `main` to build and publish a GitHub Release containing `battuta-<tag>-linux-arm64.tar.gz` and its SHA-256 checksum. The archive bundles Node and the bots' pinned dependencies; the Pi needs a remote Supabase project with the migrations and functions deployed. The optional screen launcher also needs `tmux`.
 
 Download the archive and checksum from the release page, then on the Pi:
 
@@ -52,10 +52,23 @@ cd battuta
 cp .env.example .env.prod
 # Fill in .env.prod with your Telegram, Linear, and remote Supabase credentials.
 bin/battuta configure
-bin/battuta start-prod
+bin/battuta start-prod-screen
 ```
 
-Log into your model provider in each Pi pane using `/login`. Detach with `Ctrl-b d`; `bin/battuta start-prod` reattaches. Keep the extracted directory (including `.pi` sessions and `.env.prod`) between restarts; save those files before replacing it with a newer release. Do not reuse Telegram tokens with another running instance.
+Log into your model provider in each Pi pane using `/login`. Detach with `Ctrl-b d`; `bin/battuta start-prod-screen` reattaches. You can also start just one bot in the foreground with `bin/battuta pm` or `bin/battuta tech-lead`; each command uses the same workspace and persistent Pi session as the screen launcher.
+
+For unattended operation, install two separate systemd **user** services from the extracted directory:
+
+```sh
+bin/battuta install-services
+systemctl --user daemon-reload
+systemctl --user enable --now battuta-pm.service battuta-tech-lead.service
+systemctl --user status battuta-pm.service battuta-tech-lead.service
+```
+
+The installer writes `~/.config/systemd/user/battuta-pm.service` and `battuta-tech-lead.service` with absolute paths to this installation. It uses the Raspberry Pi OS `script` utility to provide the terminal Pi needs in a systemd service. Run it as the Pi user, not with `sudo`. Use `journalctl --user -u battuta-pm.service -f` (or `battuta-tech-lead.service`) for logs. To start user services at boot without an interactive login, an administrator can run `sudo loginctl enable-linger "$USER"`. Stop the `battuta-prod` tmux session before enabling the services, and do not start the screen launcher while the services run: there must be only one Pi process per bot/session. If you move the installation, stop the services, remove the old unit files, reinstall them from the new path, and reload systemd.
+
+Keep the extracted directory (including `.pi` sessions and `.env.prod`) between restarts; save those files before replacing it with a newer release. Do not reuse Telegram tokens with another running instance.
 
 The PM and tech lead share the [agent-mail extension](agent-mail/README.md) for durable, direct communication. Keep one Pi process per role and resume each bot's persistent Pi session after restart.
 
