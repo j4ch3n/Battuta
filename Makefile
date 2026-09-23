@@ -1,7 +1,7 @@
 SUPABASE_DIR := supabase
 ENV_FILE := $(SUPABASE_DIR)/.env
 
-.PHONY: help db-diff functions-serve setup-bot setup-pm-bot setup-tech-lead-bot run-dev
+.PHONY: help db-diff functions-serve setup-bot setup-pm-bot setup-tech-lead-bot start-dev start-prod run-dev
 
 help:
 	@printf '%s\n' \
@@ -11,7 +11,8 @@ help:
 		'  make setup-pm-bot     Install Pi, Telegram, and project-management MCP' \
 		'  make setup-tech-lead-bot  Install tech-lead Pi, Telegram, and Linear MCP' \
 		'  make setup-bot        Set up both PM and tech-lead bots' \
-		'  make run-dev          Attach to the PM + tech-lead + Supabase tmux session' \
+		'  make start-dev        Attach to the dev PM + tech-lead + Supabase tmux session' \
+		'  make start-prod       Attach to the prod PM + tech-lead tmux session (remote Supabase)' \
 		'  uv run python bots/pm-bot/scripts/configure-bot.py --help  PM bot setup options' \
 		'  uv run python bots/tech-lead-bot/scripts/configure-bot.py --help  Tech-lead setup options'
 
@@ -33,5 +34,10 @@ setup-tech-lead-bot:
 
 setup-bot: setup-pm-bot setup-tech-lead-bot
 
-run-dev:
-	bash bots/pm-bot/scripts/run-dev.sh
+start-dev:
+	bash bots/pm-bot/scripts/run-dev.sh dev
+
+start-prod:
+	bash bots/pm-bot/scripts/run-dev.sh prod
+
+run-dev: start-dev

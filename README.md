@@ -32,10 +32,30 @@ cp supabase/.env.example supabase/.env
 # Fill in .env and supabase/.env following their respective .env.example files.
 supabase start
 make setup-bot
-make run-dev
+make start-dev
 ```
 
-In each Pi pane, use `/login` to connect your model provider, then message the corresponding bot on Telegram. Each bot has separate Pi state and Telegram credentials; both use the same Linear API key. `make run-dev` opens PM (upper left), tech lead (upper right), and local Supabase functions (bottom) in a tmux session; detach with `Ctrl-b d` and run it again to reattach. If an older two-pane session is running, stop it before running `make run-dev` to get the new layout.
+In each Pi pane, use `/login` to connect your model provider, then message the corresponding bot on Telegram. Each bot has separate Pi state and Telegram credentials; both use the same Linear API key. `make start-dev` opens PM (upper left), tech lead (upper right), and local Supabase functions (bottom) in the `battuta-dev` tmux session; detach with `Ctrl-b d` and run it again to reattach. `make run-dev` remains an alias.
+
+For a remote Supabase project, copy `.env.example` to `.env.prod`, set its `SUPABASE_URL` and `SUPABASE_SECRET_KEY` to the remote project's values, then run `make start-prod`. This opens only the two bot panes in the separate `battuta-prod` tmux session; it does not start local Supabase. Use distinct Telegram bot tokens for dev and prod if running both modes simultaneously. Both modes currently use the same on-disk Pi state for each bot, so do not run them concurrently from the same checkout.
+
+### Raspberry Pi release (64-bit Linux ARM)
+
+Push a `v*` tag whose commit is on `main` to build and publish a GitHub Release containing `battuta-<tag>-linux-arm64.tar.gz` and its SHA-256 checksum. The archive bundles Node and the bots' pinned dependencies; the Pi needs `tmux` and a remote Supabase project with the migrations and functions deployed.
+
+Download the archive and checksum from the release page, then on the Pi:
+
+```sh
+sha256sum -c battuta-vX.Y.Z-linux-arm64.tar.gz.sha256
+tar -xzf battuta-vX.Y.Z-linux-arm64.tar.gz
+cd battuta
+cp .env.example .env.prod
+# Fill in .env.prod with your Telegram, Linear, and remote Supabase credentials.
+bin/battuta configure
+bin/battuta start-prod
+```
+
+Log into your model provider in each Pi pane using `/login`. Detach with `Ctrl-b d`; `bin/battuta start-prod` reattaches. Keep the extracted directory (including `.pi` sessions and `.env.prod`) between restarts; save those files before replacing it with a newer release. Do not reuse Telegram tokens with another running instance.
 
 The PM and tech lead share the [agent-mail extension](agent-mail/README.md) for durable, direct communication. Keep one Pi process per role and resume each bot's persistent Pi session after restart.
 
