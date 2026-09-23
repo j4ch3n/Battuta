@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export PATH="$root/bin:$PATH"
+
+case "${1:-}" in
+  configure)
+    [[ -f "$root/.env.prod" ]] || { printf 'Copy %s/.env.example to %s/.env.prod and fill it in first\n' "$root" "$root" >&2; exit 1; }
+    set -a
+    source "$root/.env.prod"
+    set +a
+    exec "$root/bin/node" "$root/bin/configure.mjs"
+    ;;
+  start-prod)
+    exec bash "$root/bots/pm-bot/scripts/run-dev.sh" prod
+    ;;
+  *)
+    printf 'Usage: %s configure|start-prod\n' "$0" >&2
+    exit 2
+    ;;
+esac

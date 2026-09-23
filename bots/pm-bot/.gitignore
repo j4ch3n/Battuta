@@ -1,0 +1,16 @@
+# Pi runtime state is local; explicitly allow versioned bot configuration and code.
+AGENTS.md
+.pi/*
+!.pi/settings.json
+!.pi/skills/
+.pi/skills/*
+!.pi/skills/problem-framing/
+!.pi/skills/user-story/
+!.pi/skills/prd/
+!.pi/skills/project-management/
+!.pi/skills/active-telegram-message/
+!.pi/extensions/
+.pi/extensions/*
+!.pi/extensions/pm-bot/
+.pi/extensions/pm-bot/*
+!.pi/extensions/pm-bot/index.ts

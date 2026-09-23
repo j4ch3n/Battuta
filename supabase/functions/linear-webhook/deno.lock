@@ -1,0 +1,33 @@
+{
+  "version": "5",
+  "specifiers": {
+    "npm:@linear/sdk@95.1.0": "95.1.0_graphql@16.14.0",
+    "npm:postgres@3.4.7": "3.4.7"
+  },
+  "npm": {
+    "@graphql-typed-document-node/core@3.2.0_graphql@16.14.0": {
+      "integrity": "sha512-mB9oAsNCm9aM3/SOv4YtBMqZbYj10R7dkq8byBqxGY/ncFwhf2oQzMV+LCRlWoDSEBJ3COiR1yeDvMtsoOsuFQ==",
+      "dependencies": [
+        "graphql"
+      ]
+    },
+    "@linear/sdk@95.1.0_graphql@16.14.0": {
+      "integrity": "sha512-c1BzIWqVEDcTV42EuEOVFYrYjmsqFBmaR/105xbOY9SmMPBrtcE4+BNHFfTa4WtrWN2cL3EJ9c+zcccZxNSWsQ==",
+      "dependencies": [
+        "@graphql-typed-document-node/core"
+      ]
+    },
+    "graphql@16.14.0": {
+      "integrity": "sha512-BBvQ/406p+4CZbTpCbVPSxfzrZrbnuWSP1ELYgyS6B+hNeKzgrdB4JczCa5VZUBQrDa9hUngm0KnexY6pJRN5Q=="
+    },
+    "postgres@3.4.7": {
+      "integrity": "sha512-Jtc2612XINuBjIl/QTWsV5UvE8UHuNblcO3vVADSrKsrc6RqGX6lOW1cEo3CM2v0XG4Nat8nI+YM7/f26VxXLw=="
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "npm:@linear/sdk@95.1.0",
+      "npm:postgres@3.4.7"
+    ]
+  }
+}

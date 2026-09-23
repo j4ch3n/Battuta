@@ -1,0 +1,9 @@
+{
+  "name": "battuta-pm-bot",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.20.0",
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.87.1"
+  }
+}

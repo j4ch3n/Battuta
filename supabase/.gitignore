@@ -1,0 +1,16 @@
+# Supabase
+.branches
+.temp
+.env
+
+# Deno and npm dependency caches
+.deno/
+node_modules/
+
+# Local webhook payload capture
+*.log
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local

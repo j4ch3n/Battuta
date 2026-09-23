@@ -1,0 +1,13 @@
+{
+  "name": "battuta-agent-mail",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.0",
+    "@supabase/supabase-js": "^2.57.0"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.87.1",
+    "typescript": "~5.9.3"
+  }
+}
