@@ -1,0 +1,10 @@
+{
+  "packages": [
+    "npm:@llblab/pi-telegram@0.50.1",
+    "npm:pi-mcp-adapter@2.37.0"
+  ],
+  "lastChangelogVersion": "0.87.1",
+  "theme": "dark",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.5"
+}
