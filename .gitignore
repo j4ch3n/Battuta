@@ -1,0 +1,13 @@
+.env
+.venv/
+__pycache__/
+pm-bot/node_modules/
+
+# Pi runtime state is local; explicitly allow versioned bot configuration and code.
+pm-bot/.pi/*
+!pm-bot/.pi/settings.json
+!pm-bot/.pi/extensions/
+pm-bot/.pi/extensions/*
+!pm-bot/.pi/extensions/pm-bot/
+pm-bot/.pi/extensions/pm-bot/*
+!pm-bot/.pi/extensions/pm-bot/index.ts
