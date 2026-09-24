@@ -8,6 +8,25 @@ The project involves a human product owner, a PM bot, and a tech-lead bot. Each 
 
 Consult the other bot when a decision crosses that boundary; keep the human informed of decisions and meaningful outcomes rather than forwarding every internal exchange.
 
+## Shared project context
+
+When working on a known registered project, PM and Tech Lead should explicitly
+load its config and read shared memory. Pi runs from `bots/pm-bot` or
+`bots/tech-lead-bot`; run these commands there, replacing `my-project` with
+its registered name:
+
+```sh
+cd ../.. && python -c 'from scripts.projects import load_project, read_memory; p = load_project("my-project"); print(p); print(read_memory(p))'
+```
+
+To explicitly save durable context, run `cd ../.. && python -c 'from scripts.projects import load_project, write_memory; write_memory(load_project("my-project"), "durable context\n")'`. These are commands to invoke, not functions magically
+available in Pi's prompt/runtime. Do not load or inject the entire memory
+automatically, and
+do not put mutable Linear/GitHub snapshots, ticket handles, or copies of
+repository `AGENTS.md` instructions in project memory. Memory is shared between
+the two roles and isolated under that project's `~/.factory/projects/<name>`
+directory.
+
 ## Agent-mail recipients
 
 These IDs are the persistent Pi `--session-id` values in `bots/pm-bot/scripts/run-dev.sh`. Use them as `send_agent_message` recipients; they are not Telegram chat IDs.

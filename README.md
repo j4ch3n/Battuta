@@ -73,3 +73,41 @@ Keep the extracted directory (including `.pi` sessions and `.env.prod`) between 
 The PM and tech lead share the [agent-mail extension](agent-mail/README.md) for durable, direct communication. Keep one Pi process per role and resume each bot's persistent Pi session after restart.
 
 Bot workspaces live in `bots/pm-bot` and `bots/tech-lead-bot`. Each setup command assembles its runtime `AGENTS.md` from `bots/AGENTS_shared.md` and the bot's `AGENTS_dedicated.md`; rerun setup after changing either instruction file.
+
+## Project registry
+
+Project configuration is stored separately from bot workspaces under
+`~/.factory/projects/<name>/project.yaml`. Run these commands from either bot
+working directory, `bots/pm-bot` or `bots/tech-lead-bot`, using `cd ../..`
+to reach the repository root (replace `my-project` with its registered name):
+
+```sh
+cd ../.. && python -c 'from scripts.projects import load_project, read_memory; p = load_project("my-project"); print(p); print(read_memory(p))'
+```
+
+The first load can initialize a project by providing a checkout path, for
+example `load_project("my-project", Path("/path/to/checkout"))`. The typed
+`ProjectConfig` exposes project name/path, optional Linear project/team IDs,
+optional GitHub `owner/repository`, and reusable Engineer/Reviewer role names.
+The YAML schema has `version: 1`; unsupported versions or fields are rejected.
+
+Shared project memory is stored in that project's `MEMORY.md`. To write it,
+explicitly invoke this one-liner from either bot directory:
+
+```sh
+cd ../.. && python -c 'from scripts.projects import load_project, write_memory; write_memory(load_project("my-project"), "durable project context\n")'
+```
+
+Loading a project never injects
+the full memory automatically. Registry config and memory
+are durable project context, not mirrors of Linear/GitHub issue or repository
+state, ticket handles, or generated `AGENTS.md` files.
+
+Registry access rejects static symlinks that escape the registry/project
+directories. These checks and subsequent path operations are not race-free
+against a same-UID process that can change filesystem entries between
+validation and use; this is not a security boundary against same-user
+attackers, who already have direct access to the files. In particular, no
+protection against symlink races is claimed. Config and memory files are
+created with mode `0600` to avoid granting access to other local users under
+ordinary filesystem permissions; this does not restrict their owning UID.
