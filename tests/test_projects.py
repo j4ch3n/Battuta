@@ -6,7 +6,16 @@ from pathlib import Path
 
 import click
 
-from scripts.projects import ProjectRegistry, read_memory, write_memory
+from scripts.bot_setup.skills import link_project_context
+import sys
+
+SKILL_SCRIPTS = Path(__file__).resolve().parents[1] / "bots/shared-skills/project-context/scripts"
+sys.path.insert(0, str(SKILL_SCRIPTS))
+from project_context_lib import ProjectRegistry, read_memory, write_memory
+
+# Ensure skill-local dependencies and implementation load exactly as packaged.
+from project_context_lib import registry as project_registry_module
+
 
 
 class ProjectRegistryTests(unittest.TestCase):
@@ -15,9 +24,31 @@ class ProjectRegistryTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name) / "projects"
 
+    def test_shared_skill_link_is_relative_idempotent_and_collision_safe(self):
+        root = Path(self.temporary.name)
+        (root / "bots/shared-skills/project-context").mkdir(parents=True)
+        bot = root / "bots/pm-bot"
+        bot.mkdir()
+        link_project_context(bot)
+        link = bot / ".pi/skills/project-context"
+        self.assertEqual(link.readlink(), Path("../../../shared-skills/project-context"))
+        self.assertTrue(link.resolve().is_dir())
+        link_project_context(bot)
+        self.assertEqual(link.readlink(), Path("../../../shared-skills/project-context"))
+
+        other = root / "bots/tech-lead-bot"
+        other.mkdir()
+        skills = other / ".pi/skills"
+        skills.mkdir(parents=True)
+        collision = skills / "project-context"
+        collision.mkdir()
+        with self.assertRaises(click.ClickException):
+            link_project_context(other)
+        self.assertTrue(collision.is_dir())
+
     def test_default_registry_root_is_battuta_projects_under_home(self):
         home = Path(self.temporary.name) / "home"
-        with patch("scripts.projects.registry.Path.home", return_value=home):
+        with patch.object(project_registry_module.Path, "home", return_value=home):
             registry = ProjectRegistry()
         self.assertEqual(registry.root, home / ".battuta" / "projects")
 

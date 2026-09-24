@@ -41,7 +41,7 @@ For a remote Supabase project, copy `.env.example` to `.env.prod`, set its `SUPA
 
 ### Raspberry Pi release (64-bit Linux ARM)
 
-Push a `v*` tag whose commit is on `main` to build and publish a GitHub Release containing `battuta-<tag>-linux-arm64.tar.gz` and its SHA-256 checksum. The archive bundles Node and the bots' pinned dependencies; the Pi needs a remote Supabase project with the migrations and functions deployed. The optional screen launcher also needs `tmux`.
+Push a `v*` tag whose commit is on `main` to build and publish a GitHub Release containing `battuta-<tag>-linux-arm64.tar.gz` and its SHA-256 checksum. The archive bundles Node and the bots' pinned dependencies; the Pi needs a remote Supabase project with the migrations and functions deployed. The project-context skill's CLI commands require system Python 3.10 or newer; its Click and PyYAML dependencies are vendored in the archive, so no `uv` or `pip` installation is needed at runtime. The optional screen launcher also needs `tmux`.
 
 Download the archive and checksum from the release page, then on the Pi:
 
@@ -72,49 +72,8 @@ Keep the extracted directory (including `.pi` sessions and `.env.prod`) between 
 
 The PM and tech lead share the [agent-mail extension](agent-mail/README.md) for durable, direct communication. Keep one Pi process per role and resume each bot's persistent Pi session after restart.
 
-Bot workspaces live in `bots/pm-bot` and `bots/tech-lead-bot`. Each setup command assembles its runtime `AGENTS.md` from `bots/AGENTS_shared.md` and the bot's `AGENTS_dedicated.md`; rerun setup after changing either instruction file.
+Bot workspaces live in `bots/pm-bot` and `bots/tech-lead-bot`. Setup assembles `AGENTS.md` and links the shared project-context Pi skill from `bots/shared-skills/project-context`; rerun setup to refresh the link.
 
 ## Project registry
 
-Project configuration is stored separately from bot workspaces under
-`~/.battuta/projects/<name>/project.yaml`, with shared `MEMORY.md` beside it.
-Config and memory are management context for the PM and Tech Lead only; Executors
-must not load or read either directly. For delegated work, the Tech Lead supplies
-any task-specific instruction needed. Executors use their project directory,
-repository `AGENTS.md`, and their own local runtime environment (such as Node or
-pyenv).
-
-Run the following management commands from either bot working directory,
-`bots/pm-bot` or `bots/tech-lead-bot`, using `cd ../..` to reach the repository
-root (replace `my-project` with its registered name):
-
-```sh
-cd ../.. && python -c 'from scripts.projects import load_project, read_memory; p = load_project("my-project"); print(p); print(read_memory(p))'
-```
-
-The first load can initialize a project by providing a checkout path, for
-example `load_project("my-project", Path("/path/to/checkout"))`. The typed
-`ProjectConfig` exposes project name/path, optional Linear project/team IDs,
-optional GitHub `owner/repository`, and reusable Engineer/Reviewer role names.
-The YAML schema has `version: 1`; unsupported versions or fields are rejected.
-
-Shared project memory is stored in that project's `MEMORY.md`. To write it,
-explicitly invoke this one-liner from either bot directory:
-
-```sh
-cd ../.. && python -c 'from scripts.projects import load_project, write_memory; write_memory(load_project("my-project"), "durable project context\n")'
-```
-
-Loading a project never injects
-the full memory automatically. Registry config and memory
-are durable project context, not mirrors of Linear/GitHub issue or repository
-state, ticket handles, or generated `AGENTS.md` files.
-
-Registry access rejects static symlinks that escape the registry/project
-directories. These checks and subsequent path operations are not race-free
-against a same-UID process that can change filesystem entries between
-validation and use; this is not a security boundary against same-user
-attackers, who already have direct access to the files. In particular, no
-protection against symlink races is claimed. Config and memory files are
-created with mode `0600` to avoid granting access to other local users under
-ordinary filesystem permissions; this does not restrict their owning UID.
+Project configuration and shared `MEMORY.md` live under `~/.battuta/projects/<name>`. Project-context management is a Pi skill provided from `bots/shared-skills/project-context` and linked into PM and Tech Lead during setup and release packaging. Use the skill for registry and explicit memory operations. Executors do not use the registry or memory; they use their project directory, repository `AGENTS.md`, and local runtime. Memory is not injected automatically.

@@ -19,6 +19,18 @@ required('SUPABASE_SECRET_KEY');
 
 for (const [role, prefix] of [['pm-bot', 'PM'], ['tech-lead-bot', 'TECH_LEAD']]) {
   const dir = join(root, 'bots', role);
+  const skills = join(dir, '.pi/skills');
+  await import('node:fs/promises').then(async ({ mkdir, lstat, symlink, readlink }) => {
+    await mkdir(skills, { recursive: true });
+    const link = join(skills, 'project-context');
+    try {
+      const stat = await lstat(link);
+      if (!stat.isSymbolicLink() || await readlink(link) !== '../../../shared-skills/project-context') throw new Error(`Refusing to replace existing skill: ${link}`);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      await symlink('../../../shared-skills/project-context', link, 'dir');
+    }
+  });
   const token = required(`${prefix}_TELEGRAM_TOKEN`);
   const [id, secret] = token.split(':');
   const botId = Number(id);
