@@ -37,7 +37,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots agent-mail .env.example | tar -x -C dist/stage/battuta
+          git archive HEAD bots agent-mail .env.example setup.md | tar -x -C dist/stage/battuta
+          test -s dist/stage/battuta/setup.md
           python3 -m pip install --no-deps --only-binary=:all: --target dist/stage/battuta/bots/shared-skills/project-context/scripts/vendor click==8.5.0 PyYAML==6.0.3
           cp "$(command -v node)" dist/stage/battuta/bin/node
           cp packaging/battuta dist/stage/battuta/bin/battuta
