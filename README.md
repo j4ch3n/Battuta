@@ -77,9 +77,16 @@ Bot workspaces live in `bots/pm-bot` and `bots/tech-lead-bot`. Each setup comman
 ## Project registry
 
 Project configuration is stored separately from bot workspaces under
-`~/.factory/projects/<name>/project.yaml`. Run these commands from either bot
-working directory, `bots/pm-bot` or `bots/tech-lead-bot`, using `cd ../..`
-to reach the repository root (replace `my-project` with its registered name):
+`~/.battuta/projects/<name>/project.yaml`, with shared `MEMORY.md` beside it.
+Config and memory are management context for the PM and Tech Lead only; Executors
+must not load or read either directly. For delegated work, the Tech Lead supplies
+any task-specific instruction needed. Executors use their project directory,
+repository `AGENTS.md`, and their own local runtime environment (such as Node or
+pyenv).
+
+Run the following management commands from either bot working directory,
+`bots/pm-bot` or `bots/tech-lead-bot`, using `cd ../..` to reach the repository
+root (replace `my-project` with its registered name):
 
 ```sh
 cd ../.. && python -c 'from scripts.projects import load_project, read_memory; p = load_project("my-project"); print(p); print(read_memory(p))'

@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from dataclasses import replace
+from unittest.mock import patch
 from pathlib import Path
 
 import click
@@ -13,6 +14,12 @@ class ProjectRegistryTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name) / "projects"
+
+    def test_default_registry_root_is_battuta_projects_under_home(self):
+        home = Path(self.temporary.name) / "home"
+        with patch("scripts.projects.registry.Path.home", return_value=home):
+            registry = ProjectRegistry()
+        self.assertEqual(registry.root, home / ".battuta" / "projects")
 
     def test_load_lazily_creates_versioned_config_and_defaults(self):
         registry = ProjectRegistry(self.root)
@@ -46,6 +53,18 @@ class ProjectRegistryTests(unittest.TestCase):
         )
         with self.assertRaises(click.ClickException):
             ProjectRegistry(self.root).load("bad")
+
+    def test_rejects_config_name_that_does_not_match_registry_name(self):
+        directory = self.root / "registered-name"
+        directory.mkdir(parents=True)
+        (directory / "project.yaml").write_text(
+            "version: 1\nproject: {name: different-name, path: /tmp/project}\n"
+            "linear: {project_id: null, team_id: null}\n"
+            "github: {repository: null}\n"
+            "roles: {engineer: Engineer, reviewer: Reviewer}\n"
+        )
+        with self.assertRaisesRegex(click.ClickException, "does not match registry name"):
+            ProjectRegistry(self.root).load("registered-name")
 
     def test_loads_typed_project_refs_and_custom_role_names(self):
         directory = self.root / "configured"

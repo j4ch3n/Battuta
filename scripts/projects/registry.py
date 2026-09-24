@@ -71,10 +71,10 @@ def _parse(data: Any, config_path: Path) -> ProjectConfig:
 
 
 class ProjectRegistry:
-    """Registry rooted at ``~/.factory/projects`` by default."""
+    """Registry rooted at ``~/.battuta/projects`` by default."""
 
     def __init__(self, root: Path | None = None):
-        self.root = (root or Path.home() / ".factory" / "projects").expanduser().resolve(strict=False)
+        self.root = (root or Path.home() / ".battuta" / "projects").expanduser().resolve(strict=False)
 
     def _directory(self, name: str) -> Path:
         directory = self.root / name
@@ -128,7 +128,12 @@ class ProjectRegistry:
                 data = yaml.safe_load(source)
         except (OSError, yaml.YAMLError) as error:
             raise click.ClickException(f"Cannot read {config_path}: {error}") from error
-        return replace(_parse(data, config_path), registry_root=self.root)
+        config = _parse(data, config_path)
+        if config.name != name:
+            raise click.ClickException(
+                f"{config_path}: project.name {config.name!r} does not match registry name {name!r}"
+            )
+        return replace(config, registry_root=self.root)
 
 
 def load_project(name: str, project_path: Path | None = None, root: Path | None = None) -> ProjectConfig:

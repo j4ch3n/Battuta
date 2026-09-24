@@ -11,9 +11,13 @@ Consult the other bot when a decision crosses that boundary; keep the human info
 ## Shared project context
 
 When working on a known registered project, PM and Tech Lead should explicitly
-load its config and read shared memory. Pi runs from `bots/pm-bot` or
-`bots/tech-lead-bot`; run these commands there, replacing `my-project` with
-its registered name:
+load its config and read shared memory. Config and memory are management context
+for these roles only: Executors must not load or read them directly. For
+delegated work, the Tech Lead supplies any needed task-specific instruction;
+Executors use their project directory, repository `AGENTS.md`, and their own
+local runtime environment (for example Node or pyenv). Pi runs from
+`bots/pm-bot` or `bots/tech-lead-bot`; run these management commands there,
+replacing `my-project` with its registered name:
 
 ```sh
 cd ../.. && python -c 'from scripts.projects import load_project, read_memory; p = load_project("my-project"); print(p); print(read_memory(p))'
@@ -24,7 +28,7 @@ available in Pi's prompt/runtime. Do not load or inject the entire memory
 automatically, and
 do not put mutable Linear/GitHub snapshots, ticket handles, or copies of
 repository `AGENTS.md` instructions in project memory. Memory is shared between
-the two roles and isolated under that project's `~/.factory/projects/<name>`
+the two roles and isolated under that project's `~/.battuta/projects/<name>`
 directory.
 
 ## Agent-mail recipients
