@@ -1,43 +1,36 @@
 ---
 name: project-context
-description: Manage registered project configuration and durable shared memory for PM and Tech Lead.
+description: Use when the PM or Tech Lead starts work on a registered project, needs its checkout or role configuration, or needs to recall or save durable project decisions across sessions.
 ---
 
 # Project context
 
-Only PM and Tech Lead use the project registry and shared `MEMORY.md`. Executors must not load or read either; provide task-specific instructions and let them use their repository `AGENTS.md` and local runtime.
+The project registry stores each project's configuration; `MEMORY.md` stores durable context shared by the PM and Tech Lead. Neither is loaded automatically. Use this skill to retrieve the context relevant to the current project and update it when a lasting decision changes.
 
-The CLI requires Python 3.12 or newer. Development dependencies are managed by `pyproject.toml` and `uv.lock`. Released archives vendor Click and PyYAML, but do not bundle Python; use a `python3` executable at version 3.12+ there. No package installation is needed at release runtime.
+## When to load context
 
-From a source checkout at the repository root, run the CLI in the project's locked uv environment:
+- At the start of project-specific work, identify the project name and run `show` to obtain its registered checkout, integrations, and roles. If the project has not been registered, initialize it by supplying its checkout path to `show` once.
+- Run `read` when prior decisions or standing constraints could affect the work, especially before making a decision that may conflict with earlier context. An empty result means there is no saved memory yet.
+- Check current repository and issue-tracker evidence for live facts. Memory is for durable decisions and rationale, not current ticket status or a snapshot of the codebase.
 
-```sh
-uv run --locked python bots/shared-skills/project-context/scripts/project_context.py show <name> [checkout-path]
-uv run --locked python bots/shared-skills/project-context/scripts/project_context.py read <name>
-uv run --locked python bots/shared-skills/project-context/scripts/project_context.py write <name> 'Durable context'
-```
+## When to update memory
 
-Supply multiline text in a literal quoted argument.
+Save decisions, their rationale, and stable project constraints that the PM and Tech Lead will need in future sessions. A brief ticket identifier is optional when it helps trace a decision; do not store ticket URLs, transient progress, or generated or repository instructions. For example:
 
-From a PM or Tech Lead workspace in a source checkout (`bots/pm-bot` or `bots/tech-lead-bot`), return to the repository root first:
+- “Use the existing worker for imports because the deployment has no separate queue (decided during IMP-42).”
+- “Retrying an import must retain the original import record so users can trace its history.”
 
-```sh
-cd ../..
-uv run --locked python bots/shared-skills/project-context/scripts/project_context.py show <name> [checkout-path]
-uv run --locked python bots/shared-skills/project-context/scripts/project_context.py read <name>
-uv run --locked python bots/shared-skills/project-context/scripts/project_context.py write <name> 'Durable context'
-```
+Check the issue tracker for whether a ticket is complete; memory is not its status record. Before writing, read the existing memory and retain anything still relevant: **`write` replaces the entire `MEMORY.md`**.
 
-From the root of a released archive, use Python 3.12+ and the vendored dependencies:
+## Run the script
+
+From a source checkout's repository root, use the locked Python environment:
 
 ```sh
-python3 bots/shared-skills/project-context/scripts/project_context.py show <name> [checkout-path]
-python3 bots/shared-skills/project-context/scripts/project_context.py read <name>
-python3 bots/shared-skills/project-context/scripts/project_context.py write <name> 'Durable context'
+uv run --locked python bots/shared-skills/project-context/scripts/project_context.py show my-project
+uv run --locked python bots/shared-skills/project-context/scripts/project_context.py show my-project /absolute/path/to/checkout
+uv run --locked python bots/shared-skills/project-context/scripts/project_context.py read my-project
+uv run --locked python bots/shared-skills/project-context/scripts/project_context.py write my-project 'Durable context'
 ```
 
-Memory is not an automatic prompt injection or a snapshot of issue trackers/repository state. Keep only durable decisions and context; never store ticket handles or generated/repository instructions.
-
-## Filesystem handling
-
-The registry rejects project, config, and memory paths that statically resolve through symlinks outside their expected locations. These checks are not race-free against a same-UID process that can alter paths concurrently. Project config and `MEMORY.md` files are created with mode `0600` for ordinary local-user isolation; this does not restrict the owning UID. These checks and permissions are not an authentication or security boundary.
+Use the second command only to initialize a missing project; a checkout path is rejected for an existing registration. Supply multiline memory as one quoted argument. From the root of a released archive, use the same script path with `python3` instead of `uv run --locked python`. The CLI requires Python 3.12+; the release archive vendors its library dependencies but not Python.
