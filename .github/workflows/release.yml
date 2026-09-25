@@ -16,6 +16,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Require tag on main
         env:
           TAG: ${{ github.ref_name }}
@@ -37,14 +41,27 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots agent-mail .env.example | tar -x -C dist/stage/battuta
+          git archive HEAD bots agent-mail .env.example release.md | tar -x -C dist/stage/battuta
+          test -s dist/stage/battuta/release.md
+          python3 -m pip install --no-deps --only-binary=:all: --target dist/stage/battuta/bots/shared-skills/project-context/scripts/vendor click==8.5.0 PyYAML==6.0.3
           cp "$(command -v node)" dist/stage/battuta/bin/node
           cp packaging/battuta dist/stage/battuta/bin/battuta
           cp packaging/configure.mjs dist/stage/battuta/bin/configure.mjs
           cp packaging/install-services.mjs dist/stage/battuta/bin/install-services.mjs
           chmod +x dist/stage/battuta/bin/*
+          for bot in pm-bot tech-lead-bot; do
+            mkdir -p "dist/stage/battuta/bots/$bot/.pi/skills"
+            ln -s ../../../shared-skills/project-context "dist/stage/battuta/bots/$bot/.pi/skills/project-context"
+            test -f "dist/stage/battuta/bots/$bot/.pi/skills/project-context/SKILL.md"
+          done
           bash -n dist/stage/battuta/bin/battuta
           node --check dist/stage/battuta/bin/install-services.mjs
+          skill_cli="$PWD/dist/stage/battuta/bots/shared-skills/project-context/scripts/project_context.py"
+          python3 "$skill_cli" --help
+          smoke_home="$(mktemp -d)"
+          HOME="$smoke_home" python3 "$skill_cli" show release-smoke "$smoke_home/checkout"
+          HOME="$smoke_home" python3 "$skill_cli" read release-smoke
+          rm -rf "$smoke_home"
           for bot in pm-bot tech-lead-bot; do
             bot_dir="$PWD/dist/stage/battuta/bots/$bot"
             pnpm --dir "$bot_dir" install --frozen-lockfile --prod

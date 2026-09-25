@@ -14,3 +14,6 @@ def configure_instructions(bot_dir: Path) -> None:
     (bot_dir / "AGENTS.md").write_text(
         shared.read_text() + "\n" + dedicated.read_text()
     )
+    if bot_dir.name in {"pm-bot", "tech-lead-bot"}:
+        from .skills import link_project_context
+        link_project_context(bot_dir)
