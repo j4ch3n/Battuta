@@ -1,33 +1,18 @@
 # Battuta
 
-Battuta is a team of AI agents working together on software projects.
+Battuta brings a team of AI agents together to help plan, build, and review software projects. It connects product conversations with engineering work so ideas can move from requirements to implementation.
 
-## Agents Fleet
+## Features
 
-### PM bot
+- **Product planning:** A PM bot helps clarify requirements and organize work through Telegram.
+- **Technical planning:** A tech-lead bot turns product goals into an engineering approach and actionable tasks.
+- **Agent collaboration:** Bots communicate directly and retain shared project context across sessions.
+- **Implementation and review:** Engineer and review bots are planned to handle code changes and feedback (work in progress).
 
-Helps organize product work and clarify requirements through Telegram. Available for local development.
+## Tech stack
 
-### Tech-lead bot
+Battuta uses the Pi coding-agent runtime, Telegram for conversations, Linear for work tracking, and Supabase for shared data and integrations. Its agent extension is written in TypeScript, with Python tooling for setup and project management.
 
-Plans the technical approach and breaks work into engineering tasks.
+## Getting started
 
-### Engineer bot (WIP)
-
-Implements tasks and makes code changes.
-
-### Review bot (WIP)
-
-Reviews changes and provides feedback before they are accepted.
-
-## Setup
-
-For the hands-on source development and Raspberry Pi 64-bit release instructions, see [setup.md](setup.md). The published release tarball includes `setup.md` at its root. The guide covers dependencies, credentials, local versus remote Supabase, configuration, and optional systemd services.
-
-The PM and tech lead share the [agent-mail extension](agent-mail/README.md) for durable, direct communication. Keep one Pi process per role and resume each bot's persistent Pi session after restart.
-
-Bot workspaces live in `bots/pm-bot` and `bots/tech-lead-bot`. Setup assembles `AGENTS.md` and links the shared project-context Pi skill from `bots/shared-skills/project-context`; rerun setup to refresh the link.
-
-## Project registry
-
-Project configuration and shared `MEMORY.md` live under `~/.battuta/projects/<name>`. Project-context management is a Pi skill provided from `bots/shared-skills/project-context` and linked into PM and Tech Lead during setup and release packaging. Use the skill for registry and explicit memory operations. Executors do not use the registry or memory; they use their project directory, repository `AGENTS.md`, and local runtime. Memory is not injected automatically.
+See [local development](development.md) for working from source or the [Raspberry Pi release guide](release.md) for installing a prebuilt release.
