@@ -47,16 +47,19 @@ class ProjectRegistryTests(unittest.TestCase):
         self.assertTrue(collision.is_dir())
 
     def test_default_registry_root_is_battuta_projects_under_home(self):
-        home = Path(self.temporary.name) / "home"
-        with patch.object(project_registry_module.Path, "home", return_value=home):
-            registry = ProjectRegistry()
-        self.assertEqual(registry.root, home / ".battuta" / "projects")
+        with tempfile.TemporaryDirectory(dir="/tmp") as directory:
+            home = Path(directory).resolve() / "home"
+            with patch.object(project_registry_module.Path, "home", return_value=home):
+                registry = ProjectRegistry()
+            self.assertEqual(registry.root, home / ".battuta" / "projects")
 
     def test_load_lazily_creates_versioned_config_and_defaults(self):
         registry = ProjectRegistry(self.root)
-        config = registry.load("demo", Path(self.temporary.name) / "checkout")
+        with tempfile.TemporaryDirectory(dir="/tmp") as directory:
+            checkout = Path(directory).resolve() / "checkout"
+            config = registry.load("demo", checkout)
         self.assertEqual(config.name, "demo")
-        self.assertEqual(config.path, Path(self.temporary.name) / "checkout")
+        self.assertEqual(config.path, checkout)
         self.assertEqual(config.roles.engineer, "Engineer")
         self.assertEqual(config.roles.reviewer, "Reviewer")
         self.assertIsNone(config.linear_project_id)
@@ -66,6 +69,28 @@ class ProjectRegistryTests(unittest.TestCase):
         self.assertFalse((self.root / "demo" / "MEMORY.md").exists())
         with self.assertRaises(click.ClickException):
             registry.load("demo", Path(self.temporary.name) / "other")
+
+    def test_dot_only_names_cannot_create_configs_at_registry_root_or_parent(self):
+        registry = ProjectRegistry(self.root)
+        for name in (".", ".."):
+            with self.subTest(name=name):
+                with self.assertRaises(click.ClickException):
+                    registry.load(name, Path(self.temporary.name) / "checkout")
+                with self.assertRaises(click.ClickException):
+                    registry.load(name)
+        self.assertFalse((self.root / "project.yaml").exists())
+        self.assertFalse((self.root.parent / "project.yaml").exists())
+
+    def test_linux_filename_project_names(self):
+        registry = ProjectRegistry(self.root)
+        for name in ("my project", "project:alpha", "équipe", ".hidden", "three...dots"):
+            with self.subTest(name=name):
+                self.assertEqual(registry.load(name, Path(self.temporary.name)).name, name)
+                self.assertEqual(registry.load(name).name, name)
+        for name in ("", "a/b", "a\x00b", ".", ".."):
+            with self.subTest(name=name):
+                with self.assertRaises(click.ClickException):
+                    registry.load(name, Path(self.temporary.name))
 
     def test_rejects_unsupported_version_and_fields(self):
         directory = self.root / "bad"

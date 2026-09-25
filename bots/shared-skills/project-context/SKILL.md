@@ -7,7 +7,7 @@ description: Manage registered project configuration and durable shared memory f
 
 Only PM and Tech Lead use the project registry and shared `MEMORY.md`. Executors must not load or read either; provide task-specific instructions and let them use their repository `AGENTS.md` and local runtime.
 
-The CLI requires Python 3.10 or newer. Development dependencies are managed by `pyproject.toml` and `uv.lock`. Released archives vendor Click and PyYAML, but do not bundle Python; use the system `python3` there. No package installation is needed at release runtime.
+The CLI requires Python 3.12 or newer. Development dependencies are managed by `pyproject.toml` and `uv.lock`. Released archives vendor Click and PyYAML, but do not bundle Python; use a `python3` executable at version 3.12+ there. No package installation is needed at release runtime.
 
 From a source checkout at the repository root, run the CLI in the project's locked uv environment:
 
@@ -28,7 +28,7 @@ uv run --locked python bots/shared-skills/project-context/scripts/project_contex
 uv run --locked python bots/shared-skills/project-context/scripts/project_context.py write <name> 'Durable context'
 ```
 
-From the root of a released archive, use the system `python3` and the vendored dependencies:
+From the root of a released archive, use Python 3.12+ and the vendored dependencies:
 
 ```sh
 python3 bots/shared-skills/project-context/scripts/project_context.py show <name> [checkout-path]

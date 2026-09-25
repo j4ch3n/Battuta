@@ -12,7 +12,8 @@ import yaml
 
 
 CONFIG_VERSION = 1
-_SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+# Linux filenames may contain any character except '/' and NUL; '.' and '..' are reserved.
+_SAFE_NAME = re.compile(r"(?!\.{1,2}\Z)[^/\x00]+")
 
 
 @dataclass(frozen=True)
@@ -51,7 +52,7 @@ def _parse(data: Any, config_path: Path) -> ProjectConfig:
         raise click.ClickException(f"{config_path}: config contains missing or unsupported fields")
     name, path = project.get("name"), project.get("path")
     if not isinstance(name, str) or not _SAFE_NAME.fullmatch(name):
-        raise click.ClickException(f"{config_path}: project.name must be a safe directory name")
+        raise click.ClickException(f"{config_path}: project.name must be a valid directory name")
     if not isinstance(path, str) or not path.strip():
         raise click.ClickException(f"{config_path}: project.path must be a non-empty path")
     try:
@@ -86,8 +87,8 @@ class ProjectRegistry:
         return directory
 
     def load(self, name: str, project_path: Path | None = None) -> ProjectConfig:
-        if not _SAFE_NAME.fullmatch(name):
-            raise click.ClickException("project name must contain only letters, numbers, '.', '_' or '-'")
+        if not isinstance(name, str) or not _SAFE_NAME.fullmatch(name):
+            raise click.ClickException("project name must be a valid directory name (no '/', NUL, '.' or '..')")
         directory = self._directory(name)
         config_path = directory / "project.yaml"
         if config_path.is_symlink():
