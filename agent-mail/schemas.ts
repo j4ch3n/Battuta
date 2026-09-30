@@ -1,21 +1,18 @@
 import { Type, type Static, type TSchema } from "typebox";
 import { Format } from "typebox/format";
 import { Value } from "typebox/value";
+import { MessageContentSchema, MessageReferenceSchema, validateContent, validateExpectation } from "./content.ts";
+export { validateCoverage, type MessageContent } from "./content.ts";
 
 // Make format validation explicit even if another extension changes the registry.
 Format.Set("uuid", Format.IsUuid);
 Format.Set("date-time", Format.IsDateTime);
 
 export const Role = Type.Union([Type.Literal("pm"), Type.Literal("tech-lead")]);
-export const MessageRef = Type.Object({
-  conversation_id: Type.String({ format: "uuid" }),
-  id: Type.String({ pattern: "^[a-f0-9]{12}$" }),
-}, { additionalProperties: false });
+export const MessageRef = MessageReferenceSchema;
 export type MessageReference = Static<typeof MessageRef>;
 
-const Content = Type.Object({
-  content: Type.String({ minLength: 1, maxLength: 16000, pattern: "\\S" }),
-}, { additionalProperties: false });
+export const Content = MessageContentSchema;
 const MessageType = Type.Union([Type.Literal("chat"), Type.Literal("chase")]);
 const ReplyExpectation = Type.Union([
   Type.Null(),
@@ -29,9 +26,9 @@ export const SendArguments = Type.Object({ recipient: Role, ...intent }, { addit
 export const ReplyArguments = Type.Object({ parent: MessageRef, ...intent }, { additionalProperties: false });
 
 export const mailTools = [
-  { name: "send_agent_message", description: "Send a new JSON message to another agent role (pm / tech-lead). Use chat for ordinary mail. Set reply_expectation to null if no answer is needed; otherwise choose short for a quick acknowledgement, medium for a bounded investigation, or long for a deeper review.",
+  { name: "send_agent_message", description: "Send a structured JSON message to the other role. Both roles use the same content schema: include every field, [] for unused lists and null for unused sections. A request requires a reply expectation. Link later results to the original request with related_messages. Use chat for ordinary mail; chase for an intentional follow-up. Choose short for acknowledgement, medium for bounded investigation, long for deeper review.",
     parameters: SendArguments },
-  { name: "reply_agent_message", description: "Reply to incoming agent mail. Copy its message_ref into parent; Supabase inherits the conversation and resolves the recipient. Use chat for ordinary replies. Set reply_expectation to null unless this reply needs another answer; choose short for a quick acknowledgement, medium for a bounded investigation, or long for a deeper review.",
+  { name: "reply_agent_message", description: "Answer incoming mail using the shared structured content schema. Copy message_ref into parent, not in_reply_to. Include every content field; use [] or null for unused sections. State a conclusion, clarification, or honest progress. For a complete result, copy request requirements exactly into evidence-backed required checks. A new request requires a reply expectation; otherwise use null.",
     parameters: ReplyArguments },
 ];
 
@@ -46,6 +43,7 @@ export function validate<T extends TSchema>(schema: T, input: unknown): Static<T
 type AgentContext = { role: Static<typeof Role>; sessionId: string };
 export function sendRequest(agent: AgentContext, input: unknown) {
   const args = validate(SendArguments, input);
+  validateExpectation(args.content, args.reply_expectation !== null);
   if (args.recipient === agent.role) throw new Error("Cannot send agent mail to yourself");
   return { operation: "send" as const, sender_role: agent.role, recipient_role: args.recipient,
     conversation_id: agent.sessionId, message_type: args.message_type, content: args.content,
@@ -53,6 +51,7 @@ export function sendRequest(agent: AgentContext, input: unknown) {
 }
 export function replyRequest(agent: AgentContext, input: unknown) {
   const args = validate(ReplyArguments, input);
+  validateExpectation(args.content, args.reply_expectation !== null);
   return { operation: "reply" as const, sender_role: agent.role, parent: args.parent,
     message_type: args.message_type, content: args.content, response_due_minutes: offset(args.reply_expectation) };
 }
@@ -74,6 +73,7 @@ export type Message = Static<typeof StoredMessage>;
 export const reference = (message: Message): MessageReference => ({ conversation_id: message.conversation_id, id: message.id });
 export const referenceKey = (ref: MessageReference) => `${ref.conversation_id}:${ref.id}`;
 export function envelope(message: Message) {
+  validateContent(message.content);
   return { message_ref: reference(message),
     in_reply_to: message.in_reply_to === null ? null : { conversation_id: message.conversation_id, id: message.in_reply_to },
     sender: message.sender, recipient: message.recipient, message_type: message.message_type,

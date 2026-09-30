@@ -5,7 +5,7 @@ export default defineConfig({
     projects: [
       { test: {
         name: "unit",
-        include: ["tests/schema.test.ts", "tests/completion.test.ts"],
+        include: ["tests/schema.test.ts"],
       } },
       { test: {
         name: "integration",

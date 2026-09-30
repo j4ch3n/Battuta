@@ -7,7 +7,7 @@ export default {
     if (req.method !== "POST") return Response.json({ error: "Use POST" }, { status: 405 });
     let request;
     try { request = parseRequest(await req.json()); }
-    catch { return Response.json({ error: "Invalid agent-mail request" }, { status: 400 }); }
+    catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Invalid agent-mail request" }, { status: 400 }); }
     const { name, args } = rpcRequest(request);
     const { data, error } = await ctx.supabaseAdmin.rpc(name, args);
     if (error) {

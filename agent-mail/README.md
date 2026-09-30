@@ -1,82 +1,102 @@
 # Agent mail
 
-Role-addressed JSON communication between the Project Manager (`pm`) and Tech Lead (`tech-lead`). The recipient's running Pi extension injects incoming JSON into its current context and starts a turn. One agent runs per role; there is no inbox lock or lease.
+Agent mail connects the Project Manager (`pm`) and Tech Lead (`tech-lead`) through their running Pi agents. It supports focused questions, technical assessments, work handoffs, progress updates, and verified results without forwarding every exchange to the human owner.
 
-## Contracts and ownership
+Messages are addressed to a role rather than a particular Pi session. Both agents use the same structured content contract, exposed directly through two tools: **`send_agent_message`** and **`reply_agent_message`**. Ordinary assistant text does not send mail.
 
-| Layer | Owns |
-| --- | --- |
-| LLM (`schemas.ts`) | Destination role or parent reference, `chat`/`chase`, `{content: string}`, and explicit `reply_expectation: null \| {window: short/medium/long}`. |
-| Pi adapter | `Value.Check()` then `Value.Parse()` and a final check; sender role from `AGENT_ROLE`; Pi UUID for new sends; window-to-minute translation; Edge Function invocation and JSON delivery. |
-| Edge Function (`supabase/functions/agent-mail`) | Secret-key authentication, strict transport validation, and send/reply/read RPC dispatch. |
-| PostgreSQL RPCs | Short message IDs, reply validation/locking, inserts, status transitions, conversation inheritance, and database-time deadlines. |
+## How it works
 
-The adapter translates short/medium/long to 5/10/20; no expectation becomes a null offset. It never calculates absolute deadlines. The RPC stores `response_due = created_at + offset`, using database time and `timestamptz`. Offsets are transport fields, not database columns.
-
-### LLM tool arguments
-
-`send_agent_message`:
-
-```json
-{"recipient":"tech-lead","message_type":"chat","content":{"content":"Please review this design."},"reply_expectation":{"window":"medium"}}
+```text
+Sender's Pi tool → Supabase Edge Function → PostgreSQL
+                                               ↓
+                              Realtime → Recipient's Pi context
 ```
 
-`reply_agent_message`:
+- **Pi** validates outgoing content and presents incoming messages to the recipient, starting an agent turn. The tool definitions guide the main LLM; no separate composition LLM is needed.
+- **Supabase** provides transport, durable storage, reply linking, and response deadlines. It stores content as a JSON object without duplicating the business schema.
+- **Delivery and recovery** combine Realtime with periodic reconciliation. A message becomes read when Pi accepts it into its conversation. Unanswered requests survive restarts, and missing replies receive bounded correction prompts.
 
-```json
-{"parent":{"conversation_id":"550e8400-e29b-41d4-a716-446655440000","id":"a7c91e3b4d62"},"message_type":"chat","content":{"content":"The design looks good."},"reply_expectation":null}
-```
+Agent mail is for internal coordination; use the connected Telegram tool when a human decision or escalation is needed. For setup and running the bots, see the [project README](../README.md#getting-started).
 
-Both tools are registered with Pi. Normal tool calls already contain the complete typed intent, including the reply expectation; the wrapper does not run a second LLM call to infer metadata.
+## Send a request
 
-For direct completion, `/agent-mail <instruction>` uses the active Pi model's `modelRegistry.complete()` with these same two tool schemas and recent incoming mail. `completion.ts` extracts exactly one completed tool-call block and validates its arguments before submission. Plain text, unknown/multiple tools, invalid arguments, and error/aborted/truncated completions are rejected. Pi completion returns an assistant message, not an automatically validated typed object.
+Use `send_agent_message` for a new exchange. Choose the recipient, explain the action and expected answer, and include the context needed to act. The tool describes the content fields; unused lists are empty and unused sections are null.
 
-### Adapter → Edge Function
-
-Send payload: `operation: "send"`, `sender_role`, `recipient_role`, `conversation_id`, `message_type`, `content`, `response_due_minutes: null | 5 | 10 | 20`.
-
-Reply payload: `operation: "reply"`, `sender_role`, `parent: {conversation_id, id}`, `message_type`, `content`, `response_due_minutes`. No recipient or current Pi session ID is sent for a reply.
-
-Read payload: `operation: "read"`, `recipient_role`, `message_ref: {conversation_id, id}`.
-
-The function returns `{data: storedMessage}` for sends/replies or `{data: boolean}` for acknowledgements. It calls `agent_mail_send`, `agent_mail_reply`, or `agent_mail_read`; these RPCs perform the actual writes. SQL role columns are text, not enums. `message_type` is the PostgreSQL enum `chat | chase` (default `chat`).
-
-### Supabase → recipient
+For example, the PM can ask the tech lead to inspect delivery behavior:
 
 ```json
 {
-  "message_ref": {"conversation_id":"550e8400-e29b-41d4-a716-446655440000","id":"b8d02f4c5e73"},
-  "in_reply_to": {"conversation_id":"550e8400-e29b-41d4-a716-446655440000","id":"a7c91e3b4d62"},
-  "sender":"tech-lead",
-  "recipient":"pm",
-  "message_type":"chat",
-  "content":{"content":"The design looks good."},
-  "created_at":"2026-09-30T12:00:00Z",
-  "response_due":null
+  "recipient": "tech-lead",
+  "message_type": "chat",
+  "content": {
+    "schema_version": 1,
+    "summary": "Explain when incoming mail is marked read.",
+    "context": ["We need to distinguish receipt from acceptance into the agent conversation."],
+    "findings": [],
+    "options": [],
+    "recommendation": null,
+    "request": {
+      "action": "Inspect incoming mail delivery.",
+      "requirements": ["Explain when a message is marked read."],
+      "expected_response": "Report the finding with supporting evidence."
+    },
+    "result": null,
+    "uncertainties": [],
+    "references": [],
+    "related_messages": []
+  },
+  "reply_expectation": { "window": "medium" }
 }
 ```
 
-Root messages have `in_reply_to: null`. Reply to the current `message_ref`, not its `in_reply_to`.
+Use `reply_expectation: null` when no answer is needed. Otherwise choose `short` for a quick acknowledgement or clarification, `medium` for a bounded investigation, or `long` for a deeper review. This is an expectation for a response, not a commitment to finish the work within that window.
 
-## Identity, persistence, and delivery
+## Answer incoming mail
 
-- `AGENT_ROLE=pm|tech-lead` is the stable address. Pi creates its own UUID; it must not equal the role.
-- New messages use the sender's current Pi UUID. All sends from that session share a conversation ID. Replies inherit their parent's UUID and reverse roles. Primary key and reply references use `(conversation_id, id)`; IDs are random 12-character hexadecimal hashes, with collision retries in SQL.
-- Launchers use `--continue --session-dir <bot>/.pi/mail-sessions`: first launch creates a UUID session; later launches resume it. This separate directory avoids legacy role-named sessions. Already-read messages are not injected into a different session.
-- Realtime wakes the role inbox. Reconciliation runs on startup/reconnect and every 10 seconds. Session changes refresh delivery state and new sends use the active context's UUID.
-- `created → read` occurs when Pi accepts the custom message into its conversation, not on socket receipt. Saved branch entries prevent reinjection after append-before-ack crashes. Failed acknowledgements retry while the process remains live.
-- Replies require a read parent, inherit its conversation, and mark it replied in one transaction. One direct reply is permitted per parent; subsequent dialogue replies to the newest relevant message.
-- No idempotency keys or automatic send/reply retries. An ambiguous transport failure may have committed. Read acknowledgements and inbox reconciliation remain retryable.
-- No mail leases, chase claims, or automatic chasing. Nullable deadlines and the `chase` type prepare future scheduling.
+Incoming mail includes a **`message_ref`**. Copy that entire reference into the reply tool's `parent`; do not copy `in_reply_to`, which identifies an earlier message.
 
-## Run and verify locally
+The tech lead could answer the request above with the following call. The parent shown is illustrative—use the actual incoming reference and evidence you inspected.
 
-1. `supabase start` and `supabase migration up --local`.
-2. Run `supabase functions serve agent-mail` (or serve all functions with the existing development command).
-3. Set `SUPABASE_URL` and modern `SUPABASE_SECRET_KEY` in the root `.env`.
-4. Run `make setup-bot`, then `make run-dev`.
+```json
+{
+  "parent": {
+    "conversation_id": "550e8400-e29b-41d4-a716-446655440000",
+    "id": "a7c91e3b4d62"
+  },
+  "message_type": "chat",
+  "content": {
+    "schema_version": 1,
+    "summary": "Mail is marked read after Pi accepts it, rather than on socket receipt.",
+    "context": [],
+    "findings": [{
+      "statement": "The message_start handler acknowledges acceptance of agent mail.",
+      "basis": "observed",
+      "evidence": [{
+        "locator": "agent-mail/index.ts",
+        "note": "The acceptance handler invokes the read acknowledgement."
+      }]
+    }],
+    "options": [],
+    "recommendation": null,
+    "request": null,
+    "result": null,
+    "uncertainties": [],
+    "references": [],
+    "related_messages": []
+  },
+  "reply_expectation": null
+}
+```
 
-Checks:
+A reply may instead ask a clarification or report honest progress. If it asks another question, give it a reply expectation.
+
+One direct reply is allowed per message. After an initial progress reply, send later results as new messages linked to the original request through `related_messages`. Use `chat` for ordinary discussion and `chase` only for an intentional follow-up. If a send result is uncertain, reconcile or escalate rather than blindly sending again.
+
+## Development
+
+The content contract and field descriptions live in [`content.ts`](content.ts). Tool definitions and argument validation live in [`schemas.ts`](schemas.ts). Bot instructions describe responsibilities and communication behavior, rather than repeating the schema.
+
+Run checks from the repository root:
 
 ```sh
 pnpm --dir agent-mail check
@@ -85,10 +105,4 @@ pnpm --dir agent-mail test:integration
 deno check --config supabase/functions/agent-mail/deno.json supabase/functions/agent-mail/index.ts
 ```
 
-TypeScript tests are registered as separate `unit` and `integration` Vitest projects. Integration tests use local Supabase credentials from `supabase status -o json` unless supplied explicitly, reject remote URLs, and need the mail Edge Function running. Run against an isolated local instance without active bots.
-
-## Deployment and trust
-
-Apply the forward migration before deploying the updated Edge Function and runners. Mail tables are assumed empty; the migration replaces them without copying historical rows. Existing deployment automation deploys all functions. `verify_jwt = false` is paired with `@supabase/server`'s `auth: "secret"`, which checks the `apikey` header; the endpoint is not public. Standard Supabase secret-key environment variables are provisioned by the platform/CLI.
-
-Both agents are trusted holders of the elevated Supabase secret key. Roles are routing labels, not individual authentication identities. Service-role access and RLS remain as before; a key holder can impersonate another role. Keep credentials on trusted hosts in uncommitted environment files.
+Integration tests need the local Supabase instance and Edge Function running. Run them with the bots stopped; tests use only local endpoints and clean up their own messages.

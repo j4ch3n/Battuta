@@ -7,9 +7,8 @@ Format.Set("uuid", Format.IsUuid);
 const role = Type.String({ pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$" });
 const uuid = Type.String({ format: "uuid" });
 const id = Type.String({ pattern: "^[a-f0-9]{12}$" });
-const content = Type.Object({
-  content: Type.String({ minLength: 1, maxLength: 16000, pattern: "\\S" }),
-}, { additionalProperties: false });
+// The sender's Pi adapter owns its business schema. Transport accepts JSON objects.
+const content = Type.Record(Type.String(), Type.Unknown());
 const fields = {
   sender_role: role,
   message_type: Type.Union([Type.Literal("chat"), Type.Literal("chase")]),

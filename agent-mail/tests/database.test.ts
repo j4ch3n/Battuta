@@ -3,10 +3,11 @@ import { randomUUID } from "node:crypto";
 import { test } from "vitest";
 import { cleanup, db, ok, row } from "./local.ts";
 import type { MessageReference } from "../schemas.ts";
+import { content } from "./fixtures.ts";
 
 const send = (conversation: string, overrides: Record<string, unknown> = {}) => db.rpc("agent_mail_send", {
   p_sender_role: "pm", p_recipient_role: "tech-lead", p_conversation_id: conversation,
-  p_message_type: "chat", p_content: { content: "Question" }, p_response_due_minutes: null, ...overrides,
+  p_message_type: "chat", p_content: content("Question"), p_response_due_minutes: null, ...overrides,
 });
 const ref = (message: MessageReference) => ({ conversation_id: message.conversation_id, id: message.id });
 const read = (message: MessageReference, role = "tech-lead") => db.rpc("agent_mail_read", {
@@ -14,7 +15,7 @@ const read = (message: MessageReference, role = "tech-lead") => db.rpc("agent_ma
 });
 const reply = (parent: MessageReference, overrides: Record<string, unknown> = {}) => db.rpc("agent_mail_reply", {
   p_sender_role: "tech-lead", p_parent_conversation_id: parent.conversation_id, p_parent_id: parent.id,
-  p_message_type: "chat", p_content: { content: "Answer" }, p_response_due_minutes: null, ...overrides,
+  p_message_type: "chat", p_content: content("Answer"), p_response_due_minutes: null, ...overrides,
 });
 
 test("RPCs enforce role routing, JSON, enum types and database-time deadlines", async () => {
@@ -24,7 +25,7 @@ test("RPCs enforce role routing, JSON, enum types and database-time deadlines", 
       const message = ok(await send(conversation, { p_response_due_minutes: minutes }));
       assert.match(message.id, /^[a-f0-9]{12}$/);
       assert.equal(message.conversation_id, conversation);
-      assert.deepEqual(message.content, { content: "Question" });
+      assert.deepEqual(message.content, content("Question"));
       assert.equal(message.message_type, "chat");
       assert.equal(message.status, "created");
       if (minutes === null) assert.equal(message.response_due, null);
@@ -35,16 +36,16 @@ test("RPCs enforce role routing, JSON, enum types and database-time deadlines", 
     assert.equal(ok(await send(conversation, { p_sender_role: "future-role" })).sender, "future-role");
     for (const invalid of [
       { p_recipient_role: "pm" }, { p_sender_role: "invalid role!" }, { p_message_type: "unknown" },
-      { p_content: null }, { p_content: "plain text" }, { p_content: {} }, { p_content: { content: 42 } },
-      { p_content: { content: "  " } }, { p_content: { content: "x", extra: true } },
+      { p_content: null }, { p_content: "plain text" }, { p_content: [] }, { p_content: 42 },
       { p_response_due_minutes: 0 }, { p_response_due_minutes: 15 }, { p_response_due_minutes: -5 },
     ]) assert.ok((await send(conversation, invalid)).error, JSON.stringify(invalid));
     // Removed idempotency means identical new sends create separate messages.
     const first = ok(await send(conversation)), second = ok(await send(conversation));
     assert.notEqual(first.id, second.id);
-    // Empty/malformed JSON is also rejected by the table, not only by RPCs.
+    // The database checks only JSON-object storage, not the business schema.
+    assert.deepEqual(ok(await send(conversation, { p_content: { arbitrary: { payload: true } } })).content, { arbitrary: { payload: true } });
     assert.ok((await db.from("agent_messages").insert({ conversation_id: conversation,
-      id: "111111111111", sender: "pm", recipient: "tech-lead", content: {} })).error);
+      id: "111111111111", sender: "pm", recipient: "tech-lead", content: [] })).error);
     for (const table of ["agent_mail_leases", "agent_mail_chases"]) assert.ok((await db.from(table).select("*")).error);
     assert.ok((await db.rpc("agent_mail_lease_session", { p_session: "pm", p_owner: randomUUID() })).error);
     assert.ok((await db.rpc("agent_mail_due_session", { p_session: "pm", p_deadline_seconds: 1, p_interval_seconds: 1 })).error);
