@@ -19,8 +19,6 @@ case "$mode" in
     exit 2
     ;;
 esac
-pm_pi_session_id="pm"
-tech_lead_pi_session_id="tech-lead"
 
 programs=(tmux)
 if [[ "$mode" == dev ]]; then
@@ -61,8 +59,8 @@ for key in SUPABASE_URL SUPABASE_SECRET_KEY; do
 done
 [[ -d "$repo_dir/agent-mail/node_modules" ]] || { printf 'Install agent-mail dependencies with pnpm --dir agent-mail install\n' >&2; exit 1; }
 
-printf -v pi_command 'set -a; source %q; set +a; AGENT_MAIL_IDENTITY=pm PI_CODING_AGENT_DIR=%q exec %q --approve --session-id %q --extension %q' "$env_file" "$bot_dir/.pi" "$bot_dir/node_modules/.bin/pi" "$pm_pi_session_id" "$repo_dir/agent-mail/index.ts"
-printf -v tech_lead_command 'set -a; source %q; set +a; AGENT_MAIL_IDENTITY=tech-lead PI_CODING_AGENT_DIR=%q exec %q --approve --session-id %q --extension %q' "$env_file" "$tech_lead_dir/.pi" "$tech_lead_dir/node_modules/.bin/pi" "$tech_lead_pi_session_id" "$repo_dir/agent-mail/index.ts"
+printf -v pi_command 'set -a; source %q; set +a; AGENT_ROLE=pm PI_CODING_AGENT_DIR=%q exec %q --approve --continue --session-dir %q --extension %q' "$env_file" "$bot_dir/.pi" "$bot_dir/node_modules/.bin/pi" "$bot_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts"
+printf -v tech_lead_command 'set -a; source %q; set +a; AGENT_ROLE=tech-lead PI_CODING_AGENT_DIR=%q exec %q --approve --continue --session-dir %q --extension %q' "$env_file" "$tech_lead_dir/.pi" "$tech_lead_dir/node_modules/.bin/pi" "$tech_lead_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts"
 pi_pane="$(tmux new-session -d -P -F '#{pane_id}' -s "$session" -n "$mode" -c "$bot_dir" "$pi_command")"
 if [[ "$mode" == dev ]]; then
   tmux split-window -v -p 30 -t "$pi_pane" -c "$repo_dir" 'exec make functions-serve'
