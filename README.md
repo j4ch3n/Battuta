@@ -9,10 +9,12 @@ Battuta brings a team of AI agents together to help plan, build, and review soft
 - **Agent collaboration:** Bots communicate directly and retain shared project context across sessions.
 - **Implementation and review:** Engineer and review bots are planned to handle code changes and feedback (work in progress).
 
-## Tech stack
-
-Battuta uses the Pi coding-agent runtime, Telegram for conversations, Linear for work tracking, and Supabase for shared data and integrations. Its agent extension is written in TypeScript, with Python tooling for setup and project management.
-
 ## Getting started
 
-See [local development](development.md) for working from source or the [Raspberry Pi release guide](release.md) for installing a prebuilt release.
+See [local development](.agents/skills/battuta-setup/references/development.md) for working from source or the [Raspberry Pi release guide](RELEASE.md) for installing a prebuilt release.
+
+## Further guidance
+
+- [Contributor conventions](AGENTS.md) and [OpenCode skills](docs/opencode.md)
+- [Tech stack](docs/tech-stack.md) and [command reference](docs/commands.md)
+- [Agent mail](agent-mail/README.md) and [Linear issue guidance](docs/linear-issues.md)

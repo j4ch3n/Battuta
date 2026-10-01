@@ -38,13 +38,13 @@ Ask the owner which version to install and where to keep it. From the project's 
 sha256sum -c battuta-<version>-linux-arm64.tar.gz.sha256
 ```
 
-Replace `<version>` with the actual release tag. Expect `OK`; if verification fails, stop and download both files again. The archive includes this `release.md` guide at its root.
+Replace `<version>` with the actual release tag. Expect `OK`; if verification fails, stop and download both files again. The archive includes this `RELEASE.md` guide at its root.
 
 ## 3. Extract to a stable location
 
 ### Already done?
 
-Inspect the intended target before extraction. If `bin/battuta`, `.env.example`, and `release.md` are present, confirm with the owner that this installation is the requested version. If it is, reuse it and continue at step 4; if it is older, use step 7. If the directory exists but is incomplete or its version is unclear, investigate before changing it. Never unpack over an existing installation simply to retry setup.
+Inspect the intended target before extraction. If `bin/battuta`, `.env.example`, and `RELEASE.md` are present, confirm with the owner that this installation is the requested version. If it is, reuse it and continue at step 4; if it is older, use step 7. If the directory exists but is incomplete or its version is unclear, investigate before changing it. Never unpack over an existing installation simply to retry setup.
 
 ### Fresh setup
 
@@ -54,7 +54,7 @@ Choose an installation path with no spaces if services may be used. Check whethe
 mkdir -p ~/apps
 tar -xzf battuta-<version>-linux-arm64.tar.gz -C ~/apps
 cd ~/apps/battuta
-test -x bin/battuta && test -f .env.example && test -f release.md
+test -x bin/battuta && test -f .env.example && test -f RELEASE.md
 ```
 
 Run subsequent commands from this extracted installation directory. If the final check fails, stop and inspect the extraction.
