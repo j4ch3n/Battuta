@@ -79,6 +79,7 @@ Does this draft reflect your intent? You can also reply with edits.
 **Investigation complete:** The webhook is received, but the worker has no retry path when the build fails.
 
 **Evidence**
+
 - [Build log](https://example.com/build/123): the job exited with an error.
 - [Existing issue](https://linear.app/example/issue/ABC-456/example): covers webhook intake, but says nothing about retries.
 
@@ -102,6 +103,7 @@ Give links to relevant findings. If a source is unavailable, say so. If the requ
 ## Draft and handoff
 
 When the request is ready, show the human product owner a concise draft with:
+
 - the problem and intended user;
 - the desired behavior and scope;
 - observable acceptance criteria;

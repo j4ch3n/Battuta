@@ -13,12 +13,12 @@ Do not demand a complete charter before helping with a blocking dependency.
 Preserve the existing board. Do not assign a per-person WIP limit or redesign
 workflow columns without a flow diagnosis.
 
-| Context | First useful output | Avoid |
-|---|---|---|
-| Team without Project Manager | One-page outcome/ownership brief, next milestone, short blocker list | Certification jargon or a meeting-heavy PMO |
-| Practicing TPM | Changes since last review, critical assumptions, options and recommendation | Definitions of terms they already use |
-| Inherited project | Evidence inventory and disputed commitments | Treating last week's green report as the baseline truth |
-| Unapproved idea | Discovery questions and an options/authorization brief | An execution schedule masquerading as a harmless draft |
+| Context                      | First useful output                                                         | Avoid                                                   |
+| ---------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Team without Project Manager | One-page outcome/ownership brief, next milestone, short blocker list        | Certification jargon or a meeting-heavy PMO             |
+| Practicing TPM               | Changes since last review, critical assumptions, options and recommendation | Definitions of terms they already use                   |
+| Inherited project            | Evidence inventory and disputed commitments                                 | Treating last week's green report as the baseline truth |
+| Unapproved idea              | Discovery questions and an options/authorization brief                      | An execution schedule masquerading as a harmless draft  |
 
 For expert requests, use the user's requested format and decision horizon. Give
 feedback that improves their judgment: show the missing dependency, weak evidence,

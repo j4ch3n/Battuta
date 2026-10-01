@@ -3,13 +3,18 @@ name: Release Raspberry Pi package
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
 
 jobs:
+  validate:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
   build:
+    needs: validate
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
@@ -18,7 +23,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Require tag on main
         env:
@@ -30,7 +35,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .node-version
 
       - name: Install pnpm
         run: corepack enable && corepack prepare pnpm@10.20.0 --activate

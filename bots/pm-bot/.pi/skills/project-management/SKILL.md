@@ -15,14 +15,14 @@ Read existing project artifacts and Linear projects, issues, and cycles before a
 
 ### Choose the entry point
 
-| Starting condition | First action | Primary output |
-|---|---|---|
-| New or inherited project with unclear mandate | Read [Engagement and initiation](references/engagement-and-initiation.md) | Proposed brief with authority and evidence gaps |
-| Approved work with weak control, or a material risk or issue | Read [Control and communication](references/control-and-communication.md) | Current control record and decision brief |
-| Slipping scope, cycle goal, or dependency | Read [Change and recovery](references/change-and-recovery.md) | Recovery options and affected commitments |
-| Cross-team or supplier handoff | Read [Hybrid and dependencies](references/hybrid-and-dependencies.md) | Dependency agreement and acceptance evidence |
-| Cycle ending or work being handed over | Read [Closure and transition](references/closure-and-transition.md) | Delivered work, carryovers, and accepted ownership |
-| Technical uncertainty needs staged learning | Read [Adaptive delivery](references/adaptive-delivery.md) | Evidence-backed next learning or delivery decision |
+| Starting condition                                           | First action                                                              | Primary output                                     |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------- | -------------------------------------------------- |
+| New or inherited project with unclear mandate                | Read [Engagement and initiation](references/engagement-and-initiation.md) | Proposed brief with authority and evidence gaps    |
+| Approved work with weak control, or a material risk or issue | Read [Control and communication](references/control-and-communication.md) | Current control record and decision brief          |
+| Slipping scope, cycle goal, or dependency                    | Read [Change and recovery](references/change-and-recovery.md)             | Recovery options and affected commitments          |
+| Cross-team or supplier handoff                               | Read [Hybrid and dependencies](references/hybrid-and-dependencies.md)     | Dependency agreement and acceptance evidence       |
+| Cycle ending or work being handed over                       | Read [Closure and transition](references/closure-and-transition.md)       | Delivered work, carryovers, and accepted ownership |
+| Technical uncertainty needs staged learning                  | Read [Adaptive delivery](references/adaptive-delivery.md)                 | Evidence-backed next learning or delivery decision |
 
 Do not call a proposed cycle an active cycle, an approved issue a cycle commitment, a desired date a commitment, or a diagnostic brief an approved plan. Before proposing a commitment, identify who can authorize scope, dates, capacity, acceptance, and external communication. Mark each as accepted, proposed, unknown, or disputed. Read-only diagnosis may proceed; changes to cycle membership or other commitments require the user's approval.
 
@@ -39,14 +39,14 @@ Do not call a proposed cycle an active cycle, an approved issue a cycle commitme
 
 Read only what the current task requires. The local references contain applicability, procedures, failure signals, and observable exits. Their source IDs refer to the local [source index](references/source-index.md).
 
-| Decision phase / situation | Read | Exit artifact or evidence |
-|---|---|---|
-| New or inherited project | [Engagement and initiation](references/engagement-and-initiation.md) | Mandate, authority, evidence gaps |
-| Scrum, cycles, incremental delivery, uncertainty | [Adaptive delivery](references/adaptive-delivery.md) | Learning or increment evidence and next decision |
-| Cross-team or vendor interfaces | [Hybrid and dependencies](references/hybrid-and-dependencies.md) | Dependency and handoff acceptance |
-| Progress, risks, stakeholder disagreement | [Control and communication](references/control-and-communication.md) | Update or decision brief with next checkpoint |
-| Scope changes or troubled work | [Change and recovery](references/change-and-recovery.md) | Decision preserving prior commitments |
-| Acceptance or operational handoff | [Closure and transition](references/closure-and-transition.md) | Closure or transition with residual owners |
+| Decision phase / situation                       | Read                                                                 | Exit artifact or evidence                        |
+| ------------------------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------ |
+| New or inherited project                         | [Engagement and initiation](references/engagement-and-initiation.md) | Mandate, authority, evidence gaps                |
+| Scrum, cycles, incremental delivery, uncertainty | [Adaptive delivery](references/adaptive-delivery.md)                 | Learning or increment evidence and next decision |
+| Cross-team or vendor interfaces                  | [Hybrid and dependencies](references/hybrid-and-dependencies.md)     | Dependency and handoff acceptance                |
+| Progress, risks, stakeholder disagreement        | [Control and communication](references/control-and-communication.md) | Update or decision brief with next checkpoint    |
+| Scope changes or troubled work                   | [Change and recovery](references/change-and-recovery.md)             | Decision preserving prior commitments            |
+| Acceptance or operational handoff                | [Closure and transition](references/closure-and-transition.md)       | Closure or transition with residual owners       |
 
 ## Authority and completion
 

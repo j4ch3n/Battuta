@@ -34,14 +34,14 @@ confidence basis, review date, escalation owner, and fallback. A provider saying
 
 ## Vendor and distributed-team cases
 
-| Problem | Response |
-|---|---|
+| Problem                                         | Response                                                                                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | Fixed-price vendor with evolving software needs | Identify contractual acceptance/change process; assess options with procurement/legal rather than interpreting rights yourself |
-| Vendor dates lag the project need | Record date gap and latest decision point for contingency; escalate before the fallback becomes impossible |
-| Shared environment unavailable | Treat environment capacity as a dependency, with a specific reservation owner |
-| Time-zone handoffs add a day per question | Use an async decision brief, clear response window, and backup decision-maker |
-| Two teams claim contract ownership | Separate authoring, approval, and acceptance responsibilities; route unresolved authority to the sponsor |
-| Several projects compete for one team | Surface program/portfolio arbitration; do not allocate another project's capacity unilaterally |
+| Vendor dates lag the project need               | Record date gap and latest decision point for contingency; escalate before the fallback becomes impossible                     |
+| Shared environment unavailable                  | Treat environment capacity as a dependency, with a specific reservation owner                                                  |
+| Time-zone handoffs add a day per question       | Use an async decision brief, clear response window, and backup decision-maker                                                  |
+| Two teams claim contract ownership              | Separate authoring, approval, and acceptance responsibilities; route unresolved authority to the sponsor                       |
+| Several projects compete for one team           | Surface program/portfolio arbitration; do not allocate another project's capacity unilaterally                                 |
 
 ## Worked boundary (hypothetical)
 

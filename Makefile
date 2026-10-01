@@ -1,11 +1,15 @@
 SUPABASE_DIR := supabase
 ENV_FILE := $(SUPABASE_DIR)/.env
 
-.PHONY: help db-diff functions-serve setup-bot setup-pm-bot setup-tl-bot start-dev start-prod run-dev
+.PHONY: help db-diff functions-serve setup-bot setup-pm-bot setup-tl-bot start-dev start-prod run-dev setup-checks format check check-all
 
 help:
 	@printf '%s\n' \
 		'Available targets:' \
+		'  make setup-checks     Install locked development tooling and Git hooks' \
+		'  make format           Format repository-owned TypeScript and supported files' \
+		'  make check            Format, lint, type-check, unit and supporting-code checks' \
+		'  make check-all        Full checks including isolated local Supabase integration' \
 		'  make db-diff NAME=name Create a migration from local schema changes' \
 		'  make functions-serve   Serve Edge Functions with supabase/.env loaded' \
 		'  make setup-pm-bot     Install Pi, Telegram, and project-management MCP' \
@@ -41,3 +45,16 @@ start-prod:
 	bash bots/pm-bot/scripts/run-dev.sh prod
 
 run-dev: start-dev
+
+setup-checks:
+	pnpm install --frozen-lockfile
+	pnpm setup:checks
+
+format:
+	pnpm format
+
+check:
+	pnpm check
+
+check-all:
+	pnpm check:all

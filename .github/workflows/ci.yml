@@ -1,0 +1,158 @@
+name: Code checks
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  HUSKY: "0"
+
+jobs:
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      functions: ${{ steps.functions.outputs.names }}
+    concurrency:
+      group: checks-format-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-checks
+      - run: pnpm format:check
+      - id: functions
+        name: Discover Edge Functions
+        run: |
+          node --input-type=module - <<'JS' >> "$GITHUB_OUTPUT"
+          import { readdirSync } from "node:fs";
+          const names = readdirSync("supabase/functions", { withFileTypes: true })
+            .filter((entry) => entry.isDirectory() && !entry.name.startsWith("_"))
+            .map((entry) => entry.name);
+          if (!names.length) throw new Error("No Edge Functions found");
+          console.log(`names=${JSON.stringify(names)}`);
+          JS
+
+  node:
+    name: Node plugins
+    needs: format
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: checks-node-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-checks
+      - run: |
+          pnpm --dir agent-mail install --frozen-lockfile
+          pnpm --dir bots/pm-bot install --frozen-lockfile
+          pnpm --dir bots/tl-bot install --frozen-lockfile
+      - run: pnpm lint:node
+      - run: pnpm typecheck:node
+      - run: pnpm test:coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-${{ github.workflow }}-${{ github.run_attempt }}
+          path: agent-mail/coverage/
+          if-no-files-found: ignore
+
+  deno:
+    name: Deno (${{ matrix.function }})
+    needs: format
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        function: ${{ fromJSON(needs.format.outputs.functions) }}
+    concurrency:
+      group: checks-deno-${{ matrix.function }}-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version-file: .deno-version
+          cache: true
+      - run: deno task lint
+        working-directory: supabase/functions/${{ matrix.function }}
+      - run: deno task check
+        working-directory: supabase/functions/${{ matrix.function }}
+      - run: deno task test
+        working-directory: supabase/functions/${{ matrix.function }}
+
+  integration:
+    name: Supabase integration
+    needs: format
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: checks-integration-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-checks
+      - run: pnpm --dir agent-mail install --frozen-lockfile
+      - id: versions
+        run: printf 'supabase=%s\n' "$(<.supabase-version)" >> "$GITHUB_OUTPUT"
+      - uses: supabase/setup-cli@v3
+        with:
+          version: ${{ steps.versions.outputs.supabase }}
+      - run: pnpm test:integration
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-${{ github.workflow }}-${{ github.run_attempt }}
+          path: .reports/
+          include-hidden-files: true
+          if-no-files-found: ignore
+
+  support:
+    name: Supporting code
+    needs: format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: checks-support-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-checks
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.19"
+          enable-cache: true
+      - run: pnpm check:support
+
+  quality:
+    name: Quality gate
+    if: always()
+    needs: [format, node, deno, integration, support]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every check to succeed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          results = json.loads(os.environ["RESULTS"])
+          failures = {name: job["result"] for name, job in results.items() if job["result"] != "success"}
+          if failures:
+              raise SystemExit(f"Required checks did not succeed: {failures}")
+          print("All required checks passed")
+          PY

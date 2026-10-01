@@ -1,0 +1,42 @@
+{
+  "name": "battuta-devtools",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "setup:checks": "pnpm --dir agent-mail install --frozen-lockfile && pnpm --dir bots/pm-bot install --frozen-lockfile && pnpm --dir bots/tl-bot install --frozen-lockfile && uv sync --locked",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint:node": "eslint . --max-warnings=0",
+    "lint:deno": "node scripts/check-deno.mjs lint",
+    "lint": "pnpm lint:node && pnpm lint:deno",
+    "typecheck:node": "pnpm --dir agent-mail check && tsc --project bots/pm-bot/tsconfig.json",
+    "typecheck:deno": "node scripts/check-deno.mjs check",
+    "typecheck": "pnpm typecheck:node && pnpm typecheck:deno",
+    "test:node": "pnpm --dir agent-mail test",
+    "test:deno": "node scripts/check-deno.mjs test",
+    "test:unit": "pnpm test:node && pnpm test:deno",
+    "test:coverage": "pnpm --dir agent-mail test:coverage",
+    "test:integration": "node scripts/check-supabase.mjs",
+    "check:support": "node scripts/check-support.mjs",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm check:support",
+    "check:all": "pnpm check && pnpm test:integration",
+    "precommit": "lint-staged --concurrent false"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.4",
+    "eslint": "10.11.0",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "17.13.0",
+    "husky": "9.1.7",
+    "lint-staged": "17.6.0",
+    "prettier": "3.9.9",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.0"
+  }
+}

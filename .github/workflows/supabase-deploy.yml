@@ -16,7 +16,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
   deploy:
+    needs: validate
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -28,7 +31,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - id: versions
+        run: printf 'supabase=%s\n' "$(<.supabase-version)" >> "$GITHUB_OUTPUT"
       - uses: supabase/setup-cli@v3
+        with:
+          version: ${{ steps.versions.outputs.supabase }}
 
       - name: Link Supabase project
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF"

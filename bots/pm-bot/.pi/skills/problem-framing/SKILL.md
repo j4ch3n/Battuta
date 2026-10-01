@@ -44,12 +44,14 @@ it as the underlying difficulty.
 ## Question Flow (Budget: 4)
 
 ### Question 1 of 4: The problem area
+
 In plain words, what is going wrong, and who first noticed?
 (Recommendations: derive from session context. If the answer arrives
 as a solution — "we need X" — reflect it back as the difficulty X is
 presumed to fix, and offer 3 candidate underlying problems.)
 
 ### Question 2 of 4: Affected populations
+
 Who experiences this problem — and who is affected that nobody has
 mentioned yet?
 (Generate 3 options derived from Question 1: the obvious primary
@@ -57,12 +59,14 @@ population, plus at least one non-primary, downstream, or
 marginalized population the equity lens would surface.)
 
 ### Question 3 of 4: Current state and evidence
+
 What happens today when this problem bites, and how do you know?
 (Generate 3 options spanning: documented evidence — invite a bulk
 drop of data, tickets, or research; observed but unmeasured; assumed
 — the canvas will carry explicit assumption labels.)
 
 ### Question 4 of 4: Desired outcome and "done"
+
 If this problem were solved, what would be observably different?
 (Generate 3 candidate outcomes derived from prior answers, each
 phrased as an observable change for the affected populations, not
@@ -99,12 +103,14 @@ problem statement containing an embedded solution.
 
 ```markdown
 ## Decisions Made
+
 - Problem area (reframed from any solution language):
 - Populations included (and who was added by the equity lens):
 - Evidence base:
 - Desired outcome selected (and why):
 
 ## Assumptions to Validate
+
 - [Assumption 1]
 - [Assumption 2]
 - [Assumption 3]
@@ -113,6 +119,7 @@ problem statement containing an embedded solution.
 ## Final Step
 
 Offer exactly 4 next options:
+
 1. Brainstorm solution directions from the HMW question (Recommended)
 2. Build an opportunity solution tree rooted in the desired outcome
 3. Generate a stakeholder map for the affected populations

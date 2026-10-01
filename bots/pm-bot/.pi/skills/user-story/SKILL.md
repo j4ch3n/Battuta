@@ -16,17 +16,19 @@ questions (one at a time), then continue with labeled assumptions.
 
 Render Markdown in a code block using this exact structure:
 
-~~~markdown
+```markdown
 ### User Story [User Story Number ID]:
 
 - **Summary**: [brief, memorable, human-readable story title with how value is provided to the persona]
 
 #### Use Case:
+
 - **As a** [user name if available, otherwise user persona, otherwise role/title],
 - **I want to** [action user takes to get to outcome],
 - **so that** [desired outcome by the user].
 
 #### Acceptance Criteria:
+
 - **Scenario**: [brief, human-readable scenario aligned to the `As a [user]` actor]
 - **Given**: [initial precondition]
 - **and Given**: [additional precondition]
@@ -35,11 +37,12 @@ Render Markdown in a code block using this exact structure:
 - **When**: [one triggering action aligned to the `I want to` in the use case]
 - **Then**: [one expected outcome aligned to the `so that` in the use case]
 - **Split Signal Rule**: [If more than one `When` or `Then` is needed, split the story using `user-story-splitting-prompt-template.md`]
-~~~
+```
 
 ## Final Step
 
 Offer exactly 3 next options:
+
 1. Generate 2 alternative story cuts (scope up/scope down) (Recommended)
 2. Check this story for split signals and suggest split approach
 3. Generate test case checklist from acceptance criteria

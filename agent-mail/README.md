@@ -68,14 +68,18 @@ The Tech Lead could answer the request above with the following call. The parent
     "schema_version": 1,
     "summary": "Mail is marked read after Pi accepts it, rather than on socket receipt.",
     "context": [],
-    "findings": [{
-      "statement": "The message_start handler acknowledges acceptance of agent mail.",
-      "basis": "observed",
-      "evidence": [{
-        "locator": "agent-mail/index.ts",
-        "note": "The acceptance handler invokes the read acknowledgement."
-      }]
-    }],
+    "findings": [
+      {
+        "statement": "The message_start handler acknowledges acceptance of agent mail.",
+        "basis": "observed",
+        "evidence": [
+          {
+            "locator": "agent-mail/index.ts",
+            "note": "The acceptance handler invokes the read acknowledgement."
+          }
+        ]
+      }
+    ],
     "options": [],
     "recommendation": null,
     "request": null,
@@ -99,10 +103,9 @@ The content contract and field descriptions live in [`content.ts`](content.ts). 
 Run checks from the repository root:
 
 ```sh
-pnpm --dir agent-mail check
-pnpm --dir agent-mail test
-pnpm --dir agent-mail test:integration
-deno check --config supabase/functions/agent-mail/deno.json supabase/functions/agent-mail/index.ts
+make setup-checks
+make check
+pnpm test:integration
 ```
 
-Integration tests need the local Supabase instance and Edge Function running. Run them with the bots stopped; tests use only local endpoints and clean up their own messages.
+The root integration command starts and stops a separate local Supabase stack, replays migrations, checks database permissions, and runs the Edge Function/plugin integration tests. Docker is required. See [the development guide](../development.md#code-checks) for individual commands, pre-commit hooks, test naming, and CI.

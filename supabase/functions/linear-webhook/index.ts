@@ -1,11 +1,14 @@
-import { Buffer } from "node:buffer";
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { LinearClient } from "@linear/sdk";
 import type { EntityWebhookPayloadWithIssueData } from "@linear/sdk/webhooks";
 import postgres from "postgres";
+import {
+  isFreshTimestamp,
+  isIssueWebhookPayload,
+  isNewBacklogIssue,
+  isRecord,
+  verifySignature,
+} from "./webhook.ts";
 
-const signaturePattern = /^[0-9a-f]{64}$/i;
-const replayWindowMs = 60_000;
 const queueName = "engineer_tasks";
 
 type EngineerTask = {
@@ -16,51 +19,6 @@ type EngineerTask = {
   url: string;
   webhookTimestamp: number;
 };
-
-function verifySignature(
-  headerSignature: string | null,
-  rawBody: Uint8Array,
-  secret: string,
-) {
-  if (!headerSignature || !signaturePattern.test(headerSignature)) {
-    return false;
-  }
-
-  const suppliedSignature = Buffer.from(headerSignature, "hex");
-  const computedSignature = createHmac("sha256", secret)
-    .update(rawBody)
-    .digest();
-
-  return timingSafeEqual(computedSignature, suppliedSignature);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function isIssueWebhookPayload(
-  payload: Record<string, unknown>,
-): payload is EntityWebhookPayloadWithIssueData {
-  if (payload.type !== "Issue" || !isRecord(payload.data)) {
-    return false;
-  }
-
-  const { data } = payload;
-  return (
-    typeof data.id === "string" &&
-    typeof data.identifier === "string" &&
-    typeof data.teamId === "string" &&
-    typeof data.title === "string" &&
-    typeof data.url === "string" &&
-    isRecord(data.state) &&
-    typeof data.state.name === "string" &&
-    typeof data.state.type === "string"
-  );
-}
-
-function isNewBacklogIssue(payload: EntityWebhookPayloadWithIssueData) {
-  return payload.action === "create" && payload.data.state.type === "backlog";
-}
 
 async function enqueueEngineerTask(task: EngineerTask) {
   const databaseUrl = Deno.env.get("SUPABASE_DB_URL");
@@ -114,10 +72,7 @@ async function moveIssueToTodo(issueId: string, teamId: string) {
   }
 
   const client = new LinearClient({ apiKey });
-  const [issue, team] = await Promise.all([
-    client.issue(issueId),
-    client.team(teamId),
-  ]);
+  const [issue, team] = await Promise.all([client.issue(issueId), client.team(teamId)]);
 
   if (!issue || !team) {
     throw new Error("Linear issue or team was not found");
@@ -173,9 +128,7 @@ Deno.serve(async (request) => {
   }
 
   const rawBody = new Uint8Array(await request.arrayBuffer());
-  if (
-    !verifySignature(request.headers.get("linear-signature"), rawBody, secret)
-  ) {
+  if (!verifySignature(request.headers.get("linear-signature"), rawBody, secret)) {
     return new Response("Invalid webhook signature", { status: 401 });
   }
 
@@ -193,11 +146,7 @@ Deno.serve(async (request) => {
   const payload = parsedPayload as Record<string, unknown>;
 
   const webhookTimestamp = payload.webhookTimestamp;
-  if (
-    typeof webhookTimestamp !== "number" ||
-    !Number.isFinite(webhookTimestamp) ||
-    Math.abs(Date.now() - webhookTimestamp) > replayWindowMs
-  ) {
+  if (!isFreshTimestamp(webhookTimestamp)) {
     return new Response("Expired webhook", { status: 401 });
   }
 
