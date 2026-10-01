@@ -15,7 +15,7 @@ type Handler = (event?: unknown, context?: ExtensionContext) => Promise<unknown>
 type Tool = { name: string; execute: (callId: string, args: unknown, signal: undefined, update: undefined,
   context: ExtensionContext) => Promise<{ details: { message_ref: MessageReference } }> };
 
-function session(role: "pm" | "tech-lead", id: string = randomUUID(), entries: Entry[] = [], autoAccept = true) {
+function session(role: "pm" | "tl", id: string = randomUUID(), entries: Entry[] = [], autoAccept = true) {
   process.env.AGENT_ROLE = role;
   const handlers = new Map<string, Handler>(), tools = new Map<string, Tool>(), messages: Delivery[] = [];
   const notices: string[] = [];
@@ -36,18 +36,18 @@ function session(role: "pm" | "tech-lead", id: string = randomUUID(), entries: E
     execute: (name: string, args: unknown) => tools.get(name)!.execute(randomUUID(), args, undefined, undefined, ctx),
     start: () => handlers.get("session_start")!({}, ctx), stop: () => handlers.get("session_shutdown")!() };
 }
-const intent = (summary: string, recipient: "pm" | "tech-lead" = "tech-lead",
+const intent = (summary: string, recipient: "pm" | "tl" = "tl",
   expectation: Static<typeof SendArguments>["reply_expectation"] = null): Static<typeof SendArguments> => ({ recipient, message_type: "chat",
   content: expectation ? requestContent(summary) : content(summary), reply_expectation: expectation });
 
 test("different Pi UUIDs communicate by role; JSON delivery, acceptance, replies and session changes", async () => {
   process.env.SUPABASE_URL = url; process.env.SUPABASE_SECRET_KEY = secret;
-  const pm = session("pm"), lead = session("tech-lead", randomUUID(), [], false), sessions = [pm, lead];
+  const pm = session("pm"), lead = session("tl", randomUUID(), [], false), sessions = [pm, lead];
   const conversations = [pm.id];
   try {
     assert.notEqual(pm.id, lead.id);
     await pm.start(); await lead.start();
-    const sent = await pm.execute("send_agent_message", intent("Technical question", "tech-lead", { window: "medium" }));
+    const sent = await pm.execute("send_agent_message", intent("Technical question", "tl", { window: "medium" }));
     const ref = sent.details.message_ref;
     await wait(() => lead.messages.some((message) => message.details.message_ref.id === ref.id));
     const delivered = lead.messages.find((message) => message.details.message_ref.id === ref.id);
@@ -76,7 +76,7 @@ test("different Pi UUIDs communicate by role; JSON delivery, acceptance, replies
     await resumed.start();
     const next = await resumed.execute("send_agent_message", intent("New session"));
     assert.equal(next.details.message_ref.conversation_id, nextId);
-    assert.equal((await row(next.details.message_ref)).recipient, "tech-lead");
+    assert.equal((await row(next.details.message_ref)).recipient, "tl");
   } finally {
     for (const item of sessions.reverse()) await item.stop();
     await cleanup(conversations);
@@ -86,7 +86,7 @@ test("different Pi UUIDs communicate by role; JSON delivery, acceptance, replies
 test("append-before-ack recovery and failed acknowledgement retry do not reinject mail", async () => {
   process.env.SUPABASE_URL = url; process.env.SUPABASE_SECRET_KEY = secret;
   const conversation = randomUUID();
-  const stored = ok(await db.rpc("agent_mail_send", { p_sender_role: "pm", p_recipient_role: "tech-lead",
+  const stored = ok(await db.rpc("agent_mail_send", { p_sender_role: "pm", p_recipient_role: "tl",
     p_conversation_id: conversation, p_message_type: "chat", p_content: content("Recover me"), p_response_due_minutes: null }));
   const ref = { conversation_id: conversation, id: stored.id };
   const originalFetch = globalThis.fetch;
@@ -99,7 +99,7 @@ test("append-before-ack recovery and failed acknowledgement retry do not reinjec
     }
     return originalFetch(input, init);
   };
-  const lead = session("tech-lead", randomUUID(), [{ type: "custom_message", customType: "agent-mail", details: { message_ref: ref } }]);
+  const lead = session("tl", randomUUID(), [{ type: "custom_message", customType: "agent-mail", details: { message_ref: ref } }]);
   try {
     await lead.start();
     assert.equal(failRead, false);
@@ -116,9 +116,9 @@ test("append-before-ack recovery and failed acknowledgement retry do not reinjec
 
 test("complete reports cover original requirements, including after an initial progress reply", async () => {
   process.env.SUPABASE_URL = url; process.env.SUPABASE_SECRET_KEY = secret;
-  const conversation = randomUUID(), lead = session("tech-lead");
+  const conversation = randomUUID(), lead = session("tl");
   const requirements = ["Retain the original task", "Do not create duplicate retry work"];
-  const parent = ok(await db.rpc("agent_mail_send", { p_sender_role: "pm", p_recipient_role: "tech-lead",
+  const parent = ok(await db.rpc("agent_mail_send", { p_sender_role: "pm", p_recipient_role: "tl",
     p_conversation_id: conversation, p_message_type: "chat", p_content: requestContent("Implement retry behavior", requirements), p_response_due_minutes: 10 }));
   const ref = { conversation_id: conversation, id: parent.id };
   try {
@@ -143,8 +143,8 @@ test("complete reports cover original requirements, including after an initial p
 
 test("required-reply guard corrects missing mail twice, reports failure, and recovers read requests", async () => {
   process.env.SUPABASE_URL = url; process.env.SUPABASE_SECRET_KEY = secret;
-  const conversation = randomUUID(), lead = session("tech-lead"), sessions = [lead];
-  const parent = ok(await db.rpc("agent_mail_send", { p_sender_role: "pm", p_recipient_role: "tech-lead",
+  const conversation = randomUUID(), lead = session("tl"), sessions = [lead];
+  const parent = ok(await db.rpc("agent_mail_send", { p_sender_role: "pm", p_recipient_role: "tl",
     p_conversation_id: conversation, p_message_type: "chat", p_content: requestContent("Please investigate"), p_response_due_minutes: 10 }));
   const ref = { conversation_id: conversation, id: parent.id };
   try {
@@ -160,7 +160,7 @@ test("required-reply guard corrects missing mail twice, reports failure, and rec
     assert.equal((await row(ref)).status, "read");
     await lead.stop();
     // A new Pi session receives only unanswered read requests, not all old mail.
-    const recovered = session("tech-lead"); sessions.push(recovered);
+    const recovered = session("tl"); sessions.push(recovered);
     await recovered.start();
     assert.equal(recovered.messages.length, 1);
     assert.equal((await recovered.settle())?.continue, true);
@@ -172,8 +172,8 @@ test("required-reply guard corrects missing mail twice, reports failure, and rec
 
 test("ambiguous reply failures persist across restart and never trigger automatic write replay", async () => {
   process.env.SUPABASE_URL = url; process.env.SUPABASE_SECRET_KEY = secret;
-  const conversation = randomUUID(), lead = session("tech-lead"), sessions = [lead];
-  const parent = ok(await db.rpc("agent_mail_send", { p_sender_role: "pm", p_recipient_role: "tech-lead",
+  const conversation = randomUUID(), lead = session("tl"), sessions = [lead];
+  const parent = ok(await db.rpc("agent_mail_send", { p_sender_role: "pm", p_recipient_role: "tl",
     p_conversation_id: conversation, p_message_type: "chat", p_content: requestContent("Investigate"), p_response_due_minutes: 10 }));
   const ref = { conversation_id: conversation, id: parent.id };
   const originalFetch = globalThis.fetch;
@@ -191,14 +191,14 @@ test("ambiguous reply failures persist across restart and never trigger automati
     await assert.rejects(() => lead.execute("reply_agent_message", answer), /delivery unknown/);
     assert.equal(await lead.settle(), undefined);
     await lead.stop();
-    const recovered = session("tech-lead", lead.id, lead.entries); sessions.push(recovered);
+    const recovered = session("tl", lead.id, lead.entries); sessions.push(recovered);
     await recovered.start();
     assert.equal(await recovered.settle(), undefined);
     await assert.rejects(() => recovered.execute("reply_agent_message", answer), /delivery is uncertain/);
     assert.equal(writes, 1);
     // Reconciliation recognizes a reply which eventually committed elsewhere.
     globalThis.fetch = originalFetch;
-    ok(await db.rpc("agent_mail_reply", { p_sender_role: "tech-lead", p_parent_conversation_id: conversation,
+    ok(await db.rpc("agent_mail_reply", { p_sender_role: "tl", p_parent_conversation_id: conversation,
       p_parent_id: ref.id, p_message_type: "chat", p_content: content("Findings"), p_response_due_minutes: null }));
     assert.equal(await recovered.settle(), undefined);
     assert.equal((await row(ref)).status, "replied");

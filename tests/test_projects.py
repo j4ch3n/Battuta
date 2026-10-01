@@ -36,7 +36,7 @@ class ProjectRegistryTests(unittest.TestCase):
         link_project_context(bot)
         self.assertEqual(link.readlink(), Path("../../../shared-skills/project-context"))
 
-        other = root / "bots/tech-lead-bot"
+        other = root / "bots/tl-bot"
         other.mkdir()
         skills = other / ".pi/skills"
         skills.mkdir(parents=True)

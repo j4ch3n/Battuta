@@ -54,7 +54,7 @@ const content = object({
   }), "Unresolved information and its impact."),
   references: references(),
   related_messages: array(messageReference, "Earlier exchanges this builds on. Include the original request when reporting its result; this does not replace the reply parent.", 10),
-}, "One shared content contract for PM and tech lead. Include every field; use [] or null for unused sections.");
+}, "One shared content contract for PM and TL. Include every field; use [] or null for unused sections.");
 
 export const MessageContentSchema = content;
 export type MessageContent = Static<typeof content>;

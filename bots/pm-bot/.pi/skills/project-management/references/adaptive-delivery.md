@@ -44,7 +44,7 @@ uncertainty and an early calibration checkpoint, not invented historical data.
 
 ## Lightweight and expert use
 
-A team without a PM can start with one visible ordered work list, one shared outcome,
+A team without a Project Manager can start with one visible ordered work list, one shared outcome,
 accepted-work evidence, and a brief review. Call this a lightweight adaptive setup
 unless the full chosen framework is actually being followed. An expert TPM usually
 needs an exception summary and impact on commitments, not a ceremony redesign.

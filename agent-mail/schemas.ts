@@ -8,7 +8,7 @@ export { validateCoverage, type MessageContent } from "./content.ts";
 Format.Set("uuid", Format.IsUuid);
 Format.Set("date-time", Format.IsDateTime);
 
-export const Role = Type.Union([Type.Literal("pm"), Type.Literal("tech-lead")]);
+export const Role = Type.Union([Type.Literal("pm"), Type.Literal("tl")]);
 export const MessageRef = MessageReferenceSchema;
 export type MessageReference = Static<typeof MessageRef>;
 

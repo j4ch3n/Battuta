@@ -1,6 +1,6 @@
 ---
 name: active-telegram-message
-description: Send an explicit, proactive Telegram message from the PM's connected Pi session when asked to notify the human outside the normal reply to a Telegram turn.
+description: Send an explicit, proactive Telegram message from the Project Manager's connected Pi session when asked to notify the human outside the normal reply to a Telegram turn.
 ---
 
 # Active Telegram message

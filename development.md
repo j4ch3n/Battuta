@@ -1,6 +1,6 @@
 # Local development
 
-Run the PM and tech-lead bots from a source checkout with Python **3.12+**, uv, Node.js **22+**, pnpm **10.20.x**, and tmux. Local Supabase also needs Docker and the Supabase CLI; a remote Supabase project does not.
+Run the Project Manager and Tech Lead bots from a source checkout with Python **3.12+**, uv, Node.js **22+**, pnpm **10.20.x**, and tmux. Local Supabase also needs Docker and the Supabase CLI; a remote Supabase project does not.
 
 ## Configure
 
@@ -16,6 +16,6 @@ make setup-bot
 make start-dev
 ```
 
-`make start-dev` attaches the PM, tech-lead, and Edge Functions panes; it expects local Supabase to be running already. Use `make start-prod` instead when connecting to remote Supabase with `.env.prod` (it runs the two bots only). Do not run dev and prod modes concurrently from the same checkout; they share Pi state.
+`make start-dev` attaches the Project Manager, Tech Lead, and Edge Functions panes; it expects local Supabase to be running already. Use `make start-prod` instead when connecting to remote Supabase with `.env.prod` (it runs the two bots only). Do not run dev and prod modes concurrently from the same checkout; they share Pi state.
 
 Complete `/login` in each Pi pane, then message both Telegram bots. Detach with `Ctrl-b d` and rerun the same Make target to reattach. See the [release guide](release.md#5-configure-and-verify-interactively) for a more detailed verification walkthrough.

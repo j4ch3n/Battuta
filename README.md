@@ -4,8 +4,8 @@ Battuta brings a team of AI agents together to help plan, build, and review soft
 
 ## Features
 
-- **Product planning:** A PM bot helps clarify requirements and organize work through Telegram.
-- **Technical planning:** A tech-lead bot turns product goals into an engineering approach and actionable tasks.
+- **Product planning:** A Project Manager bot helps clarify requirements and organize work through Telegram.
+- **Technical planning:** A Tech Lead bot turns product goals into an engineering approach and actionable tasks.
 - **Agent collaboration:** Bots communicate directly and retain shared project context across sessions.
 - **Implementation and review:** Engineer and review bots are planned to handle code changes and feedback (work in progress).
 

@@ -9,7 +9,7 @@ const unitDir = join(configHome, 'systemd/user');
 // systemd unit values do not support shell quoting; refuse paths requiring escaping.
 if (/[^a-zA-Z0-9_./-]/.test(root)) throw new Error('Install path must not contain spaces or systemd special characters');
 
-const units = [['pm', 'PM'], ['tech-lead', 'tech-lead']].map(([role, description]) => {
+const units = [['pm', 'PM'], ['tl', 'TL']].map(([role, description]) => {
   const path = join(unitDir, `battuta-${role}.service`);
   const content = `[Unit]
 Description=Battuta ${description} bot

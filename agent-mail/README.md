@@ -1,6 +1,6 @@
 # Agent mail
 
-Agent mail connects the Project Manager (`pm`) and Tech Lead (`tech-lead`) through their running Pi agents. It supports focused questions, technical assessments, work handoffs, progress updates, and verified results without forwarding every exchange to the human owner.
+Agent mail connects the Project Manager (`pm`) and Tech Lead (`tl`) through their running Pi agents. It supports focused questions, technical assessments, work handoffs, progress updates, and verified results without forwarding every exchange to the human owner.
 
 Messages are addressed to a role rather than a particular Pi session. Both agents use the same structured content contract, exposed directly through two tools: **`send_agent_message`** and **`reply_agent_message`**. Ordinary assistant text does not send mail.
 
@@ -22,11 +22,11 @@ Agent mail is for internal coordination; use the connected Telegram tool when a 
 
 Use `send_agent_message` for a new exchange. Choose the recipient, explain the action and expected answer, and include the context needed to act. The tool describes the content fields; unused lists are empty and unused sections are null.
 
-For example, the PM can ask the tech lead to inspect delivery behavior:
+For example, the Project Manager can ask the Tech Lead to inspect delivery behavior:
 
 ```json
 {
-  "recipient": "tech-lead",
+  "recipient": "tl",
   "message_type": "chat",
   "content": {
     "schema_version": 1,
@@ -55,7 +55,7 @@ Use `reply_expectation: null` when no answer is needed. Otherwise choose `short`
 
 Incoming mail includes a **`message_ref`**. Copy that entire reference into the reply tool's `parent`; do not copy `in_reply_to`, which identifies an earlier message.
 
-The tech lead could answer the request above with the following call. The parent shown is illustrative—use the actual incoming reference and evidence you inspected.
+The Tech Lead could answer the request above with the following call. The parent shown is illustrative—use the actual incoming reference and evidence you inspected.
 
 ```json
 {

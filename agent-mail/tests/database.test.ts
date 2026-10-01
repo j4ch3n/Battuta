@@ -6,15 +6,15 @@ import type { MessageReference } from "../schemas.ts";
 import { content } from "./fixtures.ts";
 
 const send = (conversation: string, overrides: Record<string, unknown> = {}) => db.rpc("agent_mail_send", {
-  p_sender_role: "pm", p_recipient_role: "tech-lead", p_conversation_id: conversation,
+  p_sender_role: "pm", p_recipient_role: "tl", p_conversation_id: conversation,
   p_message_type: "chat", p_content: content("Question"), p_response_due_minutes: null, ...overrides,
 });
 const ref = (message: MessageReference) => ({ conversation_id: message.conversation_id, id: message.id });
-const read = (message: MessageReference, role = "tech-lead") => db.rpc("agent_mail_read", {
+const read = (message: MessageReference, role = "tl") => db.rpc("agent_mail_read", {
   p_recipient_role: role, p_conversation_id: message.conversation_id, p_message_id: message.id,
 });
 const reply = (parent: MessageReference, overrides: Record<string, unknown> = {}) => db.rpc("agent_mail_reply", {
-  p_sender_role: "tech-lead", p_parent_conversation_id: parent.conversation_id, p_parent_id: parent.id,
+  p_sender_role: "tl", p_parent_conversation_id: parent.conversation_id, p_parent_id: parent.id,
   p_message_type: "chat", p_content: content("Answer"), p_response_due_minutes: null, ...overrides,
 });
 
@@ -45,11 +45,11 @@ test("RPCs enforce role routing, JSON, enum types and database-time deadlines", 
     // The database checks only JSON-object storage, not the business schema.
     assert.deepEqual(ok(await send(conversation, { p_content: { arbitrary: { payload: true } } })).content, { arbitrary: { payload: true } });
     assert.ok((await db.from("agent_messages").insert({ conversation_id: conversation,
-      id: "111111111111", sender: "pm", recipient: "tech-lead", content: [] })).error);
+      id: "111111111111", sender: "pm", recipient: "tl", content: [] })).error);
     for (const table of ["agent_mail_leases", "agent_mail_chases"]) assert.ok((await db.from(table).select("*")).error);
     assert.ok((await db.rpc("agent_mail_lease_session", { p_session: "pm", p_owner: randomUUID() })).error);
     assert.ok((await db.rpc("agent_mail_due_session", { p_session: "pm", p_deadline_seconds: 1, p_interval_seconds: 1 })).error);
-    assert.ok((await db.rpc("agent_mail_store", { p_sender_role: "pm", p_recipient_role: "tech-lead",
+    assert.ok((await db.rpc("agent_mail_store", { p_sender_role: "pm", p_recipient_role: "tl",
       p_conversation_id: conversation, p_message_type: "chat", p_content: { content: "Bypass" }, p_response_due_minutes: null })).error);
   } finally { await cleanup([conversation]); }
 });
@@ -72,7 +72,7 @@ test("composite references scope acknowledgement and atomic concurrent replies",
     assert.ok(successful);
     const answer = ok(successful);
     assert.equal(answer.conversation_id, parent.conversation_id);
-    assert.equal(answer.sender, "tech-lead");
+    assert.equal(answer.sender, "tl");
     assert.equal(answer.recipient, "pm");
     assert.equal(answer.in_reply_to, parent.id);
     assert.equal((await row(ref(parent))).status, "replied");
@@ -81,7 +81,7 @@ test("composite references scope acknowledgement and atomic concurrent replies",
     const clarification = ok(await reply(answer, { p_sender_role: "pm", p_response_due_minutes: 5 }));
     assert.equal(clarification.conversation_id, conversation);
     assert.equal(clarification.in_reply_to, answer.id);
-    assert.equal(clarification.recipient, "tech-lead");
+    assert.equal(clarification.recipient, "tl");
     assert.equal(Date.parse(clarification.response_due) - Date.parse(clarification.created_at), 300_000);
   } finally { await cleanup([conversation, other]); }
 });

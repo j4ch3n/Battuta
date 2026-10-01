@@ -1,7 +1,7 @@
 SUPABASE_DIR := supabase
 ENV_FILE := $(SUPABASE_DIR)/.env
 
-.PHONY: help db-diff functions-serve setup-bot setup-pm-bot setup-tech-lead-bot start-dev start-prod run-dev
+.PHONY: help db-diff functions-serve setup-bot setup-pm-bot setup-tl-bot start-dev start-prod run-dev
 
 help:
 	@printf '%s\n' \
@@ -9,12 +9,12 @@ help:
 		'  make db-diff NAME=name Create a migration from local schema changes' \
 		'  make functions-serve   Serve Edge Functions with supabase/.env loaded' \
 		'  make setup-pm-bot     Install Pi, Telegram, and project-management MCP' \
-		'  make setup-tech-lead-bot  Install tech-lead Pi, Telegram, and Linear MCP' \
-		'  make setup-bot        Set up both PM and tech-lead bots' \
-		'  make start-dev        Attach to the dev PM + tech-lead + Supabase tmux session' \
-		'  make start-prod       Attach to the prod PM + tech-lead tmux session (remote Supabase)' \
+		'  make setup-tl-bot     Install TL Pi, Telegram, and Linear MCP' \
+		'  make setup-bot        Set up both PM and TL bots' \
+		'  make start-dev        Attach to the dev PM + TL + Supabase tmux session' \
+		'  make start-prod       Attach to the prod PM + TL tmux session (remote Supabase)' \
 		'  uv run python bots/pm-bot/scripts/configure-bot.py --help  PM bot setup options' \
-		'  uv run python bots/tech-lead-bot/scripts/configure-bot.py --help  Tech-lead setup options'
+		'  uv run python bots/tl-bot/scripts/configure-bot.py --help  TL setup options'
 
 db-diff:
 	@test -n "$(NAME)" || (printf '%s\n' 'Set NAME, for example: make db-diff NAME=create_tasks' >&2; exit 1)
@@ -28,11 +28,11 @@ setup-pm-bot:
 	uv run --locked python bots/pm-bot/scripts/configure-bot.py
 	pnpm --dir agent-mail install
 
-setup-tech-lead-bot:
-	uv run --locked python bots/tech-lead-bot/scripts/configure-bot.py
+setup-tl-bot:
+	uv run --locked python bots/tl-bot/scripts/configure-bot.py
 	pnpm --dir agent-mail install
 
-setup-bot: setup-pm-bot setup-tech-lead-bot
+setup-bot: setup-pm-bot setup-tl-bot
 
 start-dev:
 	bash bots/pm-bot/scripts/run-dev.sh dev

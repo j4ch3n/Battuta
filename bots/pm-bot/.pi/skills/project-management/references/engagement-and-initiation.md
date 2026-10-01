@@ -1,6 +1,6 @@
 # Engagement and initiation
 
-Use for a new project, inherited project, missing PM role, or unclear mandate.
+Use for a new project, inherited project, missing Project Manager role, or unclear mandate.
 Basis: S06 establishes proportionate governance and explicit accountability.
 The interaction and triage sequence below is original application.
 
@@ -15,7 +15,7 @@ workflow columns without a flow diagnosis.
 
 | Context | First useful output | Avoid |
 |---|---|---|
-| Team without PM | One-page outcome/ownership brief, next milestone, short blocker list | Certification jargon or a meeting-heavy PMO |
+| Team without Project Manager | One-page outcome/ownership brief, next milestone, short blocker list | Certification jargon or a meeting-heavy PMO |
 | Practicing TPM | Changes since last review, critical assumptions, options and recommendation | Definitions of terms they already use |
 | Inherited project | Evidence inventory and disputed commitments | Treating last week's green report as the baseline truth |
 | Unapproved idea | Discovery questions and an options/authorization brief | An execution schedule masquerading as a harmless draft |
@@ -32,7 +32,7 @@ reason; hard versus negotiable constraints; known capacity and skills; external
 interfaces; source of funding; decision rights; and the next decision date.
 Distinguish an actual deadline from a desired date and record its source.
 
-A small team can combine sponsor, delivery coordinator, and technical lead roles,
+A small team can combine sponsor, delivery coordinator, and Tech Lead roles,
 but name which decisions each role can make. A coordinator does not acquire
 architecture, budget, product-priority, or risk-acceptance authority by tracking
 work. Get explicit acceptance for new commitments, not merely a name in a table.

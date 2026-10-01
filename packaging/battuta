@@ -15,7 +15,7 @@ case "${1:-}" in
   start-prod-screen)
     exec bash "$root/bots/pm-bot/scripts/run-dev.sh" prod
     ;;
-  pm|tech-lead)
+  pm|tl)
     role="$1"
     bot_dir="$root/bots/$role-bot"
     [[ -f "$root/.env.prod" ]] || { printf 'Missing %s/.env.prod\n' "$root" >&2; exit 1; }
@@ -38,7 +38,7 @@ case "${1:-}" in
     exec "$root/bin/node" "$root/bin/install-services.mjs"
     ;;
   *)
-    printf 'Usage: %s configure|start-prod-screen|pm|tech-lead|install-services\n' "$0" >&2
+    printf 'Usage: %s configure|start-prod-screen|pm|tl|install-services\n' "$0" >&2
     exit 2
     ;;
 esac

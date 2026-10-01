@@ -15,8 +15,8 @@ const BOT_CONFIGURATIONS = [
     directory: join(BOTS_DIRECTORY, 'pm-bot'),
   },
   {
-    name: 'TECH_LEAD',
-    directory: join(BOTS_DIRECTORY, 'tech-lead-bot'),
+    name: 'TL',
+    directory: join(BOTS_DIRECTORY, 'tl-bot'),
   },
 ].map((bot) => {
   const piDirectory = join(bot.directory, '.pi');
