@@ -10,3 +10,4 @@ function run(command, args) {
 run("bash", ["-n", "packaging/battuta", "bots/pm-bot/scripts/run-dev.sh"]);
 run("node", ["--check", "packaging/configure.mjs"]);
 run("node", ["--check", "packaging/install-services.mjs"]);
+run("uv", ["run", "--locked", "python", "-m", "unittest", "discover", "-s", "scripts/tests", "-v"]);

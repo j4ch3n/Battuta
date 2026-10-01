@@ -27,9 +27,11 @@ For local Supabase, start Docker and run `supabase start`, then copy its URL and
 ```sh
 uv sync --locked
 make setup-bot
-make start-dev
+make dev
 ```
 
-`make start-dev` attaches the Project Manager, Tech Lead, and Edge Functions panes; it expects local Supabase to be running already. Use `make start-prod` instead when connecting to remote Supabase with `.env.prod` (it runs the two bots only). Do not run dev and prod modes concurrently from the same checkout; they share Pi state.
+`make dev` attaches the Project Manager, Tech Lead, and Edge Functions panes; it expects local Supabase to be running already and loads the bots' runtime environment from `.env`. Use `make prod` instead when connecting to remote Supabase with `.env.prod` (it runs the two bots only). These commands launch or reattach without updating Telegram configuration. Do not run dev and prod modes concurrently from the same checkout; they share Pi state.
+
+To update Telegram settings separately, run `make refresh-telegram ENV_FILE=.env`. The file argument can select `.env.prod` or another path; omitting it defaults to `.env`. This refreshes the token, derived bot ID, allowed user ID, and optional username in each bot's `.pi/telegram.json` without reinstalling packages or regenerating instructions. Restart any running bots separately to pick up the refreshed settings; reattaching an existing session does not reload them.
 
 Complete `/login` in each Pi pane and finish model-provider authentication, then message both Telegram bots from the allowed user account and confirm each responds. Inspect errors in the panes before declaring setup complete. Detach with `Ctrl-b d` and rerun the same Make target to reattach.

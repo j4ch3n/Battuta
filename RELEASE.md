@@ -137,3 +137,15 @@ systemctl --user enable --now battuta-pm.service battuta-tl.service
 ```
 
 Check both service statuses and bot responses again. Do not move an installation while its services are active.
+
+## Source-checkout Telegram refresh
+
+When running from a source checkout, use the separate Telegram refresh command from the repository root:
+
+```sh
+make refresh-telegram ENV_FILE=.env.prod
+```
+
+`ENV_FILE` also accepts `.env` or any other environment-file path; it defaults to `.env` when omitted. The command updates both bots' `.pi/telegram.json` with the token, derived bot ID, allowed user ID, and optional username. It does not launch or restart bots. Restart running bots separately to use refreshed settings; `make dev` and `make prod` only launch or reattach sessions.
+
+This Make command requires the source-checkout Python/uv tooling and is not included in the prebuilt archive. For the packaged release, use `bin/battuta configure` as described in step 5.

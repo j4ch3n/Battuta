@@ -53,9 +53,9 @@ fi
 set -a
 source "$env_file"
 set +a
-[[ -n "${LINEAR_API_KEY:-}" ]] || { printf 'Set LINEAR_API_KEY in .env\n' >&2; exit 1; }
+[[ -n "${LINEAR_API_KEY:-}" ]] || { printf 'Set LINEAR_API_KEY in %s\n' "$env_file" >&2; exit 1; }
 for key in SUPABASE_URL SUPABASE_SECRET_KEY; do
-  [[ -n "${!key:-}" ]] || { printf 'Set %s in .env\n' "$key" >&2; exit 1; }
+  [[ -n "${!key:-}" ]] || { printf 'Set %s in %s\n' "$key" "$env_file" >&2; exit 1; }
 done
 [[ -d "$repo_dir/agent-mail/node_modules" ]] || { printf 'Install agent-mail dependencies with pnpm --dir agent-mail install\n' >&2; exit 1; }
 

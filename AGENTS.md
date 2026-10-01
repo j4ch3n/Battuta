@@ -14,6 +14,7 @@ TypeScript on Node.js and Deno, the Pi coding-agent runtime, Telegram, Linear, a
 - Scan related code before adding logic; reuse existing helpers and refactor duplication within the affected scope. Avoid unrelated rewrites.
 - Cover changed behavior, edge cases, and regressions with meaningful tests. Use parameterized tests for equivalent cases.
 - Keep unit tests small and focused. Stub external services, clocks, and runtime boundaries; exercise real internal logic. Use integration tests for cross-system behavior.
+- For `scripts/`, organize tests in `scripts/tests/test_<script_or_module>.py` by the script or helper they exercise. Keep configuration/parsing tests separate from launcher orchestration; avoid a single catch-all launch test suite. Run discovery through `pnpm check:support`.
 - Review coverage for changed modules and address meaningful gaps; do not optimize for a percentage alone. Run relevant verification before claiming completion.
 - Keep every `README.md` concise: project/component description, high-level features, and links to getting started and further guidance. Put commands, setup, stack details, and technical explanations in focused references.
 - Keep this file high-level and link to a single maintained source rather than duplicating technical guidance.
