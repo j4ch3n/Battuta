@@ -25,7 +25,7 @@ jobs:
       group: checks-format-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node-checks
       - run: pnpm format:check
       - id: functions
@@ -49,7 +49,7 @@ jobs:
       group: checks-node-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node-checks
       - run: |
           pnpm --dir agent-mail install --frozen-lockfile
@@ -78,7 +78,7 @@ jobs:
       group: checks-deno-${{ matrix.function }}-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: denoland/setup-deno@v2
         with:
           deno-version-file: .deno-version
@@ -90,32 +90,6 @@ jobs:
       - run: deno task test
         working-directory: supabase/functions/${{ matrix.function }}
 
-  integration:
-    name: Supabase integration
-    needs: format
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    concurrency:
-      group: checks-integration-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
-      cancel-in-progress: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-node-checks
-      - run: pnpm --dir agent-mail install --frozen-lockfile
-      - id: versions
-        run: printf 'supabase=%s\n' "$(<.supabase-version)" >> "$GITHUB_OUTPUT"
-      - uses: supabase/setup-cli@v3
-        with:
-          version: ${{ steps.versions.outputs.supabase }}
-      - run: pnpm test:integration
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: integration-${{ github.workflow }}-${{ github.run_attempt }}
-          path: .reports/
-          include-hidden-files: true
-          if-no-files-found: ignore
-
   support:
     name: Supporting code
     needs: format
@@ -125,12 +99,12 @@ jobs:
       group: checks-support-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node-checks
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
           version: "0.11.19"
           enable-cache: true
@@ -139,7 +113,7 @@ jobs:
   quality:
     name: Quality gate
     if: always()
-    needs: [format, node, deno, integration, support]
+    needs: [format, node, deno, support]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

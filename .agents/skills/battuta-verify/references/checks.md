@@ -19,5 +19,3 @@ make check-all
 The pre-commit hook formats staged files, then lints staged code with its runtime-specific configuration. lint-staged preserves partially staged work. Run `make check` before pushing; full-project type checks cannot reliably be restricted to staged files.
 
 Use `*.test.ts` for Node unit tests and `*.integration.test.ts` for Node integration tests; new tests are discovered automatically. Co-locate Deno `*.test.ts` files with their function. Every function directory must have `lint`, `check`, and `test` tasks in its `deno.json`; root commands discover directories automatically. Commit updated lockfiles when changing dependencies. CI uses frozen installs/checks.
-
-GitHub Actions checks PRs when opened, updated with new commits, or reopened, and merge queue candidates. Formatting runs first, followed by parallel Node, Deno, integration and supporting-code jobs. `Quality gate` fails if any required job fails or is skipped. Production deployment and tagged releases call the same validation workflow before proceeding. The default branch ruleset must require the `Quality gate` check.
