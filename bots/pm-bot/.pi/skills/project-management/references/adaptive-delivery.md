@@ -33,18 +33,18 @@ uncertainty and an early calibration checkpoint, not invented historical data.
 
 ## Boundary cases
 
-| Situation | Management response |
-|---|---|
-| A deadline is fixed but research may fail | Commit to a learning decision or bounded fallback; do not promise the research result |
-| User feedback is unavailable | Find a legitimate evaluator or label the assumption unvalidated |
-| Support interrupts every cycle | Quantify interruption demand and agree intake/capacity changes |
-| Teams finish separate components but integration fails | Establish shared integration evidence before reporting capability complete |
-| Audit evidence is required | Include evidence creation in work and acceptance; iteration does not waive obligations |
-| AI output quality is probabilistic | Define evaluation dataset, acceptance criteria, review authority and fallback with ML/agent specialists |
+| Situation                                              | Management response                                                                                     |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| A deadline is fixed but research may fail              | Commit to a learning decision or bounded fallback; do not promise the research result                   |
+| User feedback is unavailable                           | Find a legitimate evaluator or label the assumption unvalidated                                         |
+| Support interrupts every cycle                         | Quantify interruption demand and agree intake/capacity changes                                          |
+| Teams finish separate components but integration fails | Establish shared integration evidence before reporting capability complete                              |
+| Audit evidence is required                             | Include evidence creation in work and acceptance; iteration does not waive obligations                  |
+| AI output quality is probabilistic                     | Define evaluation dataset, acceptance criteria, review authority and fallback with ML/agent specialists |
 
 ## Lightweight and expert use
 
-A team without a PM can start with one visible ordered work list, one shared outcome,
+A team without a Project Manager can start with one visible ordered work list, one shared outcome,
 accepted-work evidence, and a brief review. Call this a lightweight adaptive setup
 unless the full chosen framework is actually being followed. An expert TPM usually
 needs an exception summary and impact on commitments, not a ceremony redesign.

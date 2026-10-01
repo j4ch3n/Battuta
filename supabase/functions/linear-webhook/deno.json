@@ -1,4 +1,9 @@
 {
+  "tasks": {
+    "lint": "deno lint .",
+    "check": "deno check --frozen .",
+    "test": "deno test --frozen ."
+  },
   "imports": {
     "@linear/sdk": "npm:@linear/sdk@95.1.0",
     "@linear/sdk/webhooks": "npm:@linear/sdk@95.1.0/webhooks",

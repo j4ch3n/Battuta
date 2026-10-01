@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+/supabase/snippets/
 
 # Python
 .venv/
@@ -14,3 +15,6 @@ __pycache__/
 
 # Node.js
 node_modules/
+dist/
+coverage/
+.reports/

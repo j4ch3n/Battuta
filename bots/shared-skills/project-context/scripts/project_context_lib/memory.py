@@ -1,4 +1,4 @@
-"""Explicit APIs for shared project-specific PM/Tech Lead memory."""
+"""Explicit APIs for shared project-specific PM/TL memory."""
 
 from pathlib import Path
 import os

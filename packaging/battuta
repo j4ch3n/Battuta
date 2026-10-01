@@ -15,7 +15,7 @@ case "${1:-}" in
   start-prod-screen)
     exec bash "$root/bots/pm-bot/scripts/run-dev.sh" prod
     ;;
-  pm|tech-lead)
+  pm|tl)
     role="$1"
     bot_dir="$root/bots/$role-bot"
     [[ -f "$root/.env.prod" ]] || { printf 'Missing %s/.env.prod\n' "$root" >&2; exit 1; }
@@ -30,15 +30,15 @@ case "${1:-}" in
     for key in LINEAR_API_KEY SUPABASE_URL SUPABASE_SECRET_KEY; do
       [[ -n "${!key:-}" ]] || { printf 'Set %s in .env.prod\n' "$key" >&2; exit 1; }
     done
-    export AGENT_MAIL_IDENTITY="$role" PI_CODING_AGENT_DIR="$bot_dir/.pi"
+    export AGENT_ROLE="$role" PI_CODING_AGENT_DIR="$bot_dir/.pi"
     cd "$bot_dir"
-    exec "$bot_dir/node_modules/.bin/pi" --approve --session-id "$role" --extension "$root/agent-mail/index.ts"
+    exec "$bot_dir/node_modules/.bin/pi" --approve --continue --session-dir "$bot_dir/.pi/mail-sessions" --extension "$root/agent-mail/index.ts"
     ;;
   install-services)
     exec "$root/bin/node" "$root/bin/install-services.mjs"
     ;;
   *)
-    printf 'Usage: %s configure|start-prod-screen|pm|tech-lead|install-services\n' "$0" >&2
+    printf 'Usage: %s configure|start-prod-screen|pm|tl|install-services\n' "$0" >&2
     exit 2
     ;;
 esac

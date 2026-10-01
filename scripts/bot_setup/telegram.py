@@ -8,7 +8,7 @@ from .env import positive_id, required
 from .json_config import read_config, write_config
 
 
-def configure_telegram(bot_dir: Path, env_file: Path, prefix: str, values: dict[str, str]) -> None:
+def prepare_telegram_config(bot_dir: Path, env_file: Path, prefix: str, values: dict[str, str]) -> tuple[Path, dict, bool]:
     def field(name: str) -> str:
         return f"{prefix}_TELEGRAM_{name}"
 
@@ -30,11 +30,19 @@ def configure_telegram(bot_dir: Path, env_file: Path, prefix: str, values: dict[
     default = profiles.setdefault("default", {})
     if not isinstance(default, dict):
         raise click.ClickException("profiles.default must be a JSON object")
+    previous = default.copy()
     default["botToken"] = token
     default["allowedUserId"] = owner
     if username:
         default["botUsername"] = username
+    else:
+        default.pop("botUsername", None)
     default["botId"] = bot_id
+    return config, data, default != previous
 
-    write_config(config, data, ".telegram-")
+
+def configure_telegram(bot_dir: Path, env_file: Path, prefix: str, values: dict[str, str]) -> None:
+    config, data, changed = prepare_telegram_config(bot_dir, env_file, prefix, values)
+    if changed:
+        write_config(config, data, ".telegram-")
     click.echo(f"Configured {config} from {env_file}.")

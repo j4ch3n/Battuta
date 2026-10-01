@@ -1,11 +1,11 @@
 ---
 name: project-context
-description: Use when the PM or Tech Lead starts work on a registered project, needs its checkout or role configuration, or needs to recall or save durable project decisions across sessions.
+description: Use when the Project Manager or Tech Lead starts work on a registered project, needs its checkout or role configuration, or needs to recall or save durable project decisions across sessions.
 ---
 
 # Project context
 
-The project registry stores each project's configuration; `MEMORY.md` stores durable context shared by the PM and Tech Lead. Neither is loaded automatically. Use this skill to retrieve the context relevant to the current project and update it when a lasting decision changes.
+The project registry stores each project's configuration; `MEMORY.md` stores durable context shared by the Project Manager and Tech Lead. Neither is loaded automatically. Use this skill to retrieve the context relevant to the current project and update it when a lasting decision changes.
 
 ## When to load context
 
@@ -15,7 +15,7 @@ The project registry stores each project's configuration; `MEMORY.md` stores dur
 
 ## When to update memory
 
-Save decisions, their rationale, and stable project constraints that the PM and Tech Lead will need in future sessions. A brief ticket identifier is optional when it helps trace a decision; do not store ticket URLs, transient progress, or generated or repository instructions. For example:
+Save decisions, their rationale, and stable project constraints that the Project Manager and Tech Lead will need in future sessions. A brief ticket identifier is optional when it helps trace a decision; do not store ticket URLs, transient progress, or generated or repository instructions. For example:
 
 - “Use the existing worker for imports because the deployment has no separate queue (decided during IMP-42).”
 - “Retrying an import must retain the original import record so users can trace its history.”

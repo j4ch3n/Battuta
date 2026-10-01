@@ -3,13 +3,18 @@ name: Release Raspberry Pi package
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
 
 jobs:
+  validate:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
   build:
+    needs: validate
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
@@ -18,7 +23,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Require tag on main
         env:
@@ -30,7 +35,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .node-version
 
       - name: Install pnpm
         run: corepack enable && corepack prepare pnpm@10.20.0 --activate
@@ -41,15 +46,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots agent-mail .env.example release.md | tar -x -C dist/stage/battuta
-          test -s dist/stage/battuta/release.md
+          git archive HEAD bots agent-mail .env.example RELEASE.md | tar -x -C dist/stage/battuta
+          test -s dist/stage/battuta/RELEASE.md
           python3 -m pip install --no-deps --only-binary=:all: --target dist/stage/battuta/bots/shared-skills/project-context/scripts/vendor click==8.5.0 PyYAML==6.0.3
           cp "$(command -v node)" dist/stage/battuta/bin/node
           cp packaging/battuta dist/stage/battuta/bin/battuta
           cp packaging/configure.mjs dist/stage/battuta/bin/configure.mjs
           cp packaging/install-services.mjs dist/stage/battuta/bin/install-services.mjs
           chmod +x dist/stage/battuta/bin/*
-          for bot in pm-bot tech-lead-bot; do
+          for bot in pm-bot tl-bot; do
             mkdir -p "dist/stage/battuta/bots/$bot/.pi/skills"
             ln -s ../../../shared-skills/project-context "dist/stage/battuta/bots/$bot/.pi/skills/project-context"
             test -f "dist/stage/battuta/bots/$bot/.pi/skills/project-context/SKILL.md"
@@ -62,7 +67,7 @@ jobs:
           HOME="$smoke_home" python3 "$skill_cli" show release-smoke "$smoke_home/checkout"
           HOME="$smoke_home" python3 "$skill_cli" read release-smoke
           rm -rf "$smoke_home"
-          for bot in pm-bot tech-lead-bot; do
+          for bot in pm-bot tl-bot; do
             bot_dir="$PWD/dist/stage/battuta/bots/$bot"
             pnpm --dir "$bot_dir" install --frozen-lockfile --prod
             PI_CODING_AGENT_DIR="$bot_dir/.pi" "$bot_dir/node_modules/.bin/pi" install -l --approve npm:@llblab/pi-telegram@0.50.1
@@ -70,13 +75,13 @@ jobs:
           done
           pnpm --dir dist/stage/battuta/agent-mail install --frozen-lockfile --prod
           test -x dist/stage/battuta/bots/pm-bot/node_modules/.bin/pi
-          test -x dist/stage/battuta/bots/tech-lead-bot/node_modules/.bin/pi
+          test -x dist/stage/battuta/bots/tl-bot/node_modules/.bin/pi
           test -d dist/stage/battuta/agent-mail/node_modules
           test ! -e dist/stage/battuta/.env
           test ! -e dist/stage/battuta/bots/pm-bot/.pi/auth.json
-          test ! -e dist/stage/battuta/bots/tech-lead-bot/.pi/auth.json
+          test ! -e dist/stage/battuta/bots/tl-bot/.pi/auth.json
           test ! -e dist/stage/battuta/bots/pm-bot/.pi/telegram.json
-          test ! -e dist/stage/battuta/bots/tech-lead-bot/.pi/telegram.json
+          test ! -e dist/stage/battuta/bots/tl-bot/.pi/telegram.json
           tar -C dist/stage -czf "dist/battuta-$TAG-linux-arm64.tar.gz" battuta
           (cd dist && sha256sum "battuta-$TAG-linux-arm64.tar.gz" > "battuta-$TAG-linux-arm64.tar.gz.sha256")
 

@@ -42,14 +42,14 @@ and preserve the record of what was previously promised.
 
 ## Hard cases
 
-| Condition | Required response |
-|---|---|
+| Condition                                                     | Required response                                                                                         |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Sponsor insists on same scope/date/cost despite infeasibility | State conflict, assumptions and consequences; seek authorized tradeoff, do not fabricate a compliant plan |
-| Sponsor leaves | Identify interim authority; preserve commitments and escalate decisions that cannot wait |
-| Vendor conceals progress | Request acceptance evidence and contract-authorized remedies through procurement/legal |
-| Risk acceptance requested without technical review | Obtain specialist evidence; a PM status decision cannot waive reserved approval |
-| Team proposes deleting the old baseline | Retain history; distinguish revised plan from original performance |
-| Requirements are not approved | Produce diagnosis/options; route formal implementation planning upstream rather than bypass its gate |
+| Sponsor leaves                                                | Identify interim authority; preserve commitments and escalate decisions that cannot wait                  |
+| Vendor conceals progress                                      | Request acceptance evidence and contract-authorized remedies through procurement/legal                    |
+| Risk acceptance requested without technical review            | Obtain specialist evidence; a Project Manager status decision cannot waive reserved approval              |
+| Team proposes deleting the old baseline                       | Retain history; distinguish revised plan from original performance                                        |
+| Requirements are not approved                                 | Produce diagnosis/options; route formal implementation planning upstream rather than bypass its gate      |
 
 Complete when a recovery/change decision is supported by evidence and authority,
 or when the exact blocked decision and missing input are reported. Stop after

@@ -71,6 +71,7 @@ Then append a closing self-critique:
 - Recommended next step
 
 ### Assumptions to Validate
+
 - [Assumption 1]
 - [Assumption 2]
 - [Assumption 3]
@@ -78,6 +79,7 @@ Then append a closing self-critique:
 ## Final Step
 
 Offer exactly 4 next options:
+
 1. Generate a validation plan for the top assumptions (Recommended)
 2. Draft user stories with acceptance criteria from the PRD scope
 3. Create a one-page executive summary for stakeholder review

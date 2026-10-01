@@ -1,6 +1,7 @@
 """Read and validate setup environment values."""
 
 from pathlib import Path
+import shlex
 
 import click
 
@@ -9,7 +10,7 @@ def read_env(path: Path) -> dict[str, str]:
     if not path.is_file():
         raise click.ClickException(f"Missing {path}; create it from .env.example")
     values: dict[str, str] = {}
-    for line in path.read_text().splitlines():
+    for number, line in enumerate(path.read_text().splitlines(), start=1):
         line = line.strip()
         if not line or line.startswith("#"):
             continue
@@ -18,9 +19,22 @@ def read_env(path: Path) -> dict[str, str]:
         key, separator, value = line.partition("=")
         if separator:
             value = value.strip()
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-                value = value[1:-1]
-            values[key.strip()] = value
+            if not value or value.startswith("#"):
+                values[key.strip()] = ""
+                continue
+            # Read one shell-style value. A # within a word or quotes is literal;
+            # a comment after the value is ignored without parsing its contents.
+            lexer = shlex.shlex(value, posix=True)
+            lexer.whitespace_split = True
+            lexer.commenters = ""
+            try:
+                parsed = lexer.get_token() or ""
+                trailing = lexer.instream.read().strip()
+                if trailing and not trailing.startswith("#"):
+                    raise ValueError("Expected a single quoted or unquoted value")
+            except ValueError as error:
+                raise click.ClickException(f"Invalid environment value in {path}:{number}: {error}") from error
+            values[key.strip()] = parsed
     return values
 
 
