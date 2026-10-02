@@ -1,6 +1,7 @@
 """Documentation indexes are recursive; directory presentation is bounded."""
 
 from battuta_project.explain import explain_project
+from battuta_project.models import GithubConfig
 from battuta_project.presentation import render
 from project_fixtures import ProjectTestCase
 
@@ -34,7 +35,7 @@ class ExplainTests(ProjectTestCase):
         self.assertEqual(result.sub_agents, [])
         self.assertEqual(result.tree, ["code/"])
 
-    def test_render_only_exposes_checkout_and_doc_index(self):
+    def test_render_exposes_context_without_internal_registry_files(self):
         self.file("README.md")
         output = render("explain.md.j2", explain_project(self.project))
         self.assertIn("Project Root: ~/.battuta/projects/atlas-api/code", output)
@@ -44,3 +45,10 @@ class ExplainTests(ProjectTestCase):
         self.assertNotIn("MEMORY.md", output)
         self.assertNotIn("project.yaml", output)
         self.assertNotIn(".config.json", output)
+
+    def test_missing_repository_is_reported_without_inventing_a_url(self):
+        project = self.project.model_copy(update={
+            "config": self.project.config.model_copy(update={"github": GithubConfig()}),
+        })
+        output = render("explain.md.j2", explain_project(project))
+        self.assertIn("Repository URL: not configured", output)

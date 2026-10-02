@@ -8,10 +8,39 @@ import click
 import httpx
 
 from battuta_project.linear import LinearClient, require_linear_token
-from linear_fixtures import CREATED_PROJECT, linear_http, payload, team_page
+from linear_fixtures import CREATED_PROJECT, PROJECT, linear_http, payload, team_page
 
 
 class LinearTests(unittest.TestCase):
+    def test_get_project_uses_id_variable_and_returns_actual_url(self):
+        with linear_http(PROJECT) as requests:
+            project = LinearClient("secret").get_project("project-1")
+        self.assertEqual(project.id, "project-1")
+        self.assertEqual(project.url, "https://linear.app/team/project/atlas")
+        self.assertEqual(len(requests), 1)
+        self.assertEqual(payload(requests[0])["variables"], {"id": "project-1"})
+        self.assertIn("project(id: $id)", payload(requests[0])["query"])
+        self.assertEqual(requests[0].headers["Authorization"], "secret")
+
+    def test_get_project_rejects_blank_id_before_http(self):
+        with linear_http() as requests:
+            with self.assertRaises(click.ClickException):
+                LinearClient("secret").get_project(" ")
+        self.assertEqual(requests, [])
+
+    def test_get_project_failures_are_readable_and_not_retried(self):
+        for response in (
+            {"data": {"project": None}},
+            {"data": {"project": {"id": "project-1", "name": "Atlas", "url": ""}}},
+            {"data": {}},
+            {"errors": [{"message": "Not authenticated"}]},
+            httpx.ReadTimeout("Request timed out"),
+        ):
+            with self.subTest(response=response), linear_http(response) as requests:
+                with self.assertRaisesRegex(click.ClickException, "Linear"):
+                    LinearClient("secret").get_project("project-1")
+                self.assertEqual(len(requests), 1)
+
     def test_token_is_required_and_trimmed(self):
         for value in (None, "", " \t\n"):
             with self.subTest(value=value), patch.dict(os.environ, {}, clear=True):

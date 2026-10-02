@@ -1,6 +1,6 @@
 # Durable project memory
 
-Store stable decisions, rationale, and standing constraints in the selected project's `MEMORY.md`. Check current repository and issue-tracker evidence for live facts. Memory is not a ticket-status record or a copy of repository instructions. A short ticket identifier can help trace a decision; avoid ticket URLs and transient progress.
+Store stable decisions, rationale, and standing constraints with the selected project's `memory` commands. Check current repository and issue-tracker evidence for live facts. Memory is not a ticket-status record or a copy of repository instructions. A short ticket identifier can help trace a decision; avoid ticket URLs and transient progress.
 
 ## Commands
 

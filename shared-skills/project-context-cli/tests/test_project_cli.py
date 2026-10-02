@@ -9,7 +9,7 @@ import yaml
 
 from battuta_project.cli import main
 from project_fixtures import ProjectTestCase
-from linear_fixtures import CREATED_PROJECT, linear_http, payload, team_page
+from linear_fixtures import CREATED_PROJECT, PROJECT, linear_http, payload, team_page
 
 
 class CliTests(ProjectTestCase):
@@ -53,6 +53,39 @@ class CliTests(ProjectTestCase):
         self.assertIn("Project Root: ~/.battuta/projects/atlas-api/code", self.invoke("explain"))
         result = self.runner.invoke(main, ["explain", "atlas-api"])
         self.assertNotEqual(result.exit_code, 0)
+
+    def test_explain_prints_repository_and_unlinked_linear_without_http(self):
+        with linear_http() as requests:
+            output = self.invoke("explain")
+        self.assertIn("Repository URL: https://github.com/team/atlas-api", output)
+        self.assertIn("Linear Project URL: not linked", output)
+        self.assertEqual(requests, [])
+
+    def test_explain_fetches_linked_linear_url_without_changing_local_state(self):
+        self.invoke("linear", "link", "--project-id", "project-1", "--team-id", "team-1")
+        original = (self.project.root / "project.yaml").read_text()
+        state = self.registry.state_path.read_text()
+        with linear_http(PROJECT) as requests:
+            output = self.invoke("explain")
+        self.assertIn("Repository URL: https://github.com/team/atlas-api", output)
+        self.assertIn("Linear Project URL: https://linear.app/team/project/atlas", output)
+        self.assertIn("Project Root: ~/.battuta/projects/atlas-api/code", output)
+        self.assertEqual(len(requests), 1)
+        self.assertEqual(payload(requests[0])["variables"], {"id": "project-1"})
+        self.assertEqual((self.project.root / "project.yaml").read_text(), original)
+        self.assertEqual(self.registry.state_path.read_text(), state)
+
+    def test_explain_reports_lookup_failure_without_rendering_misleading_url(self):
+        self.invoke("linear", "link", "--project-id", "project-1", "--team-id", "team-1")
+        for response, message in (
+            ({"errors": [{"message": "Not authenticated"}]}, "Not authenticated"),
+            ({"data": {"project": None}}, "Linear project"),
+        ):
+            with self.subTest(response=response), linear_http(response):
+                result = self.runner.invoke(main, ["explain"])
+                self.assertNotEqual(result.exit_code, 0)
+                self.assertIn(message, result.output)
+                self.assertNotIn("Linear Project URL:", result.output)
 
     def test_missing_current_project_and_invalid_indexes_are_readable_errors(self):
         self.registry.state_path.unlink()

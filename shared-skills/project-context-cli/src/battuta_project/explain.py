@@ -62,8 +62,10 @@ def explain_project(project: ProjectContext) -> Explanation:
             raise click.ClickException(f"Checkout must be a real directory: {project.code}")
         entries = _entries(project.code)
         documents = {entry.path for entry in entries if not entry.is_directory}
+        repository = project.config.github.repository
         return Explanation(
             project=project.name, root=project.code,
+            repository_url=f"https://github.com/{repository}" if repository else None,
             readme="README.md" if "README.md" in documents else None,
             agents="AGENTS.md" if "AGENTS.md" in documents else None,
             sub_readmes=sorted(path for path in documents if path.endswith("/README.md")),

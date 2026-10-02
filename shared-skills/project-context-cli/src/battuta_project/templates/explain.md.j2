@@ -1,6 +1,8 @@
 # Project: {{ project }}
 
 Project Root: {{ root | display_path }}
+Repository URL: {{ repository_url or 'not configured' }}
+Linear Project URL: {{ linear_project_url or 'not linked' }}
 
 - README.md: {{ readme or 'not found' }}
 - AGENTS.md: {{ agents or 'not found' }}

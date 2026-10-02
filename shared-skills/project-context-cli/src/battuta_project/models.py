@@ -143,6 +143,8 @@ class CheckoutEntry(Model):
 class Explanation(Model):
     project: str
     root: Path
+    repository_url: str | None = None
+    linear_project_url: str | None = None
     readme: str | None
     agents: str | None
     sub_readmes: list[str]

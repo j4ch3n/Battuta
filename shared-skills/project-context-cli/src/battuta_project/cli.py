@@ -57,9 +57,15 @@ def switch(project_name: str):
 
 
 @main.command()
-def explain():
-    """Index the current checkout's README/AGENTS files and directory tree."""
-    click.echo(render("explain.md.j2", explain_project(ProjectRegistry().current())))
+@click.pass_obj
+def explain(token: str):
+    """Show project URLs, README/AGENTS locations, and the checkout tree."""
+    project = ProjectRegistry().current()
+    explanation = explain_project(project)
+    if project.config.linear.project_id:
+        remote = LinearClient(token).get_project(project.config.linear.project_id)
+        explanation = explanation.model_copy(update={"linear_project_url": remote.url})
+    click.echo(render("explain.md.j2", explanation))
 
 
 @main.group()

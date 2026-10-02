@@ -10,7 +10,7 @@ A bare `battuta-project` invocation displays command help.
 battuta-project init <github-repo-url>
 ```
 
-Use `init` once to register a repository, clone it into `~/.battuta/projects/<repository-name>/code/`, create `project.yaml`, and select it as the current project. Authenticate with `gh auth login` first.
+Use `init` once to register a repository, clone it into a managed checkout, and select it as the current project. Authenticate with `gh auth login` first. Use the checkout location printed by the command.
 
 Accepted URL forms include:
 
@@ -39,7 +39,7 @@ Both options are independently optional. Supplied IDs are trimmed and must not b
 battuta-project switch <project-name>
 ```
 
-Use the exact folder name under `~/.battuta/projects/`, quoting names containing spaces:
+Use the exact registered project name, quoting names containing spaces:
 
 ```sh
 battuta-project switch atlas-api
@@ -78,7 +78,7 @@ Select the local project you want to link before creating. The name and explicit
 
 If remote creation succeeds but saving the local link fails, the error includes the created project's ID, URL, and recovery commands. Fix the local error, select the original project, then run the supplied `linear link` command. This saves the link without creating another remote project. Creation is not automatically retried; if a request times out, inspect Linear before trying creation again.
 
-Only `linear refresh` and `linear create` contact Linear. Linking and the initialization options record IDs locally. Run state-changing commands serially to retain the intended selection and associations.
+`linear refresh`, `linear create`, and `explain` for a linked project contact Linear. Linking and the initialization options record IDs locally. Run state-changing commands serially to retain the intended selection and associations.
 
 ## Inspect project context
 
@@ -88,7 +88,9 @@ battuta-project explain
 
 Run `explain` after selecting a project and before working in its checkout. It takes no project argument; use `switch` first to inspect another project.
 
-Use the documentation index to find and read applicable `README.md` and `AGENTS.md` files, then work from `~/.battuta/projects/<project>/code/`. Documentation paths are relative to that checkout. Discovery is recursive, while the directory tree is limited to two levels. Symlinks, dependencies, and generated directories are excluded.
+The output includes the repository URL and the linked Linear project's URL. Repository information comes from the local registration; `not configured` means it is absent. For a linked project, the command fetches its actual URL from Linear and requires network access and a token with access to that project. An unlinked project shows `not linked` without contacting Linear. Lookup failures are reported as errors; the command does not change the project or its selection.
+
+Use the documentation index to find and read applicable `README.md` and `AGENTS.md` files, then work from the displayed Project Root. Documentation paths are relative to that checkout. Discovery is recursive, while the directory tree is limited to two levels. Symlinks, dependencies, and generated directories are excluded.
 
 ## Read and edit project memory
 
@@ -146,7 +148,7 @@ battuta-project explain
 battuta-project memory get
 ```
 
-Read the relevant repository guidance and memory, work in the selected project's `code/` directory, and save lasting decisions with `memory append` or `memory replace`.
+Read the relevant repository guidance and memory, work in the checkout returned by `explain`, and save lasting decisions with `memory append` or `memory replace`.
 
 ## Command help
 

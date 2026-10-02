@@ -18,6 +18,10 @@ CREATED_PROJECT = {"data": {"projectCreate": {
     "project": {"id": "project-1", "name": "Atlas", "url": "https://linear.app/team/project/atlas"},
 }}}
 
+PROJECT = {"data": {"project": {
+    "id": "project-1", "name": "Atlas", "url": "https://linear.app/team/project/atlas",
+}}}
+
 
 @contextmanager
 def linear_http(*responses):

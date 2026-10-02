@@ -31,6 +31,12 @@ CREATE_PROJECT = gql("""
     }
 """)
 
+GET_PROJECT = gql("""
+    query BattutaProject($id: String!) {
+      project(id: $id) { id name url }
+    }
+""")
+
 
 class _PageInfo(Model):
     has_next_page: bool = Field(alias="hasNextPage")
@@ -58,6 +64,14 @@ class _CreatePayload(Model):
 
 class _CreateResult(Model):
     project_create: _CreatePayload = Field(alias="projectCreate")
+
+
+class _ProjectInput(Model):
+    id: Text
+
+
+class _ProjectResult(Model):
+    project: LinearProject | None
 
 
 def require_linear_token() -> str:
@@ -112,3 +126,13 @@ class LinearClient:
                 request = GraphQLRequest(CREATE_PROJECT, variable_values={"input": inputs.model_dump(by_alias=True)})
                 result = session.execute(request)
             return _CreateResult.model_validate(result).project_create.project
+
+    def get_project(self, project_id: str) -> LinearProject:
+        with self._errors():
+            inputs = _ProjectInput(id=project_id)
+            with self.client as session:
+                request = GraphQLRequest(GET_PROJECT, variable_values=inputs.model_dump())
+                result = _ProjectResult.model_validate(session.execute(request))
+            if result.project is None:
+                raise click.ClickException(f"Linear project {inputs.id} was not found or is inaccessible.")
+            return result.project
