@@ -1,4 +1,4 @@
-import { lstat, mkdir, readFile, readlink, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, readlink, symlink, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,7 +7,7 @@ const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(SCRIPT_DIRECTORY, "..");
 const BOTS_DIRECTORY = join(PACKAGE_ROOT, "bots");
 const SHARED_INSTRUCTIONS_PATH = join(BOTS_DIRECTORY, "AGENTS_shared.md");
-const SHARED_SKILL_PATH = join(BOTS_DIRECTORY, "shared-skills", "project-context");
+const SHARED_SKILL_PATH = join(PACKAGE_ROOT, "shared-skills", "project-context");
 const SHARED_INSTRUCTIONS = await readFile(SHARED_INSTRUCTIONS_PATH, "utf8");
 const BOT_CONFIGURATIONS = [
   {
@@ -50,8 +50,16 @@ for (const bot of BOT_CONFIGURATIONS) {
   const skillLinkTarget = relative(bot.skillsDirectory, SHARED_SKILL_PATH);
   try {
     const stat = await lstat(bot.skillLinkPath);
-    if (!stat.isSymbolicLink() || (await readlink(bot.skillLinkPath)) !== skillLinkTarget) {
+    if (!stat.isSymbolicLink()) {
       throw new Error(`Refusing to replace existing skill: ${bot.skillLinkPath}`);
+    }
+    const existingTarget = await readlink(bot.skillLinkPath);
+    if (existingTarget !== skillLinkTarget) {
+      if (existingTarget !== "../../../shared-skills/project-context") {
+        throw new Error(`Refusing to replace existing skill: ${bot.skillLinkPath}`);
+      }
+      await unlink(bot.skillLinkPath);
+      await symlink(skillLinkTarget, bot.skillLinkPath, "dir");
     }
   } catch (error) {
     if (error.code !== "ENOENT") throw error;

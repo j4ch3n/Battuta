@@ -33,5 +33,5 @@ Run source-checkout commands from the repository root. See [development](../.age
 - `bots/{pm-bot,tl-bot}/scripts/configure-bot.py` generates bot instructions and runtime configuration; use `uv run --locked python <script-path> --help` for options.
 - `bots/pm-bot/scripts/run-dev.sh` implements the `dev` and `prod` tmux launch modes.
 - `scripts/refresh-telegram.py` validates and refreshes both Telegram profiles without reinstalling packages or regenerating instructions.
-- Shared project registry/memory commands are documented in the bot [project-context skill](../bots/shared-skills/project-context/SKILL.md).
+- Shared project registry/memory commands are documented in the [project-context skill](../shared-skills/project-context/SKILL.md).
 - Release launcher, configuration, and service commands are documented in [release setup](../RELEASE.md); their implementations live in `packaging/`.

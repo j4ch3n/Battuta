@@ -34,7 +34,7 @@ Paths below are relative to the repository root.
 | `bots/{pm-bot,tl-bot}/scripts/configure-bot.py`                     | Bot setup and runtime configuration                                                                |
 | `bots/pm-bot/scripts/run-dev.sh`                                    | Shared dev/prod tmux launcher                                                                      |
 | `bots/pm-bot/.pi/extensions/pm-bot/index.ts`                        | PM runtime extension                                                                               |
-| `bots/shared-skills/project-context/`                               | Shared project registry and memory tooling                                                         |
+| `shared-skills/project-context/`                                    | Shared project registry and memory tooling                                                         |
 | `scripts/`, root `package.json`, `Makefile`                         | Development checks, commands, and runtime-specific tooling                                         |
 | `packaging/`, `.github/workflows/release.yml`                       | Release launcher, configuration, services, and assembly                                            |
 | `docs/`                                                             | Shared technical references and detailed material without a dedicated workflow home                |

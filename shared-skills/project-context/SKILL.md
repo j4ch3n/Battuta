@@ -27,10 +27,10 @@ Check the issue tracker for whether a ticket is complete; memory is not its stat
 From a source checkout's repository root, use the locked Python environment:
 
 ```sh
-uv run --locked python bots/shared-skills/project-context/scripts/project_context.py show my-project
-uv run --locked python bots/shared-skills/project-context/scripts/project_context.py show my-project /absolute/path/to/checkout
-uv run --locked python bots/shared-skills/project-context/scripts/project_context.py read my-project
-uv run --locked python bots/shared-skills/project-context/scripts/project_context.py write my-project 'Durable context'
+uv run --locked python shared-skills/project-context/scripts/project_context.py show my-project
+uv run --locked python shared-skills/project-context/scripts/project_context.py show my-project /absolute/path/to/checkout
+uv run --locked python shared-skills/project-context/scripts/project_context.py read my-project
+uv run --locked python shared-skills/project-context/scripts/project_context.py write my-project 'Durable context'
 ```
 
 Use the second command only to initialize a missing project; a checkout path is rejected for an existing registration. Supply multiline memory as one quoted argument. From the root of a released archive, use the same script path with `python3` instead of `uv run --locked python`. The CLI requires Python 3.12+; the release archive vendors its library dependencies but not Python.
