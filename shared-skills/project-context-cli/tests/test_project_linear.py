@@ -8,7 +8,7 @@ import click
 import httpx
 
 from battuta_project.linear import LinearClient, require_linear_token
-from linear_fixtures import CREATED_PROJECT, PROJECT, linear_http, payload, team_page
+from linear_fixtures import CREATED_PROJECT, PROJECT, linear_http, payload
 
 
 class LinearTests(unittest.TestCase):
@@ -21,6 +21,10 @@ class LinearTests(unittest.TestCase):
         self.assertEqual(payload(requests[0])["variables"], {"id": "project-1"})
         self.assertIn("project(id: $id)", payload(requests[0])["query"])
         self.assertEqual(requests[0].headers["Authorization"], "secret")
+        self.assertEqual(str(requests[0].url), "https://api.linear.app/graphql")
+        self.assertEqual(requests[0].method, "POST")
+        self.assertEqual(requests[0].extensions["timeout"]["read"], 30)
+        self.assertNotIn("__schema", payload(requests[0])["query"])
 
     def test_get_project_rejects_blank_id_before_http(self):
         with linear_http() as requests:
@@ -51,46 +55,12 @@ class LinearTests(unittest.TestCase):
         with patch.dict(os.environ, {"LINEAR_API_TOKEN": " token "}):
             self.assertEqual(require_linear_token(), "token")
 
-    def test_team_pages_use_cursors_authentication_and_timeout(self):
-        with linear_http(
-            team_page([{"id": "team-1", "name": "Engineering"}], more=True, cursor="next"),
-            team_page([{"id": "team-2", "name": "Design"}]),
-        ) as requests:
-            teams = LinearClient("secret").list_teams()
-        self.assertEqual([(team.id, team.name) for team in teams],
-                         [("team-1", "Engineering"), ("team-2", "Design")])
-        self.assertEqual(len(requests), 2)
-        for request in requests:
-            self.assertEqual(str(request.url), "https://api.linear.app/graphql")
-            self.assertEqual(request.headers["Authorization"], "secret")
-            self.assertEqual(request.method, "POST")
-            self.assertEqual(request.extensions["timeout"]["read"], 30)
-            self.assertNotIn("__schema", payload(request)["query"])
-        self.assertEqual(payload(requests[0])["variables"]["after"], None)
-        self.assertEqual(payload(requests[1])["variables"]["after"], "next")
-
-    def test_empty_team_list_is_valid(self):
-        with linear_http(team_page()):
-            self.assertEqual(LinearClient("secret").list_teams(), [])
-
-    def test_invalid_and_repeated_pagination_are_rejected(self):
-        for responses in (
-            [team_page(more=True)],
-            [team_page(more=True, cursor="same"), team_page(more=True, cursor="same")],
-            [{"data": {"teams": {"nodes": [], "pageInfo": {"hasNextPage": "yes", "endCursor": None}}}}],
-            [team_page([{"id": "", "name": "Engineering"}])],
-            [{"data": {"teams": None}}],
-        ):
-            with self.subTest(responses=responses), linear_http(*responses):
-                with self.assertRaisesRegex(click.ClickException, "Linear"):
-                    LinearClient("secret").list_teams()
-
     def test_api_errors_are_readable_including_http_200_graphql_errors(self):
         responses = (
-            {"errors": [{"message": "Not authenticated"}], "data": {"teams": None}},
+            {"errors": [{"message": "Not authenticated"}], "data": {"project": None}},
             httpx.Response(401, text="Unauthorized"),
             httpx.Response(429, text="Rate limited"),
-            httpx.Response(500, json=team_page()),
+            httpx.Response(500, json=PROJECT),
             httpx.ReadTimeout("Request timed out"),
             httpx.ConnectError("Connection failed"),
             httpx.Response(200, text="not json"),
@@ -99,7 +69,7 @@ class LinearTests(unittest.TestCase):
         for response in responses:
             with self.subTest(response=response), linear_http(response):
                 with self.assertRaisesRegex(click.ClickException, "Linear"):
-                    LinearClient("secret").list_teams()
+                    LinearClient("secret").get_project("project-1")
 
     def test_create_uses_variables_and_returns_remote_project(self):
         name = 'Atlas "quoted"'

@@ -10,17 +10,8 @@ from gql.transport.exceptions import TransportError
 from gql.transport.httpx import HTTPXTransport
 from pydantic import Field, ValidationError
 
-from .models import LinearProject, LinearTeam, Model, Text
+from .models import LinearProject, Model, Text
 
-
-TEAMS = gql("""
-    query BattutaTeams($after: String) {
-      teams(first: 100, after: $after) {
-        nodes { id name }
-        pageInfo { hasNextPage endCursor }
-      }
-    }
-""")
 
 CREATE_PROJECT = gql("""
     mutation BattutaProjectCreate($input: ProjectCreateInput!) {
@@ -36,20 +27,6 @@ GET_PROJECT = gql("""
       project(id: $id) { id name url }
     }
 """)
-
-
-class _PageInfo(Model):
-    has_next_page: bool = Field(alias="hasNextPage")
-    end_cursor: Text | None = Field(alias="endCursor")
-
-
-class _Teams(Model):
-    nodes: list[LinearTeam]
-    page_info: _PageInfo = Field(alias="pageInfo")
-
-
-class _TeamResult(Model):
-    teams: _Teams
 
 
 class _CreateInput(Model):
@@ -101,23 +78,6 @@ class LinearClient:
             raise click.ClickException(f"Linear API request failed: {error}") from error
         except (ValidationError, AssertionError, AttributeError, TypeError) as error:
             raise click.ClickException(f"Invalid Linear input or response: {error}") from error
-
-    def list_teams(self) -> list[LinearTeam]:
-        teams = []
-        cursor = None
-        seen = set()
-        with self._errors(), self.client as session:
-            while True:
-                request = GraphQLRequest(TEAMS, variable_values={"after": cursor})
-                result = _TeamResult.model_validate(session.execute(request))
-                teams.extend(result.teams.nodes)
-                page = result.teams.page_info
-                if not page.has_next_page:
-                    return teams
-                cursor = page.end_cursor
-                if cursor is None or cursor in seen:
-                    raise click.ClickException("Invalid Linear pagination: missing or repeated next-page cursor.")
-                seen.add(cursor)
 
     def create_project(self, name: str, team_id: str) -> LinearProject:
         with self._errors():

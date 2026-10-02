@@ -20,26 +20,15 @@ class Model(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True, validate_default=True)
 
 
-class LinearTeam(Model):
-    id: Text
-    name: Text
-
-
 class LinearProject(Model):
     id: Text
     name: Text
     url: Text
 
 
-class CachedLinearConfig(Model):
-    model_config = ConfigDict(extra="allow")
-    teams: list[LinearTeam] = Field(default_factory=list)
-
-
 class CurrentConfig(Model):
     model_config = ConfigDict(extra="allow")
     current_project: str | None = Field(default=None, alias="currentProject")
-    linear: CachedLinearConfig = Field(default_factory=CachedLinearConfig)
 
     @field_validator("current_project")
     @classmethod
@@ -117,9 +106,8 @@ class ProjectContext(Model):
 
 
 class LinearResult(Model):
-    operation: Literal["refresh", "link", "create"]
-    teams: list[LinearTeam] = Field(default_factory=list)
-    project: ProjectContext | None = None
+    operation: Literal["link", "create"]
+    project: ProjectContext
     remote: LinearProject | None = None
 
 

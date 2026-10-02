@@ -70,18 +70,7 @@ def explain(token: str):
 
 @main.group()
 def linear():
-    """Refresh Linear teams, link a project, or create and link one."""
-
-
-@linear.command()
-@click.pass_obj
-def refresh(token: str):
-    """Fetch all accessible teams and update the shared cache."""
-    registry = ProjectRegistry()
-    registry.state()
-    teams = LinearClient(token).list_teams()
-    registry.update_teams(teams)
-    click.echo(render("linear.md.j2", LinearResult(operation="refresh", teams=teams)))
+    """Link a Linear project or create and link one."""
 
 
 @linear.command()

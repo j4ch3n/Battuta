@@ -12,7 +12,7 @@ import yaml
 
 from battuta_project.registry import ProjectRegistry
 from battuta_project.memory import ProjectMemory
-from battuta_project.models import LinearConfig, LinearTeam
+from battuta_project.models import LinearConfig
 
 
 class RegistryTests(unittest.TestCase):
@@ -39,7 +39,7 @@ class RegistryTests(unittest.TestCase):
             check=True,
         )
         self.assertEqual(json.loads((self.root / ".config.json").read_text()), {
-            "currentProject": "atlas-api", "linear": {"teams": []},
+            "currentProject": "atlas-api",
         })
         config = yaml.safe_load((self.root / "atlas-api" / "project.yaml").read_text())
         self.assertEqual(config, {
@@ -68,6 +68,9 @@ class RegistryTests(unittest.TestCase):
                 config = yaml.safe_load((project.root / "project.yaml").read_text())
                 self.assertEqual(config["linear"], {
                     "project_id": fields.get("project_id"), "team_id": fields.get("team_id"),
+                })
+                self.assertEqual(json.loads(registry.state_path.read_text()), {
+                    "currentProject": "atlas-api",
                 })
 
     def test_link_updates_captured_project_and_preserves_latest_metadata(self):
@@ -154,7 +157,6 @@ class RegistryTests(unittest.TestCase):
 
     def test_absent_and_nullable_state_have_no_selection(self):
         self.assertIsNone(self.registry.state().current_project)
-        self.assertEqual(self.registry.state().linear.teams, [])
         self.assertFalse(self.root.exists())
         self.root.mkdir()
         for value in ('{}', '{"currentProject": null}'):
@@ -164,45 +166,23 @@ class RegistryTests(unittest.TestCase):
                 with self.assertRaisesRegex(click.ClickException, "init|switch"):
                     self.registry.current()
 
-    def test_refresh_creates_state_and_merges_selection_and_extra_fields(self):
-        teams = [LinearTeam(id="team-1", name="Engineering")]
-        self.registry.update_teams(teams)
+    def test_selection_preserves_unrelated_state_and_per_project_linear_ids(self):
+        atlas = LinearConfig(project_id="project-1", team_id="team-1")
+        harbor = LinearConfig(project_id="project-2", team_id="team-2")
+        self.registry.init("https://github.com/team/atlas-api", linear=atlas)
+        self.registry.state_path.write_text(json.dumps({
+            "currentProject": "atlas-api", "custom": {"keep": True},
+        }))
+        self.registry.init("https://github.com/team/harbor-web", linear=harbor)
         self.assertEqual(json.loads(self.registry.state_path.read_text()), {
-            "currentProject": None, "linear": {"teams": [{"id": "team-1", "name": "Engineering"}]},
+            "currentProject": "harbor-web", "custom": {"keep": True},
         })
-        data = json.loads(self.registry.state_path.read_text())
-        data["custom"] = {"keep": True}
-        data["linear"]["custom"] = "keep too"
-        self.registry.state_path.write_text(json.dumps(data))
-        self.registry.init("https://github.com/team/atlas-api")
-        self.assertEqual(self.registry.state().linear.teams, teams)
-        self.registry.init("https://github.com/team/harbor-web")
-        self.assertEqual(self.registry.state().linear.teams, teams)
         self.registry.switch("atlas-api")
-        self.assertEqual(self.registry.state().linear.teams, teams)
-        self.registry.update_teams([])
         self.assertEqual(json.loads(self.registry.state_path.read_text()), {
             "currentProject": "atlas-api", "custom": {"keep": True},
-            "linear": {"teams": [], "custom": "keep too"},
         })
-
-    def test_legacy_state_is_readable_and_preserved_during_refresh(self):
-        self.registry.init("https://github.com/team/atlas-api")
-        self.registry.state_path.write_text('{"currentProject": "atlas-api"}')
-        self.assertEqual(self.registry.current().name, "atlas-api")
-        self.registry.update_teams([LinearTeam(id="team-1", name="Engineering")])
-        self.assertEqual(self.registry.current().name, "atlas-api")
-        self.assertEqual(self.registry.state().linear.teams[0].id, "team-1")
-
-    def test_invalid_state_cannot_be_replaced_by_refresh(self):
-        self.root.mkdir()
-        for value in ('not json', '{"linear": {"teams": null}}',
-                      '{"linear": {"teams": [{"id": "", "name": "Engineering"}]}}'):
-            with self.subTest(value=value):
-                self.registry.state_path.write_text(value)
-                with self.assertRaisesRegex(click.ClickException, r"\.config\.json"):
-                    self.registry.update_teams([])
-                self.assertEqual(self.registry.state_path.read_text(), value)
+        self.assertEqual(self.registry.load("atlas-api").config.linear, atlas)
+        self.assertEqual(self.registry.load("harbor-web").config.linear, harbor)
 
     def test_invalid_project_config_is_rejected(self):
         self.registry.init("https://github.com/team/atlas-api")

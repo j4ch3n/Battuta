@@ -6,7 +6,7 @@ Install as the ordinary OS user running the bots. The tool runs independently of
 
 - uv and Python **3.12+** (`requires-python` is defined in `shared-skills/project-context-cli/pyproject.toml`). uv can provision Python with `uv python install 3.12`.
 - Git and GitHub CLI (`gh`). Authenticate as the bot user with `gh auth login`, then verify `gh auth status`. Repository access uses that user's GitHub credentials.
-- A Linear personal API token in the session's `LINEAR_API_TOKEN` environment variable (reuse the value used for Linear MCP). Every `battuta-project` command, including help, requires it. Startup checks presence only; `linear refresh` needs read access to teams, `explain` needs read access to a linked project, and `linear create` needs project-creation access.
+- A Linear personal API token in the session's `LINEAR_API_TOKEN` environment variable (reuse the value used for Linear MCP). Every `battuta-project` command, including help, requires it. Startup checks presence only; `explain` needs read access to a linked project and `linear create` needs project-creation access.
 
 See the official [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/) and [GitHub CLI installation guide](https://cli.github.com/).
 

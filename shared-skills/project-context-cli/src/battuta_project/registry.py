@@ -8,7 +8,7 @@ import click
 from pydantic import ValidationError
 import yaml
 
-from .models import CurrentConfig, GithubConfig, LinearConfig, LinearTeam, ProjectConfig, ProjectContext, ProjectMetadata, Repository, project_name
+from .models import CurrentConfig, GithubConfig, LinearConfig, ProjectConfig, ProjectContext, ProjectMetadata, Repository, project_name
 from .storage import atomic_write, check_registry_root, file_errors, regular_file
 
 
@@ -51,14 +51,6 @@ class ProjectRegistry:
     def _write_state(self, state: CurrentConfig) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
         atomic_write(self.state_path, state.model_dump_json(by_alias=True, indent=2) + "\n")
-
-    def update_teams(self, teams: list[LinearTeam]) -> CurrentConfig:
-        with file_errors():
-            state = self.state()
-            linear = state.linear.model_copy(update={"teams": teams})
-            state = state.model_copy(update={"linear": linear})
-            self._write_state(state)
-            return state
 
     def _select(self, project: ProjectContext) -> None:
         state = self.state().model_copy(update={"current_project": project.name})

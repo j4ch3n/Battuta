@@ -50,15 +50,7 @@ The command validates the project's configuration and checkout before updating t
 
 Selection is shared by bots and sessions using the same OS account. Reselect the intended project before commands if another session may have switched it.
 
-## Linear projects and teams
-
-### Refresh teams
-
-```sh
-battuta-project linear refresh
-```
-
-Discover all accessible, non-archived Linear teams and their IDs. Use the IDs when linking or creating a project. Refresh works without a selected local project and replaces the saved team list while preserving your current selection. If no teams are accessible, the saved list is cleared; a failed refresh leaves it unchanged. Initializing or switching projects retains the saved teams.
+## Linear projects
 
 ### Link an existing Linear project
 
@@ -74,11 +66,11 @@ Select a local project first. Both IDs are required, trimmed, and must not be bl
 battuta-project linear create 'Atlas Platform' --team-id <team-id>
 ```
 
-Select the local project you want to link before creating. The name and explicit team ID are required. The command creates a new Linear project associated with the supplied team, then links it to the selected local project. Use this command only when a new remote project is needed; use `linear link` for an existing one. A previous team refresh is not required.
+Select the local project you want to link before creating. The name and explicit team ID are required. The command creates a new Linear project associated with the supplied team, then links it to the selected local project. Use this command only when a new remote project is needed; use `linear link` for an existing one.
 
 If remote creation succeeds but saving the local link fails, the error includes the created project's ID, URL, and recovery commands. Fix the local error, select the original project, then run the supplied `linear link` command. This saves the link without creating another remote project. Creation is not automatically retried; if a request times out, inspect Linear before trying creation again.
 
-`linear refresh`, `linear create`, and `explain` for a linked project contact Linear. Linking and the initialization options record IDs locally. Run state-changing commands serially to retain the intended selection and associations.
+`linear create` and `explain` for a linked project contact Linear. Linking and the initialization options record IDs for the selected project locally. Run state-changing commands serially to retain the intended selection and associations.
 
 ## Inspect project context
 

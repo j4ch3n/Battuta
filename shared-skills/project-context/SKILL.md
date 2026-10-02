@@ -9,7 +9,7 @@ description: Use when working on, researching, coding, or building artifacts for
 
 `battuta-project` manages project checkouts, indexes repository guidance, and stores durable project memory shared by the bots. Before project work, select the intended project, run `explain`, and read the relevant README/AGENTS files. Run commands from any directory after [installation](references/installation.md).
 
-Run `linear refresh` explicitly to discover current teams. `linear refresh`, `linear create`, and `explain` for a linked project contact Linear; GitHub initialization still clones over the network.
+`linear create` and `explain` for a linked project contact Linear; GitHub initialization still clones over the network.
 
 ## Commands
 
@@ -41,13 +41,12 @@ Run `linear refresh` explicitly to discover current teams. `linear refresh`, `li
 
 ### `battuta-project linear <operation>`
 
-| Operation | Usage                                                           | Behavior                                                                                                                          |
-| --------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `refresh` | `battuta-project linear refresh`                                | Fetch all accessible, non-archived teams; print and cache names/IDs. No current project required.                                 |
-| `link`    | `battuta-project linear link --project-id <id> --team-id <id>`  | Associate both IDs with the current project; no Linear request.                                                                   |
-| `create`  | `battuta-project linear create 'Atlas Platform' --team-id <id>` | Create a Linear project, print its ID/URL, and link it to the current local project. Explicit team required; refresh is optional. |
+| Operation | Usage                                                           | Behavior                                                                                                     |
+| --------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `link`    | `battuta-project linear link --project-id <id> --team-id <id>`  | Associate both IDs with the current project; no Linear request.                                              |
+| `create`  | `battuta-project linear create 'Atlas Platform' --team-id <id>` | Create a Linear project, print its ID/URL, and link it to the current local project. Explicit team required. |
 
-IDs and creation names must not be blank. Refresh preserves selection and other config fields; `init`/`switch` preserve cached teams. If creation succeeds but local saving fails, fix the local error and use the error's `switch`/`linear link` recovery commands rather than creating a duplicate. After a creation timeout, inspect Linear before retrying. See [command contracts](references/commands.md#linear-projects-and-teams).
+IDs and creation names must not be blank. Linear project and team associations belong to the selected project. If creation succeeds but local saving fails, fix the local error and use the error's `switch`/`linear link` recovery commands rather than creating a duplicate. After a creation timeout, inspect Linear before retrying. See [command contracts](references/commands.md#linear-projects).
 
 ### `battuta-project memory <operation>`
 

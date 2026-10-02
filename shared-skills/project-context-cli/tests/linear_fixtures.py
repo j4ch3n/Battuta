@@ -7,12 +7,6 @@ from unittest.mock import patch
 import httpx
 
 
-def team_page(nodes=(), *, more=False, cursor=None):
-    return {"data": {"teams": {
-        "nodes": list(nodes), "pageInfo": {"hasNextPage": more, "endCursor": cursor},
-    }}}
-
-
 CREATED_PROJECT = {"data": {"projectCreate": {
     "success": True,
     "project": {"id": "project-1", "name": "Atlas", "url": "https://linear.app/team/project/atlas"},

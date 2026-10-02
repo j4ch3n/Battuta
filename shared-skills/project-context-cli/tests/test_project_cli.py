@@ -1,7 +1,6 @@
 """CLI argument contracts and end-to-end current-project workflows."""
 
 from click.testing import CliRunner
-import json
 import os
 from unittest.mock import patch
 
@@ -9,7 +8,7 @@ import yaml
 
 from battuta_project.cli import main
 from project_fixtures import ProjectTestCase
-from linear_fixtures import CREATED_PROJECT, PROJECT, linear_http, payload, team_page
+from linear_fixtures import CREATED_PROJECT, PROJECT, linear_http, payload
 
 
 class CliTests(ProjectTestCase):
@@ -107,7 +106,7 @@ class CliTests(ProjectTestCase):
             (), ("--help",), ("init", "--help"), ("memory", "--help"), ("linear", "--help"),
             ("linear", "create", "--help"), ("memory", "get", "--help"),
             ("switch", "atlas-api"), ("explain",), ("memory", "get"),
-            ("init", "https://github.com/team/harbor-web"), ("linear", "refresh"),
+            ("init", "https://github.com/team/harbor-web"),
             ("linear", "link", "--project-id", "project-1", "--team-id", "team-1"),
             ("linear", "create", "Atlas", "--team-id", "team-1"), ("unknown",),
         )
@@ -139,38 +138,14 @@ class CliTests(ProjectTestCase):
         self.assertEqual(self.registry.load("atlas-api").config.linear.project_id, "project-1")
         self.assertEqual(self.registry.current().config.linear.team_id, "team-2")
 
-    def test_refresh_without_selection_creates_cache_and_prints_teams(self):
-        self.registry.state_path.unlink()
-        with linear_http(
-            team_page([{"id": "team-1", "name": "Engineering"}], more=True, cursor="next"),
-            team_page([{"id": "team-2", "name": "Design"}]),
-        ):
-            output = self.invoke("linear", "refresh")
-        self.assertIn("Engineering", output)
-        self.assertIn("team-1", output)
-        self.assertIn("Design", output)
-        self.assertEqual(json.loads(self.registry.state_path.read_text()), {
-            "currentProject": None,
-            "linear": {"teams": [{"id": "team-1", "name": "Engineering"}, {"id": "team-2", "name": "Design"}]},
-        })
-
-    def test_failed_refresh_preserves_cache_and_selection(self):
-        self.registry.state_path.write_text(json.dumps({
-            "currentProject": "atlas-api", "linear": {"teams": [{"id": "old", "name": "Old"}]},
-        }))
+    def test_removed_refresh_command_is_rejected_without_http_or_state_changes(self):
         original = self.registry.state_path.read_text()
-        with linear_http(team_page(more=True, cursor="next"), {"errors": [{"message": "Unavailable"}]}):
+        with linear_http(PROJECT) as requests:
             result = self.runner.invoke(main, ["linear", "refresh"])
         self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("Unavailable", result.output)
+        self.assertIn("No such command 'refresh'", result.output)
+        self.assertEqual(requests, [])
         self.assertEqual(self.registry.state_path.read_text(), original)
-
-    def test_refresh_empty_teams_preserves_selection(self):
-        with linear_http(team_page()):
-            output = self.invoke("linear", "refresh")
-        self.assertIn("0", output)
-        self.assertEqual(self.registry.current().name, "atlas-api")
-        self.assertEqual(self.registry.state().linear.teams, [])
 
     def test_blank_linear_options_are_rejected_before_cloning_or_http(self):
         for args in (
@@ -189,7 +164,7 @@ class CliTests(ProjectTestCase):
                 self.assertFalse((self.registry.root / "harbor-web").exists())
                 self.assertEqual(requests, [])
 
-    def test_create_links_remote_project_without_refresh(self):
+    def test_create_links_remote_project_using_explicit_team_id(self):
         with linear_http(CREATED_PROJECT) as requests:
             output = self.invoke("linear", "create", "Atlas", "--team-id", "team-1")
         self.assertIn("project-1", output)
