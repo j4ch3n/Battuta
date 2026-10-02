@@ -9,6 +9,8 @@ description: Use when working on, researching, coding, or building artifacts for
 
 `battuta-project` manages project checkouts, indexes repository guidance, and stores durable project memory shared by the bots. Before project work, select the intended project, run `explain`, and read the relevant README/AGENTS files. Run commands from any directory after [installation](references/installation.md).
 
+Every `battuta-project` invocation requires a non-empty session `LINEAR_API_TOKEN`, including help. Reuse the personal API token used for Linear MCP; startup checks presence only. Run `linear refresh` explicitly to discover current teams. Only `linear refresh` and `linear create` contact Linear; GitHub initialization still clones over the network.
+
 ## Commands
 
 ### `battuta-project init <github-repo-url>`
@@ -18,6 +20,8 @@ description: Use when working on, researching, coding, or building artifacts for
 **Output:** Project root, checkout, configuration, and current selection.
 
 **Process:** Clone with `gh` into `~/.battuta/projects/<repository-name>/code`, create project configuration, and select the project. Existing folders cause an error; failed cloning preserves the previous selection.
+
+**Linear metadata:** Optional `--linear-project-id <id>` and `--linear-team-id <id>` record existing IDs without querying Linear. Each omitted field defaults to `null`.
 
 ### `battuta-project switch <project-name>`
 
@@ -34,6 +38,16 @@ description: Use when working on, researching, coding, or building artifacts for
 **Output:** Project Root (the `code/` checkout), relative README/AGENTS locations, and a two-level ASCII directory tree.
 
 **Process:** Use the current project; discover nested documentation recursively while excluding dependencies, generated directories, and symlinks. Read the applicable instructions before working in the displayed Project Root.
+
+### `battuta-project linear <operation>`
+
+| Operation | Usage                                                           | Behavior                                                                                                                          |
+| --------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `refresh` | `battuta-project linear refresh`                                | Fetch all accessible, non-archived teams; print names/IDs and cache them in `.config.json`. No current project required.          |
+| `link`    | `battuta-project linear link --project-id <id> --team-id <id>`  | Save both IDs in the current project's `project.yaml`; no Linear request.                                                         |
+| `create`  | `battuta-project linear create 'Atlas Platform' --team-id <id>` | Create a Linear project, print its ID/URL, and link it to the current local project. Explicit team required; refresh is optional. |
+
+IDs and creation names must not be blank. Refresh preserves selection and other config fields; `init`/`switch` preserve cached teams. If creation succeeds but local saving fails, fix the local error and use the error's `switch`/`linear link` recovery commands rather than creating a duplicate. After a creation timeout, inspect Linear before retrying. See [command contracts](references/commands.md#linear-projects-and-teams).
 
 ### `battuta-project memory <operation>`
 
@@ -58,7 +72,7 @@ Initialize `atlas-api`, run `explain`, and work in its checkout. Initialize `har
 
 - Checkouts: `~/.battuta/projects/<project>/code/`
 - Project configuration and memory: `~/.battuta/projects/<project>/{project.yaml,MEMORY.md}`
-- Selection: `~/.battuta/projects/.config.json`
+- Selection and cached Linear teams: `~/.battuta/projects/.config.json`
 
 ## Reference files
 

@@ -8,7 +8,7 @@ import click
 from pydantic import ValidationError
 import yaml
 
-from .models import CurrentConfig, GithubConfig, ProjectConfig, ProjectContext, ProjectMetadata, Repository, project_name
+from .models import CurrentConfig, GithubConfig, LinearConfig, LinearTeam, ProjectConfig, ProjectContext, ProjectMetadata, Repository, project_name
 from .storage import atomic_write, check_registry_root, file_errors, regular_file
 
 
@@ -31,12 +31,12 @@ class ProjectRegistry:
             raise click.ClickException(f"Project directory must not be a symlink: {directory}")
         return directory
 
-    def _state(self) -> CurrentConfig:
+    def state(self) -> CurrentConfig:
         with file_errors():
             check_registry_root(self.root)
             regular_file(self.state_path)
             if not self.state_path.exists():
-                raise click.ClickException("No current project. Run battuta-project init <github-url> or switch <project-name>.")
+                return CurrentConfig()
             try:
                 return CurrentConfig.model_validate_json(self.state_path.read_text(encoding="utf-8"))
             except ValidationError as error:
@@ -46,11 +46,23 @@ class ProjectRegistry:
         check_registry_root(self.root)
         regular_file(self.state_path)
         if self.state_path.exists():
-            self._state()
+            self.state()
+
+    def _write_state(self, state: CurrentConfig) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        atomic_write(self.state_path, state.model_dump_json(by_alias=True, indent=2) + "\n")
+
+    def update_teams(self, teams: list[LinearTeam]) -> CurrentConfig:
+        with file_errors():
+            state = self.state()
+            linear = state.linear.model_copy(update={"teams": teams})
+            state = state.model_copy(update={"linear": linear})
+            self._write_state(state)
+            return state
 
     def _select(self, project: ProjectContext) -> None:
-        state = CurrentConfig(currentProject=project.name)
-        atomic_write(self.state_path, state.model_dump_json(by_alias=True, indent=2) + "\n")
+        state = self.state().model_copy(update={"current_project": project.name})
+        self._write_state(state)
 
     def load(self, name: str) -> ProjectContext:
         with file_errors():
@@ -66,7 +78,7 @@ class ProjectRegistry:
             regular_file(path)
             try:
                 config = ProjectConfig.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
-            except (ValidationError, yaml.YAMLError) as error:
+            except (ValidationError, yaml.YAMLError, UnicodeError) as error:
                 raise click.ClickException(f"{path}: {error}") from error
             if config.project.name != name:
                 raise click.ClickException(f"{path}: project.name does not match folder '{name}'")
@@ -78,7 +90,10 @@ class ProjectRegistry:
             return ProjectContext(name=name, root=directory, code=code, config=config)
 
     def current(self) -> ProjectContext:
-        return self.load(self._state().current_project)
+        name = self.state().current_project
+        if name is None:
+            raise click.ClickException("No current project. Run battuta-project init <github-url> or switch <project-name>.")
+        return self.load(name)
 
     def switch(self, name: str) -> ProjectContext:
         with file_errors():
@@ -87,7 +102,18 @@ class ProjectRegistry:
             self._select(project)
             return project
 
-    def init(self, url: str) -> ProjectContext:
+    @staticmethod
+    def _write_project(directory: Path, config: ProjectConfig) -> None:
+        atomic_write(directory / "project.yaml", yaml.safe_dump(config.model_dump(mode="json"), sort_keys=False))
+
+    def link_linear(self, project: ProjectContext, linear: LinearConfig) -> ProjectContext:
+        with file_errors():
+            project = self.load(project.name)
+            config = project.config.model_copy(update={"linear": linear})
+            self._write_project(project.root, config)
+            return project.model_copy(update={"config": config})
+
+    def init(self, url: str, *, linear: LinearConfig | None = None) -> ProjectContext:
         try:
             repository = Repository.from_url(url)
         except ValueError as error:
@@ -105,8 +131,9 @@ class ProjectRegistry:
                 config = ProjectConfig(
                     project=ProjectMetadata(name=repository.name, path=code),
                     github=GithubConfig(repository=f"{repository.owner}/{repository.name}"),
+                    linear=linear or LinearConfig(),
                 )
-                atomic_write(directory / "project.yaml", yaml.safe_dump(config.model_dump(mode="json"), sort_keys=False))
+                self._write_project(directory, config)
                 project = self.load(repository.name)
                 self._select(project)
                 return project

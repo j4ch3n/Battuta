@@ -20,10 +20,31 @@ class Model(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True, validate_default=True)
 
 
-class CurrentConfig(Model):
-    current_project: str = Field(alias="currentProject")
+class LinearTeam(Model):
+    id: Text
+    name: Text
 
-    _name = field_validator("current_project")(project_name)
+
+class LinearProject(Model):
+    id: Text
+    name: Text
+    url: Text
+
+
+class CachedLinearConfig(Model):
+    model_config = ConfigDict(extra="allow")
+    teams: list[LinearTeam] = Field(default_factory=list)
+
+
+class CurrentConfig(Model):
+    model_config = ConfigDict(extra="allow")
+    current_project: str | None = Field(default=None, alias="currentProject")
+    linear: CachedLinearConfig = Field(default_factory=CachedLinearConfig)
+
+    @field_validator("current_project")
+    @classmethod
+    def selected_name(cls, value):
+        return project_name(value) if value is not None else None
 
 
 class ProjectMetadata(Model):
@@ -93,6 +114,13 @@ class ProjectContext(Model):
     root: Path
     code: Path
     config: ProjectConfig
+
+
+class LinearResult(Model):
+    operation: Literal["refresh", "link", "create"]
+    teams: list[LinearTeam] = Field(default_factory=list)
+    project: ProjectContext | None = None
+    remote: LinearProject | None = None
 
 
 class MemoryEntry(Model):

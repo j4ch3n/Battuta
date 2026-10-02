@@ -6,6 +6,7 @@ Install as the ordinary OS user running the bots. The tool runs independently of
 
 - uv and Python **3.12+** (`requires-python` is defined in `shared-skills/project-context-cli/pyproject.toml`). uv can provision Python with `uv python install 3.12`.
 - Git and GitHub CLI (`gh`). Authenticate as the bot user with `gh auth login`, then verify `gh auth status`. Repository access uses that user's GitHub credentials.
+- A Linear personal API token in the session's `LINEAR_API_TOKEN` environment variable (reuse the value used for Linear MCP). Every `battuta-project` command, including help, requires it. Startup checks presence only; `linear refresh` needs read access to teams and `linear create` needs project-creation access.
 
 See the official [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/) and [GitHub CLI installation guide](https://cli.github.com/).
 
@@ -58,7 +59,7 @@ systemctl --user daemon-reload
 systemctl --user restart battuta-pm.service battuta-tl.service
 ```
 
-Include custom `gh`/Git locations in PATH when needed. Source/tmux launches inherit their shell environment; make the tool available before starting them. Verify `battuta-project --help` and `gh auth status` as the bot user with the intended PATH.
+Include custom `gh`/Git locations in PATH when needed. Source/tmux launches inherit their shell environment; make the tool available before starting them. Ensure bot services also receive `LINEAR_API_TOKEN` through their runtime environment. Verify `battuta-project --help` and `gh auth status` as the bot user with the intended PATH and token environment.
 
 ## Project registrations
 
@@ -67,3 +68,5 @@ Each registration stores its checkout in `~/.battuta/projects/<project>/code/`, 
 Use `battuta-project init <github-repo-url>` to create a registration and `battuta-project switch <project>` to select one. Initialization never overwrites an existing folder. Repository basenames must start with a letter or number and contain only letters, numbers, `.`, `_`, or `-`. Names match exactly, subject to the host filesystem's case sensitivity. See [command usage](commands.md) for the workflow.
 
 Malformed configuration errors identify the file and field. Fix invalid data in place; a malformed `.config.json` is not silently overwritten. If selection points to a removed project, `switch` can select another existing project.
+
+The shared `.config.json` stores `currentProject` (default `null`) and the cached Linear team list. `linear refresh` explicitly updates the cache; initialization and switching merge the selection into existing configuration. Per-project Linear IDs remain in `project.yaml`. See [Linear command usage](commands.md#linear-projects-and-teams).
