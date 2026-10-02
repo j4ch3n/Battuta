@@ -1,0 +1,13 @@
+{% if operation == 'get' %}
+{% for entry in entries %}
+{{ entry.index }}: {{ entry.content }}
+{% else %}
+No memory for {{ project }}.
+{% endfor %}
+{% elif operation == 'append' %}
+Appended memory line {{ count }} for {{ project }}.
+{% elif operation == 'replace' %}
+Replaced memory line {{ count }} for {{ project }}.
+{% else %}
+Replaced all memory for {{ project }}: {{ count }} lines.
+{% endif %}

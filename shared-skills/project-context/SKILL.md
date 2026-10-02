@@ -1,36 +1,67 @@
 ---
 name: project-context
-description: Use when the Project Manager or Tech Lead starts work on a registered project, needs its checkout or role configuration, or needs to recall or save durable project decisions across sessions.
+description: Use when working on, researching, coding, or building artifacts for a project.
 ---
 
 # Project context
 
-The project registry stores each project's configuration; `MEMORY.md` stores durable context shared by the Project Manager and Tech Lead. Neither is loaded automatically. Use this skill to retrieve the context relevant to the current project and update it when a lasting decision changes.
+## Overview
 
-## When to load context
+`battuta-project` manages project checkouts, indexes repository guidance, and stores durable project memory shared by the bots. Before project work, select the intended project, run `explain`, and read the relevant README/AGENTS files. Run commands from any directory after [installation](references/installation.md).
 
-- At the start of project-specific work, identify the project name and run `show` to obtain its registered checkout, integrations, and roles. If the project has not been registered, initialize it by supplying its checkout path to `show` once.
-- Run `read` when prior decisions or standing constraints could affect the work, especially before making a decision that may conflict with earlier context. An empty result means there is no saved memory yet.
-- Check current repository and issue-tracker evidence for live facts. Memory is for durable decisions and rationale, not current ticket status or a snapshot of the codebase.
+## Commands
 
-## When to update memory
+### `battuta-project init <github-repo-url>`
 
-Save decisions, their rationale, and stable project constraints that the Project Manager and Tech Lead will need in future sessions. A brief ticket identifier is optional when it helps trace a decision; do not store ticket URLs, transient progress, or generated or repository instructions. For example:
+**Usage:** `battuta-project init https://github.com/team/atlas-api.git`
 
-- “Use the existing worker for imports because the deployment has no separate queue (decided during IMP-42).”
-- “Retrying an import must retain the original import record so users can trace its history.”
+**Output:** Project root, checkout, configuration, and current selection.
 
-Check the issue tracker for whether a ticket is complete; memory is not its status record. Before writing, read the existing memory and retain anything still relevant: **`write` replaces the entire `MEMORY.md`**.
+**Process:** Clone with `gh` into `~/.battuta/projects/<repository-name>/code`, create project configuration, and select the project. Existing folders cause an error; failed cloning preserves the previous selection.
 
-## Run the script
+### `battuta-project switch <project-name>`
 
-From a source checkout's repository root, use the locked Python environment:
+**Usage:** `battuta-project switch atlas-api`
+
+**Output:** Current project and checkout location.
+
+**Process:** Match an exact folder name under `~/.battuta/projects/`, validate its configuration and checkout, and persist `currentProject`. A missing project causes an error. This does not change the shell directory.
+
+### `battuta-project explain`
+
+**Usage:** `battuta-project explain`
+
+**Output:** Project Root (the `code/` checkout), relative README/AGENTS locations, and a two-level ASCII directory tree.
+
+**Process:** Use the current project; discover nested documentation recursively while excluding dependencies, generated directories, and symlinks. Read the applicable instructions before working in the displayed Project Root.
+
+### `battuta-project memory <operation>`
+
+**Usage:**
 
 ```sh
-uv run --locked python shared-skills/project-context/scripts/project_context.py show my-project
-uv run --locked python shared-skills/project-context/scripts/project_context.py show my-project /absolute/path/to/checkout
-uv run --locked python shared-skills/project-context/scripts/project_context.py read my-project
-uv run --locked python shared-skills/project-context/scripts/project_context.py write my-project 'Durable context'
+battuta-project memory get
+battuta-project memory append 'Use the existing worker for imports.'
+battuta-project memory replace 1 'Use the existing worker because deployment has no queue.'
+battuta-project memory replaceAll 'Complete reconciled memory'
 ```
 
-Use the second command only to initialize a missing project; a checkout path is rejected for an existing registration. Supply multiline memory as one quoted argument. From the root of a released archive, use the same script path with `python3` instead of `uv run --locked python`. The CLI requires Python 3.12+; the release archive vendors its library dependencies but not Python.
+**Output:** `get` returns full memory with 1-based indexes; edits confirm the changed line or entry count.
+
+**Process:** Use the current project. Append/replace one trimmed, non-empty line; `replaceAll` trims each line and drops blanks. Retrieve memory before editing; reconcile using unnumbered content. Save durable decisions and rationale, not live ticket status or repository instructions. See [memory guidance](references/memory.md).
+
+## Workflow example
+
+Initialize `atlas-api`, run `explain`, and work in its checkout. Initialize `harbor-web` to select it, then use `switch atlas-api` to return. Before each project's work, confirm selection with `explain` and retrieve relevant memory. Selection is shared by bots using the same OS account; reselect the intended project before commands if another session may have switched it.
+
+## File locations
+
+- Checkouts: `~/.battuta/projects/<project>/code/`
+- Project configuration and memory: `~/.battuta/projects/<project>/{project.yaml,MEMORY.md}`
+- Selection: `~/.battuta/projects/.config.json`
+
+## Reference files
+
+- [Installation and migration](references/installation.md)
+- [Command contracts and two-project examples](references/commands.md)
+- [Memory editing and reconciliation](references/memory.md)

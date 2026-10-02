@@ -20,7 +20,7 @@ systemctl --version
 tmux -V
 ```
 
-Expect `aarch64`/`arm64` and Python **3.12+**. The release bundles Node, Pi, and bot dependencies; it does not require uv, pnpm, Docker, or local Supabase. If Python is missing or too old, arrange a supported Python 3.12+ installation without replacing the OS Python, then recheck. `tmux` is needed for the interactive screen launcher; on Raspberry Pi OS install it if missing with `sudo apt update && sudo apt install tmux`. `script` and working `systemctl --user` are needed only for the optional services in step 6. Check those separately before choosing services; follow the OS's supported user-session setup if unavailable. Do not continue until the tools for the chosen launch method work.
+Expect `aarch64`/`arm64` and Python **3.12+**. The release bundles Node, Pi, and bot dependencies; it does not require pnpm, Docker, or local Supabase. Project-context tooling requires uv, Git, and GitHub CLI; its bundled wheels target Python **3.12** on Linux ARM64. Install it using the [project-context installation reference](shared-skills/project-context/references/installation.md) before project work. If Python is missing or too old, arrange a supported installation without replacing the OS Python, then recheck. `tmux` is needed for the interactive screen launcher; on Raspberry Pi OS install it if missing with `sudo apt update && sudo apt install tmux`. `script` and working `systemctl --user` are needed only for the optional services in step 6. Check those separately before choosing services; follow the OS's supported user-session setup if unavailable. Do not continue until the tools for the chosen launch method work.
 
 Confirm with the owner that a **remote Supabase project** has already been deployed with Battuta's database migrations and Edge Functions, and that they have two distinct Telegram bot tokens, their numeric Telegram user ID, a Linear API key, and remote Supabase URL and secret key. This archive does not deploy Supabase. If the remote backend is not ready, pause here and arrange its deployment before launching the bots.
 
@@ -58,6 +58,8 @@ test -x bin/battuta && test -f .env.example && test -f RELEASE.md
 ```
 
 Run subsequent commands from this extracted installation directory. If the final check fails, stop and inspect the extraction.
+
+Install `battuta-project` from the included wheels as described in the [installation reference](shared-skills/project-context/references/installation.md). Verify its help command and GitHub authentication as the bot user.
 
 ## 4. Prepare production credentials
 
@@ -112,6 +114,8 @@ systemctl --user status battuta-pm.service battuta-tl.service
 
 Expect both services to be active/running. If not, inspect `journalctl --user -u battuta-pm.service -f` and the corresponding Tech Lead service logs, fix the cause, and recheck. `install-services` only writes user units; enabling/starting is a separate step. To run services at boot without an interactive login, an administrator can enable linger with `sudo loginctl enable-linger "$USER"`. Never run tmux bots alongside active services.
 
+Make the installed `battuta-project` executable available to both services using the [service PATH instructions](shared-skills/project-context/references/installation.md#bot-service-path); shell PATH changes alone do not apply to systemd units.
+
 ## 7. Updating an existing installation
 
 ### Already done?
@@ -121,6 +125,8 @@ This step applies only when the owner requests a newer release or a change of in
 ### Fresh setup
 
 For a new version or installation path, stop the screen/foreground processes or disable services with `systemctl --user disable --now battuta-pm.service battuta-tl.service` before replacing files. Back up `.env.prod` and both bots' `.pi` state, including auth and sessions, and protect the backups as secrets. Verify the new archive as in step 2. Preserve those private files while updating the same stable path; do not extract over them blindly. Then run `bin/battuta configure` again, verify interactively, and, if using services, run `bin/battuta install-services`, daemon-reload, and enable/start as in step 6.
+
+Reinstall `battuta-project` from the updated release wheels with `--reinstall`. Project registrations and memory live independently under `~/.battuta/projects/`; retain them across release updates.
 
 If the installation path changes, stop/disable services first. Their generated units use absolute paths; the installer rejects units pointing to another root. Move only the two Battuta unit files aside before installing from the new path:
 

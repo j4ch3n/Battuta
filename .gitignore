@@ -18,3 +18,7 @@ node_modules/
 dist/
 coverage/
 .reports/
+
+# Local Superpowers artifacts
+/docs/superpowers/
+/.superpowers/
