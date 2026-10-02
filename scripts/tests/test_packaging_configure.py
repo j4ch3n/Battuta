@@ -1,5 +1,6 @@
 """Release configuration installs shared skills from the archive root."""
 
+import json
 import os
 from pathlib import Path
 import shutil
@@ -33,7 +34,7 @@ class PackagingConfigureTests(unittest.TestCase):
                 env = {
                     **os.environ,
                     "TELEGRAM_ALLOWED_USER_ID": "123",
-                    "LINEAR_API_KEY": "test-linear",
+                    "LINEAR_API_TOKEN": "test-linear",
                     "SUPABASE_URL": "https://example.com",
                     "SUPABASE_SECRET_KEY": "test-supabase",
                     "PM_TELEGRAM_TOKEN": "456:test-pm",
@@ -50,3 +51,7 @@ class PackagingConfigureTests(unittest.TestCase):
                         self.assertEqual((link / "SKILL.md").read_text(), "Shared project context")
                         self.assertEqual(link.resolve(), source.resolve())
                         self.assertFalse(link.readlink().is_absolute())
+                        mcp = json.loads((link.parent.parent / "mcp.json").read_text())
+                        self.assertEqual(
+                            mcp["mcpServers"]["linear"]["bearerTokenEnv"], "LINEAR_API_TOKEN",
+                        )

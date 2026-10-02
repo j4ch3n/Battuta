@@ -34,7 +34,7 @@ def main(bot_dir: Path, env_file: Path, env_prefix: str, telegram_package: str, 
     values = read_env(env_file)
     required(values, f"{env_prefix}_TELEGRAM_TOKEN", env_file)
     required(values, "TELEGRAM_ALLOWED_USER_ID", env_file)
-    required(values, "LINEAR_API_KEY", env_file)
+    required(values, "LINEAR_API_TOKEN", env_file)
     configure_telegram(bot_dir, env_file, env_prefix, values)
     configure_mcp(bot_dir, env_file, values)
     install_packages(bot_dir, telegram_package, mcp_package)

@@ -40,7 +40,7 @@ function required(name) {
 
 const owner = Number(required("TELEGRAM_ALLOWED_USER_ID"));
 if (!Number.isSafeInteger(owner) || owner <= 0) throw new Error("Invalid TELEGRAM_ALLOWED_USER_ID");
-required("LINEAR_API_KEY");
+required("LINEAR_API_TOKEN");
 required("SUPABASE_URL");
 required("SUPABASE_SECRET_KEY");
 
@@ -82,7 +82,7 @@ for (const bot of BOT_CONFIGURATIONS) {
       linear: {
         url: "https://mcp.linear.app/mcp",
         auth: "bearer",
-        bearerTokenEnv: "LINEAR_API_KEY",
+        bearerTokenEnv: "LINEAR_API_TOKEN",
       },
     },
   };
