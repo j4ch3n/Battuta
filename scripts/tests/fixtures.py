@@ -55,7 +55,7 @@ os.execv(sys.executable, [sys.executable, *args[args.index("python") + 1:]])
             f"TL_TELEGRAM_TOKEN={tl}:tl-secret\n"
             "TELEGRAM_ALLOWED_USER_ID=123\n"
             "PM_TELEGRAM_BOT_USERNAME=new_pm_bot\n"
-            "LINEAR_API_KEY=linear-test\n"
+            "LINEAR_API_TOKEN=linear-test\n"
             "SUPABASE_URL=http://localhost:54321\n"
             "SUPABASE_SECRET_KEY=supabase-test\n"
         )

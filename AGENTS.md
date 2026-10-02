@@ -15,6 +15,8 @@ TypeScript on Node.js and Deno, the Pi coding-agent runtime, Telegram, Linear, a
 - Cover changed behavior, edge cases, and regressions with meaningful tests. Use parameterized tests for equivalent cases.
 - Keep unit tests small and focused. Stub external services, clocks, and runtime boundaries; exercise real internal logic. Use integration tests for cross-system behavior.
 - For `scripts/`, organize tests in `scripts/tests/test_<script_or_module>.py` by the script or helper they exercise. Keep configuration/parsing tests separate from launcher orchestration; avoid a single catch-all launch test suite. Run discovery through `pnpm check:support`.
+- For shared skills, keep instructions and references under `shared-skills/<skill>/` and tool code, package metadata, dependencies, and tests under `shared-skills/<skill>-cli/`. `pnpm check:support` discovers each CLI's `tests/` directory in its own locked Python environment.
+- Write skills and command references around when and how to use the tool, with concise usage examples and descriptions of user-visible effects. Command references should explain invocation, workflow, and impact rather than serve as code documentation; keep environment prerequisites in installation guidance and schemas, output examples, and implementation details in dedicated technical references when needed.
 - Review coverage for changed modules and address meaningful gaps; do not optimize for a percentage alone. Run relevant verification before claiming completion.
 - Keep every `README.md` concise: project/component description, high-level features, and links to getting started and further guidance. Put commands, setup, stack details, and technical explanations in focused references.
 - Keep this file high-level and link to a single maintained source rather than duplicating technical guidance.
@@ -34,7 +36,8 @@ Paths below are relative to the repository root.
 | `bots/{pm-bot,tl-bot}/scripts/configure-bot.py`                     | Bot setup and runtime configuration                                                                |
 | `bots/pm-bot/scripts/run-dev.sh`                                    | Shared dev/prod tmux launcher                                                                      |
 | `bots/pm-bot/.pi/extensions/pm-bot/index.ts`                        | PM runtime extension                                                                               |
-| `bots/shared-skills/project-context/`                               | Shared project registry and memory tooling                                                         |
+| `shared-skills/project-context/`                                    | Project-context skill instructions and references                                                  |
+| `shared-skills/project-context-cli/`                                | Project registry and memory CLI package, dependencies, and tests                                   |
 | `scripts/`, root `package.json`, `Makefile`                         | Development checks, commands, and runtime-specific tooling                                         |
 | `packaging/`, `.github/workflows/release.yml`                       | Release launcher, configuration, services, and assembly                                            |
 | `docs/`                                                             | Shared technical references and detailed material without a dedicated workflow home                |

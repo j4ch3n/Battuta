@@ -73,7 +73,11 @@ try {
   server = spawn("supabase", ["--workdir", workdir, "functions", "serve"], {
     cwd: root,
     stdio: ["ignore", log, log],
-    env: { ...process.env, LINEAR_WEBHOOK_SECRET: "ci-test-secret", LINEAR_API_KEY: "ci-test-key" },
+    env: {
+      ...process.env,
+      LINEAR_WEBHOOK_SECRET: "ci-test-secret",
+      LINEAR_API_TOKEN: "ci-test-token",
+    },
   });
   let spawnError;
   server.on("error", (error) => {

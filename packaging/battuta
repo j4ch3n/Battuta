@@ -27,7 +27,7 @@ case "${1:-}" in
     set -a
     source "$root/.env.prod"
     set +a
-    for key in LINEAR_API_KEY SUPABASE_URL SUPABASE_SECRET_KEY; do
+    for key in LINEAR_API_TOKEN SUPABASE_URL SUPABASE_SECRET_KEY; do
       [[ -n "${!key:-}" ]] || { printf 'Set %s in .env.prod\n' "$key" >&2; exit 1; }
     done
     export AGENT_ROLE="$role" PI_CODING_AGENT_DIR="$bot_dir/.pi"

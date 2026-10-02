@@ -25,6 +25,10 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.11.19"
+
       - name: Require tag on main
         env:
           TAG: ${{ github.ref_name }}
@@ -46,9 +50,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots agent-mail .env.example RELEASE.md | tar -x -C dist/stage/battuta
+          git archive HEAD bots shared-skills agent-mail .env.example RELEASE.md | tar -x -C dist/stage/battuta
           test -s dist/stage/battuta/RELEASE.md
-          python3 -m pip install --no-deps --only-binary=:all: --target dist/stage/battuta/bots/shared-skills/project-context/scripts/vendor click==8.5.0 PyYAML==6.0.3
+          cli_dir="$PWD/dist/stage/battuta/shared-skills/project-context-cli"
+          uv export --project "$cli_dir" --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/project-requirements.txt"
+          uv build --project "$cli_dir" --wheel --out-dir "$cli_dir/wheels"
+          python3 -m pip download --require-hashes --no-deps --only-binary=:all: --dest "$cli_dir/wheels" -r "$RUNNER_TEMP/project-requirements.txt"
           cp "$(command -v node)" dist/stage/battuta/bin/node
           cp packaging/battuta dist/stage/battuta/bin/battuta
           cp packaging/configure.mjs dist/stage/battuta/bin/configure.mjs
@@ -56,16 +63,36 @@ jobs:
           chmod +x dist/stage/battuta/bin/*
           for bot in pm-bot tl-bot; do
             mkdir -p "dist/stage/battuta/bots/$bot/.pi/skills"
-            ln -s ../../../shared-skills/project-context "dist/stage/battuta/bots/$bot/.pi/skills/project-context"
+            ln -s ../../../../shared-skills/project-context "dist/stage/battuta/bots/$bot/.pi/skills/project-context"
             test -f "dist/stage/battuta/bots/$bot/.pi/skills/project-context/SKILL.md"
           done
           bash -n dist/stage/battuta/bin/battuta
           node --check dist/stage/battuta/bin/install-services.mjs
-          skill_cli="$PWD/dist/stage/battuta/bots/shared-skills/project-context/scripts/project_context.py"
-          python3 "$skill_cli" --help
+          export UV_TOOL_DIR="$RUNNER_TEMP/project-tools"
+          export UV_TOOL_BIN_DIR="$RUNNER_TEMP/project-tool-bin"
+          uv tool install --offline --python 3.12 --no-index --find-links "$cli_dir/wheels" battuta-project
+          skill_cli="$UV_TOOL_BIN_DIR/battuta-project"
+          "$skill_cli" --help
           smoke_home="$(mktemp -d)"
-          HOME="$smoke_home" python3 "$skill_cli" show release-smoke "$smoke_home/checkout"
-          HOME="$smoke_home" python3 "$skill_cli" read release-smoke
+          HOME="$smoke_home" python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path.home() / ".battuta/projects/release-smoke"
+          code = root / "code"
+          code.mkdir(parents=True)
+          (code / "README.md").write_text("# Release smoke\n")
+          (root / "project.yaml").write_text(json.dumps({
+              "version": 1,
+              "project": {"name": "release-smoke", "path": str(code)},
+              "linear": {"project_id": None, "team_id": None},
+              "github": {"repository": None},
+              "roles": {"engineer": "Engineer", "reviewer": "Reviewer"},
+          }))
+          PY
+          HOME="$smoke_home" "$skill_cli" switch release-smoke
+          HOME="$smoke_home" "$skill_cli" explain
+          HOME="$smoke_home" "$skill_cli" memory append 'Verified release installation.'
+          test "$(HOME="$smoke_home" "$skill_cli" memory get)" = '1: Verified release installation.'
           rm -rf "$smoke_home"
           for bot in pm-bot tl-bot; do
             bot_dir="$PWD/dist/stage/battuta/bots/$bot"

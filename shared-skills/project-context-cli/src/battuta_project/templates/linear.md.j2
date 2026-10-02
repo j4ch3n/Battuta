@@ -1,0 +1,7 @@
+{% if operation == "create" %}
+Created Linear project: {{ remote.name }} ({{ remote.id }})
+URL: {{ remote.url }}
+{% endif %}
+Linked local project: {{ project.name }}
+Linear project ID: {{ project.config.linear.project_id }}
+Linear team ID: {{ project.config.linear.team_id }}

@@ -28,10 +28,10 @@ Run source-checkout commands from the repository root. See [development](../.age
 - Root `package.json` defines individual formatting, Node/Deno lint and type checks, unit tests, coverage, integration tests, and supporting checks. The [code-check reference](../.agents/skills/battuta-verify/references/checks.md) lists their invocations.
 - `scripts/check-deno.mjs` discovers each function's `lint`, `check`, or `test` task.
 - `scripts/check-supabase.mjs` manages isolated Supabase integration checks, migrations, database permissions tests, and Node integration tests.
-- `scripts/check-support.mjs` validates packaging JavaScript and shell syntax and discovers the focused Python tests under `scripts/tests/`.
+- `scripts/check-support.mjs` validates packaging JavaScript and shell syntax and discovers the focused Python tests under `scripts/tests/` and each `shared-skills/<skill>-cli/tests/` directory, using the corresponding package's locked environment.
 - `scripts/lint-staged-code.mjs` applies runtime-specific linting to staged code through lint-staged/Husky.
 - `bots/{pm-bot,tl-bot}/scripts/configure-bot.py` generates bot instructions and runtime configuration; use `uv run --locked python <script-path> --help` for options.
 - `bots/pm-bot/scripts/run-dev.sh` implements the `dev` and `prod` tmux launch modes.
 - `scripts/refresh-telegram.py` validates and refreshes both Telegram profiles without reinstalling packages or regenerating instructions.
-- Shared project registry/memory commands are documented in the bot [project-context skill](../bots/shared-skills/project-context/SKILL.md).
+- `battuta-project` manages project initialization, selection, context indexes, and indexed memory. See the [project-context skill](../shared-skills/project-context/SKILL.md) and its [installation reference](../shared-skills/project-context/references/installation.md).
 - Release launcher, configuration, and service commands are documented in [release setup](../RELEASE.md); their implementations live in `packaging/`.

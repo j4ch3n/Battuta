@@ -1,9 +1,32 @@
 """Launcher orchestration, independent of Telegram refresh implementation."""
 
+import os
+import subprocess
+import sys
+
 from fixtures import LauncherFixture
 
 
 class RunDevTests(LauncherFixture):
+    def test_production_pane_commands_export_token_to_both_bots(self):
+        for role in ("pm", "tl"):
+            pi = self.root / f"bots/{role}-bot/node_modules/.bin/pi"
+            pi.write_text(f"#!{sys.executable}\n" + '''import os
+print(os.environ["AGENT_ROLE"] + ":" + os.environ.get("LINEAR_API_TOKEN", ""))
+''')
+        result = self.run_launcher("prod", existing=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        env = dict(os.environ)
+        env.pop("LINEAR_API_TOKEN", None)
+        outputs = []
+        for command in self.commands():
+            if "AGENT_ROLE=" in command[-1]:
+                pane = subprocess.run(["bash", "-c", command[-1]], env=env,
+                                      capture_output=True, text=True)
+                self.assertEqual(pane.returncode, 0, pane.stderr)
+                outputs.append(pane.stdout.strip())
+        self.assertEqual(outputs, ["pm:linear-test", "tl:linear-test"])
+
     def test_launch_does_not_refresh_telegram_configuration(self):
         for mode in ("dev", "prod"):
             for existing in (True, False):

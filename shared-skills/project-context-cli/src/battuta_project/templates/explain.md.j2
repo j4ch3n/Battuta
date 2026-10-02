@@ -1,0 +1,25 @@
+# Project: {{ project }}
+
+Project Root: {{ root | display_path }}
+Repository URL: {{ repository_url or 'not configured' }}
+Linear Project URL: {{ linear_project_url or 'not linked' }}
+
+- README.md: {{ readme or 'not found' }}
+- AGENTS.md: {{ agents or 'not found' }}
+- Subfolder README.md files:
+{% for path in sub_readmes %}
+  - {{ path }}
+{% else %}
+  - none found
+{% endfor %}
+- Subfolder AGENTS.md files:
+{% for path in sub_agents %}
+  - {{ path }}
+{% else %}
+  - none found
+{% endfor %}
+
+Directory tree (maximum 2 directory levels):
+{% for line in tree %}
+{{ line }}
+{% endfor %}

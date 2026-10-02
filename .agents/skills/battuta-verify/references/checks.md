@@ -13,7 +13,7 @@ make check-all
 - `pnpm test:unit`: Vitest Node unit tests and Deno-native function tests.
 - `pnpm test:coverage`: Node unit coverage, including untested owned modules; reports are in `agent-mail/coverage/`.
 - `pnpm --dir agent-mail test:watch`: watch-mode Node unit tests.
-- `pnpm check:support`: packaging/shell syntax checks.
+- `pnpm check:support`: packaging/shell syntax checks and Python test discovery under `scripts/tests/` and each `shared-skills/<skill>-cli/tests/` directory, using the corresponding package's locked environment.
 - `pnpm test:integration`: an isolated local Supabase stack, migration replay, database lint, pgTAP permissions tests, and Vitest integration tests. Uses project `battuta-check`, ports `553xx` and inspector port `8183`; leaves the normal development stack alone. Run only one integration check at a time. Failure logs and JUnit results are in `.reports/`.
 
 The pre-commit hook formats staged files, then lints staged code with its runtime-specific configuration. lint-staged preserves partially staged work. Run `make check` before pushing; full-project type checks cannot reliably be restricted to staged files.

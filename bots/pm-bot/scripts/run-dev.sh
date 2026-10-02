@@ -53,7 +53,7 @@ fi
 set -a
 source "$env_file"
 set +a
-[[ -n "${LINEAR_API_KEY:-}" ]] || { printf 'Set LINEAR_API_KEY in %s\n' "$env_file" >&2; exit 1; }
+[[ -n "${LINEAR_API_TOKEN:-}" ]] || { printf 'Set LINEAR_API_TOKEN in %s\n' "$env_file" >&2; exit 1; }
 for key in SUPABASE_URL SUPABASE_SECRET_KEY; do
   [[ -n "${!key:-}" ]] || { printf 'Set %s in %s\n' "$key" "$env_file" >&2; exit 1; }
 done

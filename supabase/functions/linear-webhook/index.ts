@@ -66,9 +66,9 @@ async function enqueueEngineerTask(task: EngineerTask) {
 }
 
 async function moveIssueToTodo(issueId: string, teamId: string) {
-  const apiKey = Deno.env.get("LINEAR_API_KEY");
+  const apiKey = Deno.env.get("LINEAR_API_TOKEN");
   if (!apiKey) {
-    throw new Error("LINEAR_API_KEY is not configured");
+    throw new Error("LINEAR_API_TOKEN is not configured");
   }
 
   const client = new LinearClient({ apiKey });
