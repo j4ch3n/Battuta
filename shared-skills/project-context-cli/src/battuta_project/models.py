@@ -49,17 +49,11 @@ class GithubConfig(Model):
     repository: Text | None = None
 
 
-class ProjectRoles(Model):
-    engineer: Text = "Engineer"
-    reviewer: Text = "Reviewer"
-
-
 class ProjectConfig(Model):
     version: Literal[1] = 1
     project: ProjectMetadata
     linear: LinearConfig = Field(default_factory=LinearConfig)
     github: GithubConfig = Field(default_factory=GithubConfig)
-    roles: ProjectRoles = Field(default_factory=ProjectRoles)
 
     @field_validator("version", mode="before")
     @classmethod

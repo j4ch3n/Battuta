@@ -60,17 +60,10 @@ systemctl --user restart battuta-pm.service battuta-tl.service
 
 Include custom `gh`/Git locations in PATH when needed. Source/tmux launches inherit their shell environment; make the tool available before starting them. Verify `battuta-project --help` and `gh auth status` as the bot user with the intended PATH.
 
-## Existing registrations
+## Project registrations
 
-The old `show/read/write` script interface is replaced by the installed CLI. Existing `project.yaml` integration/role fields and `MEMORY.md` remain usable, but the checkout must live in the project's `code/` directory.
+Each registration stores its checkout in `~/.battuta/projects/<project>/code/`, with `project.yaml` and `MEMORY.md` alongside it. The configured `project.path` must be the absolute path to that checkout.
 
-For each legacy registration:
-
-1. Stop work on that checkout; inspect and preserve its uncommitted files.
-2. Move the complete existing checkout to `~/.battuta/projects/<project>/code/`. Do not overwrite an existing `code/` or use a symlink.
-3. Update only `project.path` in `project.yaml` to the absolute new checkout path. Preserve the name, version, GitHub/Linear fields, roles, and memory.
-4. Run `battuta-project switch <project>` and `battuta-project explain` to verify it.
-
-Initialization does not migrate existing folders. New repository basenames must start with a letter or number and contain only letters, numbers, `.`, `_`, or `-`. Existing direct folder names may also contain spaces or Unicode or start with an underscore; quote them when switching. Names match exactly, subject to the host filesystem's case sensitivity. `/`, NUL, `.`, `..`, and the reserved `.config.json` name are rejected.
+Use `battuta-project init <github-repo-url>` to create a registration and `battuta-project switch <project>` to select one. Initialization never overwrites an existing folder. Repository basenames must start with a letter or number and contain only letters, numbers, `.`, `_`, or `-`. Names match exactly, subject to the host filesystem's case sensitivity. See [command usage](commands.md) for the workflow.
 
 Malformed configuration errors identify the file and field. Fix invalid data in place; a malformed `.config.json` is not silently overwritten. If selection points to a removed project, `switch` can select another existing project.

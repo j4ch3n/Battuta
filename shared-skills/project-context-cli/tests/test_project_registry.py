@@ -39,9 +39,12 @@ class RegistryTests(unittest.TestCase):
         )
         self.assertEqual(json.loads((self.root / ".config.json").read_text()), {"currentProject": "atlas-api"})
         config = yaml.safe_load((self.root / "atlas-api" / "project.yaml").read_text())
-        self.assertEqual(config["project"], {"name": "atlas-api", "path": str(project.code)})
-        self.assertEqual(config["github"]["repository"], "team/atlas-api")
-        self.assertIsNone(config["linear"]["project_id"])
+        self.assertEqual(config, {
+            "version": 1,
+            "project": {"name": "atlas-api", "path": str(project.code)},
+            "linear": {"project_id": None, "team_id": None},
+            "github": {"repository": "team/atlas-api"},
+        })
         self.assertEqual(self.registry.current().name, "atlas-api")
 
     def test_github_url_variants(self):
@@ -112,14 +115,14 @@ class RegistryTests(unittest.TestCase):
         config = self.root / "atlas-api" / "project.yaml"
         original = yaml.safe_load(config.read_text())
         variants = [dict(original, version=2), dict(original, project={"name": "other", "path": "code"}),
-                    dict(original, roles={"engineer": 7, "reviewer": "Reviewer"})]
+                    dict(original, unexpected=True)]
         for value in variants:
             with self.subTest(value=value):
                 config.write_text(yaml.safe_dump(value))
                 with self.assertRaisesRegex(click.ClickException, "project.yaml"):
                     self.registry.switch("atlas-api")
 
-    def test_legacy_external_checkout_requires_explicit_relocation(self):
+    def test_checkout_path_outside_registration_is_rejected(self):
         self.registry.init("https://github.com/team/atlas-api")
         config = self.root / "atlas-api" / "project.yaml"
         data = yaml.safe_load(config.read_text())
@@ -174,23 +177,3 @@ class RegistryTests(unittest.TestCase):
                 redirected_root = outside if component == "projects" else outside / "projects"
                 self.assertEqual((redirected_root / "atlas-api" / "MEMORY.md").read_text(), "Preserve me\n")
                 self.assertFalse((redirected_root / "harbor-web").exists())
-
-    def test_migrated_legacy_folder_names_preserve_configuration_and_memory(self):
-        for index, name in enumerate(("My Project", "_internal", "项目")):
-            with self.subTest(name=name):
-                source = self.registry.init(f"https://github.com/team/source-{index}")
-                destination = self.root / name
-                source.root.rename(destination)
-                config = destination / "project.yaml"
-                data = yaml.safe_load(config.read_text())
-                data["project"] = {"name": name, "path": str(destination / "code")}
-                data["linear"] = {"project_id": "project-123", "team_id": "team-456"}
-                data["roles"] = {"engineer": "Custom Engineer", "reviewer": "Custom Reviewer"}
-                config.write_text(yaml.safe_dump(data))
-                (destination / "MEMORY.md").write_text("Legacy decision\n")
-                selected = self.registry.switch(name)
-                self.assertEqual(self.registry.current().name, name)
-                self.assertEqual(selected.config.linear.project_id, "project-123")
-                self.assertEqual(selected.config.roles.engineer, "Custom Engineer")
-                self.assertEqual(ProjectMemory(selected).get()[0].content, "Legacy decision")
-                self.assertEqual(yaml.safe_load(config.read_text()), data)
