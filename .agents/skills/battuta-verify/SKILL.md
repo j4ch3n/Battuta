@@ -21,5 +21,5 @@ Run commands from the repository root. Read [code checks](references/checks.md) 
 1. Identify changed behavior, failure paths, and regressions. Exercise real internal logic; stub external services, clocks, and runtime boundaries.
 2. Keep unit cases focused. Use table-driven/parameterized tests for equivalent inputs and outcomes; use integration tests for cross-system contracts.
 3. Follow discovery conventions: Node `*.test.ts`, Node integration `*.integration.test.ts`, and co-located Deno `*.test.ts`.
-4. For changed Node modules, run `pnpm test:coverage` and inspect `agent-mail/coverage/` (text, LCOV, and JSON summary). It includes untested owned modules. Review uncovered branches against requirements; add meaningful missing cases. This command does not measure Python or Deno coverage—review their cases separately.
+4. For changed Node modules, run `pnpm test:coverage` and inspect `agent-mail/coverage/` and `project-spec/coverage/` (text, LCOV, and JSON summary). They include untested owned modules. Review uncovered branches against requirements; add meaningful missing cases. This command does not measure Python or Deno coverage—review their cases separately.
 5. Report the checks actually run, their results, and any unverified behavior. Read failure logs in `.reports/` when integration checks fail.

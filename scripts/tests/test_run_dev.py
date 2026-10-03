@@ -51,6 +51,7 @@ print(os.environ["AGENT_ROLE"] + ":" + os.environ.get("LINEAR_API_TOKEN", ""))
                 for command in self.commands():
                     if "AGENT_ROLE=" in command[-1]:
                         self.assertIn(str(selected), command[-1].replace("\\ ", " "))
+                        self.assertIn(str(self.root / "project-spec/index.ts"), command[-1].replace("\\ ", " "))
                 self.assertEqual(self.commands()[-1], ["attach-session", "-t", f"=battuta-{mode}"])
 
     def test_existing_session_only_attaches(self):

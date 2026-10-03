@@ -78,6 +78,7 @@ class LauncherFixture(ConfigFixture):
             (bot / "AGENTS.md").touch()
             (bot / ".pi/mcp.json").write_text("{}")
         (self.root / "agent-mail/node_modules").mkdir(parents=True)
+        (self.root / "project-spec/node_modules").mkdir(parents=True)
         (self.root / "supabase").mkdir()
         (self.root / "supabase/.env").touch()
         self.executable("tmux", '''import json, os, sys

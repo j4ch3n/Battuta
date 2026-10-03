@@ -92,11 +92,15 @@ Use the documentation index to find and read applicable `README.md` and `AGENTS.
 
 ## Write project documents
 
-Use existing file tools and the [responsibility entries and Workspace binding](../SKILL.md#document-responsibilities) for summaries, feature specs, technical plans, tasks, and requirements reviews. The requester can use ordinary conversation; no additional CLI or slash commands are required.
+Use the [responsibility entries and Workspace binding](../SKILL.md#document-responsibilities) to shape documents. Use [project-spec agent tools](spec-tools.md) for managed specifications, technical plans, tasks, canonical checklists/reviews, and decisions. PM writes full immutable versions; TL writes full checklist/review replacements. The CLI does not author specs or record decisions. Summaries outside Specs Root can use ordinary file tools.
 
-Maintain the overview at the Summary path and write feature artifacts under Specs Root in `NNN-feature-name/` directories. Read existing documents and reuse their feature directory for follow-up work. Create optional supporting artifacts only when useful. `MEMORY.md` remains durable decision context rather than the project overview or full specification.
+Maintain the overview at the Summary path. Resolve named document versions and related artifact paths from `specs/index.json` through the read tools; no saved version is patched. Legacy feature directories remain unchanged. `MEMORY.md` is durable operational context, not the product-decision or specification source of truth.
 
 Older registrations may lack some scaffold files. Reinstallation does not migrate them, and `explain` does not write them. Requested authoring establishes missing artifacts and parent directories while preserving existing content; do not rerun `init` against an existing project.
+
+## Record product decisions
+
+PM uses `finalize_spec` with explicit project/name, go/no-go, and full rationale. The shared agent tool creates `decision.md`, fingerprints the latest spec/checklist/decision/review, and records the terminal outcome in JSON. Read [decision workflow and effects](decisions.md); no review/checklist gate or standalone announcement mail is required. Refinement creates a new version before finalization.
 
 ## Read and edit project memory
 

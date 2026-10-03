@@ -15,9 +15,9 @@ class BattutaLauncherTests(LauncherFixture):
         shutil.copy2(ROOT / "packaging" / "battuta", self.bin / "battuta")
         for role in ("pm", "tl"):
             pi = self.root / f"bots/{role}-bot/node_modules/.bin/pi"
-            pi.write_text(f"#!{sys.executable}\n" + '''import json, os
+            pi.write_text(f"#!{sys.executable}\n" + '''import json, os, sys
 print(json.dumps({"role": os.environ["AGENT_ROLE"],
-                  "token": os.environ.get("LINEAR_API_TOKEN")}))
+                  "token": os.environ.get("LINEAR_API_TOKEN"), "args": sys.argv[1:]}))
 ''')
             pi.chmod(0o700)
 
@@ -32,7 +32,10 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"],
             with self.subTest(role=role):
                 result = self.launch(role)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(json.loads(result.stdout), {"role": role, "token": "linear-test"})
+                response = json.loads(result.stdout)
+                self.assertEqual(response["role"], role)
+                self.assertEqual(response["token"], "linear-test")
+                self.assertIn(str(self.root / "project-spec/index.ts"), response["args"])
 
     def test_missing_token_stops_before_launch(self):
         path = self.root / ".env.prod"
