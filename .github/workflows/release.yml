@@ -115,7 +115,6 @@ jobs:
             bot_dir="$PWD/dist/stage/battuta/bots/$bot"
             pnpm --dir "$bot_dir" install --frozen-lockfile --prod
             PI_CODING_AGENT_DIR="$bot_dir/.pi" "$bot_dir/node_modules/.bin/pi" install -l --approve npm:@llblab/pi-telegram@0.50.1
-            PI_CODING_AGENT_DIR="$bot_dir/.pi" "$bot_dir/node_modules/.bin/pi" install -l --approve npm:pi-mcp-adapter@2.37.0
           done
           pnpm --dir dist/stage/battuta/agent-mail install --frozen-lockfile --prod
           test -x dist/stage/battuta/bots/pm-bot/node_modules/.bin/pi

@@ -34,6 +34,13 @@ class PackagingConfigureTests(unittest.TestCase):
                     skills = bot / ".pi" / "skills"
                     skills.mkdir(parents=True)
                     (bot / "AGENTS_dedicated.md").write_text(role)
+                    (bot / ".pi/settings.json").write_text(json.dumps({"theme": "dark", "packages": [
+                        "npm:@llblab/pi-telegram@0.50.1", "npm:pi-mcp-adapter@2.37.0",
+                        {"source": "npm:pi-mcp-adapter", "extensions": ["index.ts"]},
+                        "npm:pi-web-access@0.35.0",
+                        {"source": "npm:custom-tools@1.0.0", "extensions": ["read.ts"]},
+                        "npm:pi-mcp-adapter-extra@1.0.0",
+                    ]}))
                     if existing:
                         (skills / "project-context").symlink_to(existing, target_is_directory=True)
                 env = {
@@ -60,5 +67,13 @@ class PackagingConfigureTests(unittest.TestCase):
                         self.assertFalse(link.readlink().is_absolute())
                         mcp = json.loads((link.parent.parent / "mcp.json").read_text())
                         self.assertEqual(
-                            mcp["mcpServers"]["linear"]["bearerTokenEnv"], "LINEAR_API_TOKEN",
+                            mcp["mcpServers"]["linear"]["headers"], {"Authorization": "Bearer ${LINEAR_API_TOKEN}"},
                         )
+                        self.assertEqual(mcp["mcpServers"]["linear"]["exposure"], "codemode")
+                        self.assertNotIn("test-linear", json.dumps(mcp))
+                        settings = json.loads((link.parent.parent / "settings.json").read_text())
+                        self.assertEqual(settings, {"theme": "dark", "packages": [
+                            "npm:@llblab/pi-telegram@0.50.1", "npm:pi-web-access@0.35.0",
+                            {"source": "npm:custom-tools@1.0.0", "extensions": ["read.ts"]},
+                            "npm:pi-mcp-adapter-extra@1.0.0",
+                        ]})

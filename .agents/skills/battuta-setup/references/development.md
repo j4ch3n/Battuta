@@ -2,11 +2,13 @@
 
 Run all source-checkout commands from the repository root. See the shared [tech stack](../../../../docs/tech-stack.md) for runtime responsibilities and [command reference](../../../../docs/commands.md) for scripts and Make targets.
 
-Run the Project Manager and Tech Lead bots from a source checkout with Python **3.12+**, uv, Node.js **22+**, pnpm **10.20.x**, and tmux. Local Supabase also needs Docker and the Supabase CLI; a remote Supabase project does not.
+Run the Project Manager and Tech Lead bots from a source checkout with Python **3.12+**, uv, Node.js from `.node-version` (24 LTS), pnpm **10.20.x**, and tmux. Local Supabase also needs Docker and the Supabase CLI; a remote Supabase project does not.
 
 ## Contributor tooling
 
 Install Node.js from `.node-version`, pnpm **10.20.0**, Deno from `.deno-version`, Python **3.12+**, uv, and the Supabase CLI version from `.supabase-version`. Docker must be running for integration checks.
+
+For nvm users, run `nvm install` and `nvm use` from the repository root. `.nvmrc` pins the same Node version as `.node-version`, which CI and release packaging consume; update both together when upgrading Node.
 
 ```sh
 make setup-checks
@@ -35,3 +37,12 @@ make dev
 To update Telegram settings separately, run `make refresh-telegram ENV_FILE=.env`. The file argument can select `.env.prod` or another path; omitting it defaults to `.env`. This refreshes the token, derived bot ID, allowed user ID, and optional username in each bot's `.pi/telegram.json` without reinstalling packages or regenerating instructions. Restart any running bots separately to pick up the refreshed settings; reattaching an existing session does not reload them.
 
 Complete `/login` in each Pi pane and finish model-provider authentication, then message both Telegram bots from the allowed user account and confirm each responds. Inspect errors in the panes before declaring setup complete. Detach with `Ctrl-b d` and rerun the same Make target to reattach.
+
+Pi handles Linear MCP natively. `make setup-bot` writes the environment-expanded `Authorization` header to each bot's `.pi/mcp.json` and removes older `pi-mcp-adapter` package entries from settings. Rerun setup to migrate an existing checkout. The Make setup targets use `.env`; for production credentials, invoke each setup script explicitly:
+
+```sh
+uv run --locked python bots/pm-bot/scripts/configure-bot.py --env-file .env.prod
+uv run --locked python bots/tl-bot/scripts/configure-bot.py --env-file .env.prod
+```
+
+Restart running bots separately to load the migration. In each pane, check `/mcp` and request a read-only Linear lookup. Linear uses native `codemode` exposure for tool discovery and calls.

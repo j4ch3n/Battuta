@@ -9,7 +9,6 @@ import click
 
 
 TELEGRAM_PACKAGE = "npm:@llblab/pi-telegram@0.50.1"
-MCP_PACKAGE = "npm:pi-mcp-adapter@2.37.0"
 
 
 def run(*args: str, **kwargs: object) -> None:
@@ -19,13 +18,12 @@ def run(*args: str, **kwargs: object) -> None:
         raise click.ClickException(f"{args[0]} failed (exit {error.returncode})") from error
 
 
-def install_packages(bot_dir: Path, telegram_package: str, mcp_package: str) -> None:
+def install_packages(bot_dir: Path, telegram_package: str) -> None:
     if shutil.which("pnpm") is None:
         raise click.ClickException("pnpm is required")
     run("pnpm", "install", "--frozen-lockfile", cwd=bot_dir)
     agent_env = {**os.environ, "PI_CODING_AGENT_DIR": str(bot_dir / ".pi")}
     run("pnpm", "exec", "pi", "install", "-l", "--approve", telegram_package, cwd=bot_dir, env=agent_env)
-    run("pnpm", "exec", "pi", "install", "-l", "--approve", mcp_package, cwd=bot_dir, env=agent_env)
     run("pnpm", "exec", "pi", "list", cwd=bot_dir, env=agent_env)
 
 

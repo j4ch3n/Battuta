@@ -2,17 +2,17 @@
 
 ## Main application and support tooling
 
-| Layer                      | Technology and responsibility                                                            | Version source                                            |
-| -------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Agents                     | Pi coding-agent runtime; active PM and TL bots                                           | Each bot's `package.json` and lockfile                    |
-| Node                       | TypeScript extensions, Telegram integration, agent-mail client                           | `.node-version`, root and package `package.json`          |
-| Backend                    | Supabase PostgreSQL, migrations, Edge Functions, and Realtime                            | `.supabase-version`, `supabase/config.toml`               |
-| Edge Functions             | Deno TypeScript for agent mail and Linear webhooks                                       | `.deno-version`, each function's `deno.json` and lockfile |
-| Conversations and tracking | Telegram bots, Linear, MCP integrations                                                  | Bot configuration scripts and runtime configuration       |
-| Bot configuration          | Python 3.12+, Click, uv                                                                  | Root `pyproject.toml`, `uv.lock`                          |
-| Dependency tooling         | pnpm for Node; uv for Python                                                             | Root `packageManager`, `uv.lock`                          |
-| Verification               | Prettier, typed ESLint, TypeScript, Vitest/V8 coverage, Deno tests, pgTAP                | Root and component manifests, check scripts               |
-| Launch and releases        | tmux; Linux ARM64 archive with bundled Node/dependencies; optional user systemd services | `Makefile`, `packaging/`, release workflow                |
+| Layer                      | Technology and responsibility                                                            | Version source                                             |
+| -------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Agents                     | Pi coding-agent runtime; active PM and TL bots                                           | Each bot's `package.json` and lockfile                     |
+| Node                       | TypeScript extensions, Telegram integration, agent-mail client                           | `.node-version`, `.nvmrc`, root and package `package.json` |
+| Backend                    | Supabase PostgreSQL, migrations, Edge Functions, and Realtime                            | `.supabase-version`, `supabase/config.toml`                |
+| Edge Functions             | Deno TypeScript for agent mail and Linear webhooks                                       | `.deno-version`, each function's `deno.json` and lockfile  |
+| Conversations and tracking | Telegram bots, Linear, MCP integrations                                                  | Bot configuration scripts and runtime configuration        |
+| Bot configuration          | Python 3.12+, Click, uv                                                                  | Root `pyproject.toml`, `uv.lock`                           |
+| Dependency tooling         | pnpm for Node; uv for Python                                                             | Root `packageManager`, `uv.lock`                           |
+| Verification               | Prettier, typed ESLint, TypeScript, Vitest/V8 coverage, Deno tests, pgTAP                | Root and component manifests, check scripts                |
+| Launch and releases        | tmux; Linux ARM64 archive with bundled Node/dependencies; optional user systemd services | `Makefile`, `packaging/`, release workflow                 |
 
 ## Individual shared skills
 

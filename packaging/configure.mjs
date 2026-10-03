@@ -28,6 +28,7 @@ const BOT_CONFIGURATIONS = [
     skillLinkPath: join(piDirectory, "skills", "project-context"),
     telegramConfigPath: join(piDirectory, "telegram.json"),
     mcpConfigPath: join(piDirectory, "mcp.json"),
+    settingsPath: join(piDirectory, "settings.json"),
     outputInstructionsPath: join(bot.directory, "AGENTS.md"),
   };
 });
@@ -81,14 +82,34 @@ for (const bot of BOT_CONFIGURATIONS) {
     mcpServers: {
       linear: {
         url: "https://mcp.linear.app/mcp",
-        auth: "bearer",
-        bearerTokenEnv: "LINEAR_API_TOKEN",
+        headers: { Authorization: "Bearer ${LINEAR_API_TOKEN}" },
+        exposure: "codemode",
+        description: "Manage Linear issues, projects, and cycles",
       },
     },
   };
   const mcpConfigJson = JSON.stringify(mcpConfig, null, 2);
   const dedicatedInstructions = await readFile(bot.dedicatedInstructionsPath, "utf8");
   const instructions = SHARED_INSTRUCTIONS + "\n" + dedicatedInstructions;
+
+  // Retained state from older releases can still load an adapter that replaces native MCP.
+  try {
+    const settings = JSON.parse(await readFile(bot.settingsPath, "utf8"));
+    if (!settings || typeof settings !== "object" || Array.isArray(settings))
+      throw new Error(`Expected a JSON object in ${bot.settingsPath}`);
+    const packages = settings.packages ?? [];
+    if (!Array.isArray(packages)) throw new Error(`Expected packages array in ${bot.settingsPath}`);
+    const retained = packages.filter((entry) => {
+      const source = typeof entry === "string" ? entry : entry?.source;
+      return typeof source !== "string" || source.split("@", 1)[0] !== "npm:pi-mcp-adapter";
+    });
+    if (retained.length !== packages.length) {
+      settings.packages = retained;
+      await writeFile(bot.settingsPath, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 });
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
 
   await writeFile(bot.telegramConfigPath, JSON.stringify(telegram, null, 2), { mode: 0o600 });
   await writeFile(bot.mcpConfigPath, mcpConfigJson, { mode: 0o600 });
