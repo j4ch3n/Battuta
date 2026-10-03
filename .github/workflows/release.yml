@@ -65,6 +65,14 @@ jobs:
             mkdir -p "dist/stage/battuta/bots/$bot/.pi/skills"
             ln -s ../../../../shared-skills/project-context "dist/stage/battuta/bots/$bot/.pi/skills/project-context"
             test -f "dist/stage/battuta/bots/$bot/.pi/skills/project-context/SKILL.md"
+            source_references="dist/stage/battuta/shared-skills/project-context/references"
+            runtime_references="dist/stage/battuta/bots/$bot/.pi/skills/project-context/references"
+            ls -l "$runtime_references/"
+            for document in "$source_references"/*/*.md; do
+              test -f "$document" || continue
+              relative_document="${document#"$source_references/"}"
+              test -f "$runtime_references/$relative_document"
+            done
           done
           bash -n dist/stage/battuta/bin/battuta
           node --check dist/stage/battuta/bin/install-services.mjs
@@ -72,6 +80,7 @@ jobs:
           export UV_TOOL_BIN_DIR="$RUNNER_TEMP/project-tool-bin"
           uv tool install --offline --python 3.12 --no-index --find-links "$cli_dir/wheels" battuta-project
           skill_cli="$UV_TOOL_BIN_DIR/battuta-project"
+          export LINEAR_API_TOKEN=release-smoke
           "$skill_cli" --help
           smoke_home="$(mktemp -d)"
           HOME="$smoke_home" python3 - <<'PY'
@@ -86,11 +95,19 @@ jobs:
               "project": {"name": "release-smoke", "path": str(code)},
               "linear": {"project_id": None, "team_id": None},
               "github": {"repository": None},
-              "roles": {"engineer": "Engineer", "reviewer": "Reviewer"},
           }))
           PY
           HOME="$smoke_home" "$skill_cli" switch release-smoke
           HOME="$smoke_home" "$skill_cli" explain
+          HOME="$smoke_home" "$UV_TOOL_DIR/battuta-project/bin/python" - <<'PY'
+          from battuta_project.presentation import render
+          from battuta_project.registry import ProjectRegistry
+
+          summary = render("summary.md.j2", ProjectRegistry().current())
+          assert summary.startswith("# Project Summary: release-smoke\n")
+          assert "## Specifications" in summary
+          assert "{{" not in summary
+          PY
           HOME="$smoke_home" "$skill_cli" memory append 'Verified release installation.'
           test "$(HOME="$smoke_home" "$skill_cli" memory get)" = '1: Verified release installation.'
           rm -rf "$smoke_home"

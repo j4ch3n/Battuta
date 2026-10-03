@@ -20,6 +20,11 @@ class SharedSkillTests(unittest.TestCase):
                     source = root / "shared-skills" / "project-context"
                     source.mkdir(parents=True)
                     (source / "SKILL.md").write_text("Shared project context")
+                    references = source / "references"
+                    specify = references / "specify"
+                    specify.mkdir(parents=True)
+                    (specify / "prompt.md").write_text("Runtime specification prompt")
+                    (specify / "template.md").write_text("Runtime specification template")
                     bot = root / "bots" / role
                     skills = bot / ".pi" / "skills"
                     skills.mkdir(parents=True)
@@ -28,6 +33,8 @@ class SharedSkillTests(unittest.TestCase):
                         link.symlink_to(existing, target_is_directory=True)
                     link_project_context(bot)
                     self.assertEqual((link / "SKILL.md").read_text(), "Shared project context")
+                    self.assertEqual((link / "references" / "specify" / "prompt.md").read_text(), "Runtime specification prompt")
+                    self.assertEqual((link / "references" / "specify" / "template.md").read_text(), "Runtime specification template")
                     self.assertEqual(link.resolve(), source)
                     self.assertFalse(link.readlink().is_absolute())
                     link_project_context(bot)

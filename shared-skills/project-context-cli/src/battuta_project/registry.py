@@ -5,10 +5,12 @@ import shutil
 import subprocess
 
 import click
+from jinja2 import TemplateError
 from pydantic import ValidationError
 import yaml
 
 from .models import CurrentConfig, GithubConfig, LinearConfig, ProjectConfig, ProjectContext, ProjectMetadata, Repository, project_name
+from .presentation import render
 from .storage import atomic_write, check_registry_root, file_errors, regular_file
 
 
@@ -127,6 +129,15 @@ class ProjectRegistry:
                 )
                 self._write_project(directory, config)
                 project = self.load(repository.name)
+                try:
+                    summary = render("summary.md.j2", project)
+                except TemplateError as error:
+                    raise click.ClickException(f"Cannot render project summary: {error}") from error
+                atomic_write(directory / "SUMMARY.md", summary + "\n")
+                atomic_write(directory / "MEMORY.md", "")
+                specs = directory / "specs"
+                specs.mkdir()
+                atomic_write(specs / "constitution.md", "")
                 self._select(project)
                 return project
             except (OSError, subprocess.CalledProcessError, click.ClickException) as error:

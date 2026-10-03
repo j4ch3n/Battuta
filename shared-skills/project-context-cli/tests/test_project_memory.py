@@ -15,6 +15,8 @@ class MemoryTests(ProjectTestCase):
         self.path = self.project.root / "MEMORY.md"
 
     def test_missing_memory_is_empty_without_creating_file(self):
+        if self.path.exists():
+            self.path.unlink()
         self.assertEqual(self.memory.get(), [])
         self.assertFalse(self.path.exists())
 
@@ -64,6 +66,8 @@ class MemoryTests(ProjectTestCase):
     def test_symlink_memory_never_reads_or_overwrites_target(self):
         outside = self.home / "outside.md"
         outside.write_text("Keep me")
+        if self.path.exists():
+            self.path.unlink()
         self.path.symlink_to(outside)
         for action in (self.memory.get, lambda: self.memory.append("new"), lambda: self.memory.replace_all("new")):
             with self.assertRaises(click.ClickException):
@@ -72,8 +76,9 @@ class MemoryTests(ProjectTestCase):
 
     def test_failed_atomic_replace_preserves_memory_and_removes_temporary(self):
         self.memory.append("Keep me")
+        original_files = sorted(p.name for p in self.project.root.iterdir())
         with patch("battuta_project.storage.os.replace", side_effect=OSError("disk full")):
             with self.assertRaisesRegex(click.ClickException, "disk full"):
                 self.memory.replace_all("Changed")
         self.assertEqual(self.path.read_text(), "Keep me\n")
-        self.assertEqual(sorted(p.name for p in self.project.root.iterdir()), ["MEMORY.md", "code", "project.yaml"])
+        self.assertEqual(sorted(p.name for p in self.project.root.iterdir()), original_files)

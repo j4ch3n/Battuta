@@ -59,7 +59,7 @@ def switch(project_name: str):
 @main.command()
 @click.pass_obj
 def explain(token: str):
-    """Show project URLs, README/AGENTS locations, and the checkout tree."""
+    """Show project summary, artifact paths, URLs, guidance, and checkout tree."""
     project = ProjectRegistry().current()
     explanation = explain_project(project)
     if project.config.linear.project_id:

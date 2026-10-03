@@ -22,6 +22,11 @@ class PackagingConfigureTests(unittest.TestCase):
                 source = root / "shared-skills" / "project-context"
                 source.mkdir(parents=True)
                 (source / "SKILL.md").write_text("Shared project context")
+                references = source / "references"
+                summary = references / "summary"
+                summary.mkdir(parents=True)
+                (summary / "prompt.md").write_text("Runtime summary prompt")
+                (summary / "template.md").write_text("Runtime summary template")
                 (root / "bots").mkdir()
                 (root / "bots" / "AGENTS_shared.md").write_text("Shared instructions")
                 for role in ("pm-bot", "tl-bot"):
@@ -49,6 +54,8 @@ class PackagingConfigureTests(unittest.TestCase):
                     for role in ("pm-bot", "tl-bot"):
                         link = root / "bots" / role / ".pi" / "skills" / "project-context"
                         self.assertEqual((link / "SKILL.md").read_text(), "Shared project context")
+                        self.assertEqual((link / "references" / "summary" / "prompt.md").read_text(), "Runtime summary prompt")
+                        self.assertEqual((link / "references" / "summary" / "template.md").read_text(), "Runtime summary template")
                         self.assertEqual(link.resolve(), source.resolve())
                         self.assertFalse(link.readlink().is_absolute())
                         mcp = json.loads((link.parent.parent / "mcp.json").read_text())

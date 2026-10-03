@@ -29,6 +29,10 @@ class CliTests(ProjectTestCase):
         self.assertIn("Initialized project: harbor-web", output)
         self.assertIn("~/.battuta/projects/harbor-web/code", output)
         self.assertIn("Current project: harbor-web", output)
+        self.assertIn("Summary: ~/.battuta/projects/harbor-web/SUMMARY.md", output)
+        self.assertIn("Specs Root: ~/.battuta/projects/harbor-web/specs", output)
+        self.assertIn("Constitution: ~/.battuta/projects/harbor-web/specs/constitution.md", output)
+        self.assertIn("Memory: ~/.battuta/projects/harbor-web/MEMORY.md", output)
         output = self.invoke("switch", "atlas-api")
         self.assertIn("Current project: atlas-api", output)
         self.assertIn("~/.battuta/projects/atlas-api/code", output)
@@ -52,6 +56,23 @@ class CliTests(ProjectTestCase):
         self.assertIn("Project Root: ~/.battuta/projects/atlas-api/code", self.invoke("explain"))
         result = self.runner.invoke(main, ["explain", "atlas-api"])
         self.assertNotEqual(result.exit_code, 0)
+
+    def test_explain_displays_selected_project_summary_after_switching(self):
+        atlas = self.project.root / "SUMMARY.md"
+        atlas.write_text("# Atlas\n\nMap imports.\n", encoding="utf-8")
+        self.invoke("init", "https://github.com/team/harbor-web")
+        harbor = self.registry.current().root / "SUMMARY.md"
+        harbor.write_text("# Harbor\n\nHarbor scheduling.\n", encoding="utf-8")
+        for name, included, excluded in (
+            ("atlas-api", "Map imports.", "Harbor scheduling."),
+            ("harbor-web", "Harbor scheduling.", "Map imports."),
+        ):
+            with self.subTest(project=name):
+                self.invoke("switch", name)
+                output = self.invoke("explain")
+                self.assertIn(included, output)
+                self.assertNotIn(excluded, output)
+                self.assertIn(f"Specs Root: ~/.battuta/projects/{name}/specs", output)
 
     def test_explain_prints_repository_and_unlinked_linear_without_http(self):
         with linear_http() as requests:

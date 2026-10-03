@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 
 import click
+from jinja2 import TemplateNotFound, UndefinedError
 import yaml
 
 from battuta_project.registry import ProjectRegistry
@@ -59,6 +60,88 @@ class RegistryTests(unittest.TestCase):
                 project = ProjectRegistry(Path(temp) / "projects").init(url)
                 self.assertEqual(project.name, "harbor-web")
 
+    def test_init_creates_summary_scaffold_beside_checkout(self):
+        project = self.registry.init("https://github.com/team/atlas-api")
+        summary = project.root / "SUMMARY.md"
+        self.assertTrue(summary.is_file())
+        content = summary.read_text(encoding="utf-8")
+        self.assertIn("# Project Summary: atlas-api", content)
+        for section in ("Purpose", "Users and use cases", "Scope", "Current capabilities", "Specifications"):
+            self.assertIn(f"## {section}", content)
+        self.assertNotIn("{{", content)
+        self.assertNotIn("[replace by project name]", content)
+        self.assertFalse((project.code / "SUMMARY.md").exists())
+        self.assertEqual((project.root / "MEMORY.md").read_bytes(), b"")
+        self.assertEqual((project.root / "specs" / "constitution.md").read_bytes(), b"")
+        self.assertEqual(sorted(p.name for p in (project.root / "specs").iterdir()), ["constitution.md"])
+
+    def test_rendering_failure_preserves_selection_and_removes_new_project(self):
+        self.registry.init("https://github.com/team/atlas-api")
+        for index, error in enumerate((TemplateNotFound("summary.md.j2"), UndefinedError("missing project name"))):
+            with self.subTest(error=type(error).__name__):
+                name = f"harbor-web-{index}"
+                with patch("battuta_project.registry.render", side_effect=error):
+                    with self.assertRaisesRegex(click.ClickException, "summary"):
+                        self.registry.init(f"https://github.com/team/{name}")
+                self.assertEqual(self.registry.current().name, "atlas-api")
+                self.assertFalse((self.root / name).exists())
+
+    def test_scaffold_write_failure_preserves_selection_and_removes_new_project(self):
+        self.registry.init("https://github.com/team/atlas-api")
+        from battuta_project.storage import atomic_write
+
+        for filename in ("MEMORY.md", "constitution.md"):
+            with self.subTest(filename=filename):
+                name = f"harbor-{filename.removesuffix('.md').lower()}"
+                def write(path, text):
+                    if path.name == filename:
+                        raise OSError("scaffold disk full")
+                    atomic_write(path, text)
+
+                with patch("battuta_project.registry.atomic_write", side_effect=write):
+                    with self.assertRaisesRegex(click.ClickException, "scaffold disk full"):
+                        self.registry.init(f"https://github.com/team/{name}")
+                self.assertEqual(self.registry.current().name, "atlas-api")
+                self.assertFalse((self.root / name).exists())
+
+    def test_specs_directory_failure_preserves_selection_and_removes_new_project(self):
+        self.registry.init("https://github.com/team/atlas-api")
+        mkdir = Path.mkdir
+
+        def create(path, *args, **kwargs):
+            if path.name == "specs":
+                raise PermissionError("cannot create specs")
+            return mkdir(path, *args, **kwargs)
+
+        with patch("pathlib.Path.mkdir", new=create):
+            with self.assertRaisesRegex(click.ClickException, "cannot create specs"):
+                self.registry.init("https://github.com/team/harbor-web")
+        self.assertEqual(self.registry.current().name, "atlas-api")
+        self.assertFalse((self.root / "harbor-web").exists())
+
+    def test_legacy_registration_loads_without_recreating_artifacts(self):
+        project = self.registry.init("https://github.com/team/atlas-api")
+        for path in (project.root / "SUMMARY.md", project.root / "MEMORY.md", project.root / "specs" / "constitution.md"):
+            path.unlink()
+        (project.root / "specs").rmdir()
+        self.assertEqual(self.registry.switch("atlas-api").code, project.code)
+        self.assertEqual(sorted(p.name for p in project.root.iterdir()), ["code", "project.yaml"])
+
+    def test_summary_creation_failure_preserves_selection_and_removes_new_project(self):
+        self.registry.init("https://github.com/team/atlas-api")
+        from battuta_project.storage import atomic_write
+
+        def write(path, text):
+            if path.name == "SUMMARY.md":
+                raise OSError("summary disk full")
+            atomic_write(path, text)
+
+        with patch("battuta_project.registry.atomic_write", side_effect=write):
+            with self.assertRaisesRegex(click.ClickException, "summary disk full"):
+                self.registry.init("https://github.com/team/harbor-web")
+        self.assertEqual(self.registry.current().name, "atlas-api")
+        self.assertFalse((self.root / "harbor-web").exists())
+
     def test_init_records_optional_linear_metadata(self):
         for fields in ({}, {"project_id": "project-1"}, {"team_id": "team-1"},
                        {"project_id": "project-1", "team_id": "team-1"}):
@@ -95,11 +178,12 @@ class RegistryTests(unittest.TestCase):
         project = self.registry.init("https://github.com/team/atlas-api")
         path = project.root / "project.yaml"
         original = path.read_text()
+        original_files = sorted(p.name for p in project.root.iterdir())
         with patch("battuta_project.storage.os.replace", side_effect=OSError("disk full")):
             with self.assertRaisesRegex(click.ClickException, "disk full"):
                 self.registry.link_linear(project, LinearConfig(project_id="project-1", team_id="team-1"))
         self.assertEqual(path.read_text(), original)
-        self.assertEqual(sorted(p.name for p in project.root.iterdir()), ["code", "project.yaml"])
+        self.assertEqual(sorted(p.name for p in project.root.iterdir()), original_files)
 
     def test_invalid_urls_do_not_create_registry(self):
         for url in (

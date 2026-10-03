@@ -6,7 +6,7 @@ from pathlib import Path
 import click
 
 from .models import CheckoutEntry, Explanation, ProjectContext
-from .storage import check_registry_root, file_errors
+from .storage import check_registry_root, file_errors, regular_file
 
 
 EXCLUDED_DIRECTORIES = frozenset({
@@ -60,11 +60,20 @@ def explain_project(project: ProjectContext) -> Explanation:
         check_registry_root(project.root.parent)
         if project.root.is_symlink() or project.code.is_symlink() or not project.code.is_dir():
             raise click.ClickException(f"Checkout must be a real directory: {project.code}")
+        summary_path = project.root / "SUMMARY.md"
+        regular_file(summary_path)
+        try:
+            summary = summary_path.read_text(encoding="utf-8") if summary_path.exists() else ""
+        except (OSError, UnicodeError) as error:
+            raise click.ClickException(f"{summary_path}: {error}") from error
         entries = _entries(project.code)
         documents = {entry.path for entry in entries if not entry.is_directory}
         repository = project.config.github.repository
         return Explanation(
             project=project.name, root=project.code,
+            managed_root=project.root, specs_root=project.root / "specs",
+            constitution_path=project.root / "specs" / "constitution.md",
+            summary_path=summary_path, summary=summary if summary.strip() else None,
             repository_url=f"https://github.com/{repository}" if repository else None,
             readme="README.md" if "README.md" in documents else None,
             agents="AGENTS.md" if "AGENTS.md" in documents else None,

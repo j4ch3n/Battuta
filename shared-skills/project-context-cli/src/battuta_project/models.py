@@ -131,6 +131,11 @@ class CheckoutEntry(Model):
 class Explanation(Model):
     project: str
     root: Path
+    managed_root: Path
+    specs_root: Path
+    constitution_path: Path
+    summary_path: Path
+    summary: str | None
     repository_url: str | None = None
     linear_project_url: str | None = None
     readme: str | None
