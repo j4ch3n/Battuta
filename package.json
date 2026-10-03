@@ -8,7 +8,8 @@
   },
   "scripts": {
     "prepare": "husky",
-    "setup:checks": "pnpm --dir agent-mail install --frozen-lockfile && pnpm --dir project-spec install --frozen-lockfile && pnpm --dir bots/pm-bot install --frozen-lockfile && pnpm --dir bots/tl-bot install --frozen-lockfile && uv sync --locked",
+    "setup:node-checks": "pnpm --dir agent-mail install --frozen-lockfile && pnpm --dir project-spec install --frozen-lockfile && pnpm --dir bots/pm-bot install --frozen-lockfile && pnpm --dir bots/tl-bot install --frozen-lockfile",
+    "setup:checks": "pnpm setup:node-checks && uv sync --locked",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint:node": "eslint . --max-warnings=0",

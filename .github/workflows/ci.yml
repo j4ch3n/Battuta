@@ -51,10 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node-checks
-      - run: |
-          pnpm --dir agent-mail install --frozen-lockfile
-          pnpm --dir bots/pm-bot install --frozen-lockfile
-          pnpm --dir bots/tl-bot install --frozen-lockfile
+      - run: pnpm setup:node-checks
       - run: pnpm lint:node
       - run: pnpm typecheck:node
       - run: pnpm test:coverage
@@ -62,7 +59,9 @@ jobs:
         if: always()
         with:
           name: coverage-${{ github.workflow }}-${{ github.run_attempt }}
-          path: agent-mail/coverage/
+          path: |
+            agent-mail/coverage/
+            project-spec/coverage/
           if-no-files-found: ignore
 
   deno:
