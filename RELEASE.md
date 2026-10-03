@@ -110,11 +110,11 @@ If the first command does not print the confirmation, resolve the environment se
 
 ### Already done?
 
-Check whether both bots already have generated instructions and Telegram/MCP configuration (`bots/pm-bot/AGENTS.md`, `bots/tl-bot/AGENTS.md`, and each bot's `.pi/telegram.json` and `.pi/mcp.json`). Confirm that each Linear MCP entry's `bearerTokenEnv` is `LINEAR_API_TOKEN`. If configuration is present, uses that name, and the owner confirms credentials have not changed, do not rerun `configure`. Check for an existing tmux session and run `systemctl --user is-active battuta-pm.service battuta-tl.service` before starting anything; an inactive-service result is normal when using tmux. If both bots are already responding to the allowed Telegram user, this step is complete. If services are active, do not start a screen session just to verify them. If only one bot works, troubleshoot that bot without starting duplicates.
+Check whether both bots already have generated instructions and Telegram/MCP configuration (`bots/pm-bot/AGENTS.md`, `bots/tl-bot/AGENTS.md`, and each bot's `.pi/telegram.json` and `.pi/mcp.json`). Confirm that each Linear MCP entry has `headers.Authorization` set to the literal `Bearer ${LINEAR_API_TOKEN}` and `exposure` set to `codemode`, and that neither bot's `.pi/settings.json` includes `pi-mcp-adapter`. If configuration is present, uses this native format, and the owner confirms credentials have not changed, do not rerun `configure`. Check for an existing tmux session and run `systemctl --user is-active battuta-pm.service battuta-tl.service` before starting anything; an inactive-service result is normal when using tmux. If both bots are already responding to the allowed Telegram user and native Linear MCP works, this step is complete. If services are active, do not start a screen session just to verify them. If only one bot works, troubleshoot that bot without starting duplicates.
 
 ### Fresh setup
 
-If configuration is missing or credentials changed, stop any running bots before reconfiguring. Then run:
+If configuration is missing, still uses the adapter format, or credentials changed, stop any running bots before reconfiguring. Then run:
 
 ```sh
 bin/battuta configure
@@ -122,6 +122,15 @@ bin/battuta start-prod-screen
 ```
 
 Stop and resolve any configuration error before launching. If configuration was already valid but no bots are running, run only `bin/battuta start-prod-screen`. The screen command opens or reattaches a tmux session with one pane per bot. In **each** Pi pane the owner must run `/login` if not already authenticated and complete model-provider authentication. Send a message to each Telegram bot from the allowed user account and confirm both respond; investigate errors in the running panes before declaring success. Detach with `Ctrl-b d`; rerun `bin/battuta start-prod-screen` to reattach. Alternatively launch one bot in the foreground with `bin/battuta pm` or `bin/battuta tl`. Keep only one process per bot/session.
+
+Pi provides MCP natively. In each pane, use `/mcp` to confirm Linear is connected, then ask the bot for a read-only Linear lookup. With `codemode` exposure, Linear tools are discovered and called through native codemode; their names use `mcp__linear__<tool>`. For connection diagnostics without starting another bot session, load `.env.prod` as in step 4 and run the bundled CLI from each bot directory:
+
+```sh
+(cd bots/pm-bot && PI_CODING_AGENT_DIR="$PWD/.pi" ../../bin/node node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js mcp list)
+(cd bots/tl-bot && PI_CODING_AGENT_DIR="$PWD/.pi" ../../bin/node node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js mcp list)
+```
+
+Expect Linear to be connected with tools listed; a nonzero exit indicates invalid configuration or a connection failure. Pi 1.0.0 uses fullscreen TUI by default; set `tuiMode` to `regular` in bot settings if terminal scrollback is preferred.
 
 ## 6. Optional: run as user services
 
@@ -156,7 +165,9 @@ For a new version or installation path, stop the screen/foreground processes or 
 
 Before configuring a release that previously used `LINEAR_API_KEY`, have the owner rename that setting to `LINEAR_API_TOKEN` in `.env.prod` using a private editor, retaining its value. Apply the shell setup in step 4; if the stable installation path changes, update the shell startup snippets too. For source checkouts, manually rename the setting in `.env` and `supabase/.env` and rerun bot configuration; `make dev` does not migrate credentials.
 
-Then run `bin/battuta configure` again to update both Linear MCP entries, verify interactively, and, if using services, run `bin/battuta install-services`, daemon-reload, and enable/start as in step 6.
+The release workflow bundles Node selected by the source checkout's `.node-version` and Pi from each bot's pinned manifest. When upgrading from an adapter-based release, retain private auth/session state while using the new release's package manifests and dependencies. `bin/battuta configure` replaces the adapter-specific Linear authentication with an environment-expanded `Authorization` header and removes `pi-mcp-adapter` package entries from retained bot settings. An adapter left enabled would replace Pi's native MCP support. No new Linear token or MCP OAuth login is needed for this migration.
+
+Then run `bin/battuta configure` again to migrate both bots, verify native MCP and Telegram interactively as in step 5, and, if using services, run `bin/battuta install-services`, daemon-reload, and enable/start as in step 6.
 
 Reinstall `battuta-project` from the updated release wheels with `--reinstall`. Project registrations and memory live independently under `~/.battuta/projects/`; retain them across release updates.
 
