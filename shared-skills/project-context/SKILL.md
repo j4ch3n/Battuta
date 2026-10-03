@@ -1,13 +1,62 @@
 ---
 name: project-context
-description: Use when working on, researching, coding, or building artifacts for a project.
+description: Use when working on, researching, coding, summarizing, specifying, planning, or building artifacts for a project.
 ---
 
 # Project context
 
 ## Overview
 
-`battuta-project` manages project checkouts, indexes repository guidance, and stores durable project memory shared by the bots. Before project work, select the intended project, run `explain`, and read the relevant README/AGENTS files. Run commands from any directory after [installation](references/installation.md).
+`battuta-project` manages project checkouts, displays project summaries and artifact locations, indexes repository guidance, and stores durable project memory shared by agents. Before project work, select the intended project, run `explain`, and read the relevant README/AGENTS files. Run commands from any directory after [installation](references/installation.md).
+
+## Document responsibilities
+
+Select the entry matching the requested responsibility. Read its prompt and, when provided, its template. Each entry is one document collection, not a role-specific workflow or an alternative prompt set.
+
+| Entry                                             | Concept and use                                                                               | Main result                           |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------- |
+| [Summary](references/summary/prompt.md)           | Describe the project as a whole: purpose, users, scope, capabilities, and specification links | `SUMMARY.md`                          |
+| [Specify](references/specify/prompt.md)           | Define what users need and why: requirements, scenarios, and outcomes                         | Feature `spec.md`                     |
+| [Clarify](references/clarify/prompt.md)           | Resolve ambiguity and incorporate answers into existing requirements                          | Updated `spec.md`                     |
+| [Plan](references/plan/prompt.md)                 | Design how the specification will be realized                                                 | `plan.md` and useful design artifacts |
+| [Tasks](references/tasks/prompt.md)               | Translate design into concrete, traceable, ordered work                                       | `tasks.md`                            |
+| [Checklist](references/checklist/prompt.md)       | Evaluate the quality of written requirements                                                  | Requirements-quality checklist        |
+| [Analyze](references/analyze/prompt.md)           | Review consistency and coverage across spec, plan, and tasks                                  | Read-only findings                    |
+| [Constitution](references/constitution/prompt.md) | Establish or amend project-wide principles and constraints                                    | `specs/constitution.md`               |
+
+Summary is project-level; specify is feature-level. Clarify refines existing requirements. Plan makes design decisions; tasks decomposes them. Checklist reviews requirements quality; analyze compares documents. Research, data models, contracts, and quickstarts belong to planning.
+
+The seven specification responsibilities preserve original Spec Kit 1.0.13 wording with documented workspace adaptations; see [attribution](references/attribution.md). Summary is project-context-specific.
+
+## Workspace binding
+
+This binding takes precedence over upstream runtime assumptions in the imported prompts and templates. It supplies locations and invocation context, not a replacement authoring methodology.
+
+1. Select the intended registered project and run `battuta-project explain`. Read applicable checkout README/AGENTS guidance and relevant memory. Ask which project or feature if the request is ambiguous.
+2. Retain the reported Managed Project Directory, Project Root (the checkout), Summary, Specs Root, and Constitution paths. Resolve an existing feature under Specs Root; reuse its directory. For new features use `NNN-short-name`, one more than the highest existing number, starting at `001`.
+3. Treat the current natural-language request as `$ARGUMENTS`, `{ARGS}`, and “User Input.” Slash-command spellings and `__SPECKIT_COMMAND_<NAME>__` tokens name responsibilities in the table above; they are not required user syntax or shell commands. Read the corresponding prompt only when that next responsibility is requested. Implementation, convergence, and issue conversion are not active entries.
+4. Use existing file tools instead of Spec Kit setup scripts. Read `template.md` beside the selected prompt directly; create or update outputs at the resolved locations. Read existing artifacts first and preserve their content when revising them; never replace an existing document with an unfilled template. Do not install Spec Kit, initialize its project infrastructure, or create shared current-feature state.
+
+| Upstream name/path                         | Project-context location                                                |
+| ------------------------------------------ | ----------------------------------------------------------------------- |
+| `FEATURE_DIR`, `SPECIFY_FEATURE_DIRECTORY` | Absolute selected feature directory under Specs Root                    |
+| `SPEC_FILE`, `FEATURE_SPEC`, `SPEC`        | `<FEATURE_DIR>/spec.md`                                                 |
+| `IMPL_PLAN`, `PLAN`                        | `<FEATURE_DIR>/plan.md`                                                 |
+| `TASKS`                                    | `<FEATURE_DIR>/tasks.md`                                                |
+| Constitution                               | The Constitution path from `explain`; empty means no adopted principles |
+| `/specs/...` in templates                  | Under the reported Specs Root, not a filesystem-root or checkout path   |
+| Source/repository root                     | Project Root, the `code/` checkout                                      |
+| Template resolver output                   | The selected responsibility's shared `template.md`                      |
+
+Use absolute paths for file operations and relative links in artifacts. State the checkout root when a plan or task list uses source-relative paths. Branch fields are optional checkout metadata; do not create or switch branches merely to author documents. Replace command-reference tokens and input placeholders with ordinary artifact references in finished documents.
+
+Evaluate workflow prerequisites from the actual artifact files and their contents, not slash-command history. Existing manually authored documents can be inputs. Report incomplete or stale artifacts, including a task list that no longer reflects an updated plan; do not silently regenerate them during a review. Upstream research-agent examples use available research tools; when delegation is unavailable, investigate inline rather than installing another agent runtime.
+
+**Inactive upstream integration sections:** do not execute Pre-Execution Checks, Mandatory Post-Execution Hooks, Post-Execution Checks, “Check for extension hooks,” or hook-related Done When items. They are retained original reference text, including any `EXECUTE_COMMAND` markers. No hooks, registry, preset layers, or `.specify/` helper scripts participate in this runtime. The optional branch-creation-via-hook step is likewise inactive.
+
+An empty constitution scaffold is not adopted policy. Apply confirmed project guidance and do not infer approval from files or checkboxes. Follow the existing authority and conversation rules; authoring or reviewing documents does not authorize implementation, issue creation, or a cycle start. Return the requested outcome through the originating conversation, with compact Telegram summaries rather than a template dump.
+
+New project initialization creates a rendered summary skeleton, empty `MEMORY.md`, and `specs/constitution.md`. Older projects may lack these: `explain` stays read-only, while requested authoring creates only needed artifacts and parent directories. Complete the summary using its shared Markdown reference rather than guessing product context.
 
 `linear create` and `explain` for a linked project contact Linear; GitHub initialization still clones over the network.
 
@@ -17,9 +66,9 @@ description: Use when working on, researching, coding, or building artifacts for
 
 **Usage:** `battuta-project init https://github.com/team/atlas-api.git`
 
-**Output:** Project root, checkout location, and current selection.
+**Output:** Project root, checkout, config, summary, memory, specs and constitution locations, and current selection.
 
-**Process:** Clone with `gh` into a managed checkout and select the project. Already registered names cause an error; failed cloning preserves the previous selection.
+**Process:** Clone with `gh` into a managed checkout, render the `SUMMARY.md` skeleton from the packaged Jinja template, create empty `MEMORY.md` and `specs/constitution.md`, then select the project. Fill the overview during project discovery. Already registered names cause an error; failed initialization preserves the previous selection.
 
 **Linear metadata:** Optional `--linear-project-id <id>` and `--linear-team-id <id>` record existing IDs without querying Linear. Each omitted field defaults to `null`.
 
@@ -35,9 +84,9 @@ description: Use when working on, researching, coding, or building artifacts for
 
 **Usage:** `battuta-project explain`
 
-**Output:** Project Root (the checkout), repository URL, Linear project URL, relative README/AGENTS locations, and a two-level ASCII directory tree.
+**Output:** Managed Project Directory, Project Root (the checkout), Specs Root, Summary and Constitution paths, full project summary, repository URL, Linear project URL, relative README/AGENTS locations, and a two-level ASCII directory tree.
 
-**Process:** Use the current project; discover nested documentation recursively while excluding dependencies, generated directories, and symlinks. Fetch the linked project's URL from Linear; an unlinked project shows `not linked` without a request. Lookup failures cause an error. Read the applicable instructions before working in the displayed Project Root.
+**Process:** Use the current project; read its managed `SUMMARY.md` without editing it. Missing/blank summaries show `not written yet`; artifact paths are reported even before documents exist. Discover nested checkout documentation recursively while excluding dependencies, generated directories, and symlinks. Fetch the linked project's URL from Linear; an unlinked project shows `not linked` without a request. Lookup or summary-read failures cause an error. Read applicable instructions before working in the displayed Project Root.
 
 ### `battuta-project linear <operation>`
 
@@ -72,3 +121,4 @@ Initialize `atlas-api`, run `explain`, and work in the displayed Project Root. I
 - [Installation and migration](references/installation.md)
 - [Command contracts and two-project examples](references/commands.md)
 - [Memory editing and reconciliation](references/memory.md)
+- [Document sources and integration adaptations](references/attribution.md)

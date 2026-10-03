@@ -10,7 +10,9 @@ A bare `battuta-project` invocation displays command help.
 battuta-project init <github-repo-url>
 ```
 
-Use `init` once to register a repository, clone it into a managed checkout, and select it as the current project. Authenticate with `gh auth login` first. Use the checkout location printed by the command.
+Use `init` once to register a repository, clone it into a managed checkout, render a `SUMMARY.md` skeleton, create empty `MEMORY.md` and `specs/constitution.md`, and select it as the current project. Authenticate with `gh auth login` first. Use the checkout and artifact locations printed by the command. Fill the overview from confirmed conversation and repository evidence during project discovery.
+
+The initial project contains `project.yaml`, `SUMMARY.md`, `MEMORY.md`, `code/`, and `specs/constitution.md`. The summary has Purpose, Users and use cases, Scope, Current capabilities, and Specifications sections with explicit unknowns. The empty constitution is not adopted project policy. Feature directories and supporting documents are authored only when needed.
 
 Accepted URL forms include:
 
@@ -78,11 +80,23 @@ If remote creation succeeds but saving the local link fails, the error includes 
 battuta-project explain
 ```
 
-Run `explain` after selecting a project and before working in its checkout. It takes no project argument; use `switch` first to inspect another project.
+Run `explain` after selecting a project and before working in its checkout or writing project artifacts. It takes no project argument; use `switch` first to inspect another project.
+
+The output distinguishes the Managed Project Directory (`~/.battuta/projects/<project>`) from Project Root (its `code/` checkout). It reports Specs Root (`specs/` beside the checkout), Summary (`SUMMARY.md`), and Constitution (`specs/constitution.md`) paths even when those artifacts do not exist.
+
+The Project Summary section displays the managed `SUMMARY.md` as Markdown. Missing or blank summaries show `Project summary: not written yet`; unreadable, invalid UTF-8, symlink, or non-file summaries produce a file error. `explain` never edits the summary or creates artifact directories. Older registrations without a summary remain valid.
 
 The output includes the repository URL and the linked Linear project's URL. Repository information comes from the local registration; `not configured` means it is absent. For a linked project, the command fetches its actual URL from Linear and requires network access and a token with access to that project. An unlinked project shows `not linked` without contacting Linear. Lookup failures are reported as errors; the command does not change the project or its selection.
 
 Use the documentation index to find and read applicable `README.md` and `AGENTS.md` files, then work from the displayed Project Root. Documentation paths are relative to that checkout. Discovery is recursive, while the directory tree is limited to two levels. Symlinks, dependencies, and generated directories are excluded.
+
+## Write project documents
+
+Use existing file tools and the [responsibility entries and Workspace binding](../SKILL.md#document-responsibilities) for summaries, feature specs, technical plans, tasks, and requirements reviews. The requester can use ordinary conversation; no additional CLI or slash commands are required.
+
+Maintain the overview at the Summary path and write feature artifacts under Specs Root in `NNN-feature-name/` directories. Read existing documents and reuse their feature directory for follow-up work. Create optional supporting artifacts only when useful. `MEMORY.md` remains durable decision context rather than the project overview or full specification.
+
+Older registrations may lack some scaffold files. Reinstallation does not migrate them, and `explain` does not write them. Requested authoring establishes missing artifacts and parent directories while preserving existing content; do not rerun `init` against an existing project.
 
 ## Read and edit project memory
 
