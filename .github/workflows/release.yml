@@ -50,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots shared-skills agent-mail .env.example RELEASE.md | tar -x -C dist/stage/battuta
+          git archive HEAD bots shared-skills agent-mail project-spec .env.example RELEASE.md | tar -x -C dist/stage/battuta
           test -s dist/stage/battuta/RELEASE.md
           cli_dir="$PWD/dist/stage/battuta/shared-skills/project-context-cli"
           uv export --project "$cli_dir" --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/project-requirements.txt"
@@ -117,9 +117,11 @@ jobs:
             PI_CODING_AGENT_DIR="$bot_dir/.pi" "$bot_dir/node_modules/.bin/pi" install -l --approve npm:@llblab/pi-telegram@0.50.1
           done
           pnpm --dir dist/stage/battuta/agent-mail install --frozen-lockfile --prod
+          pnpm --dir dist/stage/battuta/project-spec install --frozen-lockfile --prod
           test -x dist/stage/battuta/bots/pm-bot/node_modules/.bin/pi
           test -x dist/stage/battuta/bots/tl-bot/node_modules/.bin/pi
           test -d dist/stage/battuta/agent-mail/node_modules
+          test -d dist/stage/battuta/project-spec/node_modules
           test ! -e dist/stage/battuta/.env
           test ! -e dist/stage/battuta/bots/pm-bot/.pi/auth.json
           test ! -e dist/stage/battuta/bots/tl-bot/.pi/auth.json

@@ -32,7 +32,7 @@ Do not call a proposed cycle an active cycle, an approved issue a cycle commitme
 2. Select the smallest adequate management approach. Preserve effective existing practices and specify any changed decision rights, cadence, and handoffs.
 3. Reuse existing project plans and Linear records. Maintain cycle goals, issue status, dependencies, remaining work, availability, risks, blockers, and decisions. Check for duplicate or completed work before proposing new issues.
 4. Compare evidence with the agreed goal and commitments. Investigate contradictions; missing evidence means unknown, not green. Surface material changes promptly.
-5. Present feasible options when scope, capacity, cost, or dates conflict. Keep the history of previous commitments; an authorized change does not erase prior variance. Show intended changes for review before changing issues or cycle membership. Start a cycle only when the user explicitly says to start it.
+5. Present feasible options when scope, capacity, cost, or dates conflict. Keep the history of previous commitments; an authorized change does not erase prior variance. Decide product scope within the mandate; show changes requiring owner-reserved authority for review before applying them. Cycle membership changes require owner approval; start a cycle only when the user explicitly says to start it.
 6. Close only on accepted outcomes and explicit residual ownership. Distinguish cycle close, project closure, release readiness, service operation, and later benefit realization.
 
 ## Reference routing
@@ -50,6 +50,8 @@ Read only what the current task requires. The local references contain applicabi
 
 ## Authority and completion
 
-This methodology prepares decisions. It does not invent stakeholder consent, assign accepted commitments on someone else's behalf, or approve risk. Apply the user's existing authorization; do not ask repeatedly for the same scope. Keep drafts distinct from issued communications. Do not monitor people or turn activity counts into individual performance judgments.
+PM makes go/no-go/refine product decisions within the owner's mandate under AGENTS.md. It does not invent stakeholder consent, execution authorization, or cycle commitments. Apply existing authorization without asking repeatedly for the same scope. Keep drafts distinct from issued communications. Do not monitor people or turn activity counts into individual performance judgments.
+
+For a feasibility/scope assessment, use the [product decision workflow](references/product-decisions.md). PM persists full immutable document versions, reads TL's canonical checklist/review, and finalizes go/no-go with rationale and hashes in one agent-tool call. Refinement creates a new version while open. Mail to TL is only for additional context or a needed action, not a required decision announcement.
 
 Complete a requested review when the update is delivered, claims have evidence or explicit uncertainty, and unresolved decisions have an accountable route and next review trigger. Do not imply ongoing monitoring without an authorized mechanism.
