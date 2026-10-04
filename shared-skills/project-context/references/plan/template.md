@@ -2,7 +2,7 @@
 
 **Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
 
-**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
+**Input**: [Named specification and immutable version resolved through spec tools]
 
 **Note**: This template is filled in by the `__SPECKIT_COMMAND_PLAN__` command; its definition describes the execution workflow.
 
@@ -46,15 +46,14 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 ### Documentation (this feature)
 
-```text
-specs/[###-feature]/
-├── plan.md              # This file (__SPECKIT_COMMAND_PLAN__ command output)
-├── research.md          # Phase 0 output (__SPECKIT_COMMAND_PLAN__ command)
-├── data-model.md        # Phase 1 output (__SPECKIT_COMMAND_PLAN__ command)
-├── quickstart.md        # Phase 1 output (__SPECKIT_COMMAND_PLAN__ command)
-├── contracts/           # Phase 1 output (__SPECKIT_COMMAND_PLAN__ command)
-└── tasks.md             # Phase 2 output (__SPECKIT_COMMAND_TASKS__ command - NOT created by __SPECKIT_COMMAND_PLAN__)
-```
+- Plan: [This named document and version]
+- Research: [Resolved reference for Phase 0 output]
+- Data model: [Resolved reference for Phase 1 output]
+- Quickstart: [Resolved reference for Phase 1 output]
+- Contracts: [Resolved references for Phase 1 output]
+- Tasks: [Resolved reference when authored separately; not created by planning]
+
+Document storage is managed by spec tools. Replace placeholders with returned references rather than prescribe a directory layout.
 
 ### Source Code (repository root)
 

@@ -105,6 +105,10 @@ class ProjectContext(Model):
     config: ProjectConfig
 
 
+class ProjectList(Model):
+    projects: list[ProjectContext]
+
+
 class LinearResult(Model):
     operation: Literal["link", "create"]
     project: ProjectContext
@@ -132,8 +136,6 @@ class Explanation(Model):
     project: str
     root: Path
     managed_root: Path
-    specs_root: Path
-    constitution_path: Path
     summary_path: Path
     summary: str | None
     repository_url: str | None = None

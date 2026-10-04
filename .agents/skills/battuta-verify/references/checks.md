@@ -11,7 +11,7 @@ make check-all
 - `pnpm lint`: typed ESLint for Node modules and Deno lint for each function.
 - `pnpm typecheck`: TypeScript compiler checks for Node extensions and Deno checks for all function modules and tests.
 - `pnpm test:unit`: Vitest Node unit tests and Deno-native function tests.
-- `pnpm test:coverage`: Node unit coverage, including untested owned modules; reports are in `agent-mail/coverage/`.
+- `pnpm test:coverage`: Node unit coverage, including untested owned modules; reports are in `agent-mail/coverage/` and `project-spec/coverage/`.
 - `pnpm --dir agent-mail test:watch`: watch-mode Node unit tests.
 - `pnpm check:support`: packaging/shell syntax checks and Python test discovery under `scripts/tests/` and each `shared-skills/<skill>-cli/tests/` directory, using the corresponding package's locked environment.
 - `pnpm test:integration`: an isolated local Supabase stack, migration replay, database lint, pgTAP permissions tests, and Vitest integration tests. Uses project `battuta-check`, ports `553xx` and inspector port `8183`; leaves the normal development stack alone. Run only one integration check at a time. Failure logs and JUnit results are in `.reports/`.

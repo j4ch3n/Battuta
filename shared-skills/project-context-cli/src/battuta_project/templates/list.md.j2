@@ -1,0 +1,7 @@
+{% for project in projects %}
+{{ loop.index }}. **{{ project.name }}**
+   Project Root: {{ project.root | display_path }}
+   Code: {{ project.code | display_path }}
+{% else %}
+No registered projects.
+{% endfor %}

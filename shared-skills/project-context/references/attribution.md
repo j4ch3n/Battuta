@@ -20,10 +20,11 @@ The summary prompt, Markdown reference, and CLI Jinja skeleton are project-conte
 
 - Prompt compatibility metadata points to project-context, and each prompt links to the common Workspace binding in `SKILL.md`.
 - Natural-language requests supply upstream input placeholders; workflow spellings route to responsibility references instead of requiring slash commands.
-- Setup-script calls are replaced by explicit feature/artifact resolution and direct shared-template reads. Source paths use the checkout; documents use Specs Root.
+- Setup-script calls are replaced by explicit feature/artifact resolution and direct shared-template reads. The CLI resolves project/checkout context; spec tools resolve managed documents. Prompts and templates use returned references rather than prescribe filesystem layout.
 - Prerequisites are established from artifact contents rather than command history. Research examples use the current runtime's tools, with inline investigation when delegation is unavailable.
-- Constitution reads/writes use the reported Constitution path. An empty file is a scaffold, not adopted principles.
-- Specification directory setup uses project-context naming and reuses an identified feature; preset resolution and `.specify/feature.json` persistence are replaced by shared-template reads and request-local feature context.
+- Constitution reads resolve the adopted named principles document through spec tools; PM persists amendments as complete new versions. An empty legacy scaffold is not adopted principles.
+- Specification setup selects a document name and uses managed authoring; preset resolution and feature-state persistence are replaced by shared-template reads and request-local document context.
+- Managed document setup and template references resolve through spec tools rather than fixed filenames. Checklist persistence follows TL ownership and complete canonical replacements rather than upstream per-domain append files.
 - Original hook sections and branch-hook instructions remain as source text but are explicitly inactive under Workspace binding. No hooks, registries, preset layers, installation, or CLI dependency is introduced.
 
 All other authoring and review wording remains upstream, including template examples and command-reference tokens. Formatting normalization means the files are not byte-for-byte copies. Workspace binding defines how those tokens and path conventions are interpreted; completed project documents contain real content and references rather than unresolved template instructions.

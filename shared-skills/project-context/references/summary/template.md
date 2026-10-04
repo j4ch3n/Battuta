@@ -27,4 +27,4 @@
 
 ## Specifications
 
-- [Feature name](specs/001-feature-name/spec.md) — [Brief scope and known document status.]
+- [Feature name](resolved-spec-reference) — [Brief scope and known document status.]

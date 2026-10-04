@@ -24,6 +24,7 @@ case "${1:-}" in
       exit 1
     }
     [[ -d "$root/agent-mail/node_modules" ]] || { printf 'Missing agent-mail dependencies\n' >&2; exit 1; }
+    [[ -d "$root/project-spec/node_modules" ]] || { printf 'Missing project-spec dependencies\n' >&2; exit 1; }
     set -a
     source "$root/.env.prod"
     set +a
@@ -32,7 +33,7 @@ case "${1:-}" in
     done
     export AGENT_ROLE="$role" PI_CODING_AGENT_DIR="$bot_dir/.pi"
     cd "$bot_dir"
-    exec "$bot_dir/node_modules/.bin/pi" --approve --continue --session-dir "$bot_dir/.pi/mail-sessions" --extension "$root/agent-mail/index.ts"
+    exec "$bot_dir/node_modules/.bin/pi" --approve --continue --session-dir "$bot_dir/.pi/mail-sessions" --extension "$root/agent-mail/index.ts" --extension "$root/project-spec/index.ts"
     ;;
   install-services)
     exec "$root/bin/node" "$root/bin/install-services.mjs"

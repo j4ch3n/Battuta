@@ -63,4 +63,4 @@ Include custom `gh`/Git locations in PATH when needed. Source/tmux launches inhe
 
 ## Project registrations
 
-Use `battuta-project init <github-repo-url>` to register a repository and `battuta-project switch <project>` to select an existing project. Run `battuta-project explain` to find its checkout and repository guidance. Initialization preserves existing registrations. See [command usage](commands.md) for project, Linear, and memory workflows.
+Use `battuta-project list` to discover registrations and `battuta-project current` to report the selected name. Use `init <github-repo-url>` to register a repository and `switch <project>` to select an existing project. Run `explain` to find its checkout and repository guidance. Initialization preserves existing registrations; spec tools manage document discovery and storage. See [command usage](commands.md) for project, Linear, and memory workflows.

@@ -30,8 +30,8 @@ class CliTests(ProjectTestCase):
         self.assertIn("~/.battuta/projects/harbor-web/code", output)
         self.assertIn("Current project: harbor-web", output)
         self.assertIn("Summary: ~/.battuta/projects/harbor-web/SUMMARY.md", output)
-        self.assertIn("Specs Root: ~/.battuta/projects/harbor-web/specs", output)
-        self.assertIn("Constitution: ~/.battuta/projects/harbor-web/specs/constitution.md", output)
+        self.assertNotIn("Specs Root:", output)
+        self.assertNotIn("Constitution:", output)
         self.assertIn("Memory: ~/.battuta/projects/harbor-web/MEMORY.md", output)
         output = self.invoke("switch", "atlas-api")
         self.assertIn("Current project: atlas-api", output)
@@ -72,7 +72,7 @@ class CliTests(ProjectTestCase):
                 output = self.invoke("explain")
                 self.assertIn(included, output)
                 self.assertNotIn(excluded, output)
-                self.assertIn(f"Specs Root: ~/.battuta/projects/{name}/specs", output)
+                self.assertNotIn("Specs Root:", output)
 
     def test_explain_prints_repository_and_unlinked_linear_without_http(self):
         with linear_http() as requests:
@@ -126,10 +126,10 @@ class CliTests(ProjectTestCase):
         args_list = (
             (), ("--help",), ("init", "--help"), ("memory", "--help"), ("linear", "--help"),
             ("linear", "create", "--help"), ("memory", "get", "--help"),
-            ("switch", "atlas-api"), ("explain",), ("memory", "get"),
+            ("switch", "atlas-api"), ("list",), ("current",), ("explain",), ("memory", "get"),
             ("init", "https://github.com/team/harbor-web"),
             ("linear", "link", "--project-id", "project-1", "--team-id", "team-1"),
-            ("linear", "create", "Atlas", "--team-id", "team-1"), ("unknown",),
+             ("linear", "create", "Atlas", "--team-id", "team-1"), ("unknown",),
         )
         original = self.registry.state_path.read_text()
         for value in (None, "", " \t\n"):
@@ -167,6 +167,16 @@ class CliTests(ProjectTestCase):
         self.assertIn("No such command 'refresh'", result.output)
         self.assertEqual(requests, [])
         self.assertEqual(self.registry.state_path.read_text(), original)
+
+    def test_document_authoring_is_not_exposed_as_cli_commands(self):
+        state = self.registry.state_path.read_bytes()
+        for name in ("spec", "decision"):
+            with self.subTest(command=name), linear_http() as requests:
+                result = self.runner.invoke(main, [name, "--help"])
+                self.assertNotEqual(result.exit_code, 0)
+                self.assertIn(f"No such command '{name}'", result.output)
+                self.assertEqual(requests, [])
+                self.assertEqual(self.registry.state_path.read_bytes(), state)
 
     def test_blank_linear_options_are_rejected_before_cloning_or_http(self):
         for args in (
