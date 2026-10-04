@@ -8,6 +8,7 @@ const PACKAGE_ROOT = resolve(SCRIPT_DIRECTORY, "..");
 const BOTS_DIRECTORY = join(PACKAGE_ROOT, "bots");
 const SHARED_INSTRUCTIONS_PATH = join(BOTS_DIRECTORY, "AGENTS_shared.md");
 const SHARED_SKILL_PATH = join(PACKAGE_ROOT, "shared-skills", "project-context");
+const SCHEDULE_PACKAGE = "npm:pi-schedule-prompt@0.4.1";
 const SHARED_INSTRUCTIONS = await readFile(SHARED_INSTRUCTIONS_PATH, "utf8");
 const BOT_CONFIGURATIONS = [
   {
@@ -92,23 +93,28 @@ for (const bot of BOT_CONFIGURATIONS) {
   const dedicatedInstructions = await readFile(bot.dedicatedInstructionsPath, "utf8");
   const instructions = SHARED_INSTRUCTIONS + "\n" + dedicatedInstructions;
 
-  // Retained state from older releases can still load an adapter that replaces native MCP.
+  // Retained state can load the old MCP adapter or omit newly bundled PM packages.
+  let settings = {};
   try {
-    const settings = JSON.parse(await readFile(bot.settingsPath, "utf8"));
-    if (!settings || typeof settings !== "object" || Array.isArray(settings))
-      throw new Error(`Expected a JSON object in ${bot.settingsPath}`);
-    const packages = settings.packages ?? [];
-    if (!Array.isArray(packages)) throw new Error(`Expected packages array in ${bot.settingsPath}`);
-    const retained = packages.filter((entry) => {
-      const source = typeof entry === "string" ? entry : entry?.source;
-      return typeof source !== "string" || source.split("@", 1)[0] !== "npm:pi-mcp-adapter";
-    });
-    if (retained.length !== packages.length) {
-      settings.packages = retained;
-      await writeFile(bot.settingsPath, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 });
-    }
+    settings = JSON.parse(await readFile(bot.settingsPath, "utf8"));
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
+  }
+  if (!settings || typeof settings !== "object" || Array.isArray(settings))
+    throw new Error(`Expected a JSON object in ${bot.settingsPath}`);
+  const packages = settings.packages ?? [];
+  if (!Array.isArray(packages)) throw new Error(`Expected packages array in ${bot.settingsPath}`);
+  const packageName = (entry) => {
+    const source = typeof entry === "string" ? entry : entry?.source;
+    return typeof source === "string" ? source.split("@", 1)[0] : undefined;
+  };
+  const retained = packages.filter((entry) => packageName(entry) !== "npm:pi-mcp-adapter");
+  const needsScheduler =
+    bot.name === "PM" && !retained.some((entry) => packageName(entry) === "npm:pi-schedule-prompt");
+  if (needsScheduler) retained.push(SCHEDULE_PACKAGE);
+  if (needsScheduler || retained.length !== packages.length) {
+    settings.packages = retained;
+    await writeFile(bot.settingsPath, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 });
   }
 
   await writeFile(bot.telegramConfigPath, JSON.stringify(telegram, null, 2), { mode: 0o600 });
