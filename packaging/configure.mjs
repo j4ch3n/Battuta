@@ -9,6 +9,7 @@ const BOTS_DIRECTORY = join(PACKAGE_ROOT, "bots");
 const SHARED_INSTRUCTIONS_PATH = join(BOTS_DIRECTORY, "AGENTS_shared.md");
 const SHARED_SKILL_PATH = join(PACKAGE_ROOT, "shared-skills", "project-context");
 const SCHEDULE_PACKAGE = "npm:pi-schedule-prompt@0.4.1";
+const MEMORY_PACKAGE = "npm:pi-memory-stone@0.1.7";
 const SHARED_INSTRUCTIONS = await readFile(SHARED_INSTRUCTIONS_PATH, "utf8");
 const BOT_CONFIGURATIONS = [
   {
@@ -109,10 +110,16 @@ for (const bot of BOT_CONFIGURATIONS) {
     return typeof source === "string" ? source.split("@", 1)[0] : undefined;
   };
   const retained = packages.filter((entry) => packageName(entry) !== "npm:pi-mcp-adapter");
-  const needsScheduler =
-    bot.name === "PM" && !retained.some((entry) => packageName(entry) === "npm:pi-schedule-prompt");
-  if (needsScheduler) retained.push(SCHEDULE_PACKAGE);
-  if (needsScheduler || retained.length !== packages.length) {
+  if (bot.name === "PM") {
+    for (const source of [SCHEDULE_PACKAGE, MEMORY_PACKAGE]) {
+      if (!retained.some((entry) => packageName(entry) === packageName(source)))
+        retained.push(source);
+    }
+  }
+  if (
+    retained.length !== packages.length ||
+    packages.some((entry) => packageName(entry) === "npm:pi-mcp-adapter")
+  ) {
     settings.packages = retained;
     await writeFile(bot.settingsPath, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 });
   }

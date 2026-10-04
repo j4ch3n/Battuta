@@ -60,7 +60,7 @@ done
 [[ -d "$repo_dir/agent-mail/node_modules" ]] || { printf 'Install agent-mail dependencies with pnpm --dir agent-mail install\n' >&2; exit 1; }
 [[ -d "$repo_dir/project-spec/node_modules" ]] || { printf 'Install project-spec dependencies with pnpm --dir project-spec install --frozen-lockfile\n' >&2; exit 1; }
 
-printf -v pi_command 'set -a; source %q; set +a; AGENT_ROLE=pm PI_CODING_AGENT_DIR=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q' "$env_file" "$bot_dir/.pi" "$bot_dir/node_modules/.bin/pi" "$bot_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts"
+printf -v pi_command 'set -a; source %q; set +a; AGENT_ROLE=pm PI_CODING_AGENT_DIR=%q PI_MEMORY_STONE_DB_PATH=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q' "$env_file" "$bot_dir/.pi" "$bot_dir/.pi/memory/memory.db" "$bot_dir/node_modules/.bin/pi" "$bot_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts"
 printf -v tl_command 'set -a; source %q; set +a; AGENT_ROLE=tl PI_CODING_AGENT_DIR=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q' "$env_file" "$tl_dir/.pi" "$tl_dir/node_modules/.bin/pi" "$tl_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts"
 pi_pane="$(tmux new-session -d -P -F '#{pane_id}' -s "$session" -n "$mode" -c "$bot_dir" "$pi_command")"
 if [[ "$mode" == dev ]]; then

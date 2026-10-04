@@ -17,7 +17,8 @@ class BattutaLauncherTests(LauncherFixture):
             pi = self.root / f"bots/{role}-bot/node_modules/.bin/pi"
             pi.write_text(f"#!{sys.executable}\n" + '''import json, os, sys
 print(json.dumps({"role": os.environ["AGENT_ROLE"],
-                  "token": os.environ.get("LINEAR_API_TOKEN"), "args": sys.argv[1:]}))
+                   "token": os.environ.get("LINEAR_API_TOKEN"),
+                   "memory": os.environ.get("PI_MEMORY_STONE_DB_PATH"), "args": sys.argv[1:]}))
 ''')
             pi.chmod(0o700)
 
@@ -35,6 +36,7 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"],
                 response = json.loads(result.stdout)
                 self.assertEqual(response["role"], role)
                 self.assertEqual(response["token"], "linear-test")
+                self.assertEqual(response["memory"], str(self.root / "bots/pm-bot/.pi/memory/memory.db") if role == "pm" else None)
                 self.assertIn(str(self.root / "project-spec/index.ts"), response["args"])
 
     def test_missing_token_stops_before_launch(self):
