@@ -17,7 +17,7 @@ This is illustrative input, not an actual decision. Use the exact registered pro
 
 ## Effects
 
-In one serialized operation, the tool creates `decision.md` with outcome/rationale, fingerprints the exact bytes of the latest spec, checklist, decision, and review using SHA-256, and records the terminal outcome/version/timestamp/hashes in `specs/index.json`. Hashes live in JSON, not in the decision file itself. Missing optional checklist/review files produce null hashes.
+In one serialized operation, the tool creates the decision artifact with outcome/rationale, fingerprints the exact bytes of the latest spec, checklist, decision, and review using SHA-256, and records the terminal outcome/version/timestamp/hashes in tool-managed metadata. Hashes live in JSON, not in the decision file itself. Missing optional checklist/review files produce null hashes.
 
 Finalization has no checklist/review presence, quality, completion, or freshness gate. Fingerprints are a snapshot, not proof of a passing review. Missing latest spec bytes or an actual read/write/hash failure returns an error rather than inventing a successful record.
 

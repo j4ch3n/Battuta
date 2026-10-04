@@ -6,7 +6,7 @@ import shlex
 from .explain import explain_project
 from .memory import ProjectMemory
 from .linear import LinearClient, require_linear_token
-from .models import LinearConfig, LinearResult, MemoryResult
+from .models import LinearConfig, LinearResult, MemoryResult, ProjectList
 from .presentation import render
 from .registry import ProjectRegistry
 
@@ -46,6 +46,19 @@ def init(github_url: str, linear_project_id: str | None, linear_team_id: str | N
     metadata = LinearConfig(project_id=linear_project_id, team_id=linear_team_id)
     project = ProjectRegistry().init(github_url, linear=metadata)
     click.echo(render("init.md.j2", project))
+
+
+@main.command("list")
+def list_projects():
+    """List registered projects and their managed root and checkout paths."""
+    projects = ProjectRegistry().list_projects()
+    click.echo(render("list.md.j2", ProjectList(projects=projects)))
+
+
+@main.command()
+def current():
+    """Report the selected project name without inspecting its checkout."""
+    click.echo(f"Current Project: {ProjectRegistry().current_name()}")
 
 
 @main.command()

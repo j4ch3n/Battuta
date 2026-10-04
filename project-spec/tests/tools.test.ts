@@ -20,7 +20,7 @@ test("each runtime exposes shared reads and only its own authoring tools", async
     for (const role of ["pm", "tl"] as const) {
       const fake = fakePi();
       register(fake.pi, { role, projectsRoot: f.projects });
-      const common = ["list_projects", "read_project_metadata", "describe_spec"];
+      const common = ["inspect_specs", "describe_spec"];
       const own =
         role === "pm"
           ? ["init_spec", "update_spec", "finalize_spec"]
@@ -50,8 +50,8 @@ test("all registered tool groups exercise the actual shared store", async () => 
         {} as Parameters<typeof tool.execute>[4],
       );
     };
-    await call(pm.tools, "list_projects", {});
-    await call(tl.tools, "read_project_metadata", { project: "atlas" });
+    const inventory = await call(tl.tools, "inspect_specs", { project: "atlas" });
+    assert.deepEqual(inventory.details, { schema_version: 1, specs: [] });
     await call(pm.tools, "init_spec", input);
     await call(pm.tools, "update_spec", { ...input, content: "# New spec" });
     await call(tl.tools, "write_spec_checklist", input);

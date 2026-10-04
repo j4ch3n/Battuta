@@ -27,7 +27,7 @@ test("metadata rejects malformed or impossible terminal timestamps", async () =>
     ]) {
       metadata.specs[0].decision!.recorded_at = timestamp;
       await writeFile(path, JSON.stringify(metadata));
-      await assert.rejects(f.pm.readProjectMetadata("atlas"), /timestamp/);
+      await assert.rejects(f.pm.inspectSpecs("atlas"), /timestamp/);
     }
   } finally {
     await f.cleanup();

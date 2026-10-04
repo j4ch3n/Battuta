@@ -62,8 +62,7 @@ class ProjectRegistry:
         with file_errors():
             directory = self._directory(name)
             if not directory.is_dir():
-                available = sorted(p.name for p in self.root.iterdir()
-                                   if p.is_dir() and not p.is_symlink() and not p.name.startswith(".")) if self.root.is_dir() else []
+                available = self.names()
                 raise click.ClickException(
                     f"Project '{name}' was not found under {self.root}.\n"
                     f"Available projects: {', '.join(available) or 'none'}"
@@ -83,11 +82,23 @@ class ProjectRegistry:
                 raise click.ClickException(f"{path}: relocate the checkout to {code} and update project.path")
             return ProjectContext(name=name, root=directory, code=code, config=config)
 
-    def current(self) -> ProjectContext:
+    def names(self) -> list[str]:
+        with file_errors():
+            check_registry_root(self.root)
+            return sorted(p.name for p in self.root.iterdir()
+                          if p.is_dir() and not p.is_symlink() and not p.name.startswith(".")) if self.root.is_dir() else []
+
+    def list_projects(self) -> list[ProjectContext]:
+        return [self.load(name) for name in self.names()]
+
+    def current_name(self) -> str:
         name = self.state().current_project
         if name is None:
             raise click.ClickException("No current project. Run battuta-project init <github-url> or switch <project-name>.")
-        return self.load(name)
+        return name
+
+    def current(self) -> ProjectContext:
+        return self.load(self.current_name())
 
     def switch(self, name: str) -> ProjectContext:
         with file_errors():
@@ -135,9 +146,6 @@ class ProjectRegistry:
                     raise click.ClickException(f"Cannot render project summary: {error}") from error
                 atomic_write(directory / "SUMMARY.md", summary + "\n")
                 atomic_write(directory / "MEMORY.md", "")
-                specs = directory / "specs"
-                specs.mkdir()
-                atomic_write(specs / "constitution.md", "")
                 self._select(project)
                 return project
             except (OSError, subprocess.CalledProcessError, click.ClickException) as error:

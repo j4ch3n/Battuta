@@ -5,7 +5,7 @@ import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { atomicWrite, directory, readOptional, setMode, syncDirectory } from "./files.ts";
 import { emptyMetadata, parseMetadata, readMetadata, type Metadata } from "./metadata.ts";
-import type { Project } from "./projects.ts";
+import type { SpecStorage } from "./storage.ts";
 
 export interface Change {
   path: string;
@@ -58,7 +58,7 @@ async function restore(path: string, previous: Journal["previous_index"]) {
   }
 }
 
-async function recover(project: Project) {
+async function recover(project: SpecStorage) {
   const path = join(project.specs, ".project-spec-transaction.json");
   const bytes = await readOptional(path);
   if (!bytes) return;
@@ -83,11 +83,11 @@ async function recover(project: Project) {
   await syncDirectory(project.specs);
 }
 
-export async function withLock<T>(project: Project, operation: () => Promise<T>): Promise<T> {
+export async function withLock<T>(project: SpecStorage, operation: () => Promise<T>): Promise<T> {
   const existed = await directory(project.specs, true);
   await mkdir(project.specs, { recursive: true });
   await directory(project.specs);
-  if (!existed) await syncDirectory(project.root);
+  if (!existed) await syncDirectory(dirname(project.specs));
   const release = await lockfile.lock(project.specs, {
     retries: { retries: 40, minTimeout: 10, maxTimeout: 100, factor: 1.2 },
     stale: 10000,
@@ -100,17 +100,20 @@ export async function withLock<T>(project: Project, operation: () => Promise<T>)
   }
 }
 
-export async function inspect<T>(project: Project, operation: (metadata: Metadata) => Promise<T>) {
+export async function inspect<T>(
+  project: SpecStorage,
+  operation: (metadata: Metadata) => Promise<T>,
+) {
   if (!(await directory(project.specs, true))) return operation(emptyMetadata());
   return withLock(project, async () => operation(await readMetadata(project)));
 }
 
-export async function loadMetadata(project: Project) {
+export async function loadMetadata(project: SpecStorage) {
   return inspect(project, (metadata) => Promise.resolve(metadata));
 }
 
 export async function mutate<T>(
-  project: Project,
+  project: SpecStorage,
   operation: (metadata: Metadata) => Promise<{ result: T; changes: Change[] }>,
 ): Promise<T> {
   return withLock(project, async () => {

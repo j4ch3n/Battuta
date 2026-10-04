@@ -88,11 +88,11 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Execution Steps
 
-1. **Setup**: Resolve the existing feature through project-context. Set FEATURE_DIR to its absolute path, inspect it for AVAILABLE_DOCS, and read `template.md` beside this prompt as TEMPLATE_CONTENT.
+1. **Setup**: Resolve the named specification and related documents through `inspect_specs` and `describe_spec`. Use their returned references as AVAILABLE_DOCS and read `template.md` beside this prompt as TEMPLATE_CONTENT.
    - All file paths must be absolute.
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
-2. **IF NON-EMPTY**: Load the Constitution path reported by `battuta-project explain` for project principles and governance constraints.
+2. **IF ADOPTED**: Resolve the named principles document through `inspect_specs` and `describe_spec` for project principles and governance constraints.
 
 3. **Clarify intent (dynamic)**: Derive up to THREE initial contextual clarifying questions (no pre-baked catalog). They MUST:
    - Be generated from the user's phrasing + extracted signals from spec/plan/tasks
@@ -132,7 +132,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Map focus selections to category scaffolding
    - Infer any missing context from spec/plan/tasks (do NOT hallucinate)
 
-5. **Load feature context**: Read from FEATURE_DIR:
+5. **Load feature context**: Read the resolved named document versions:
    - spec.md: Feature requirements and scope
    - plan.md (if exists): Technical details, dependencies
    - tasks.md (if exists): Implementation tasks
@@ -144,14 +144,9 @@ You **MUST** consider the user input before proceeding (if not empty).
    - If source docs are large, generate interim summary items instead of embedding raw text
 
 6. **Generate checklist** - Use TEMPLATE_CONTENT as the structural template and create "Unit Tests for Requirements":
-   - Create `FEATURE_DIR/checklists/` directory if it doesn't exist
-   - Generate unique checklist filename:
-     - Use short, descriptive name based on domain (e.g., `ux.md`, `api.md`, `security.md`)
-     - Format: `[domain].md`
-   - File handling behavior:
-     - If file does NOT exist: Create new file and number items starting from CHK001
-     - If file exists: Append new items to existing file, continuing from the last CHK ID (e.g., if last item is CHK015, start new items at CHK016)
-   - Never delete or replace existing checklist content - always preserve and append
+   - TL persists one complete canonical checklist through `write_spec_checklist`.
+   - Inspect the existing checklist through `describe_spec` before replacing it. Retain applicable criteria and stable identifiers; incorporate the requested focus areas into the complete replacement.
+   - The tool manages its location. Do not create alternate checklist files or append fragments.
    - Leave every newly generated item unchecked (`[ ]`); checkbox state belongs to the reviewer
 
    **CORE PRINCIPLE - Test the Requirements, Not the Implementation**:

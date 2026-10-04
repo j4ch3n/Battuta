@@ -1,18 +1,28 @@
 # Project-spec agent tools
 
-Use these Pi tools for managed specifications and documents under a registered project's Specs Root. They are loaded for both bots by the shared `project-spec` extension. The CLI still handles project registration, selection, context, Linear linkage, and memory; there is no spec-authoring or decision CLI.
+Use these Pi tools for managed specifications and documents. They are loaded for both bots by the shared `project-spec` extension and own spec inventory, storage, versions, reviews, and decisions. The CLI owns project discovery, registration, selection, workspace context, Linear linkage, and memory; there is no spec-authoring or decision CLI.
 
 ## Read first
 
-1. Use `list_projects` to identify the exact local registration name. Use `read_project_metadata` with that explicit name; neither changes shared current-project selection.
+1. Use `battuta-project list` to discover registered projects, or `battuta-project current` to read the selected name. For workspace context, select the intended project and run `explain`. Call `inspect_specs` with the explicit project name to obtain its spec inventory; spec reads do not change CLI selection.
 2. Use `describe_spec` with `project` and the exact display `name`. It returns version history, summaries, presence, coverage, fingerprints, and paths in one locked snapshot. Set `include_content: true` to get the full documents paired with those fingerprints; use this mode for reviewing rather than separately reading files that can change.
 3. Use the responsibility prompt/template linked from SKILL.md to shape the requested document. These are authoring guidance, not permission to edit a saved version or invent implementation authorization.
 
 All authoring tools receive complete Markdown text, not file paths, patches, or append fragments. A successful tool result identifies what was saved. Errors are failed tool results; no ordinary reply counts as a save.
 
+## Inspect a project's specs
+
+Call `inspect_specs` with an exact registered project name:
+
+```json
+{ "project": "atlas-api" }
+```
+
+The result contains only `schema_version` and `specs`. Each spec entry includes its name, versions, version summaries, and recorded checklist/review/decision metadata. An existing project with no index returns `{ "schema_version": 1, "specs": [] }` without creating storage. Project paths, checkout details, and configuration are not returned. Use `describe_spec` for actual artifact presence, resolved paths, review coverage, and full document content.
+
 ## PM: versioned document authoring
 
-`init_spec(project, name, summary, content)` creates `spec-v1.md`. Names such as **API Design** normalize to a direct `api-design` folder. An existing name requires `update_spec`; collisions between different names with the same normalized directory are rejected.
+`init_spec(project, name, summary, content)` creates the first immutable version and returns its location. The tools derive storage from the document's display name. An existing name requires `update_spec`; collisions between different names with the same normalized storage name are rejected.
 
 `update_spec(project, name, summary, content)` saves the next complete immutable version. Existing versions are never rewritten. All managed versioned documents—including product specifications, planning, task, and research artifacts—are persisted by PM; TL supplies technical content and evidence through the originating exchange.
 
@@ -52,8 +62,8 @@ Use [decision recording](decisions.md) after project-management selects go/no-go
 
 ## Persistence and recovery
 
-The tools own `specs/index.json` and the document files. Direct Pi `write`/`edit` to managed Specs Root paths is blocked for both roles. Native write/edit paths and managed persistence reject file and directory symlinks, including dangling links; fixed macOS system aliases are supported. Use regular file/directory copies for ordinary working files. To bring content into managed documents, read the source and submit its full Markdown through the owning role's authoring tool rather than linking or copying directly into Specs Root. Do not use shell commands to bypass the document workflow. These guards are for the bot's file tools, not an operating-system sandbox; pre-call checks do not prevent another process from replacing path components before a filesystem operation.
+The tools own spec metadata and document storage. Direct Pi `write`/`edit` to managed document locations is blocked for both roles. Native write/edit paths and managed persistence reject file and directory symlinks, including dangling links; fixed macOS system aliases are supported. Use regular file/directory copies for ordinary working files. To bring content into managed documents, read the source and submit its full Markdown through the owning role's authoring tool rather than linking or copying directly into managed storage. Do not use shell commands to bypass the document workflow. These guards are for the bot's file tools, not an operating-system sandbox; pre-call checks do not prevent another process from replacing path components before a filesystem operation.
 
 Writes are serialized using a shared project lock. A recovery journal preserves prior bytes/modes until document changes and metadata commit; interrupted pre-commit writes are restored, and a committed metadata record is retained. After a failed/uncertain operation, read metadata before retrying. Do not infer a new version or recorded decision from an attempted call.
 
-Read-only files mark saved spec versions and finalized artifacts. Existing unregistered documents are preserved, not automatically imported. See [metadata and file layout](spec-metadata.md).
+Read-only files mark saved spec versions and finalized artifacts. Existing unregistered documents are preserved, not automatically imported. See the [metadata contract](spec-metadata.md).

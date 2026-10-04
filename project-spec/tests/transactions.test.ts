@@ -291,7 +291,7 @@ test("failure during initial file write removes its temporary file", async () =>
     await assert.rejects(f.pm.initSpec(input), /write failed/);
     const files = await fs.readdir(join(f.projects, "atlas/specs"));
     assert.ok(!files.some((file) => file.endsWith(".tmp")), `Leaked files: ${files.join(", ")}`);
-    assert.equal((await f.pm.readProjectMetadata("atlas")).specs.length, 0);
+    assert.equal((await f.pm.inspectSpecs("atlas")).specs.length, 0);
   } finally {
     vi.mocked(fs.open).mockImplementation(original);
     await f.cleanup();
@@ -319,7 +319,7 @@ test("restart recovers an uncommitted document replacement from a durable journa
       }),
     );
     await fs.writeFile(saved.path, "Interrupted replacement");
-    assert.equal((await f.pm.readProjectMetadata("atlas")).specs.length, 1);
+    assert.equal((await f.pm.inspectSpecs("atlas")).specs.length, 1);
     assert.equal(await fs.readFile(saved.path, "utf8"), input.content);
     await assert.rejects(fs.stat(join(specs, ".project-spec-transaction.json")), /ENOENT/);
   } finally {

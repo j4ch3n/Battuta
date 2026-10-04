@@ -3,7 +3,7 @@ import { writeSpec, writeArtifact, type DocumentInput, type ReviewInput } from "
 import { finalize, type DecisionInput } from "./decisions.ts";
 import { directory, readOptional, sha256 } from "./files.ts";
 import { findSpec, latest, specPath } from "./metadata.ts";
-import { defaultProjectsRoot, listProjects, loadProject } from "./projects.ts";
+import { defaultProjectsRoot, resolveSpecStorage } from "./storage.ts";
 import { inspect, loadMetadata } from "./transactions.ts";
 
 export type Role = "pm" | "tl";
@@ -19,16 +19,11 @@ export class ProjectSpecStore {
   private allow(role: Role) {
     if (this.role !== role) throw new Error(`Only ${role.toUpperCase()} can author this artifact`);
   }
-  listProjects() {
-    return listProjects(this.root);
-  }
-  async readProjectMetadata(name: string) {
-    const project = await loadProject(this.root, name);
-    const metadata = await loadMetadata(project);
-    return { project, ...metadata };
+  async inspectSpecs(name: string) {
+    return loadMetadata(await resolveSpecStorage(this.root, name));
   }
   async describeSpec(projectName: string, name: string, includeContent = false) {
-    const project = await loadProject(this.root, projectName);
+    const project = await resolveSpecStorage(this.root, projectName);
     return inspect(project, async (metadata) => {
       const spec = findSpec(metadata, name);
       await directory(join(project.specs, spec.directory));
@@ -80,22 +75,22 @@ export class ProjectSpecStore {
   }
   async initSpec(input: DocumentInput) {
     this.allow("pm");
-    return writeSpec(await loadProject(this.root, input.project), input, true);
+    return writeSpec(await resolveSpecStorage(this.root, input.project), input, true);
   }
   async updateSpec(input: DocumentInput) {
     this.allow("pm");
-    return writeSpec(await loadProject(this.root, input.project), input, false);
+    return writeSpec(await resolveSpecStorage(this.root, input.project), input, false);
   }
   async writeChecklist(input: DocumentInput) {
     this.allow("tl");
-    return writeArtifact(await loadProject(this.root, input.project), input, "checklist");
+    return writeArtifact(await resolveSpecStorage(this.root, input.project), input, "checklist");
   }
   async writeReview(input: ReviewInput) {
     this.allow("tl");
-    return writeArtifact(await loadProject(this.root, input.project), input, "review");
+    return writeArtifact(await resolveSpecStorage(this.root, input.project), input, "review");
   }
   async finalizeSpec(input: DecisionInput) {
     this.allow("pm");
-    return finalize(await loadProject(this.root, input.project), input);
+    return finalize(await resolveSpecStorage(this.root, input.project), input);
   }
 }

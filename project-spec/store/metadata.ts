@@ -2,7 +2,7 @@ import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { join } from "node:path";
 import { directory, readOptional, nonblank } from "./files.ts";
-import type { Project } from "./projects.ts";
+import type { SpecStorage } from "./storage.ts";
 
 const text = Type.String({ minLength: 1, pattern: "\\S" });
 const hash = Type.String({ pattern: "^[a-f0-9]{64}$" });
@@ -51,7 +51,7 @@ export type Metadata = Static<typeof MetadataSchema>;
 export type Spec = Static<typeof SpecSchema>;
 export const emptyMetadata = (): Metadata => ({ schema_version: 1, specs: [] });
 export const latest = (spec: Spec) => spec.versions[spec.versions.length - 1];
-export const specPath = (project: Project, spec: Spec, version = latest(spec)) =>
+export const specPath = (project: SpecStorage, spec: Spec, version = latest(spec)) =>
   join(project.specs, spec.directory, `spec-${version}.md`);
 
 export function normalizeName(name: string) {
@@ -103,7 +103,7 @@ export function parseMetadata(bytes: Buffer | string): Metadata {
   return input;
 }
 
-export async function readMetadata(project: Project): Promise<Metadata> {
+export async function readMetadata(project: SpecStorage): Promise<Metadata> {
   if (!(await directory(project.specs, true))) return emptyMetadata();
   const bytes = await readOptional(join(project.specs, "index.json"));
   return bytes ? parseMetadata(bytes) : emptyMetadata();

@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { nonblank, readOptional, sha256 } from "./files.ts";
 import { assertOpen, findSpec, latest, specPath } from "./metadata.ts";
-import type { Project } from "./projects.ts";
+import type { SpecStorage } from "./storage.ts";
 import { mutate, type Change } from "./transactions.ts";
 
 export interface DecisionInput {
@@ -11,7 +11,7 @@ export interface DecisionInput {
   rationale: string;
 }
 
-export async function finalize(project: Project, input: DecisionInput) {
+export async function finalize(project: SpecStorage, input: DecisionInput) {
   nonblank(input.rationale, "rationale");
   if (!["go", "no-go"].includes(input.decision)) throw new Error("decision must be go or no-go");
   return mutate(project, async (metadata) => {

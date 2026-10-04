@@ -1,20 +1,69 @@
 import assert from "node:assert/strict";
-import { readFile, stat, writeFile, symlink, mkdir } from "node:fs/promises";
+import { readFile, stat, writeFile, symlink, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "vitest";
 import { fixture, input } from "./fixtures.ts";
 
-test("read tools list registrations without creating metadata or changing selection", async () => {
+test("spec inventory returns only metadata without creating storage or changing selection", async () => {
   const f = await fixture();
   try {
-    assert.deepEqual(
-      (await f.pm.listProjects()).map((p) => p.name),
-      ["atlas", "harbor"],
-    );
-    const metadata = await f.tl.readProjectMetadata("atlas");
-    assert.deepEqual(metadata.specs, []);
+    const metadata = await f.tl.inspectSpecs("atlas");
+    assert.deepEqual(metadata, { schema_version: 1, specs: [] });
     await assert.rejects(stat(join(f.projects, "atlas/specs")), /ENOENT/);
     await assert.rejects(stat(join(f.projects, ".config.json")), /ENOENT/);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("spec operations do not require project configuration or checkout", async () => {
+  const f = await fixture();
+  try {
+    await rm(join(f.projects, "atlas/code"), { recursive: true });
+    await writeFile(join(f.projects, "atlas/project.yaml"), "not: valid: yaml");
+    await f.pm.initSpec(input);
+    const inventory = await f.tl.inspectSpecs("atlas");
+    assert.deepEqual(Object.keys(inventory).sort(), ["schema_version", "specs"]);
+    assert.equal(inventory.specs[0].name, "API Design");
+    assert.deepEqual(inventory.specs[0].versions, ["v1"]);
+    assert.equal(
+      (await f.tl.describeSpec("atlas", input.name, true)).contents?.spec,
+      input.content,
+    );
+    await f.pm.updateSpec({ ...input, summary: "Refined", content: "# Refined" });
+    await f.tl.writeChecklist(input);
+    const assessed = await f.tl.describeSpec("atlas", input.name);
+    await f.tl.writeReview({
+      ...input,
+      spec_version: "v2",
+      checklist_sha256: assessed.fingerprints.checklist!,
+    });
+    await f.pm.finalizeSpec({ ...input, decision: "go", rationale: "Approved scope" });
+    assert.equal((await f.pm.inspectSpecs("atlas")).specs[0].decision?.outcome, "go");
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test.each(["../atlas", "", " ", ".", "..", "atlas/code", "atlas\\code", "missing"])(
+  "spec inventory rejects invalid or missing project %j without creating it",
+  async (project) => {
+    const f = await fixture();
+    try {
+      await assert.rejects(f.pm.inspectSpecs(project));
+      await assert.rejects(stat(join(f.projects, "missing")), /ENOENT/);
+    } finally {
+      await f.cleanup();
+    }
+  },
+);
+
+test("spec inventory rejects a symlink project and preserves its target", async () => {
+  const f = await fixture();
+  try {
+    await symlink(join(f.projects, "atlas"), join(f.projects, "alias"));
+    await assert.rejects(f.pm.inspectSpecs("alias"), /symlink/);
+    assert.deepEqual(await f.pm.inspectSpecs("atlas"), { schema_version: 1, specs: [] });
   } finally {
     await f.cleanup();
   }
@@ -121,7 +170,7 @@ test("normalization collisions, invalid paths and symlinks cannot overwrite anot
     for (const name of ["../outside", "", "   ", "🔥"]) {
       await assert.rejects(f.pm.initSpec({ ...input, name }));
     }
-    await assert.rejects(f.pm.readProjectMetadata("../atlas"));
+    await assert.rejects(f.pm.inspectSpecs("../atlas"));
     await assert.rejects(f.pm.updateSpec({ ...input, name: "Missing" }), /not found/);
     const outside = join(f.root, "outside");
     await mkdir(outside);
@@ -139,7 +188,7 @@ test("malformed metadata and missing declared files are readable errors, not inv
     await f.pm.initSpec(input);
     const index = join(f.projects, "atlas/specs/index.json");
     await writeFile(index, "{broken");
-    await assert.rejects(f.pm.readProjectMetadata("atlas"), /metadata/);
+    await assert.rejects(f.pm.inspectSpecs("atlas"), /metadata/);
   } finally {
     await f.cleanup();
   }

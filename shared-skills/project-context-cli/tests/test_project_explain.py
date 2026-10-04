@@ -11,18 +11,14 @@ from project_fixtures import ProjectTestCase
 
 
 class ExplainTests(ProjectTestCase):
-    def test_managed_artifact_paths_are_separate_from_checkout_without_creating_files(self):
-        constitution = self.project.root / "specs" / "constitution.md"
-        if constitution.exists():
-            constitution.unlink()
-            constitution.parent.rmdir()
+    def test_overview_reports_workspace_paths_without_spec_fields_or_creating_files(self):
         before = sorted(path.name for path in self.project.root.iterdir())
         output = render("explain.md.j2", explain_project(self.project))
         self.assertIn("Managed Project Directory: ~/.battuta/projects/atlas-api", output)
         self.assertIn("Project Root: ~/.battuta/projects/atlas-api/code", output)
-        self.assertIn("Specs Root: ~/.battuta/projects/atlas-api/specs", output)
+        self.assertNotIn("Specs Root:", output)
         self.assertIn("Summary: ~/.battuta/projects/atlas-api/SUMMARY.md", output)
-        self.assertIn("Constitution: ~/.battuta/projects/atlas-api/specs/constitution.md", output)
+        self.assertNotIn("Constitution:", output)
         self.assertEqual(sorted(path.name for path in self.project.root.iterdir()), before)
         self.assertFalse((self.project.root / "specs").exists())
 

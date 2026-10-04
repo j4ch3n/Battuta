@@ -64,17 +64,13 @@ Identify inconsistencies, duplications, ambiguities, and underspecified items ac
 
 **STRICTLY READ-ONLY**: Do **not** modify any files. Output a structured analysis report. Offer an optional remediation plan (user must explicitly approve before any follow-up editing commands would be invoked manually).
 
-**Constitution Authority**: The project constitution (the Constitution path from `explain`, if non-empty) is **non-negotiable** within this analysis scope. Constitution conflicts are automatically CRITICAL and require adjustment of the spec, plan, or tasks—not dilution, reinterpretation, or silent ignoring of the principle. If a principle itself needs to change, that must occur in a separate, explicit constitution update outside `/speckit-analyze`.
+**Constitution Authority**: The adopted named principles document, resolved through spec tools, is **non-negotiable** within this analysis scope. Constitution conflicts are automatically CRITICAL and require adjustment of the spec, plan, or tasks—not dilution, reinterpretation, or silent ignoring of the principle. If a principle itself needs to change, that must occur in a separate, explicit constitution update outside `/speckit-analyze`.
 
 ## Execution Steps
 
 ### 1. Initialize Analysis Context
 
-Resolve the intended existing feature through project-context. Set FEATURE_DIR to its absolute path and inspect it for AVAILABLE_DOCS. Derive absolute paths:
-
-- SPEC = FEATURE_DIR/spec.md
-- PLAN = FEATURE_DIR/plan.md
-- TASKS = FEATURE_DIR/tasks.md
+Resolve the intended project's named documents through `inspect_specs` and `describe_spec`. Use explicit immutable version references for SPEC, PLAN, and TASKS; AVAILABLE_DOCS is the resolved inventory. Read their content through the tools rather than deriving filenames or assuming documents share a directory.
 
 Abort with an error message if any required file is missing (instruct the user to run missing prerequisite command).
 For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
@@ -108,7 +104,7 @@ Load only the minimal necessary context from each artifact:
 
 **From constitution:**
 
-- Load the Constitution path from `explain` if non-empty for principle validation
+- Resolve any adopted named principles document through `inspect_specs` and `describe_spec` for principle validation
 
 ### 3. Build Semantic Models
 

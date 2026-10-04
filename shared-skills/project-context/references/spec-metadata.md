@@ -1,19 +1,6 @@
-# Project-spec metadata and files
+# Project-spec metadata contract
 
-Metadata lives at `<Specs Root>/index.json`. Each named document has one direct normalized directory:
-
-```text
-specs/
-├── index.json
-└── api-design/
-    ├── spec-v1.md
-    ├── spec-v2.md
-    ├── checklist.md
-    ├── review.md
-    └── decision.md
-```
-
-Use `read_project_metadata` and `describe_spec` to inspect current metadata and artifact locations. The metadata schema version is `1`.
+Spec tools own metadata and document storage. Use `inspect_specs` for a project's inventory and `describe_spec` for resolved artifact locations and content; do not derive locations from a presumed layout. The metadata schema version is `1`.
 
 ## Spec entries
 
@@ -25,7 +12,7 @@ Use `read_project_metadata` and `describe_spec` to inspect current metadata and 
 
 ## Read results
 
-`read_project_metadata` returns the existing registration plus the spec entries. Missing index metadata is an empty inventory; reading it does not create a registry or spec scaffold.
+`inspect_specs(project)` returns only `{ "schema_version": 1, "specs": [...] }`, without project registration, paths, checkout, or configuration. Missing index metadata is an empty inventory; reading it does not create storage. Version summaries and decisions are metadata, not proof of delivery.
 
 `describe_spec` returns presence, paths, fingerprints, and `review_status: missing | current | stale` from one locked snapshot. With `include_content: true`, it also returns complete document text paired with those fingerprints. Latest-version review coverage is current only when its assessed version, checklist fingerprint, and review bytes match. This is informational and never a finalization gate.
 

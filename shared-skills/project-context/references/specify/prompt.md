@@ -80,31 +80,17 @@ Given that feature description, do this:
 
    If the user explicitly provided `GIT_BRANCH_NAME`, pass it through to the hook so the branch script uses the exact value as the branch name (bypassing all prefix/suffix generation).
 
-3. **Create the spec feature directory**:
+3. **Resolve the named specification**:
 
-   Specs live under the Specs Root reported by `battuta-project explain`; set `SPECIFY_FEATURE_DIRECTORY` to the resolved absolute feature directory.
+   Use `inspect_specs` with the intended project name. If the request identifies an existing document, resolve it with `describe_spec`; if ambiguous, ask which document is intended. Otherwise select a clear display name for the new specification.
 
-   **Resolution order for `SPECIFY_FEATURE_DIRECTORY`**:
-   1. If the request identifies an existing feature, resolve and reuse its directory under Specs Root. If ambiguous, ask which feature is intended.
-   2. Otherwise, auto-generate it under Specs Root:
-      - Prefix is `NNN` (one more than the highest existing feature directory number; start at `001` if none exist)
-   - Construct the directory name: `<prefix>-<short-name>` (e.g., `003-user-auth` or `20260319-143022-user-auth`) - Set `SPECIFY_FEATURE_DIRECTORY` to `<Specs Root>/<directory-name>`
+   Read `template.md` beside this prompt as the active `spec-template`. Draft complete content, then PM persists it through `init_spec` or `update_spec`. The tools establish storage and return the saved reference; do not create directories or copy templates into assumed locations. Follow-up workflows resolve the same named document through spec tools.
 
-   **Create the directory and spec file**:
-   - `mkdir -p SPECIFY_FEATURE_DIRECTORY`
-   - Read `template.md` beside this prompt as the active `spec-template`.
-   - Copy the resolved `spec-template` file to `SPECIFY_FEATURE_DIRECTORY/spec.md` as the starting point
-   - Set `SPEC_FILE` to `SPECIFY_FEATURE_DIRECTORY/spec.md`
-   - Retain the resolved feature directory for this request. Follow-up workflows resolve that same feature through project-context; do not create a feature-state file.
-
-   **IMPORTANT**:
-   - You must only create one feature per `/speckit-specify` invocation
-   - The spec directory name and the git branch name are independent — they may be the same but that is the user's choice
-   - The spec directory and file are always created by this command, never by the hook
+   Only create one feature per request. Document naming and checkout branches are independent; branch changes are not required for authoring.
 
 4. Load the resolved active `spec-template` file to understand required sections.
 
-5. **IF NON-EMPTY**: Load the Constitution path reported by `battuta-project explain` for project principles and governance constraints.
+5. **IF ADOPTED**: Resolve the named principles document through `inspect_specs` and `describe_spec` for project principles and governance constraints. An empty legacy scaffold is not adopted policy.
 
 6. Follow this execution flow:
    1. Parse user description from arguments
@@ -135,7 +121,7 @@ Given that feature description, do this:
 
 8. **Specification Quality Validation**: After writing the initial spec, validate it against quality criteria:
 
-   a. **Create Spec Quality Checklist**: Generate a checklist file at `SPECIFY_FEATURE_DIRECTORY/checklists/requirements.md` using the checklist template structure with these validation items:
+   a. **Spec Quality Criteria**: Assess these validation items using the checklist template structure. TL owns canonical checklist authoring through `write_spec_checklist`; PM may request this assessment but does not create checklist files:
 
    ```markdown
    # Specification Quality Checklist: [FEATURE NAME]

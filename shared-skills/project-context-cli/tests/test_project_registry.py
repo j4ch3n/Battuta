@@ -72,8 +72,7 @@ class RegistryTests(unittest.TestCase):
         self.assertNotIn("[replace by project name]", content)
         self.assertFalse((project.code / "SUMMARY.md").exists())
         self.assertEqual((project.root / "MEMORY.md").read_bytes(), b"")
-        self.assertEqual((project.root / "specs" / "constitution.md").read_bytes(), b"")
-        self.assertEqual(sorted(p.name for p in (project.root / "specs").iterdir()), ["constitution.md"])
+        self.assertFalse((project.root / "specs").exists())
 
     def test_rendering_failure_preserves_selection_and_removes_new_project(self):
         self.registry.init("https://github.com/team/atlas-api")
@@ -90,40 +89,21 @@ class RegistryTests(unittest.TestCase):
         self.registry.init("https://github.com/team/atlas-api")
         from battuta_project.storage import atomic_write
 
-        for filename in ("MEMORY.md", "constitution.md"):
-            with self.subTest(filename=filename):
-                name = f"harbor-{filename.removesuffix('.md').lower()}"
-                def write(path, text):
-                    if path.name == filename:
-                        raise OSError("scaffold disk full")
-                    atomic_write(path, text)
+        def write(path, text):
+            if path.name == "MEMORY.md":
+                raise OSError("scaffold disk full")
+            atomic_write(path, text)
 
-                with patch("battuta_project.registry.atomic_write", side_effect=write):
-                    with self.assertRaisesRegex(click.ClickException, "scaffold disk full"):
-                        self.registry.init(f"https://github.com/team/{name}")
-                self.assertEqual(self.registry.current().name, "atlas-api")
-                self.assertFalse((self.root / name).exists())
-
-    def test_specs_directory_failure_preserves_selection_and_removes_new_project(self):
-        self.registry.init("https://github.com/team/atlas-api")
-        mkdir = Path.mkdir
-
-        def create(path, *args, **kwargs):
-            if path.name == "specs":
-                raise PermissionError("cannot create specs")
-            return mkdir(path, *args, **kwargs)
-
-        with patch("pathlib.Path.mkdir", new=create):
-            with self.assertRaisesRegex(click.ClickException, "cannot create specs"):
+        with patch("battuta_project.registry.atomic_write", side_effect=write):
+            with self.assertRaisesRegex(click.ClickException, "scaffold disk full"):
                 self.registry.init("https://github.com/team/harbor-web")
         self.assertEqual(self.registry.current().name, "atlas-api")
         self.assertFalse((self.root / "harbor-web").exists())
 
     def test_legacy_registration_loads_without_recreating_artifacts(self):
         project = self.registry.init("https://github.com/team/atlas-api")
-        for path in (project.root / "SUMMARY.md", project.root / "MEMORY.md", project.root / "specs" / "constitution.md"):
+        for path in (project.root / "SUMMARY.md", project.root / "MEMORY.md"):
             path.unlink()
-        (project.root / "specs").rmdir()
         self.assertEqual(self.registry.switch("atlas-api").code, project.code)
         self.assertEqual(sorted(p.name for p in project.root.iterdir()), ["code", "project.yaml"])
 

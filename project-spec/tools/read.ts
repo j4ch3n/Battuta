@@ -4,28 +4,16 @@ import type { ProjectSpecStore } from "../store/index.ts";
 import { argumentsFor, result, target } from "./parameters.ts";
 
 export function registerReadTools(pi: ExtensionAPI, store: ProjectSpecStore) {
-  const empty = Type.Object({}, { additionalProperties: false });
-  pi.registerTool({
-    name: "list_projects",
-    label: "List projects",
-    description:
-      "List existing registered projects and managed paths without changing project selection.",
-    parameters: empty,
-    async execute(_id, args) {
-      argumentsFor(empty, args);
-      return result(await store.listProjects());
-    },
-  });
   const project = Type.Object({ project: target.project }, { additionalProperties: false });
   pi.registerTool({
-    name: "read_project_metadata",
-    label: "Read project metadata",
+    name: "inspect_specs",
+    label: "Inspect specs",
     description:
-      "Read project registration and specs/index.json. Versions, summaries and decisions are metadata, not proof of delivery.",
+      "Inspect a named project's spec inventory, versions, summaries, checklist/review metadata and decisions. Returns spec metadata only; use the project CLI for project discovery and workspace context. Metadata is not proof of delivery.",
     parameters: project,
     async execute(_id, args) {
       const input = argumentsFor(project, args);
-      return result(await store.readProjectMetadata(input.project));
+      return result(await store.inspectSpecs(input.project));
     },
   });
   const spec = Type.Object(
@@ -44,7 +32,7 @@ export function registerReadTools(pi: ExtensionAPI, store: ProjectSpecStore) {
     name: "describe_spec",
     label: "Describe spec",
     description:
-      "Read version history, actual artifact presence, paths, review/checklist fingerprints and finalization. Read document contents with Pi read.",
+      "Read version history, actual artifact presence, paths, review/checklist fingerprints and finalization. Set include_content to read full documents with their fingerprints in one snapshot.",
     parameters: spec,
     async execute(_id, args) {
       const input = argumentsFor(spec, args);

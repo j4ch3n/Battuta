@@ -77,8 +77,7 @@ and commands read the constitution at runtime and are not modified here.
 
 ## Outline
 
-You are updating the project constitution at the Constitution path reported by `battuta-project explain`. The active
-constitution scaffold is `template.md` beside this prompt.
+You are updating the project's named principles document. Resolve an existing document through `inspect_specs` and `describe_spec`; PM persists complete versions through spec tools. The active constitution scaffold is `template.md` beside this prompt.
 
 Follow this execution flow:
 

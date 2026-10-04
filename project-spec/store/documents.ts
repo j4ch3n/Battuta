@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { nonblank, readOptional, sha256 } from "./files.ts";
 import { assertOpen, findSpec, normalizeName, specPath, type Spec } from "./metadata.ts";
-import type { Project } from "./projects.ts";
+import type { SpecStorage } from "./storage.ts";
 import { mutate } from "./transactions.ts";
 
 export interface DocumentInput {
@@ -21,7 +21,7 @@ function validate(input: DocumentInput) {
   nonblank(input.content, "content");
 }
 
-export async function writeSpec(project: Project, input: DocumentInput, initial: boolean) {
+export async function writeSpec(project: SpecStorage, input: DocumentInput, initial: boolean) {
   validate(input);
   return mutate(project, async (metadata) => {
     let spec: Spec;
@@ -67,7 +67,7 @@ export async function writeSpec(project: Project, input: DocumentInput, initial:
 }
 
 export async function writeArtifact(
-  project: Project,
+  project: SpecStorage,
   input: DocumentInput | ReviewInput,
   kind: "checklist" | "review",
 ) {

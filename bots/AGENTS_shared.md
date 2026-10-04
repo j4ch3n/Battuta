@@ -24,7 +24,9 @@ Consult the other bot when a decision crosses that boundary; keep the human info
 
 ### Managed document ownership
 
-Both bots read project/spec metadata and explicit version paths before affected work. Use the role-specific agent tools to persist managed documents with full content; do not use ordinary write/edit or shell commands to patch their files or JSON. Saved versions are immutable. One canonical checklist defines review criteria across versions; one review records actual assessed version/checklist fingerprint. Terminal go and no-go both lock all further spec/checklist/review/decision authoring; read access remains.
+The project CLI owns project discovery, selection, workspace context, memory, and Linear association. Project-spec agent tools own managed specification/document discovery, versioning, review artifacts, and product decisions. Obtain project and checkout locations from the CLI and document references from spec tools; these interfaces manage storage locations.
+
+Both bots inspect the intended project's specs and explicit versions before affected work. Use the role-specific agent tools to persist managed documents with full content; do not use ordinary write/edit or shell commands to patch their files or JSON. Saved versions are immutable. One canonical checklist defines review criteria across versions; one review records actual assessed version/checklist fingerprint. Terminal go and no-go both lock all further spec/checklist/review/decision authoring; read access remains.
 
 ## Respond to the requester
 

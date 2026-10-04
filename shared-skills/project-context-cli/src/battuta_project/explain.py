@@ -71,8 +71,7 @@ def explain_project(project: ProjectContext) -> Explanation:
         repository = project.config.github.repository
         return Explanation(
             project=project.name, root=project.code,
-            managed_root=project.root, specs_root=project.root / "specs",
-            constitution_path=project.root / "specs" / "constitution.md",
+            managed_root=project.root,
             summary_path=summary_path, summary=summary if summary.strip() else None,
             repository_url=f"https://github.com/{repository}" if repository else None,
             readme="README.md" if "README.md" in documents else None,

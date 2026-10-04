@@ -30,8 +30,8 @@ class CliTests(ProjectTestCase):
         self.assertIn("~/.battuta/projects/harbor-web/code", output)
         self.assertIn("Current project: harbor-web", output)
         self.assertIn("Summary: ~/.battuta/projects/harbor-web/SUMMARY.md", output)
-        self.assertIn("Specs Root: ~/.battuta/projects/harbor-web/specs", output)
-        self.assertIn("Constitution: ~/.battuta/projects/harbor-web/specs/constitution.md", output)
+        self.assertNotIn("Specs Root:", output)
+        self.assertNotIn("Constitution:", output)
         self.assertIn("Memory: ~/.battuta/projects/harbor-web/MEMORY.md", output)
         output = self.invoke("switch", "atlas-api")
         self.assertIn("Current project: atlas-api", output)
@@ -72,7 +72,7 @@ class CliTests(ProjectTestCase):
                 output = self.invoke("explain")
                 self.assertIn(included, output)
                 self.assertNotIn(excluded, output)
-                self.assertIn(f"Specs Root: ~/.battuta/projects/{name}/specs", output)
+                self.assertNotIn("Specs Root:", output)
 
     def test_explain_prints_repository_and_unlinked_linear_without_http(self):
         with linear_http() as requests:
@@ -126,7 +126,7 @@ class CliTests(ProjectTestCase):
         args_list = (
             (), ("--help",), ("init", "--help"), ("memory", "--help"), ("linear", "--help"),
             ("linear", "create", "--help"), ("memory", "get", "--help"),
-            ("switch", "atlas-api"), ("explain",), ("memory", "get"),
+            ("switch", "atlas-api"), ("list",), ("current",), ("explain",), ("memory", "get"),
             ("init", "https://github.com/team/harbor-web"),
             ("linear", "link", "--project-id", "project-1", "--team-id", "team-1"),
              ("linear", "create", "Atlas", "--team-id", "team-1"), ("unknown",),

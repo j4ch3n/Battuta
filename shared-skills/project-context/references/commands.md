@@ -1,6 +1,6 @@
 # Command usage
 
-Run `battuta-project` from any directory after [installation](installation.md). Use `init` or `switch` to select a project before running `explain` or memory commands.
+Run `battuta-project` from any directory after [installation](installation.md). The CLI owns project discovery and workspace management; [project-spec tools](spec-tools.md) own spec discovery and lifecycle. Use `list` to discover projects, then `init` or `switch` to select one before running `current`, `explain`, or memory commands. Obtain locations from command/tool results rather than assuming storage layout.
 
 A bare `battuta-project` invocation displays command help.
 
@@ -10,9 +10,9 @@ A bare `battuta-project` invocation displays command help.
 battuta-project init <github-repo-url>
 ```
 
-Use `init` once to register a repository, clone it into a managed checkout, render a `SUMMARY.md` skeleton, create empty `MEMORY.md` and `specs/constitution.md`, and select it as the current project. Authenticate with `gh auth login` first. Use the checkout and artifact locations printed by the command. Fill the overview from confirmed conversation and repository evidence during project discovery.
+Use `init` once to register a repository, clone it into a managed checkout, render a summary skeleton, create empty memory, and select it as the current project. Authenticate with `gh auth login` first. Use the locations printed by the command. Fill the overview from confirmed conversation and repository evidence during project discovery.
 
-The initial project contains `project.yaml`, `SUMMARY.md`, `MEMORY.md`, `code/`, and `specs/constitution.md`. The summary has Purpose, Users and use cases, Scope, Current capabilities, and Specifications sections with explicit unknowns. The empty constitution is not adopted project policy. Feature directories and supporting documents are authored only when needed.
+The summary has Purpose, Users and use cases, Scope, Current capabilities, and Specifications sections with explicit unknowns. Initialization does not establish spec storage or a constitution. Managed documents are created by spec tools only when requested.
 
 Accepted URL forms include:
 
@@ -34,6 +34,24 @@ battuta-project init https://github.com/team/atlas-api.git \
 ```
 
 Both options are independently optional. Supplied IDs are trimmed and must not be blank. The command records these values locally without a Linear API request. GitHub cloning still uses the network.
+
+## List registered projects
+
+```sh
+battuta-project list
+```
+
+The command returns a numbered Markdown list sorted by project name. Each entry has a bold name followed by indented `Project Root` and `Code` lines: the managed project directory and repository checkout, respectively. Paths under the home directory are abbreviated with `~`; other paths remain absolute.
+
+Listing validates registrations and checkouts but does not require or change current selection, read spec inventories, or contact Linear. Hidden directories, symlinks, and non-directory entries are excluded. An empty or absent registry reports `No registered projects.` without creating it. An invalid registration reports an error.
+
+## Read the current selection
+
+```sh
+battuta-project current
+```
+
+The response is a single line, for example `Current Project: atlas-api`. It reads the persisted name only, without loading project configuration, scanning a checkout, inspecting specs, or contacting Linear. Missing selection reports an error directing you to `init` or `switch`. It does not change state.
 
 ## Switch projects
 
@@ -82,7 +100,7 @@ battuta-project explain
 
 Run `explain` after selecting a project and before working in its checkout or writing project artifacts. It takes no project argument; use `switch` first to inspect another project.
 
-The output distinguishes the Managed Project Directory (`~/.battuta/projects/<project>`) from Project Root (its `code/` checkout). It reports Specs Root (`specs/` beside the checkout), Summary (`SUMMARY.md`), and Constitution (`specs/constitution.md`) paths even when those artifacts do not exist.
+The output distinguishes the Managed Project Directory from Project Root (the repository checkout) and reports the Summary path. Unlike `list`, `explain` labels the checkout as `Project Root`. Spec and constitution discovery belong to spec tools and are not included as overview fields.
 
 The Project Summary section displays the managed `SUMMARY.md` as Markdown. Missing or blank summaries show `Project summary: not written yet`; unreadable, invalid UTF-8, symlink, or non-file summaries produce a file error. `explain` never edits the summary or creates artifact directories. Older registrations without a summary remain valid.
 
@@ -92,9 +110,9 @@ Use the documentation index to find and read applicable `README.md` and `AGENTS.
 
 ## Write project documents
 
-Use the [responsibility entries and Workspace binding](../SKILL.md#document-responsibilities) to shape documents. Use [project-spec agent tools](spec-tools.md) for managed specifications, technical plans, tasks, canonical checklists/reviews, and decisions. PM writes full immutable versions; TL writes full checklist/review replacements. The CLI does not author specs or record decisions. Summaries outside Specs Root can use ordinary file tools.
+Use the [responsibility entries and Workspace binding](../SKILL.md#document-responsibilities) to shape documents. Use [project-spec agent tools](spec-tools.md) for managed specifications, technical plans, tasks, canonical checklists/reviews, and decisions. PM writes full immutable versions; TL writes full checklist/review replacements. The CLI does not author specs or record decisions. The project summary can use ordinary file tools at its reported location.
 
-Maintain the overview at the Summary path. Resolve named document versions and related artifact paths from `specs/index.json` through the read tools; no saved version is patched. Legacy feature directories remain unchanged. `MEMORY.md` is durable operational context, not the product-decision or specification source of truth.
+Maintain the overview at the reported Summary path. Inspect the named project's inventory with `inspect_specs` and resolve versions/artifacts through `describe_spec`; no saved version is patched. Existing unregistered documents are preserved. Memory is durable operational context, not the product-decision or specification source of truth.
 
 Older registrations may lack some scaffold files. Reinstallation does not migrate them, and `explain` does not write them. Requested authoring establishes missing artifacts and parent directories while preserving existing content; do not rerun `init` against an existing project.
 
@@ -154,6 +172,7 @@ Return to the first project before resuming work:
 
 ```sh
 battuta-project switch atlas-api
+battuta-project current
 battuta-project explain
 battuta-project memory get
 ```
@@ -166,6 +185,8 @@ Use `--help` at any command level to check arguments and available subcommands:
 
 ```sh
 battuta-project --help
+battuta-project list --help
+battuta-project current --help
 battuta-project init --help
 battuta-project linear --help
 battuta-project linear create --help
