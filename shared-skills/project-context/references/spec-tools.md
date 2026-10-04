@@ -52,7 +52,7 @@ Use [decision recording](decisions.md) after project-management selects go/no-go
 
 ## Persistence and recovery
 
-The tools own `specs/index.json` and the document files. Direct Pi `write`/`edit` to managed Specs Root paths is blocked for both roles. Do not use shell commands to bypass the document workflow. These guards are for the bot's file tools, not an operating-system sandbox.
+The tools own `specs/index.json` and the document files. Direct Pi `write`/`edit` to managed Specs Root paths is blocked for both roles. Native write/edit paths and managed persistence reject file and directory symlinks, including dangling links; fixed macOS system aliases are supported. Use regular file/directory copies for ordinary working files. To bring content into managed documents, read the source and submit its full Markdown through the owning role's authoring tool rather than linking or copying directly into Specs Root. Do not use shell commands to bypass the document workflow. These guards are for the bot's file tools, not an operating-system sandbox; pre-call checks do not prevent another process from replacing path components before a filesystem operation.
 
 Writes are serialized using a shared project lock. A recovery journal preserves prior bytes/modes until document changes and metadata commit; interrupted pre-commit writes are restored, and a committed metadata record is retained. After a failed/uncertain operation, read metadata before retrying. Do not infer a new version or recorded decision from an attempted call.
 

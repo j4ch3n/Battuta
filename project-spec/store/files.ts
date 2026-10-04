@@ -1,11 +1,43 @@
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, open, rename, rm } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { lstat, open, readlink, rename, rm } from "node:fs/promises";
+import { dirname, join, parse, resolve, sep } from "node:path";
+
+export class SymlinkPathError extends Error {
+  constructor(path: string) {
+    super(
+      `Path must not contain a symlink: ${path}. Use a regular file/directory copy at a non-symlink location. For managed documents, submit full content through your role's project-spec tools.`,
+    );
+  }
+}
+
+export async function assertNoSymlinks(path: string) {
+  const absolute = resolve(path);
+  let current = parse(absolute).root;
+  for (const part of absolute.slice(current.length).split(sep)) {
+    if (!part) continue;
+    current = join(current, part);
+    try {
+      if (!(await lstat(current)).isSymbolicLink()) continue;
+      // macOS supplies these fixed aliases; user-created aliases remain unsupported.
+      if (
+        process.platform === "darwin" &&
+        ["/tmp", "/var", "/etc"].includes(current) &&
+        resolve(dirname(current), await readlink(current)) === `/private${current}`
+      )
+        continue;
+      throw new SymlinkPathError(current);
+    } catch (error) {
+      if (code(error) === "ENOENT") return;
+      throw error;
+    }
+  }
+}
 
 export async function directory(path: string, optional = false) {
+  await assertNoSymlinks(path);
   try {
     const info = await lstat(path);
-    if (info.isSymbolicLink()) throw new Error(`Directory must not be a symlink: ${path}`);
+    if (info.isSymbolicLink()) throw new SymlinkPathError(path);
     if (!info.isDirectory()) throw new Error(`Expected a directory: ${path}`);
     return true;
   } catch (error) {
@@ -19,9 +51,10 @@ export function code(error: unknown): string | undefined {
 }
 
 export async function readOptional(path: string): Promise<Buffer | null> {
+  await assertNoSymlinks(path);
   try {
     const info = await lstat(path);
-    if (info.isSymbolicLink()) throw new Error(`File must not be a symlink: ${path}`);
+    if (info.isSymbolicLink()) throw new SymlinkPathError(path);
     if (!info.isFile()) throw new Error(`Expected a regular file: ${path}`);
     const handle = await open(path, "r");
     try {
