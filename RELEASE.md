@@ -24,6 +24,8 @@ Expect `aarch64`/`arm64` and Python **3.12+**. The release bundles Node, Pi, and
 
 Confirm with the owner that a **remote Supabase project** has already been deployed with Battuta's database migrations and Edge Functions, and that they have two distinct Telegram bot tokens, their numeric Telegram user ID, a Linear API key, and remote Supabase URL and secret key. This archive does not deploy Supabase. If the remote backend is not ready, pause here and arrange its deployment before launching the bots.
 
+For the PM bot's Gmail and Calendar prerequisites, follow the [gogcli setup guide](docs/gogcli-setup.md).
+
 ## 2. Download and verify the release
 
 ### Already done?
@@ -65,7 +67,7 @@ Install `battuta-project` from the included wheels as described in the [installa
 
 ### Already done?
 
-Check whether `.env.prod` exists and is private (`stat -c '%a' .env.prod` on Raspberry Pi OS). If it exists with mode `600`, ask the owner to confirm that all required values are present, including `LINEAR_API_TOKEN`, and point to the intended services; do not display or replace the file. If it is missing, create it below. If permissions are too broad, restrict them before proceeding. Also check token availability from a new terminal as described below; an existing bot's environment does not establish that other sessions have the token.
+Check whether `.env.prod` exists and is private (`stat -c '%a' .env.prod` on Raspberry Pi OS). If it exists with mode `600`, ask the owner to confirm that all required values are present, including `LINEAR_API_TOKEN` and, for Google file-keyring access, `GOG_KEYRING_PASSWORD`, and point to the intended services; do not display or replace the file. If it is missing, create it below. If permissions are too broad, restrict them before proceeding. Also check credential availability from a new terminal as described below; an existing bot's environment does not establish that other sessions have the credentials.
 
 ### Fresh setup
 
@@ -78,11 +80,13 @@ chmod 600 .env.prod
 
 Have the owner enter `PM_TELEGRAM_TOKEN`, `TL_TELEGRAM_TOKEN`, `TELEGRAM_ALLOWED_USER_ID`, `LINEAR_API_TOKEN`, `SUPABASE_URL`, and `SUPABASE_SECRET_KEY` into `.env.prod` using a private editor. The tokens must belong to different bots; the Supabase values must refer to the **deployed remote project**. Linear MCP and `battuta-project` use the same `LINEAR_API_TOKEN`. Optional usernames are described in the template. Do not request credential values in chat, put them in shell commands, or display the file's contents. Ask the owner to confirm all required values are present before continuing.
 
-### Make the Linear token available across Battuta sessions
+For Google file-keyring access, have the owner also add `GOG_KEYRING_PASSWORD` to the same private `.env.prod` file. Its value must match the password protecting the existing gog keyring; use shell-compatible quoting as needed. Keep `.env.prod` as the credential source rather than copying the password into `~/.bashrc`. Follow the [gogcli setup guide](docs/gogcli-setup.md) for keyring configuration and authentication.
 
-Keep `.env.prod` as the single credential source. The release foreground commands, both production tmux panes, and both user services load it and export its variables before starting Pi. Their child commands inherit `LINEAR_API_TOKEN`; this does not export the token back into other terminals on the machine.
+### Make the Linear token and Google keyring password available across Battuta sessions
 
-For standalone Pi sessions and `battuta-project` commands under the same OS user, add this snippet once to both `~/.profile` (login shells) and `~/.bashrc` (interactive Bash shells) using an editor. If `~/.bash_profile` or `~/.bash_login` exists, ensure it sources `~/.profile` or put the login-shell snippet there instead. Replace the example path with the actual stable installation path. If the user uses another shell, configure its equivalent startup file instead.
+Keep `.env.prod` as the single credential source. The release foreground commands, both production tmux panes, and both user services load it and export its variables before starting Pi. Their child commands inherit `LINEAR_API_TOKEN` and `GOG_KEYRING_PASSWORD` when present; this does not export the credentials back into other terminals on the machine.
+
+For standalone Pi sessions, `battuta-project`, and `gog` commands under the same OS user, add this snippet once to both `~/.profile` (login shells) and `~/.bashrc` (interactive Bash shells) using an editor. If the existing snippet exports only `LINEAR_API_TOKEN`, replace it with this version. If `~/.bash_profile` or `~/.bash_login` exists, ensure it sources `~/.profile` or put the login-shell snippet there instead. Replace the example path with the actual stable installation path. If the user uses another shell, configure its equivalent startup file instead.
 
 ```sh
 if [ -r "$HOME/apps/battuta/.env.prod" ]; then
@@ -91,20 +95,30 @@ if [ -r "$HOME/apps/battuta/.env.prod" ]; then
     . "$HOME/apps/battuta/.env.prod"
     printf '%s' "${LINEAR_API_TOKEN:-}"
   )"
-  export LINEAR_API_TOKEN
+  GOG_KEYRING_PASSWORD="$(
+    unset GOG_KEYRING_PASSWORD
+    . "$HOME/apps/battuta/.env.prod"
+    printf '%s' "${GOG_KEYRING_PASSWORD:-}"
+  )"
+  export LINEAR_API_TOKEN GOG_KEYRING_PASSWORD
 fi
 ```
 
-The subshell reads the private file but exports only the Linear token to the terminal; the other production credentials stay inside the subshell. Use the same shell-compatible assignments as the environment template and keep tracing (`set -x`) disabled when loading credentials. Do not copy the token into startup files or make `.env.prod` world-readable.
+The subshells read the private file but export only the Linear token and Google keyring password to the terminal; the other production credentials stay inside the subshells. Use the same shell-compatible assignments as the environment template and keep tracing (`set -x`) disabled when loading credentials. Do not copy credential values into startup files or make `.env.prod` world-readable.
 
-Open a new terminal under the bot user and verify without printing the token:
+Open a new terminal under the bot user and verify without printing credential values:
 
 ```sh
 test -n "${LINEAR_API_TOKEN:-}" && printf 'Linear token is available\n'
+test -n "${GOG_KEYRING_PASSWORD:-}" && printf 'Google keyring password is available\n'
 battuta-project --help
 ```
 
-If the first command does not print the confirmation, resolve the environment setup before continuing. Run these checks in any standalone Pi session used for Battuta as well. Existing shells and Pi processes retain their old environment: reopen standalone sessions and restart running bots after setup or rotation. For production tmux, stop the bot session and launch it again; reattaching does not reload credentials. Systemd services load `.env.prod` through the release launcher, so they do not depend on shell startup files.
+If the Linear check does not print its confirmation, resolve the environment setup before continuing. If Google file-keyring access is being configured, its password check must also print its confirmation; otherwise resolve it before using Google operations. Run these checks in any standalone Pi session used for Battuta as well. Existing shells and Pi processes retain their old environment: reopen standalone sessions and restart running bots after setup or rotation. For production tmux, stop the bot session and launch it again; reattaching does not reload credentials. Systemd services load `.env.prod` through the release launcher, so they do not depend on shell startup files.
+
+### Verify Google access for the PM bot
+
+Follow the [gogcli setup guide](docs/gogcli-setup.md) for installation, account selection, authentication, and read-access checks.
 
 ## 5. Configure and verify interactively
 
@@ -132,6 +146,10 @@ Pi provides MCP natively. In each pane, use `/mcp` to confirm Linear is connecte
 
 Expect Linear to be connected with tools listed; a nonzero exit indicates invalid configuration or a connection failure. Pi 1.0.0 uses fullscreen TUI by default; set `tuiMode` to `regular` in bot settings if terminal scrollback is preferred.
 
+In the PM pane, confirm `/schedule-prompt` opens the scheduler menu and ask the bot to list scheduled prompts with `schedule_prompt`. If the scheduler is missing from an upgraded installation's retained settings, rerun `bin/battuta configure` before restarting the bot. Complete the [Google runtime checks](docs/gogcli-setup.md#8-verify-the-pm-bots-runtime-and-service) in the same PM pane.
+
+The release includes `pi-schedule-prompt@0.4.1` for the PM bot. Its jobs and settings live in the PM working directory's `.pi/schedule-prompts.json` and `.pi/schedule-prompts-settings.json`. Schedules fire only while a Pi session is running in that directory; missed runs are not queued. Jobs are session-bound by default, so resume the creating session for its jobs to run. Inspect existing jobs and their scope before relying on them after a restart or update. See the [upstream scheduler guide](https://github.com/tintinweb/pi-schedule-prompt) for recurring jobs, reminders, and session/workdir scope.
+
 ## 6. Optional: run as user services
 
 ### Already done?
@@ -152,6 +170,8 @@ systemctl --user status battuta-pm.service battuta-tl.service
 Expect both services to be active/running. If not, inspect `journalctl --user -u battuta-pm.service -f` and the corresponding Tech Lead service logs, fix the cause, and recheck. `install-services` only writes user units; enabling/starting is a separate step. To run services at boot without an interactive login, an administrator can enable linger with `sudo loginctl enable-linger "$USER"`. Never run tmux bots alongside active services.
 
 Make the installed `battuta-project` executable available to both services using the [service PATH instructions](shared-skills/project-context/references/installation.md#bot-service-path); shell PATH changes alone do not apply to systemd units.
+
+Complete the [Google service-environment checks](docs/gogcli-setup.md#8-verify-the-pm-bots-runtime-and-service) for the PM service.
 
 ## 7. Updating an existing installation
 

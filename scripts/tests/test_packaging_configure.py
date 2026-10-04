@@ -1,6 +1,7 @@
 """Release configuration installs shared skills from the archive root."""
 
 import json
+from itertools import product
 import os
 from pathlib import Path
 import shutil
@@ -14,8 +15,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class PackagingConfigureTests(unittest.TestCase):
     def test_install_and_migrate_links_for_both_bots(self):
-        for existing in (None, "../../../shared-skills/project-context"):
-            with self.subTest(existing=existing), tempfile.TemporaryDirectory() as directory:
+        for existing, settings_mode in product((None, "../../../shared-skills/project-context"), ("missing", "legacy", "scheduler")):
+            with self.subTest(existing=existing, settings_mode=settings_mode), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 (root / "bin").mkdir()
                 shutil.copyfile(ROOT / "packaging" / "configure.mjs", root / "bin" / "configure.mjs")
@@ -34,13 +35,17 @@ class PackagingConfigureTests(unittest.TestCase):
                     skills = bot / ".pi" / "skills"
                     skills.mkdir(parents=True)
                     (bot / "AGENTS_dedicated.md").write_text(role)
-                    (bot / ".pi/settings.json").write_text(json.dumps({"theme": "dark", "packages": [
+                    packages = [
                         "npm:@llblab/pi-telegram@0.50.1", "npm:pi-mcp-adapter@2.37.0",
                         {"source": "npm:pi-mcp-adapter", "extensions": ["index.ts"]},
                         "npm:pi-web-access@0.35.0",
                         {"source": "npm:custom-tools@1.0.0", "extensions": ["read.ts"]},
                         "npm:pi-mcp-adapter-extra@1.0.0",
-                    ]}))
+                    ]
+                    if settings_mode == "scheduler" and role == "pm-bot":
+                        packages.append({"source": "npm:pi-schedule-prompt@0.4.1", "extensions": ["src/index.ts"]})
+                    if settings_mode != "missing":
+                        (bot / ".pi/settings.json").write_text(json.dumps({"theme": "dark", "packages": packages}))
                     if existing:
                         (skills / "project-context").symlink_to(existing, target_is_directory=True)
                 env = {
@@ -71,9 +76,23 @@ class PackagingConfigureTests(unittest.TestCase):
                         )
                         self.assertEqual(mcp["mcpServers"]["linear"]["exposure"], "codemode")
                         self.assertNotIn("test-linear", json.dumps(mcp))
-                        settings = json.loads((link.parent.parent / "settings.json").read_text())
-                        self.assertEqual(settings, {"theme": "dark", "packages": [
+                        settings_path = link.parent.parent / "settings.json"
+                        if settings_mode == "missing":
+                            if role == "pm-bot":
+                                self.assertEqual(json.loads(settings_path.read_text()), {"packages": ["npm:pi-schedule-prompt@0.4.1"]})
+                                self.assertEqual(settings_path.stat().st_mode & 0o777, 0o600)
+                            else:
+                                self.assertFalse(settings_path.exists())
+                            continue
+                        settings = json.loads(settings_path.read_text())
+                        expected_packages = [
                             "npm:@llblab/pi-telegram@0.50.1", "npm:pi-web-access@0.35.0",
                             {"source": "npm:custom-tools@1.0.0", "extensions": ["read.ts"]},
                             "npm:pi-mcp-adapter-extra@1.0.0",
-                        ]})
+                        ]
+                        if role == "pm-bot":
+                            expected_packages.append(
+                                {"source": "npm:pi-schedule-prompt@0.4.1", "extensions": ["src/index.ts"]}
+                                if settings_mode == "scheduler" else "npm:pi-schedule-prompt@0.4.1"
+                            )
+                        self.assertEqual(settings, {"theme": "dark", "packages": expected_packages})
