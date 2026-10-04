@@ -79,7 +79,7 @@ class PackagingConfigureTests(unittest.TestCase):
                         settings_path = link.parent.parent / "settings.json"
                         if settings_mode == "missing":
                             if role == "pm-bot":
-                                self.assertEqual(json.loads(settings_path.read_text()), {"packages": ["npm:pi-schedule-prompt@0.4.1"]})
+                                self.assertEqual(json.loads(settings_path.read_text()), {"packages": ["npm:pi-schedule-prompt@0.4.1", "npm:pi-memory-stone@0.1.7"]})
                                 self.assertEqual(settings_path.stat().st_mode & 0o777, 0o600)
                             else:
                                 self.assertFalse(settings_path.exists())
@@ -95,4 +95,5 @@ class PackagingConfigureTests(unittest.TestCase):
                                 {"source": "npm:pi-schedule-prompt@0.4.1", "extensions": ["src/index.ts"]}
                                 if settings_mode == "scheduler" else "npm:pi-schedule-prompt@0.4.1"
                             )
+                            expected_packages.append("npm:pi-memory-stone@0.1.7")
                         self.assertEqual(settings, {"theme": "dark", "packages": expected_packages})

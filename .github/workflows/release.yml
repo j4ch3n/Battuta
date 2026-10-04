@@ -119,6 +119,8 @@ jobs:
             if [ "$bot" = pm-bot ]; then
               PI_CODING_AGENT_DIR="$bot_dir/.pi" pnpm --dir "$bot_dir" exec pi install -l --approve npm:pi-schedule-prompt@0.4.1
               test -f "$bot_dir/.pi/npm/node_modules/pi-schedule-prompt/src/index.ts"
+              PI_CODING_AGENT_DIR="$bot_dir/.pi" pnpm --dir "$bot_dir" exec pi install -l --approve npm:pi-memory-stone@0.1.7
+              test -f "$bot_dir/.pi/npm/node_modules/pi-memory-stone/src/index.ts"
               test -f "$bot_dir/.pi/skills/manage-google/SKILL.md"
             fi
           done

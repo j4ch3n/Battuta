@@ -32,6 +32,9 @@ case "${1:-}" in
       [[ -n "${!key:-}" ]] || { printf 'Set %s in .env.prod\n' "$key" >&2; exit 1; }
     done
     export AGENT_ROLE="$role" PI_CODING_AGENT_DIR="$bot_dir/.pi"
+    if [[ "$role" == pm ]]; then
+      export PI_MEMORY_STONE_DB_PATH="$bot_dir/.pi/memory/memory.db"
+    fi
     cd "$bot_dir"
     exec "$bot_dir/node_modules/.bin/pi" --approve --continue --session-dir "$bot_dir/.pi/mail-sessions" --extension "$root/agent-mail/index.ts" --extension "$root/project-spec/index.ts"
     ;;

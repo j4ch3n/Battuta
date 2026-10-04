@@ -12,7 +12,7 @@ class RunDevTests(LauncherFixture):
         for role in ("pm", "tl"):
             pi = self.root / f"bots/{role}-bot/node_modules/.bin/pi"
             pi.write_text(f"#!{sys.executable}\n" + '''import os
-print(os.environ["AGENT_ROLE"] + ":" + os.environ.get("LINEAR_API_TOKEN", ""))
+print(os.environ["AGENT_ROLE"] + ":" + os.environ.get("LINEAR_API_TOKEN", "") + ":" + os.environ.get("PI_MEMORY_STONE_DB_PATH", ""))
 ''')
         result = self.run_launcher("prod", existing=False)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -25,7 +25,7 @@ print(os.environ["AGENT_ROLE"] + ":" + os.environ.get("LINEAR_API_TOKEN", ""))
                                       capture_output=True, text=True)
                 self.assertEqual(pane.returncode, 0, pane.stderr)
                 outputs.append(pane.stdout.strip())
-        self.assertEqual(outputs, ["pm:linear-test", "tl:linear-test"])
+        self.assertEqual(outputs, [f"pm:linear-test:{self.root.resolve()}/bots/pm-bot/.pi/memory/memory.db", "tl:linear-test:"])
 
     def test_launch_does_not_refresh_telegram_configuration(self):
         for mode in ("dev", "prod"):

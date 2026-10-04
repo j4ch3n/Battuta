@@ -48,3 +48,5 @@ Paths below are relative to the repository root.
 | `docs/`                                                             | Shared technical references and detailed material without a dedicated workflow home                                                                                                    |
 
 Bot `AGENTS.md` files are generated runtime instructions; edit their shared/dedicated sources for lasting changes. Private environment files and bot auth/session state are local configuration, not documentation sources. See [agent mail architecture](docs/agent-mail.md) for messaging behavior.
+
+See [installing Pi extensions](docs/pi-extensions.md) for bot-local package installation, dependency checks, release wiring, and verification.

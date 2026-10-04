@@ -8,7 +8,7 @@ import click
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts"))
 from bot_setup import (  # noqa: E402
-    SCHEDULE_PACKAGE, TELEGRAM_PACKAGE, configure_mcp, configure_telegram,
+    MEMORY_PACKAGE, SCHEDULE_PACKAGE, TELEGRAM_PACKAGE, configure_mcp, configure_telegram,
     configure_instructions, install_packages, read_env, required, warn_running_session,
 )
 
@@ -36,7 +36,7 @@ def main(bot_dir: Path, env_file: Path, env_prefix: str, telegram_package: str) 
     required(values, "LINEAR_API_TOKEN", env_file)
     configure_telegram(bot_dir, env_file, env_prefix, values)
     configure_mcp(bot_dir, env_file, values)
-    install_packages(bot_dir, telegram_package, extra_packages=(SCHEDULE_PACKAGE,))
+    install_packages(bot_dir, telegram_package, extra_packages=(SCHEDULE_PACKAGE, MEMORY_PACKAGE))
     warn_running_session(bot_dir)
 
 
