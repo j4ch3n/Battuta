@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cp, mkdir, realpath, symlink } from "node:fs/promises";
+import { cp, mkdir, readFile, realpath, symlink } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
 import { test } from "vitest";
@@ -14,7 +14,10 @@ test("Pi loads a staged extension with only production dependencies for both rol
     await mkdir(join(staged, "node_modules"), { recursive: true });
     for (const item of ["index.ts", "guards.ts", "store", "tools", "package.json"])
       await cp(join(packageRoot, item), join(staged, item), { recursive: true });
-    for (const dependency of ["typebox", "yaml", "proper-lockfile"])
+    const manifest = JSON.parse(await readFile(join(staged, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    for (const dependency of Object.keys(manifest.dependencies))
       await symlink(
         await realpath(join(packageRoot, "node_modules", dependency)),
         join(staged, "node_modules", dependency),
