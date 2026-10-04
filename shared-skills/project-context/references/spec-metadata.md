@@ -13,7 +13,7 @@ specs/
     └── decision.md
 ```
 
-The metadata contract is maintained in [project-spec/store/metadata.ts](../../../project-spec/store/metadata.ts). Its schema version is `1`.
+Use `read_project_metadata` and `describe_spec` to inspect current metadata and artifact locations. The metadata schema version is `1`.
 
 ## Spec entries
 

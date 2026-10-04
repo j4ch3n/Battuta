@@ -4,10 +4,10 @@ Use after technical assessment when selecting a useful achievement milestone, re
 
 ## Decide and record
 
-1. Read registered project metadata, the named spec's actual latest version, canonical checklist/review, TL findings, and the owner's mandate. Use the [project-spec tool workflow](../../../../../../shared-skills/project-context/references/spec-tools.md).
+1. Read registered project metadata, the named spec's actual latest version, canonical checklist/review, TL findings, and the owner's mandate. Use the `project-context` skill when inspecting managed project/spec artifacts.
 2. Compare the smallest useful achievement with broader alternatives: acceptance boundary, deferred capabilities, consequences, evidence, and unknowns. Decide within delegated authority; request a bounded probe for missing evidence or take owner-reserved choices to the owner.
-3. For refinement, submit complete revised requirements/acceptance with `update_spec`. Earlier versions remain immutable. PM persists managed versioned documents; TL supplies technical content and maintains canonical checklist/review. Refinement keeps the spec open and is not a final decision.
-4. Establish the rationale before go/no-go. Invoke `finalize_spec` with outcome and full rationale using [decision recording](../../../../../../shared-skills/project-context/references/decisions.md). Both outcomes are terminal; inspect the saved result/metadata before reporting success. File hashes snapshot the actual artifacts, with no checklist/review approval gate.
+3. For refinement, save complete revised requirements/acceptance using PM's available authoring tools. Use the `project-context` skill for managed document persistence. Earlier versions remain immutable. PM persists managed versioned documents; TL supplies technical content and maintains canonical checklist/review. Refinement keeps the spec open and is not a final decision.
+4. Establish the rationale before go/no-go. Record the outcome and full rationale using PM's available decision tool. Both outcomes are terminal; inspect the saved result/metadata before reporting success. File hashes snapshot the actual artifacts, with no checklist/review approval gate.
 5. Send TL additional context, an answer, or a bounded action only when needed. Reference saved version/decision paths; a standalone decision announcement and acknowledgment are unnecessary. Outstanding questions still need answers, and affected active work still needs explicit pause/context.
 
 ## Decision meaning
