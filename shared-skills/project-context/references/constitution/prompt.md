@@ -1,7 +1,7 @@
 ---
 name: "speckit-constitution"
 description: "Create or update the project constitution from interactive or provided principle inputs."
-compatibility: "Uses project-context workspace locations and existing file tools"
+compatibility: "Uses project-context workspace locations and dedicated constitution tools"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/constitution.md"
@@ -77,7 +77,7 @@ and commands read the constitution at runtime and are not modified here.
 
 ## Outline
 
-You are updating the project's named principles document. Resolve an existing document through `inspect_specs` and `describe_spec`; PM persists complete versions through spec tools. The active constitution scaffold is `template.md` beside this prompt.
+You are updating the project's canonical `Constitution` principles document. Read current content and identifying metadata through `read_constitution` with the exact registered project name. PM creates it through `init_constitution` or saves complete revisions through `update_constitution`; TL reads and supplies proposed content through the originating exchange. Use `inspect_specs` and `describe_spec` for history or previously named principles documents, which are not silently renamed or imported. Finalized constitutions reject amendments with the lock reason; reads remain available. The active constitution scaffold is `template.md` beside this prompt.
 
 Follow this execution flow:
 
@@ -85,7 +85,8 @@ Follow this execution flow:
    - If the Constitution file is non-empty, load it as the source of current project-specific
      values and amendments. Preserve information that is still applicable when applying the newly
      resolved scaffold.
-   - If it is empty or does not exist, use the shared template as the initial document.
+   - If no canonical `Constitution` entry exists in managed metadata, use the shared template as the initial document. A legacy empty scaffold is not adopted policy.
+   - If metadata declares a constitution but its latest file is missing, stop and report the storage error; restore that version before authoring rather than reinitializing.
    - Do not write back to any versioned template layer.
    - Identify every placeholder token of the form `[ALL_CAPS_IDENTIFIER]`.
      **IMPORTANT**: The user might require less or more principles than the ones used in the template. If a number is specified, respect that - follow the general template. You will update the doc accordingly.
@@ -121,7 +122,7 @@ Follow this execution flow:
    - Dates ISO format YYYY-MM-DD.
    - Principles are declarative, testable, and free of vague language ("should" → replace with MUST/SHOULD rationale where appropriate).
 
-6. Write the completed constitution back to the Constitution path (overwrite).
+6. PM submits the complete validated Markdown and a short change summary through `init_constitution` for creation or `update_constitution` for revision. This saves an immutable managed version, not an overwrite. Remove temporary scratch review comments before submitting the complete content; saved versions are not edited afterward. Report success only from the tool's returned name, path, managed version, and SHA-256 fingerprint. Managed versions are distinct from the semantic governance version in the document.
 
 7. Output a final summary to the user with:
    - New version and bump rationale.

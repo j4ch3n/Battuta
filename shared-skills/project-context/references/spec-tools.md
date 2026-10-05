@@ -37,6 +37,28 @@ The result contains only `schema_version` and `specs`. Each spec entry includes 
 
 This fictional input illustrates `init_spec`/`update_spec`. Use real project names, requirements, and evidence. Read the returned version path before reporting a saved requirement to others. There is no prepare/publish stage or follow-up file write.
 
+## Constitution: dedicated read and authoring
+
+Each project has one canonical managed document named `Constitution`. Use constitution tools when establishing or amending project-wide principles; ordinary Markdown files continue to use generic file tools outside managed storage.
+
+- `read_constitution(project)` is available to PM and TL. It returns full current Markdown with `name`, `path`, managed `version`, `summary`, `sha256`, and `decision` in one locked snapshot. A missing constitution or latest file is an error, not an adopted empty scaffold.
+- `init_constitution(project, summary, content)` is PM-only and creates the first immutable version. An existing constitution requires `update_constitution`.
+- `update_constitution(project, summary, content)` is PM-only and saves the next complete immutable version. It rejects missing or finalized constitutions and reports the lock reason.
+
+For example, PM submits a complete initial document through `init_constitution`:
+
+```json
+{
+  "project": "atlas-api",
+  "summary": "Adopt project governance",
+  "content": "# Atlas API Constitution\n\n## Core Principles\n\n### Explicit contracts\n\nPublic interfaces MUST document compatibility guarantees.\n\n## Governance\n\nAmendments require product-owner approval.\n\n**Version**: 1.0.0 | **Ratified**: 2026-10-05 | **Last Amended**: 2026-10-05\n"
+}
+```
+
+This fictional input illustrates invocation; use the [constitution prompt and template](constitution/prompt.md) to author actual policy. Successful writes return `name`, `path`, `version`, `summary`, and `sha256`; report that exact saved reference to TL. Managed versions (`v1`, `v2`) are separate from semantic governance versions inside the Markdown. There is no follow-up file edit or publish step.
+
+Use `describe_spec` with `name: "Constitution"` for history and checklist/review coverage, and existing checklist/review/decision tools with that name for coordination. Both go and no-go decisions permanently lock constitution writes; `read_constitution` remains available. Do not bypass a lock or silently create a successor. Previously named principles documents are not automatically renamed or imported; resolve and discuss them explicitly before establishing the canonical document.
+
 ## TL: canonical checklist and review
 
 `write_spec_checklist(project, name, summary, content)` fully replaces the single `checklist.md` shared across the named spec's versions. Use stable criteria identifiers; this is the sole review-criteria source. Do not create alternate checklist files or amend individual items using edit tools.

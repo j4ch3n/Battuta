@@ -7,6 +7,8 @@ import { defaultProjectsRoot, resolveSpecStorage } from "./storage.ts";
 import { inspect, loadMetadata } from "./transactions.ts";
 
 export type Role = "pm" | "tl";
+export type ConstitutionInput = Omit<DocumentInput, "name">;
+const constitutionName = "Constitution";
 export class ProjectSpecStore {
   readonly root: string;
   constructor(
@@ -76,6 +78,35 @@ export class ProjectSpecStore {
   async initSpec(input: DocumentInput) {
     this.allow("pm");
     return writeSpec(await resolveSpecStorage(this.root, input.project), input, true);
+  }
+  async readConstitution(project: string) {
+    const description = await this.describeSpec(project, constitutionName, true);
+    if (!description.has_spec)
+      throw new Error("Latest constitution file is missing; restore it before reading");
+    const version = description.latest_version;
+    return {
+      name: constitutionName,
+      path: description.paths.versions.find((entry) => entry.version === version)!.path,
+      version,
+      summary: description.spec.version_summaries[version],
+      content: description.contents!.spec!,
+      sha256: description.fingerprints.spec!,
+      decision: description.spec.decision,
+    };
+  }
+  async initConstitution(input: ConstitutionInput) {
+    this.allow("pm");
+    const saved = await writeSpec(
+      await resolveSpecStorage(this.root, input.project),
+      { ...input, name: constitutionName },
+      true,
+      "update_constitution",
+    );
+    return { name: constitutionName, ...saved };
+  }
+  async updateConstitution(input: ConstitutionInput) {
+    const saved = await this.updateSpec({ ...input, name: constitutionName });
+    return { name: constitutionName, ...saved };
   }
   async updateSpec(input: DocumentInput) {
     this.allow("pm");

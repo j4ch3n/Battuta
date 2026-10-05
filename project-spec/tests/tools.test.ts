@@ -1,18 +1,7 @@
 import assert from "node:assert/strict";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { test } from "vitest";
 import register from "../index.ts";
-import { fixture, input } from "./fixtures.ts";
-
-export function fakePi() {
-  const tools = new Map<string, Parameters<ExtensionAPI["registerTool"]>[0]>();
-  const hooks = new Map<string, unknown>();
-  const pi = {
-    registerTool: (tool: Parameters<ExtensionAPI["registerTool"]>[0]) => tools.set(tool.name, tool),
-    on: (name: string, hook: unknown) => hooks.set(name, hook),
-  } as unknown as ExtensionAPI;
-  return { pi, tools, hooks };
-}
+import { fixture, input, fakePi } from "./fixtures.ts";
 
 test("each runtime exposes shared reads and only its own authoring tools", async () => {
   const f = await fixture();
@@ -20,10 +9,16 @@ test("each runtime exposes shared reads and only its own authoring tools", async
     for (const role of ["pm", "tl"] as const) {
       const fake = fakePi();
       register(fake.pi, { role, projectsRoot: f.projects });
-      const common = ["inspect_specs", "describe_spec"];
+      const common = ["inspect_specs", "describe_spec", "read_constitution"];
       const own =
         role === "pm"
-          ? ["init_spec", "update_spec", "finalize_spec"]
+          ? [
+              "init_spec",
+              "update_spec",
+              "finalize_spec",
+              "init_constitution",
+              "update_constitution",
+            ]
           : ["write_spec_checklist", "write_spec_review"];
       assert.deepEqual([...fake.tools.keys()].sort(), [...common, ...own].sort());
       assert.ok(fake.hooks.has("tool_call"));

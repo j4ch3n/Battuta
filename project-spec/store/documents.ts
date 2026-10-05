@@ -21,13 +21,18 @@ function validate(input: DocumentInput) {
   nonblank(input.content, "content");
 }
 
-export async function writeSpec(project: SpecStorage, input: DocumentInput, initial: boolean) {
+export async function writeSpec(
+  project: SpecStorage,
+  input: DocumentInput,
+  initial: boolean,
+  updateTool = "update_spec",
+) {
   validate(input);
   return mutate(project, async (metadata) => {
     let spec: Spec;
     if (initial) {
       if (metadata.specs.some((s) => s.name === input.name))
-        throw new Error(`Spec '${input.name}' already exists; use update_spec`);
+        throw new Error(`Spec '${input.name}' already exists; use ${updateTool}`);
       const directory = normalizeName(input.name);
       if (metadata.specs.some((s) => s.directory === directory))
         throw new Error(`Spec name collides with an existing directory: ${directory}`);
