@@ -1,16 +1,13 @@
-import { lstat, mkdir, readFile, readlink, symlink, unlink, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { readFile, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { configureSharedResources } from "./shared-resources.mjs";
 
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 // In source this is the repository root; in a release it is the archive root.
 const PACKAGE_ROOT = resolve(SCRIPT_DIRECTORY, "..");
 const BOTS_DIRECTORY = join(PACKAGE_ROOT, "bots");
-const SHARED_INSTRUCTIONS_PATH = join(BOTS_DIRECTORY, "AGENTS_shared.md");
-const SHARED_SKILL_PATH = join(PACKAGE_ROOT, "shared-skills", "project-context");
 const SCHEDULE_PACKAGE = "npm:pi-schedule-prompt@0.4.1";
-const MEMORY_PACKAGE = "npm:pi-memory-stone@0.1.7";
-const SHARED_INSTRUCTIONS = await readFile(SHARED_INSTRUCTIONS_PATH, "utf8");
 const BOT_CONFIGURATIONS = [
   {
     name: "PM",
@@ -24,14 +21,10 @@ const BOT_CONFIGURATIONS = [
   const piDirectory = join(bot.directory, ".pi");
   return {
     ...bot,
-    dedicatedInstructionsPath: join(bot.directory, "AGENTS_dedicated.md"),
     piDirectory,
-    skillsDirectory: join(piDirectory, "skills"),
-    skillLinkPath: join(piDirectory, "skills", "project-context"),
     telegramConfigPath: join(piDirectory, "telegram.json"),
     mcpConfigPath: join(piDirectory, "mcp.json"),
     settingsPath: join(piDirectory, "settings.json"),
-    outputInstructionsPath: join(bot.directory, "AGENTS.md"),
   };
 });
 
@@ -48,26 +41,7 @@ required("SUPABASE_URL");
 required("SUPABASE_SECRET_KEY");
 
 for (const bot of BOT_CONFIGURATIONS) {
-  await mkdir(bot.skillsDirectory, { recursive: true });
-  // Keep the link relative so it still resolves after the release archive is moved.
-  const skillLinkTarget = relative(bot.skillsDirectory, SHARED_SKILL_PATH);
-  try {
-    const stat = await lstat(bot.skillLinkPath);
-    if (!stat.isSymbolicLink()) {
-      throw new Error(`Refusing to replace existing skill: ${bot.skillLinkPath}`);
-    }
-    const existingTarget = await readlink(bot.skillLinkPath);
-    if (existingTarget !== skillLinkTarget) {
-      if (existingTarget !== "../../../shared-skills/project-context") {
-        throw new Error(`Refusing to replace existing skill: ${bot.skillLinkPath}`);
-      }
-      await unlink(bot.skillLinkPath);
-      await symlink(skillLinkTarget, bot.skillLinkPath, "dir");
-    }
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-    await symlink(skillLinkTarget, bot.skillLinkPath, "dir");
-  }
+  await configureSharedResources(PACKAGE_ROOT, bot.directory);
 
   const token = required(`${bot.name}_TELEGRAM_TOKEN`);
   const [id, secret] = token.split(":");
@@ -91,8 +65,6 @@ for (const bot of BOT_CONFIGURATIONS) {
     },
   };
   const mcpConfigJson = JSON.stringify(mcpConfig, null, 2);
-  const dedicatedInstructions = await readFile(bot.dedicatedInstructionsPath, "utf8");
-  const instructions = SHARED_INSTRUCTIONS + "\n" + dedicatedInstructions;
 
   // Retained state can load the old MCP adapter or omit newly bundled PM packages.
   let settings = {};
@@ -109,16 +81,20 @@ for (const bot of BOT_CONFIGURATIONS) {
     const source = typeof entry === "string" ? entry : entry?.source;
     return typeof source === "string" ? source.split("@", 1)[0] : undefined;
   };
-  const retained = packages.filter((entry) => packageName(entry) !== "npm:pi-mcp-adapter");
+  const retained = packages.filter(
+    (entry) => !["npm:pi-mcp-adapter", "npm:pi-memory-stone"].includes(packageName(entry)),
+  );
   if (bot.name === "PM") {
-    for (const source of [SCHEDULE_PACKAGE, MEMORY_PACKAGE]) {
+    for (const source of [SCHEDULE_PACKAGE]) {
       if (!retained.some((entry) => packageName(entry) === packageName(source)))
         retained.push(source);
     }
   }
   if (
     retained.length !== packages.length ||
-    packages.some((entry) => packageName(entry) === "npm:pi-mcp-adapter")
+    packages.some((entry) =>
+      ["npm:pi-mcp-adapter", "npm:pi-memory-stone"].includes(packageName(entry)),
+    )
   ) {
     settings.packages = retained;
     await writeFile(bot.settingsPath, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 });
@@ -126,6 +102,5 @@ for (const bot of BOT_CONFIGURATIONS) {
 
   await writeFile(bot.telegramConfigPath, JSON.stringify(telegram, null, 2), { mode: 0o600 });
   await writeFile(bot.mcpConfigPath, mcpConfigJson, { mode: 0o600 });
-  await writeFile(bot.outputInstructionsPath, instructions);
 }
 console.log("Configured both bots. Run bin/battuta start-prod.");

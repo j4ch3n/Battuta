@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 from fixtures import LauncherFixture, ROOT
 
@@ -36,8 +37,18 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"],
                 response = json.loads(result.stdout)
                 self.assertEqual(response["role"], role)
                 self.assertEqual(response["token"], "linear-test")
-                self.assertEqual(response["memory"], str(self.root / "bots/pm-bot/.pi/memory/memory.db") if role == "pm" else None)
+                self.assertEqual(response["memory"], str(Path.home() / ".battuta/memory/memory.db"))
                 self.assertIn(str(self.root / "project-spec/index.ts"), response["args"])
+                self.assertIn(str(self.root / "memory-stone/index.ts"), response["args"])
+
+    def test_both_roles_honor_the_same_database_override(self):
+        path = self.root / "custom memory/shared.db"
+        with (self.root / ".env.prod").open("a") as output:
+            output.write(f'PI_MEMORY_STONE_DB_PATH="{path}"\n')
+        for role in ("pm", "tl"):
+            response = self.launch(role)
+            self.assertEqual(response.returncode, 0, response.stderr)
+            self.assertEqual(json.loads(response.stdout)["memory"], str(path))
 
     def test_missing_token_stops_before_launch(self):
         path = self.root / ".env.prod"

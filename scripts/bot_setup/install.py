@@ -10,7 +10,6 @@ import click
 
 TELEGRAM_PACKAGE = "npm:@llblab/pi-telegram@0.50.1"
 SCHEDULE_PACKAGE = "npm:pi-schedule-prompt@0.4.1"
-MEMORY_PACKAGE = "npm:pi-memory-stone@0.1.7"
 
 
 def run(*args: str, **kwargs: object) -> None:

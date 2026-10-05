@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+/bots/AGENTS_personal.md
 /supabase/snippets/
 
 # Python

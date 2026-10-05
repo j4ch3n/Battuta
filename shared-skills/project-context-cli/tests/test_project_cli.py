@@ -32,24 +32,22 @@ class CliTests(ProjectTestCase):
         self.assertIn("Summary: ~/.battuta/projects/harbor-web/SUMMARY.md", output)
         self.assertNotIn("Specs Root:", output)
         self.assertNotIn("Constitution:", output)
-        self.assertIn("Memory: ~/.battuta/projects/harbor-web/MEMORY.md", output)
+        self.assertNotIn("Memory:", output)
         output = self.invoke("switch", "atlas-api")
         self.assertIn("Current project: atlas-api", output)
         self.assertIn("~/.battuta/projects/atlas-api/code", output)
 
-    def test_memory_workflow_uses_current_project_and_indexes(self):
-        self.assertIn("line 1", self.invoke("memory", "append", "  First  "))
-        self.invoke("memory", "append", "Second")
-        self.assertEqual(self.invoke("memory", "get"), "1: First\n2: Second\n")
-        self.invoke("memory", "replace", "2", " Revised ")
-        self.assertEqual(self.invoke("memory", "get"), "1: First\n2: Revised\n")
-        self.invoke("memory", "replaceAll", " Clean \n\n Reconciled ")
-        self.assertEqual(self.invoke("memory", "get"), "1: Clean\n2: Reconciled\n")
-        self.invoke("init", "https://github.com/team/harbor-web")
-        self.assertIn("No memory", self.invoke("memory", "get"))
-        self.invoke("memory", "append", "Harbor")
-        self.invoke("switch", "atlas-api")
-        self.assertEqual(self.invoke("memory", "get"), "1: Clean\n2: Reconciled\n")
+    def test_memory_command_is_removed_without_touching_legacy_private_content(self):
+        memory = self.project.root / "MEMORY.md"
+        memory.write_text("Private legacy content")
+        state = self.registry.state_path.read_bytes()
+        with linear_http() as requests:
+            result = self.runner.invoke(main, ["memory", "get"])
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("No such command 'memory'", result.output)
+        self.assertEqual(memory.read_text(), "Private legacy content")
+        self.assertEqual(self.registry.state_path.read_bytes(), state)
+        self.assertEqual(requests, [])
 
     def test_explain_rejects_project_argument_and_uses_current_checkout(self):
         self.file("README.md")
@@ -107,26 +105,19 @@ class CliTests(ProjectTestCase):
                 self.assertIn(message, result.output)
                 self.assertNotIn("Linear Project URL:", result.output)
 
-    def test_missing_current_project_and_invalid_indexes_are_readable_errors(self):
+    def test_missing_current_project_reports_a_readable_error(self):
         self.registry.state_path.unlink()
-        for args in (["explain"], ["memory", "get"], ["memory", "append", "entry"]):
-            with self.subTest(args=args):
-                result = self.runner.invoke(main, args)
-                self.assertNotEqual(result.exit_code, 0)
-                self.assertIn("Error:", result.output)
-                self.assertIn("switch", result.output)
+        result = self.runner.invoke(main, ["explain"])
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("Error:", result.output)
+        self.assertIn("switch", result.output)
         self.invoke("switch", "atlas-api")
-        self.invoke("memory", "append", "First")
-        for index in ("0", "2", "not-a-number"):
-            result = self.runner.invoke(main, ["memory", "replace", index, "changed"])
-            self.assertNotEqual(result.exit_code, 0)
-        self.assertEqual(self.invoke("memory", "get"), "1: First\n")
 
     def test_all_invocations_require_token_before_any_side_effect(self):
         args_list = (
-            (), ("--help",), ("init", "--help"), ("memory", "--help"), ("linear", "--help"),
-            ("linear", "create", "--help"), ("memory", "get", "--help"),
-            ("switch", "atlas-api"), ("list",), ("current",), ("explain",), ("memory", "get"),
+            (), ("--help",), ("init", "--help"), ("linear", "--help"),
+            ("linear", "create", "--help"),
+            ("switch", "atlas-api"), ("list",), ("current",), ("explain",),
             ("init", "https://github.com/team/harbor-web"),
             ("linear", "link", "--project-id", "project-1", "--team-id", "team-1"),
              ("linear", "create", "Atlas", "--team-id", "team-1"), ("unknown",),
@@ -151,7 +142,6 @@ class CliTests(ProjectTestCase):
                     self.assertIn("Usage:", self.invoke(*args))
             self.invoke("switch", "atlas-api")
             self.invoke("explain")
-            self.invoke("memory", "get")
             self.invoke("linear", "link", "--project-id", " project-1 ", "--team-id", " team-1 ")
             self.invoke("init", "https://github.com/team/harbor-web",
                         "--linear-project-id", " project-2 ", "--linear-team-id", " team-2 ")

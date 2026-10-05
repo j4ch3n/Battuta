@@ -7,7 +7,7 @@ description: Use when working on, researching, coding, summarizing, specifying, 
 
 ## Overview
 
-`battuta-project` owns high-level project management: discovery, selection, checkout context, summaries, repository guidance, Linear association, and durable memory. Project-spec agent tools own spec inventory, versioned documents, checklists/reviews, and terminal decisions. Obtain project/checkout locations from the CLI and document references from spec tools rather than assuming storage layout. Run commands from any directory after [installation](references/installation.md).
+`battuta-project` owns high-level project management: discovery, selection, checkout context, summaries, repository guidance, and Linear association. The shared [memory skill](../memory/SKILL.md) owns project/global recall and durable memory. Project-spec agent tools own spec inventory, versioned documents, checklists/reviews, and terminal decisions. Obtain project/checkout locations from the CLI and document references from spec tools rather than assuming storage layout. Run commands from any directory after [installation](references/installation.md).
 
 Use `list` to discover projects, `current` to read the selected name, and `switch` to select the intended project. Run `explain` and read applicable README/AGENTS guidance before project work. Use `inspect_specs` with that exact name to discover documents, then `describe_spec` for a named document's details and content. Spec tools use explicit project names and do not change CLI selection.
 
@@ -60,7 +60,7 @@ Evaluate workflow prerequisites from the actual artifact files and their content
 
 An empty constitution scaffold is not adopted policy. Apply confirmed project guidance and do not infer approval from files or checkboxes. Follow the existing authority and conversation rules; authoring or reviewing documents does not authorize implementation, issue creation, or a cycle start. Return the requested outcome through the originating conversation, with compact Telegram summaries rather than a template dump.
 
-New project initialization creates a rendered summary skeleton and empty memory. Spec tools establish document storage only when authoring is requested. Older projects may lack artifacts: `explain` stays read-only, while requested authoring creates only what is needed. Complete the summary using its shared Markdown reference rather than guessing product context.
+New project initialization creates a rendered summary skeleton. The shared memory bridge handles memory without project-local memory files. Spec tools establish document storage only when authoring is requested. Older projects may lack artifacts: `explain` stays read-only, while requested authoring creates only what is needed. Complete the summary using its shared Markdown reference rather than guessing product context.
 
 `linear create` and `explain` for a linked project contact Linear; GitHub initialization still clones over the network.
 
@@ -74,9 +74,9 @@ Use [project-spec tools](references/spec-tools.md) for named specs, canonical ch
 
 **Usage:** `battuta-project init https://github.com/team/atlas-api.git`
 
-**Output:** Project root, checkout, config, summary, memory locations, and current selection.
+**Output:** Project root, checkout, config, summary locations, and current selection.
 
-**Process:** Clone with `gh` into a managed checkout, render the summary skeleton, create empty memory, then select the project. Fill the overview during project discovery. Already registered names cause an error; failed initialization preserves the previous selection.
+**Process:** Clone with `gh` into a managed checkout, render the summary skeleton, then select the project. Fill the overview during project discovery. Already registered names cause an error; failed initialization preserves the previous selection.
 
 **Linear metadata:** Optional `--linear-project-id <id>` and `--linear-team-id <id>` record existing IDs without querying Linear. Each omitted field defaults to `null`.
 
@@ -121,20 +121,9 @@ Use [project-spec tools](references/spec-tools.md) for named specs, canonical ch
 
 IDs and creation names must not be blank. Linear project and team associations belong to the selected project. If creation succeeds but local saving fails, fix the local error and use the error's `switch`/`linear link` recovery commands rather than creating a duplicate. After a creation timeout, inspect Linear before retrying. See [command contracts](references/commands.md#linear-projects).
 
-### `battuta-project memory <operation>`
+### Project and global memory
 
-**Usage:**
-
-```sh
-battuta-project memory get
-battuta-project memory append 'Use the existing worker for imports.'
-battuta-project memory replace 1 'Use the existing worker because deployment has no queue.'
-battuta-project memory replaceAll 'Complete reconciled memory'
-```
-
-**Output:** `get` returns full memory with 1-based indexes; edits confirm the changed line or entry count.
-
-**Process:** Use the current project. Append/replace one trimmed, non-empty line; `replaceAll` trims each line and drops blanks. Retrieve memory before editing; reconcile using unnumbered content. Save durable decisions and rationale, not live ticket status or repository instructions. See [memory guidance](references/memory.md).
+Use the shared [memory skill](../memory/SKILL.md) and Pi memory tools for recall and explicit storage. Project memory is bound at request start to the selected registered checkout. A selection change applies to memory on the next request; it does not rebind an in-progress request. Global memory is separate and requires explicit intent for new storage.
 
 ## Workflow example
 
@@ -144,5 +133,5 @@ Use `list` to discover registrations or initialize a new repository. Run `curren
 
 - [Installation and migration](references/installation.md)
 - [Command contracts and two-project examples](references/commands.md)
-- [Memory editing and reconciliation](references/memory.md)
+- [Project/global memory scope and tools](../memory/SKILL.md)
 - [Document sources and integration adaptations](references/attribution.md)

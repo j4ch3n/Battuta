@@ -20,3 +20,4 @@ bots/**/.pi/*
 !bots/**/.pi/extensions/
 !bots/**/.pi/skills/
 bots/**/.pi/skills/project-context/
+bots/**/.pi/skills/memory/

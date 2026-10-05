@@ -4,9 +4,8 @@ import click
 import shlex
 
 from .explain import explain_project
-from .memory import ProjectMemory
 from .linear import LinearClient, require_linear_token
-from .models import LinearConfig, LinearResult, MemoryResult, ProjectList
+from .models import LinearConfig, LinearResult, ProjectList
 from .presentation import render
 from .registry import ProjectRegistry
 
@@ -32,7 +31,7 @@ def _trimmed(ctx, param, value):
 @click.group(cls=_TokenGroup, invoke_without_command=True)
 @click.pass_context
 def main(ctx):
-    """Manage project checkouts, context, and durable memory."""
+    """Manage project checkouts, selection, context, and Linear association."""
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
 
@@ -115,53 +114,3 @@ def create(token: str, name: str, team_id: str):
             f"After fixing the local error, recover with:\n{switch}\n{recovery}"
         ) from error
     click.echo(render("linear.md.j2", LinearResult(operation="create", project=linked, remote=remote)))
-
-
-@main.group()
-def memory():
-    """Read or edit durable memory for the current project."""
-
-
-def _memory_result(operation, content=None, index=None):
-    project = ProjectRegistry().current()
-    store = ProjectMemory(project)
-    entries = []
-    if operation == "get":
-        entries = store.get()
-        count = len(entries)
-    elif operation == "append":
-        count = store.append(content)
-    elif operation == "replace":
-        store.replace(index, content)
-        count = index
-    else:
-        count = store.replace_all(content)
-    click.echo(render("memory.md.j2", MemoryResult(project=project.name, operation=operation, count=count, entries=entries)))
-
-
-@memory.command()
-@click.argument("content")
-def append(content: str):
-    """Append one non-empty trimmed memory line."""
-    _memory_result("append", content)
-
-
-@memory.command()
-def get():
-    """Return full memory with 1-based line indexes."""
-    _memory_result("get")
-
-
-@memory.command()
-@click.argument("line_index", type=click.IntRange(min=1))
-@click.argument("content")
-def replace(line_index: int, content: str):
-    """Replace one existing memory line."""
-    _memory_result("replace", content, line_index)
-
-
-@memory.command(name="replaceAll")
-@click.argument("content")
-def replace_all(content: str):
-    """Replace full memory, trimming lines and dropping empty lines."""
-    _memory_result("replaceAll", content)

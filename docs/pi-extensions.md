@@ -41,3 +41,5 @@ For a standard Battuta extension, update its owning setup and release paths:
 - Add required runtime environment to the source launcher `bots/pm-bot/scripts/run-dev.sh` and the release foreground/service launcher `packaging/battuta`.
 
 Keep runtime data out of source control. Extend the relevant tests in `scripts/tests/` for installation, retained-settings migration, and launcher environment behavior. See [local setup](../.agents/skills/battuta-setup/references/development.md) for full bot configuration and launch instructions.
+
+Memory is supplied by the shared [Battuta memory bridge](memory-stone.md), whose pinned Stone utilities are installed with `pnpm` in `memory-stone/`. Load the bridge through the existing launchers; do not separately install Stone's upstream extension or skill into either bot.

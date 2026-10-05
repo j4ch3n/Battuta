@@ -3,6 +3,7 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 from fixtures import LauncherFixture
 
@@ -25,7 +26,23 @@ print(os.environ["AGENT_ROLE"] + ":" + os.environ.get("LINEAR_API_TOKEN", "") + 
                                       capture_output=True, text=True)
                 self.assertEqual(pane.returncode, 0, pane.stderr)
                 outputs.append(pane.stdout.strip())
-        self.assertEqual(outputs, [f"pm:linear-test:{self.root.resolve()}/bots/pm-bot/.pi/memory/memory.db", "tl:linear-test:"])
+        path = str(Path.home() / ".battuta/memory/memory.db")
+        self.assertEqual(outputs, [f"pm:linear-test:{path}", f"tl:linear-test:{path}"])
+
+    def test_shared_database_override_reaches_both_processes(self):
+        override = str(self.root / "shared memory/custom.db")
+        with (self.root / ".env.prod").open("a") as output:
+            output.write(f'PI_MEMORY_STONE_DB_PATH="{override}"\n')
+        for role in ("pm", "tl"):
+            pi = self.root / f"bots/{role}-bot/node_modules/.bin/pi"
+            pi.write_text(f"#!{sys.executable}\nimport os\nprint(os.environ['PI_MEMORY_STONE_DB_PATH'])\n")
+        result = self.run_launcher("prod", existing=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for command in self.commands():
+            if "AGENT_ROLE=" in command[-1]:
+                pane = subprocess.run(["bash", "-c", command[-1]], capture_output=True, text=True)
+                self.assertEqual(pane.returncode, 0, pane.stderr)
+                self.assertEqual(pane.stdout.strip(), override)
 
     def test_launch_does_not_refresh_telegram_configuration(self):
         for mode in ("dev", "prod"):
@@ -52,6 +69,7 @@ print(os.environ["AGENT_ROLE"] + ":" + os.environ.get("LINEAR_API_TOKEN", "") + 
                     if "AGENT_ROLE=" in command[-1]:
                         self.assertIn(str(selected), command[-1].replace("\\ ", " "))
                         self.assertIn(str(self.root / "project-spec/index.ts"), command[-1].replace("\\ ", " "))
+                        self.assertIn(str(self.root / "memory-stone/index.ts"), command[-1].replace("\\ ", " "))
                 self.assertEqual(self.commands()[-1], ["attach-session", "-t", f"=battuta-{mode}"])
 
     def test_existing_session_only_attaches(self):
