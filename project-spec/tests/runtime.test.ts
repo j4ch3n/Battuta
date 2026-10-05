@@ -42,6 +42,9 @@ test("Pi loads a staged extension with only production dependencies for both rol
       const extension = loaded.extensions.find((e) => e.resolvedPath === join(staged, "index.ts"));
       assert.ok(extension, "Shared extension must load through Pi's real loader");
       assert.ok(extension.tools.has("describe_spec"));
+      assert.ok(extension.tools.has("read_constitution"));
+      assert.equal(extension.tools.has("init_constitution"), role === "pm");
+      assert.equal(extension.tools.has("update_constitution"), role === "pm");
       assert.equal(extension.tools.has("finalize_spec"), role === "pm");
       assert.equal(extension.tools.has("write_spec_review"), role === "tl");
     }
