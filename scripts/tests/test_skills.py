@@ -8,10 +8,35 @@ import unittest
 import click
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from bot_setup.skills import link_project_context  # noqa: E402
+from bot_setup.skills import link_project_context, link_shared_skills  # noqa: E402
 
 
 class SharedSkillTests(unittest.TestCase):
+    def test_memory_link_is_relative_and_custom_entries_are_preserved(self):
+        for existing in (None, "directory", "symlink"):
+            with self.subTest(existing=existing), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                for name in ("project-context", "memory"):
+                    skill = root / "shared-skills" / name
+                    skill.mkdir(parents=True)
+                    (skill / "SKILL.md").write_text(name)
+                bot = root / "bots/tl-bot"
+                link = bot / ".pi/skills/memory"
+                link.parent.mkdir(parents=True)
+                if existing == "directory":
+                    link.mkdir()
+                elif existing == "symlink":
+                    link.symlink_to("custom-memory")
+                if existing:
+                    with self.assertRaises(click.ClickException):
+                        link_shared_skills(bot)
+                    self.assertEqual(link.readlink(), Path("custom-memory")) if existing == "symlink" else self.assertTrue(link.is_dir())
+                else:
+                    for _ in range(2):
+                        link_shared_skills(bot)
+                        self.assertEqual((link / "SKILL.md").read_text(), "memory")
+                        self.assertFalse(link.readlink().is_absolute())
+
     def test_install_and_migrate_links_for_both_bots(self):
         for role in ("pm-bot", "tl-bot"):
             for existing in (None, "../../../shared-skills/project-context"):

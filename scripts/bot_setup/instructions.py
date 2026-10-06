@@ -11,9 +11,8 @@ def configure_instructions(bot_dir: Path) -> None:
     for source in (shared, dedicated):
         if not source.is_file():
             raise click.ClickException(f"Missing {source}")
-    (bot_dir / "AGENTS.md").write_text(
-        shared.read_text() + "\n" + dedicated.read_text()
-    )
+    sources = [shared, dedicated]
+    (bot_dir / "AGENTS.md").write_text("\n".join(source.read_text() for source in sources))
     if bot_dir.name in {"pm-bot", "tl-bot"}:
-        from .skills import link_project_context
-        link_project_context(bot_dir)
+        from .skills import link_shared_skills
+        link_shared_skills(bot_dir)

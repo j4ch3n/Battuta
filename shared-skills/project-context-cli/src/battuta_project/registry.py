@@ -145,7 +145,6 @@ class ProjectRegistry:
                 except TemplateError as error:
                     raise click.ClickException(f"Cannot render project summary: {error}") from error
                 atomic_write(directory / "SUMMARY.md", summary + "\n")
-                atomic_write(directory / "MEMORY.md", "")
                 self._select(project)
                 return project
             except (OSError, subprocess.CalledProcessError, click.ClickException) as error:

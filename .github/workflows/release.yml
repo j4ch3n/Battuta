@@ -50,9 +50,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots shared-skills agent-mail project-spec .env.example RELEASE.md docs/gogcli-setup.md | tar -x -C dist/stage/battuta
+          git archive HEAD bots shared-skills agent-mail project-spec memory-stone .env.example RELEASE.md docs/gogcli-setup.md docs/memory-stone.md | tar -x -C dist/stage/battuta
           test -s dist/stage/battuta/RELEASE.md
           test -s dist/stage/battuta/docs/gogcli-setup.md
+          test -s dist/stage/battuta/shared-skills/memory/references/ME.template.md
+          test -s dist/stage/battuta/shared-skills/memory/references/profile-rewrite-prompt.md
+          test ! -e dist/stage/battuta/bots/AGENTS_personal.md
           cli_dir="$PWD/dist/stage/battuta/shared-skills/project-context-cli"
           uv export --project "$cli_dir" --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/project-requirements.txt"
           uv build --project "$cli_dir" --wheel --out-dir "$cli_dir/wheels"
@@ -60,12 +63,16 @@ jobs:
           cp "$(command -v node)" dist/stage/battuta/bin/node
           cp packaging/battuta dist/stage/battuta/bin/battuta
           cp packaging/configure.mjs dist/stage/battuta/bin/configure.mjs
+          cp packaging/shared-resources.mjs dist/stage/battuta/bin/shared-resources.mjs
           cp packaging/install-services.mjs dist/stage/battuta/bin/install-services.mjs
           chmod +x dist/stage/battuta/bin/*
           for bot in pm-bot tl-bot; do
             mkdir -p "dist/stage/battuta/bots/$bot/.pi/skills"
-            ln -s ../../../../shared-skills/project-context "dist/stage/battuta/bots/$bot/.pi/skills/project-context"
-            test -f "dist/stage/battuta/bots/$bot/.pi/skills/project-context/SKILL.md"
+            test ! -e "dist/stage/battuta/bots/$bot/.pi/ME.md"
+            for skill in project-context memory; do
+              ln -s "../../../../shared-skills/$skill" "dist/stage/battuta/bots/$bot/.pi/skills/$skill"
+              test -f "dist/stage/battuta/bots/$bot/.pi/skills/$skill/SKILL.md"
+            done
             source_references="dist/stage/battuta/shared-skills/project-context/references"
             runtime_references="dist/stage/battuta/bots/$bot/.pi/skills/project-context/references"
             ls -l "$runtime_references/"
@@ -109,8 +116,6 @@ jobs:
           assert "## Specifications" in summary
           assert "{{" not in summary
           PY
-          HOME="$smoke_home" "$skill_cli" memory append 'Verified release installation.'
-          test "$(HOME="$smoke_home" "$skill_cli" memory get)" = '1: Verified release installation.'
           rm -rf "$smoke_home"
           for bot in pm-bot tl-bot; do
             bot_dir="$PWD/dist/stage/battuta/bots/$bot"
@@ -119,17 +124,22 @@ jobs:
             if [ "$bot" = pm-bot ]; then
               PI_CODING_AGENT_DIR="$bot_dir/.pi" pnpm --dir "$bot_dir" exec pi install -l --approve npm:pi-schedule-prompt@0.4.1
               test -f "$bot_dir/.pi/npm/node_modules/pi-schedule-prompt/src/index.ts"
-              PI_CODING_AGENT_DIR="$bot_dir/.pi" pnpm --dir "$bot_dir" exec pi install -l --approve npm:pi-memory-stone@0.1.7
-              test -f "$bot_dir/.pi/npm/node_modules/pi-memory-stone/src/index.ts"
               test -f "$bot_dir/.pi/skills/manage-google/SKILL.md"
             fi
           done
           pnpm --dir dist/stage/battuta/agent-mail install --frozen-lockfile --prod
           pnpm --dir dist/stage/battuta/project-spec install --frozen-lockfile --prod
+          pnpm --dir dist/stage/battuta/memory-stone install --frozen-lockfile --prod
+          test -f dist/stage/battuta/memory-stone/node_modules/pi-memory-stone/src/db/index.ts
+          memory_smoke_home="$(mktemp -d)"
+          mkdir -p "$memory_smoke_home/agent"
+          HOME="$memory_smoke_home" node dist/stage/battuta/memory-stone/tests/loader-worker.mjs "$memory_smoke_home/memory.db" "$memory_smoke_home/agent" "$PWD/dist/stage/battuta/bots/pm-bot/node_modules/@earendil-works/pi-coding-agent/dist/index.js"
+          rm -rf "$memory_smoke_home"
           test -x dist/stage/battuta/bots/pm-bot/node_modules/.bin/pi
           test -x dist/stage/battuta/bots/tl-bot/node_modules/.bin/pi
           test -d dist/stage/battuta/agent-mail/node_modules
           test -d dist/stage/battuta/project-spec/node_modules
+          test -d dist/stage/battuta/memory-stone/node_modules
           test ! -e dist/stage/battuta/.env
           test ! -e dist/stage/battuta/bots/pm-bot/.pi/auth.json
           test ! -e dist/stage/battuta/bots/tl-bot/.pi/auth.json

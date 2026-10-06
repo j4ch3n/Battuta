@@ -53,5 +53,5 @@ package = pathlib.Path.cwd() / ".pi/npm/node_modules" / name
             packages = stage / role / ".pi/npm/node_modules"
             self.assertTrue((packages / "@llblab/pi-telegram/src/index.ts").is_file())
             self.assertEqual((packages / "pi-schedule-prompt/src/index.ts").is_file(), role == "pm-bot")
-            self.assertEqual((packages / "pi-memory-stone/src/index.ts").is_file(), role == "pm-bot")
+            self.assertFalse((packages / "pi-memory-stone/src/index.ts").exists())
         self.assertFalse((self.root / ".pi/npm").exists())

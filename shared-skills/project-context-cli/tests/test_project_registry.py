@@ -12,7 +12,6 @@ from jinja2 import TemplateNotFound, UndefinedError
 import yaml
 
 from battuta_project.registry import ProjectRegistry
-from battuta_project.memory import ProjectMemory
 from battuta_project.models import LinearConfig
 
 
@@ -71,7 +70,7 @@ class RegistryTests(unittest.TestCase):
         self.assertNotIn("{{", content)
         self.assertNotIn("[replace by project name]", content)
         self.assertFalse((project.code / "SUMMARY.md").exists())
-        self.assertEqual((project.root / "MEMORY.md").read_bytes(), b"")
+        self.assertFalse((project.root / "MEMORY.md").exists())
         self.assertFalse((project.root / "specs").exists())
 
     def test_rendering_failure_preserves_selection_and_removes_new_project(self):
@@ -85,25 +84,9 @@ class RegistryTests(unittest.TestCase):
                 self.assertEqual(self.registry.current().name, "atlas-api")
                 self.assertFalse((self.root / name).exists())
 
-    def test_scaffold_write_failure_preserves_selection_and_removes_new_project(self):
-        self.registry.init("https://github.com/team/atlas-api")
-        from battuta_project.storage import atomic_write
-
-        def write(path, text):
-            if path.name == "MEMORY.md":
-                raise OSError("scaffold disk full")
-            atomic_write(path, text)
-
-        with patch("battuta_project.registry.atomic_write", side_effect=write):
-            with self.assertRaisesRegex(click.ClickException, "scaffold disk full"):
-                self.registry.init("https://github.com/team/harbor-web")
-        self.assertEqual(self.registry.current().name, "atlas-api")
-        self.assertFalse((self.root / "harbor-web").exists())
-
     def test_legacy_registration_loads_without_recreating_artifacts(self):
         project = self.registry.init("https://github.com/team/atlas-api")
-        for path in (project.root / "SUMMARY.md", project.root / "MEMORY.md"):
-            path.unlink()
+        (project.root / "SUMMARY.md").unlink()
         self.assertEqual(self.registry.switch("atlas-api").code, project.code)
         self.assertEqual(sorted(p.name for p in project.root.iterdir()), ["code", "project.yaml"])
 
@@ -301,17 +284,15 @@ class RegistryTests(unittest.TestCase):
                 base = Path(temp)
                 registry = ProjectRegistry(base / ".battuta" / "projects")
                 project = registry.init("https://github.com/team/atlas-api")
-                memory = ProjectMemory(project)
-                memory.append("Preserve me")
+                (project.root / "SUMMARY.md").write_text("Preserve me\n")
                 link = registry.root if component == "projects" else registry.root.parent
                 outside = base / "external"
                 link.rename(outside)
                 link.symlink_to(outside, target_is_directory=True)
                 for action in (registry.current, lambda: registry.switch("atlas-api"),
-                               lambda: registry.init("https://github.com/team/harbor-web"),
-                               memory.get, lambda: memory.append("Wrong place")):
+                               lambda: registry.init("https://github.com/team/harbor-web")):
                     with self.assertRaises(click.ClickException):
                         action()
                 redirected_root = outside if component == "projects" else outside / "projects"
-                self.assertEqual((redirected_root / "atlas-api" / "MEMORY.md").read_text(), "Preserve me\n")
+                self.assertEqual((redirected_root / "atlas-api" / "SUMMARY.md").read_text(), "Preserve me\n")
                 self.assertFalse((redirected_root / "harbor-web").exists())

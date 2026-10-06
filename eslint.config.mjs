@@ -20,7 +20,12 @@ export default defineConfig(
     languageOptions: { globals: globals.node },
   },
   {
-    files: ["agent-mail/**/*.ts", "project-spec/**/*.ts", "bots/**/.pi/extensions/**/*.ts"],
+    files: [
+      "agent-mail/**/*.ts",
+      "project-spec/**/*.ts",
+      "memory-stone/**/*.ts",
+      "bots/**/.pi/extensions/**/*.ts",
+    ],
     extends: [js.configs.recommended, tseslint.configs.recommendedTypeChecked],
     languageOptions: {
       globals: globals.node,

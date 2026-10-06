@@ -1,0 +1,9 @@
+# Defense in depth for force-tracked private runtime state in git archive.
+bots/AGENTS_personal.md export-ignore
+**/.pi/ME.md export-ignore
+**/.pi/ME.md.* export-ignore
+*.db export-ignore
+*.db-wal export-ignore
+*.db-shm export-ignore
+*.db.queue export-ignore
+*.db.queue/** export-ignore

@@ -115,18 +115,6 @@ class LinearResult(Model):
     remote: LinearProject | None = None
 
 
-class MemoryEntry(Model):
-    index: int = Field(ge=1)
-    content: str
-
-
-class MemoryResult(Model):
-    project: str
-    operation: Literal["append", "replace", "replaceAll", "get"]
-    count: int = Field(ge=0)
-    entries: list[MemoryEntry] = Field(default_factory=list)
-
-
 class CheckoutEntry(Model):
     path: str
     is_directory: bool

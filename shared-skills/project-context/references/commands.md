@@ -1,6 +1,6 @@
 # Command usage
 
-Run `battuta-project` from any directory after [installation](installation.md). The CLI owns project discovery and workspace management; [project-spec tools](spec-tools.md) own spec discovery and lifecycle. Use `list` to discover projects, then `init` or `switch` to select one before running `current`, `explain`, or memory commands. Obtain locations from command/tool results rather than assuming storage layout.
+Run `battuta-project` from any directory. The CLI owns project discovery and workspace management; [project-spec tools](spec-tools.md) own spec discovery and lifecycle. Use `list` to discover projects, then `init` or `switch` to select one before running `current` or `explain`. Use the `memory` skill for memory operations with the request-bound selection. Obtain locations from command/tool results rather than assuming storage layout.
 
 A bare `battuta-project` invocation displays command help.
 
@@ -10,7 +10,7 @@ A bare `battuta-project` invocation displays command help.
 battuta-project init <github-repo-url>
 ```
 
-Use `init` once to register a repository, clone it into a managed checkout, render a summary skeleton, create empty memory, and select it as the current project. Authenticate with `gh auth login` first. Use the locations printed by the command. Fill the overview from confirmed conversation and repository evidence during project discovery.
+Use `init` once to register a repository, clone it into a managed checkout, render a summary skeleton, and select it as the current project. Authenticate with `gh auth login` first. Use the locations printed by the command. Fill the overview from confirmed conversation and repository evidence during project discovery.
 
 The summary has Purpose, Users and use cases, Scope, Current capabilities, and Specifications sections with explicit unknowns. Initialization does not establish spec storage or a constitution. Managed documents are created by spec tools only when requested.
 
@@ -114,41 +114,15 @@ Use the [responsibility entries and Workspace binding](../SKILL.md#document-resp
 
 Maintain the overview at the reported Summary path. Inspect the named project's inventory with `inspect_specs` and resolve versions/artifacts through `describe_spec`; no saved version is patched. Existing unregistered documents are preserved. Memory is durable operational context, not the product-decision or specification source of truth.
 
-Older registrations may lack some scaffold files. Reinstallation does not migrate them, and `explain` does not write them. Requested authoring establishes missing artifacts and parent directories while preserving existing content; do not rerun `init` against an existing project.
+Existing registrations may lack some scaffold files; `explain` does not write them. Requested authoring establishes missing artifacts and parent directories while preserving existing content; do not rerun `init` against an existing project.
 
 ## Record product decisions
 
 PM uses `finalize_spec` with explicit project/name, go/no-go, and full rationale. The shared agent tool creates `decision.md`, fingerprints the latest spec/checklist/decision/review, and records the terminal outcome in JSON. Read [decision workflow and effects](decisions.md); no review/checklist gate or standalone announcement mail is required. Refinement creates a new version before finalization.
 
-## Read and edit project memory
+## Recall project and global memory
 
-All memory commands act on the current project and take no project argument. Retrieve memory before editing so you can retain relevant decisions and use the correct line indexes.
-
-```sh
-battuta-project memory get
-battuta-project memory append 'Use PostgreSQL for durable application data.'
-battuta-project memory replace 1 'Use PostgreSQL because imports require transactions.'
-```
-
-- `get`: read all memory entries with their 1-based indexes.
-- `append <content>`: add one trimmed, non-empty line.
-- `replace <line-index> <content>`: replace one existing line; indexes start at 1.
-- `replaceAll <content>`: replace the entire memory with reconciled content, trimming each line and dropping blank lines.
-
-Quote content as a single shell argument. `append` and `replace` reject multiline content. For whole-file reconciliation, pass the complete revised text without the displayed index prefixes:
-
-```sh
-battuta-project memory replaceAll 'Use PostgreSQL for durable application data.
-Run API and migration tests before merging.'
-```
-
-To clear all memory:
-
-```sh
-battuta-project memory replaceAll ''
-```
-
-Run edits serially; concurrent edits are not merged automatically. Store durable decisions, rationale, and standing constraints rather than live ticket status or copies of repository instructions. See [memory editing and reconciliation](memory.md) for more guidance.
+Use the `memory` skill for scoped Pi tools and autonomous memory management. Project memory binds to selection at request start; a switch applies on the next request. Retrieve stable decisions and rationale and confirm live facts against current evidence. Choose project scope for project-specific facts and global scope for personal/cross-project facts; owner approval is not required.
 
 ## Typical workflow
 
@@ -157,7 +131,6 @@ Register a new project and inspect its context:
 ```sh
 battuta-project init https://github.com/team/atlas-api.git
 battuta-project explain
-battuta-project memory get
 ```
 
 Register another repository when needed:
@@ -165,7 +138,6 @@ Register another repository when needed:
 ```sh
 battuta-project init https://github.com/team/harbor-web.git
 battuta-project explain
-battuta-project memory get
 ```
 
 Return to the first project before resuming work:
@@ -174,10 +146,9 @@ Return to the first project before resuming work:
 battuta-project switch atlas-api
 battuta-project current
 battuta-project explain
-battuta-project memory get
 ```
 
-Read the relevant repository guidance and memory, work in the checkout returned by `explain`, and save lasting decisions with `memory append` or `memory replace`.
+Read the relevant repository guidance and scoped memory, work in the checkout returned by `explain`, and use the memory tools for requested lasting decisions. If this request switched projects, continue memory work on the next request under the new binding.
 
 ## Command help
 
@@ -190,6 +161,4 @@ battuta-project current --help
 battuta-project init --help
 battuta-project linear --help
 battuta-project linear create --help
-battuta-project memory --help
-battuta-project memory replace --help
 ```
