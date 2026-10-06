@@ -5,6 +5,7 @@ import { registerList } from "./tools/list.ts";
 import { registerOpen } from "./tools/open.ts";
 import { registerRemember } from "./tools/remember.ts";
 import { registerForget } from "./tools/forget.ts";
+import { registerReplace } from "./tools/replace.ts";
 
 export function registerTools(pi: ExtensionAPI, runtime: MemoryRuntime) {
   for (const register of [
@@ -13,6 +14,7 @@ export function registerTools(pi: ExtensionAPI, runtime: MemoryRuntime) {
     registerOpen,
     registerRemember,
     registerForget,
+    registerReplace,
   ])
     register(pi, runtime);
 }

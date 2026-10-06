@@ -15,10 +15,13 @@ test("the bridge loads with only locked production dependencies in a relocated r
   try {
     await mkdir(stage, { recursive: true });
     await mkdir(agent);
+    await cp(join(source, "../shared-skills/memory"), join(stage, "../shared-skills/memory"), {
+      recursive: true,
+    });
     for (const file of await readdir(source)) {
       if (
         file.endsWith(".ts") ||
-        ["package.json", "pnpm-lock.yaml", "tools", "commands", "tests"].includes(file)
+        ["package.json", "pnpm-lock.yaml", "tools", "commands", "profile", "tests"].includes(file)
       )
         await cp(join(source, file), join(stage, file), { recursive: true });
     }

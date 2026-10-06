@@ -8,27 +8,21 @@ export function registerForget(pi: ExtensionAPI, runtime: MemoryRuntime) {
     name: "memory_forget",
     label: "Forget memory",
     description:
-      "Soft-forget a visible memory on user request. Permanent deletion requires interactive user confirmation.",
-    parameters: Type.Object({ ref: Type.String(), hard: Type.Optional(Type.Boolean()) }),
-    execute: async (_id, params, _signal, _update, ctx) =>
+      "Permanently delete an active or historical detailed memory reference from its scope and future recall. ME.md, transcripts, and already-sent prompts are unchanged.",
+    parameters: Type.Object({
+      ref: Type.String(),
+    }),
+    execute: async (_id, params, signal, _update, ctx) =>
       handle(async () => {
+        signal?.throwIfAborted();
         const binding = await runtime.binding(ctx.sessionManager.getSessionId());
-        const record = runtime.store.open(binding, params.ref);
-        if (
-          params.hard &&
-          (!ctx.hasUI ||
-            !(await ctx.ui.confirm(
-              "Permanently delete memory?",
-              `${scopeLabel(record.scope, binding)}: ref=${record.id}`,
-            )))
-        )
-          return result("Permanent deletion was not confirmed; memory was retained.", {
-            requiresConfirmation: true,
-          });
-        runtime.store.forget(binding, params.ref, params.hard);
+        const record = runtime.store.open(binding, params.ref, "any");
+        signal?.throwIfAborted();
+        runtime.store.forget(binding, params.ref, true);
+        runtime.invalidateRecall(ctx.sessionManager.getSessionId());
         return result(
-          `${params.hard ? "Permanently deleted" : "Soft-forgotten"} ${scopeLabel(record.scope, binding)} memory: ref=${record.id}`,
-          { scope: record.scope, ref: record.id, hard: params.hard ?? false },
+          `Permanently deleted ${scopeLabel(record.scope, binding)} SQLite memory: ref=${record.id}. ME.md and already-sent prompts/transcripts are unchanged; next-request recall excludes it.`,
+          { store: "SQLite", scope: record.scope, ref: record.id, deleted: true },
         );
       }),
   });

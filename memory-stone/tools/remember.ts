@@ -8,22 +8,16 @@ export function registerRemember(pi: ExtensionAPI, runtime: MemoryRuntime) {
     name: "memory_remember",
     label: "Remember",
     description:
-      "Store memory only when the user asks. Set userRequested only for explicit remembering intent; globalRequested only for explicit cross-project/global storage intent. Sensitive global details may be downgraded; secrets are refused.",
+      "Remember a detailed fact in project or global (personal/cross-project) scope. Project-specific or sensitive global content may be stored in project scope instead; report the actual scope. Credentials cannot be stored.",
     parameters: Type.Object({
       kind: kindSchema,
       text: Type.String(),
       scope: Type.Optional(scopeSchema),
-      userRequested: Type.Optional(Type.Boolean()),
-      globalRequested: Type.Optional(Type.Boolean()),
       tags: Type.Optional(Type.String()),
       importance: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),
     }),
     execute: async (_id, params, _signal, _update, ctx) =>
       handle(async () => {
-        if (!params.userRequested || (params.scope === "global" && !params.globalRequested))
-          throw new Error(
-            "Explicit user intent is required before storing memory, including explicit global intent for global storage",
-          );
         const binding = await runtime.binding(ctx.sessionManager.getSessionId());
         const saved = runtime.store.remember(binding, params);
         const label = scopeLabel(saved.record.scope, binding);

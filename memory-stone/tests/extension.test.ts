@@ -11,10 +11,7 @@ import type { SessionEntry } from "../stone.ts";
 
 test("the extension registers scoped tools and hooks that index only a bound request", async () => {
   const fixture = await registryFixture();
-  type Hook = (
-    event: { prompt: string; systemPrompt: string },
-    ctx: ExtensionContext,
-  ) => Promise<unknown>;
+  type Hook = (event: object, ctx: ExtensionContext) => Promise<unknown>;
   const hooks = new Map<string, Hook>();
   const tools = new Map<string, Parameters<ExtensionAPI["registerTool"]>[0]>();
   const commands = new Map<string, Parameters<ExtensionAPI["registerCommand"]>[1]>();
@@ -31,7 +28,11 @@ test("the extension registers scoped tools and hooks that index only a bound req
       getSessionFile: () => join(fixture.directory, "session.jsonl"),
       getBranch: () => branch,
     },
-    ui: { setStatus: () => undefined, notify: () => undefined },
+    ui: {
+      setStatus: () => undefined,
+      notify: () => undefined,
+      confirm: () => Promise.resolve(true),
+    },
     hasUI: true,
   } as unknown as ExtensionContext;
   try {
@@ -45,14 +46,20 @@ test("the extension registers scoped tools and hooks that index only a bound req
       "memory_list",
       "memory_open",
       "memory_remember",
+      "memory_replace",
       "memory_search",
     ]);
     expect(commands.has("memory-status")).toBe(true);
-    const started = await hooks.get("before_agent_start")!(
-      { prompt: "Use PostgreSQL", systemPrompt: "Bot instructions" },
+    const sections: Record<string, string> = {};
+    await hooks.get("before_agent_start")!(
+      {
+        prompt: "Use PostgreSQL",
+        systemPrompt: "Bot instructions",
+        systemPromptOptions: { sections },
+      },
       ctx,
     );
-    expect(JSON.stringify(started)).toContain("atlas");
+    expect(sections.battuta_memory).toContain("atlas");
     await fixture.select("harbor");
     branch = [
       { id: "user", type: "message", message: { role: "user", content: "Use PostgreSQL" } },
@@ -75,6 +82,27 @@ test("the extension registers scoped tools and hooks that index only a bound req
       );
     expect(JSON.stringify(result)).toContain("PostgreSQL supports transactions");
     expect(JSON.stringify(result)).toContain("atlas");
+    const ref = (result.details as { results: { id: string }[] }).results[0].id;
+    await hooks.get("before_agent_start")!(
+      { prompt: "PostgreSQL", systemPromptOptions: { sections } },
+      ctx,
+    );
+    await tools
+      .get("memory_forget")!
+      .execute("delete", { ref }, undefined, undefined, ctx as unknown as ExtensionToolContext);
+    const messages = [
+      {
+        role: "system",
+        content: "",
+        sections: { another_extension: "Keep me", battuta_memory: "Old recalled content" },
+        timestamp: 0,
+      },
+    ];
+    const refreshed = (await hooks.get("context_with_system")!({ messages }, ctx)) as {
+      messages: typeof messages;
+    };
+    expect(refreshed.messages[0]).toEqual(messages[0]);
+    expect(refreshed.messages.at(-1)?.sections).toEqual({ battuta_memory: null });
   } finally {
     await hooks.get("session_shutdown")?.({ prompt: "", systemPrompt: "" }, ctx);
     await fixture.cleanup();
@@ -111,7 +139,11 @@ test.each(["automatic retry", "mail pre-settle continuation"])(
         agentDirectory: join(fixture.directory, "agent"),
       });
       await hooks.get("before_agent_start")!(
-        { prompt: "Choose PostgreSQL", systemPrompt: "Instructions" },
+        {
+          prompt: "Choose PostgreSQL",
+          systemPrompt: "Instructions",
+          systemPromptOptions: { sections: {} },
+        },
         ctx,
       );
       branch = [
@@ -128,7 +160,7 @@ test.each(["automatic retry", "mail pre-settle continuation"])(
         .get("memory_remember")!
         .execute(
           "save",
-          { kind: "decision", text: "Use PostgreSQL transactions", userRequested: true },
+          { kind: "decision", text: "Use PostgreSQL transactions" },
           undefined,
           undefined,
           ctx as unknown as ExtensionToolContext,

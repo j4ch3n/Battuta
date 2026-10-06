@@ -8,7 +8,7 @@ export function registerSearch(pi: ExtensionAPI, runtime: MemoryRuntime) {
     name: "memory_search",
     label: "Search memory",
     description:
-      "Search one explicit memory scope. Omitted scope means the selected project. Empty keyword results do not mean no memories exist.",
+      "Search active detailed memories by keyword in project or global (personal/cross-project) scope. Omitted scope means the selected project. No matches does not mean the scope contains no records.",
     parameters: Type.Object({
       query: Type.String(),
       scope: Type.Optional(scopeSchema),

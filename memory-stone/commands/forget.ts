@@ -4,26 +4,18 @@ import { scopeLabel } from "../tools/common.ts";
 
 export function registerForgetCommand(pi: ExtensionAPI, runtime: MemoryRuntime) {
   pi.registerCommand("memory-forget", {
-    description: "Forget a visible reference; --hard requires confirmation",
+    description: "Permanently delete a visible reference without confirmation",
     handler: async (args, ctx) => {
-      const [ref, flag] = args.trim().split(/\s+/);
-      if (!ref || (flag && flag !== "--hard"))
-        throw new Error("Usage: /memory-forget <ref> [--hard]");
+      const [ref, ...extra] = args.trim().split(/\s+/);
+      if (!ref || extra.length) throw new Error("Usage: /memory-forget <ref>");
       const binding = await runtime.binding(ctx.sessionManager.getSessionId());
-      const record = runtime.store.open(binding, ref);
-      if (
-        flag === "--hard" &&
-        (!ctx.hasUI ||
-          !(await ctx.ui.confirm(
-            "Permanently delete memory?",
-            `${scopeLabel(record.scope, binding)}: ref=${ref}`,
-          )))
-      ) {
-        ctx.ui.notify("Memory retained; permanent deletion was not confirmed.", "info");
-        return;
-      }
-      runtime.store.forget(binding, ref, flag === "--hard");
-      ctx.ui.notify(`Forgotten ${scopeLabel(record.scope, binding)} memory: ref=${ref}`, "info");
+      const record = runtime.store.open(binding, ref, "any");
+      runtime.store.forget(binding, ref, true);
+      runtime.invalidateRecall(ctx.sessionManager.getSessionId());
+      ctx.ui.notify(
+        `Permanently deleted ${scopeLabel(record.scope, binding)} memory: ref=${ref}`,
+        "info",
+      );
     },
   });
 }

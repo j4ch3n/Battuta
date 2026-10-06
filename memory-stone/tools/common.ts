@@ -3,6 +3,7 @@ import type { MemoryRecord } from "../stone.ts";
 import type { ProjectBinding } from "../binding.ts";
 
 export const scopeSchema = Type.Union([Type.Literal("project"), Type.Literal("global")]);
+export const statusSchema = Type.Union([Type.Literal("active"), Type.Literal("soft_forgotten")]);
 export const kindSchema = Type.Union(
   ["decision", "preference", "task", "error_resolution", "turn_summary", "session_summary"].map(
     (value) => Type.Literal(value),
@@ -13,7 +14,9 @@ export const result = (text: string, details: unknown = {}) => ({
   details,
 });
 export const scopeLabel = (scope: string, binding: ProjectBinding | null) =>
-  scope === "global" ? "global" : `project: ${binding?.name ?? "unselected"}`;
+  scope === "global"
+    ? "personal/cross-project (global)"
+    : `project: ${binding?.name ?? "unselected"}`;
 export const displayRecord = (record: MemoryRecord, binding: ProjectBinding | null) =>
   `[${scopeLabel(record.scope, binding)}; ${record.kind}; ref=${record.id}] ${record.text}`;
 export async function handle(

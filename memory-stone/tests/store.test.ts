@@ -190,3 +190,118 @@ test("safe cross-project credential-handling preferences remain globally eligibl
     }).record.scope,
   ).toBe("global");
 });
+
+test.each([
+  ["turn_summary", "I grew up in Toronto and enjoy hiking"],
+  ["decision", "My enduring goal is to learn Spanish"],
+] as const)("non-sensitive personal %s records remain cross-project", async (kind, text) => {
+  const { store } = await setup();
+  expect(store.remember(null, { kind, text, scope: "global" }).record.scope).toBe("global");
+});
+
+test.each(["task", "error_resolution"] as const)("%s remains project-scoped", async (kind) => {
+  const { store, atlas } = await setup();
+  expect(
+    store.remember(atlas, { kind, text: "Finish the migration", scope: "global" }).record.scope,
+  ).toBe("project");
+});
+
+test("retired records require explicit status selection and can be permanently deleted", async () => {
+  const { store, atlas } = await setup();
+  const record = store.remember(atlas, { kind: "decision", text: "Use PostgreSQL" }).record;
+  store.forget(atlas, record.id);
+  expect(store.list(atlas, "project")).toEqual([]);
+  expect(store.list(atlas, "project", "soft_forgotten").map((item) => item.id)).toEqual([
+    record.id,
+  ]);
+  expect(store.open(atlas, record.id, "soft_forgotten").text).toBe("Use PostgreSQL");
+  store.forget(atlas, record.id, true);
+  expect(store.stone.db.getRecord(record.id)).toBeUndefined();
+});
+
+test.each([false, true])(
+  "automatic writes cannot restore forgotten content (hard=%s)",
+  async (hard) => {
+    const { store, atlas } = await setup();
+    const input = {
+      kind: "decision" as const,
+      text: "Use PostgreSQL",
+      project_id: atlas.projectId,
+    };
+    const record = store.remember(atlas, input).record;
+    store.forget(atlas, record.id, hard);
+    expect(store.write(input)).toBeUndefined();
+    expect(store.search(atlas, "PostgreSQL", "project")).toEqual([]);
+    expect(store.remember(atlas, input).record.status).toBe("active");
+  },
+);
+
+test("correction retires predecessor atomically and invalid correction preserves it", async () => {
+  const { store, atlas } = await setup();
+  const record = store.remember(atlas, { kind: "decision", text: "Use PostgreSQL" }).record;
+  expect(() =>
+    store.replace(atlas, record.id, { kind: "decision", text: "password=secret123" }),
+  ).toThrow();
+  expect(store.open(atlas, record.id).text).toBe("Use PostgreSQL");
+  const saved = store.replace(atlas, record.id, { kind: "decision", text: "Use SQLite" });
+  expect(saved.record.text).toBe("Use SQLite");
+  expect(store.open(atlas, record.id, "soft_forgotten").status).toBe("soft_forgotten");
+  expect(store.search(atlas, "PostgreSQL", "project")).toEqual([]);
+});
+
+test("a retirement failure rolls back correction, suppression, and recalled packet cleanup", async () => {
+  const { store, atlas } = await setup();
+  const record = store.remember(atlas, { kind: "decision", text: "Use PostgreSQL" }).record;
+  store.stone.db.insertInjection({
+    session_id: "session",
+    prompt_hash: "prompt",
+    injected_refs: record.id,
+    packet: "Use PostgreSQL",
+    reasons: "test",
+  });
+  const db = store.stone.db.getDb();
+  db.exec(
+    "CREATE TRIGGER fail_retirement BEFORE UPDATE OF status ON records BEGIN SELECT RAISE(ABORT, 'retirement failed'); END",
+  );
+  expect(() => store.replace(atlas, record.id, { kind: "decision", text: "Use SQLite" })).toThrow(
+    /retirement failed/,
+  );
+  expect(store.list(atlas, "project").map((item) => item.text)).toEqual(["Use PostgreSQL"]);
+  expect(store.stone.db.getLastInjection("session")?.packet).toBe("Use PostgreSQL");
+  expect(db.prepare("SELECT COUNT(*) AS n FROM battuta_suppression").get()).toMatchObject({ n: 0 });
+});
+
+test("permanent deletion cleans FTS, activity, and recalled packets atomically", async () => {
+  const { store, atlas } = await setup();
+  const record = store.remember(atlas, { kind: "decision", text: "Use PostgreSQL" }).record;
+  store.stone.db.insertFileActivity({
+    record_id: record.id,
+    project_id: atlas.projectId,
+    path: "src/db.ts",
+    action: "read",
+    entry_id: "entry",
+  });
+  store.stone.db.insertInjection({
+    session_id: "session",
+    prompt_hash: "prompt",
+    injected_refs: record.id,
+    packet: "Use PostgreSQL",
+    reasons: "test",
+  });
+  const db = store.stone.db.getDb();
+  const rowid = (
+    db.prepare("SELECT rowid FROM records WHERE id = ?").get(record.id) as { rowid: number }
+  ).rowid;
+  db.exec(
+    "CREATE TRIGGER fail_deletion BEFORE DELETE ON records BEGIN SELECT RAISE(ABORT, 'delete failed'); END",
+  );
+  expect(() => store.forget(atlas, record.id, true)).toThrow(/delete failed/);
+  expect(store.stone.db.getLastInjection("session")?.packet).toBe("Use PostgreSQL");
+  expect(store.stone.db.getRecentFilePaths(atlas.projectId)).toContain("src/db.ts");
+  expect(store.search(atlas, "PostgreSQL", "project")).toHaveLength(1);
+  db.exec("DROP TRIGGER fail_deletion");
+  store.forget(atlas, record.id, true);
+  expect(db.prepare("SELECT rowid FROM record_fts WHERE rowid = ?").get(rowid)).toBeUndefined();
+  expect(store.stone.db.getLastInjection("session")).toBeUndefined();
+  expect(store.stone.db.getRecentFilePaths(atlas.projectId)).toEqual([]);
+});

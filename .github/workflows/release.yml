@@ -53,6 +53,9 @@ jobs:
           git archive HEAD bots shared-skills agent-mail project-spec memory-stone .env.example RELEASE.md docs/gogcli-setup.md docs/memory-stone.md | tar -x -C dist/stage/battuta
           test -s dist/stage/battuta/RELEASE.md
           test -s dist/stage/battuta/docs/gogcli-setup.md
+          test -s dist/stage/battuta/shared-skills/memory/references/ME.template.md
+          test -s dist/stage/battuta/shared-skills/memory/references/profile-rewrite-prompt.md
+          test ! -e dist/stage/battuta/bots/AGENTS_personal.md
           cli_dir="$PWD/dist/stage/battuta/shared-skills/project-context-cli"
           uv export --project "$cli_dir" --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/project-requirements.txt"
           uv build --project "$cli_dir" --wheel --out-dir "$cli_dir/wheels"
@@ -65,6 +68,7 @@ jobs:
           chmod +x dist/stage/battuta/bin/*
           for bot in pm-bot tl-bot; do
             mkdir -p "dist/stage/battuta/bots/$bot/.pi/skills"
+            test ! -e "dist/stage/battuta/bots/$bot/.pi/ME.md"
             for skill in project-context memory; do
               ln -s "../../../../shared-skills/$skill" "dist/stage/battuta/bots/$bot/.pi/skills/$skill"
               test -f "dist/stage/battuta/bots/$bot/.pi/skills/$skill/SKILL.md"

@@ -1,6 +1,6 @@
 # Command usage
 
-Run `battuta-project` from any directory after [installation](installation.md). The CLI owns project discovery and workspace management; [project-spec tools](spec-tools.md) own spec discovery and lifecycle. Use `list` to discover projects, then `init` or `switch` to select one before running `current` or `explain`. [Memory tools](../../memory/SKILL.md) use the request-bound selection. Obtain locations from command/tool results rather than assuming storage layout.
+Run `battuta-project` from any directory. The CLI owns project discovery and workspace management; [project-spec tools](spec-tools.md) own spec discovery and lifecycle. Use `list` to discover projects, then `init` or `switch` to select one before running `current` or `explain`. Use the `memory` skill for memory operations with the request-bound selection. Obtain locations from command/tool results rather than assuming storage layout.
 
 A bare `battuta-project` invocation displays command help.
 
@@ -114,7 +114,7 @@ Use the [responsibility entries and Workspace binding](../SKILL.md#document-resp
 
 Maintain the overview at the reported Summary path. Inspect the named project's inventory with `inspect_specs` and resolve versions/artifacts through `describe_spec`; no saved version is patched. Existing unregistered documents are preserved. Memory is durable operational context, not the product-decision or specification source of truth.
 
-Older registrations may lack some scaffold files. Reinstallation does not migrate them, and `explain` does not write them. Requested authoring establishes missing artifacts and parent directories while preserving existing content; do not rerun `init` against an existing project.
+Existing registrations may lack some scaffold files; `explain` does not write them. Requested authoring establishes missing artifacts and parent directories while preserving existing content; do not rerun `init` against an existing project.
 
 ## Record product decisions
 
@@ -122,7 +122,7 @@ PM uses `finalize_spec` with explicit project/name, go/no-go, and full rationale
 
 ## Recall project and global memory
 
-Use the [memory skill](../../memory/SKILL.md) for scoped Pi tools. Project memory binds to selection at request start; a switch applies on the next request. Retrieve stable decisions and rationale, confirm live facts against current evidence, and store only explicitly requested durable content. Global preferences/identity require explicit cross-project storage intent.
+Use the `memory` skill for scoped Pi tools and autonomous memory management. Project memory binds to selection at request start; a switch applies on the next request. Retrieve stable decisions and rationale and confirm live facts against current evidence. Choose project scope for project-specific facts and global scope for personal/cross-project facts; owner approval is not required.
 
 ## Typical workflow
 

@@ -9,9 +9,12 @@ export function indexRequest(
   sessionId: string,
   sessionFile: string,
   entries: SessionEntry[],
+  jobId?: string,
 ) {
   const last = entries.at(-1);
-  if (!last || store.stone.db.getIndexState(sessionFile)?.last_indexed_entry_id === last.id) return;
+  if (!last) return;
+  if (!jobId && store.stone.db.getIndexState(sessionFile)?.last_indexed_entry_id === last.id)
+    return;
   const { turns } = store.stone.parser.parseEntries(
     entries.map((entry) => redactHistoryEntry(store.stone, entry)),
   );
@@ -22,6 +25,8 @@ export function indexRequest(
     sessionFile,
   );
   store.transaction(() => {
+    const db = store.stone.db.getDb();
+    if (jobId && db.prepare("SELECT 1 FROM battuta_index_jobs WHERE id = ?").get(jobId)) return;
     store.stone.db.upsertSession({
       id: sessionId,
       session_file: sessionFile,
@@ -41,6 +46,7 @@ export function indexRequest(
         entry_id_start: payload.entryIdStart,
         entry_id_end: payload.entryIdEnd,
       });
+      if (!id) continue;
       for (const activity of payload.fileActivities ?? [])
         store.stone.db.insertFileActivity({
           record_id: id,
@@ -57,5 +63,10 @@ export function indexRequest(
       last_indexed_entry_timestamp: last.timestamp,
       branch_leaf_id: last.id,
     });
+    if (jobId)
+      db.prepare("INSERT INTO battuta_index_jobs (id, completed_at) VALUES (?, ?)").run(
+        jobId,
+        Date.now(),
+      );
   });
 }

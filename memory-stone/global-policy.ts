@@ -1,6 +1,6 @@
 import type { RecordKind, Stone } from "./stone.ts";
 
-// Global records describe the human's cross-project preferences or identity,
+// Global records describe non-sensitive personal/cross-project context,
 // not project facts. Syntactic Stone checks are supplemented with plainly
 // labelled internal context and project/schema identifiers without paths.
 const internalDetail =
@@ -13,7 +13,7 @@ export function globalDowngradeReason(
 ): string | undefined {
   if (stone.privacy.isSensitiveForGlobalMemory(text) || internalDetail.test(text))
     return "Contains project-specific or internal details";
-  if (kind !== "preference")
-    return "Global storage is reserved for cross-project preferences and non-sensitive identity";
+  if (kind === "task" || kind === "error_resolution")
+    return "Tasks and implementation resolutions belong to project memory";
   return undefined;
 }

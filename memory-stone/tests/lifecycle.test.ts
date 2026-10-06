@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { join } from "node:path";
 import { MemoryRuntime } from "../lifecycle.ts";
 import { MemoryStore } from "../store.ts";
@@ -9,6 +9,7 @@ import { registryFixture } from "./fixtures.ts";
 let fixture: Awaited<ReturnType<typeof registryFixture>>;
 let store: MemoryStore | undefined;
 afterEach(async () => {
+  vi.useRealTimers();
   store?.close();
   store = undefined;
   await fixture?.cleanup();
@@ -87,6 +88,7 @@ test("missing selection stays unbound for the request and does not backfill into
 
 test("indexing checkpoint and FTS roll back on failure and the same request can retry", async () => {
   const { store, runtime, atlas } = await setup();
+  vi.useFakeTimers({ toFake: ["Date"] });
   await runtime.start("session", []);
   const branch = [
     entry("user", "user", "Choose PostgreSQL"),
@@ -102,6 +104,7 @@ test("indexing checkpoint and FTS roll back on failure and the same request can 
   expect(store.list(atlas, "project")).toEqual([]);
   expect(store.stone.db.getIndexState(file)).toBeUndefined();
   store.stone.db.getDb().exec("DROP TRIGGER reject_checkpoint");
+  vi.setSystemTime(Date.now() + 1001);
   runtime.finish("session", file, branch);
   expect(store.search(atlas, "PostgreSQL", "project")).toHaveLength(1);
   expect(store.stone.db.getIndexState(file)?.last_indexed_entry_id).toBe("assistant");
@@ -119,6 +122,7 @@ test("injection labels project/global context and bounds its size", async () => 
   });
   await runtime.start("session", []);
   const injected = runtime.inject("session", "PostgreSQL", {
+    ownerProfile: false,
     enabled: true,
     maxRecords: 5,
     maxTokens: 1000,
@@ -129,6 +133,7 @@ test("injection labels project/global context and bounds its size", async () => 
   expect(injected).toContain("global");
   expect(
     runtime.inject("session", "PostgreSQL", {
+      ownerProfile: false,
       enabled: false,
       maxRecords: 5,
       maxTokens: 1000,
@@ -138,6 +143,7 @@ test("injection labels project/global context and bounds its size", async () => 
   ).toBe("");
   expect(
     runtime.inject("session", "PostgreSQL", {
+      ownerProfile: false,
       enabled: true,
       maxRecords: 1,
       maxTokens: 50,

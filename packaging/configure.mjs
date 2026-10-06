@@ -90,13 +90,19 @@ for (const bot of BOT_CONFIGURATIONS) {
         retained.push(source);
     }
   }
+  const memory = settings.battutaMemory ?? {};
+  if (!memory || typeof memory !== "object" || Array.isArray(memory))
+    throw new Error(`Expected battutaMemory object in ${bot.settingsPath}`);
+  const ownerProfile = bot.name === "PM";
   if (
+    memory.ownerProfile !== ownerProfile ||
     retained.length !== packages.length ||
     packages.some((entry) =>
       ["npm:pi-mcp-adapter", "npm:pi-memory-stone"].includes(packageName(entry)),
     )
   ) {
-    settings.packages = retained;
+    if (settings.packages !== undefined || retained.length > 0) settings.packages = retained;
+    settings.battutaMemory = { ...memory, ownerProfile };
     await writeFile(bot.settingsPath, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 });
   }
 

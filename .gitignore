@@ -3,6 +3,13 @@
 .env.*
 !.env.example
 /bots/AGENTS_personal.md
+# Private owner profiles and SQLite memory (including suppression and recovery)
+**/.pi/ME.md
+**/.pi/ME.md.*
+*.db
+*.db-wal
+*.db-shm
+*.db.queue/
 /supabase/snippets/
 
 # Python

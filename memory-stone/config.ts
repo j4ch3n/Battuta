@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 export interface MemoryConfig {
+  ownerProfile: boolean;
   enabled: boolean;
   maxRecords: number;
   maxTokens: number;
@@ -10,6 +11,7 @@ export interface MemoryConfig {
   includeGlobal: boolean;
 }
 export const defaultConfig: MemoryConfig = {
+  ownerProfile: false,
   enabled: true,
   maxRecords: 5,
   maxTokens: 1000,
@@ -17,10 +19,10 @@ export const defaultConfig: MemoryConfig = {
   includeGlobal: true,
 };
 export const defaultDatabasePath = () => join(homedir(), ".battuta", "memory", "memory.db");
+export const defaultAgentDirectory = () =>
+  process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent");
 
-export async function readConfig(
-  agentDirectory = process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent"),
-): Promise<MemoryConfig> {
+export async function readConfig(agentDirectory = defaultAgentDirectory()): Promise<MemoryConfig> {
   let settings: unknown;
   try {
     settings = JSON.parse(await readFile(join(agentDirectory, "settings.json"), "utf8"));
@@ -37,6 +39,7 @@ export async function readConfig(
   const config = { ...defaultConfig, ...value };
   if (
     typeof config.enabled !== "boolean" ||
+    typeof config.ownerProfile !== "boolean" ||
     typeof config.includeGlobal !== "boolean" ||
     !Number.isInteger(config.maxRecords) ||
     config.maxRecords < 1 ||

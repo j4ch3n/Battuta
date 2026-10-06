@@ -7,7 +7,7 @@ description: Use when working on, researching, coding, summarizing, specifying, 
 
 ## Overview
 
-`battuta-project` owns high-level project management: discovery, selection, checkout context, summaries, repository guidance, and Linear association. The shared [memory skill](../memory/SKILL.md) owns project/global recall and durable memory. Project-spec agent tools own spec inventory, versioned documents, checklists/reviews, and terminal decisions. Obtain project/checkout locations from the CLI and document references from spec tools rather than assuming storage layout. Run commands from any directory after [installation](references/installation.md).
+`battuta-project` owns high-level project management: discovery, selection, checkout context, summaries, repository guidance, and Linear association. Use the memory skill for prior project facts, decisions, requirements, implementation context, and project-specific preferences. Personal owner understanding is separate; short project facts do not belong in the owner profile. Project-spec agent tools own spec inventory, versioned documents, checklists/reviews, and terminal decisions. Obtain project/checkout locations from the CLI and document references from spec tools rather than assuming storage layout. Run commands from any directory.
 
 Use `list` to discover projects, `current` to read the selected name, and `switch` to select the intended project. Run `explain` and read applicable README/AGENTS guidance before project work. Use `inspect_specs` with that exact name to discover documents, then `describe_spec` for a named document's details and content. Spec tools use explicit project names and do not change CLI selection.
 
@@ -123,7 +123,7 @@ IDs and creation names must not be blank. Linear project and team associations b
 
 ### Project and global memory
 
-Use the shared [memory skill](../memory/SKILL.md) and Pi memory tools for recall and explicit storage. Project memory is bound at request start to the selected registered checkout. A selection change applies to memory on the next request; it does not rebind an in-progress request. Global memory is separate and requires explicit intent for new storage.
+Use the `memory` skill for recall and autonomous memory management. Project memory is bound at request start to the selected registered checkout. A selection change applies to memory on the next request; it does not rebind an in-progress request. Choose project scope for project-specific facts and global scope for personal/cross-project facts; owner approval is not required.
 
 ## Workflow example
 
@@ -131,7 +131,6 @@ Use `list` to discover registrations or initialize a new repository. Run `curren
 
 ## Reference files
 
-- [Installation and migration](references/installation.md)
 - [Command contracts and two-project examples](references/commands.md)
-- [Project/global memory scope and tools](../memory/SKILL.md)
+- Use the `memory` skill for project/global memory scope and tools.
 - [Document sources and integration adaptations](references/attribution.md)

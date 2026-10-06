@@ -27,10 +27,5 @@ export async function configureSharedResources(root, botDirectory) {
   const shared = await readFile(join(root, "bots", "AGENTS_shared.md"), "utf8");
   const dedicated = await readFile(join(botDirectory, "AGENTS_dedicated.md"), "utf8");
   const sections = [shared, dedicated];
-  try {
-    sections.push(await readFile(join(root, "bots", "AGENTS_personal.md"), "utf8"));
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-  }
   await writeFile(join(botDirectory, "AGENTS.md"), sections.join("\n"));
 }

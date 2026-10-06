@@ -27,6 +27,7 @@ class PackagingConfigureTests(unittest.TestCase):
                 memory_skill = root / "shared-skills/memory"
                 memory_skill.mkdir()
                 (memory_skill / "SKILL.md").write_text("Memory scope guidance")
+                shutil.copytree(ROOT / "shared-skills/memory/references", memory_skill / "references")
                 references = source / "references"
                 summary = references / "summary"
                 summary.mkdir(parents=True)
@@ -40,6 +41,8 @@ class PackagingConfigureTests(unittest.TestCase):
                     bot = root / "bots" / role
                     skills = bot / ".pi" / "skills"
                     skills.mkdir(parents=True)
+                    if personal is not None:
+                        (bot / ".pi/ME.md").write_text("Private profile")
                     (bot / "AGENTS_dedicated.md").write_text(role)
                     packages = [
                         "npm:@llblab/pi-telegram@0.50.1", "npm:pi-mcp-adapter@2.37.0",
@@ -78,7 +81,13 @@ class PackagingConfigureTests(unittest.TestCase):
                         self.assertEqual(link.resolve(), source.resolve())
                         self.assertFalse(link.readlink().is_absolute())
                         self.assertEqual((link.parent / "memory/SKILL.md").read_text(), "Memory scope guidance")
-                        self.assertEqual((root / "bots" / role / "AGENTS.md").read_text(), f"Shared instructions\n{role}" + (f"\n{personal}" if personal else ""))
+                        for resource in ("ME.template.md", "profile-rewrite-prompt.md"):
+                            self.assertEqual((link.parent / "memory/references" / resource).read_text(), (ROOT / "shared-skills/memory/references" / resource).read_text())
+                        profile = link.parent.parent / "ME.md"
+                        self.assertEqual(profile.read_text() if profile.exists() else None, "Private profile" if personal is not None else None)
+                        if personal is not None:
+                            self.assertEqual((root / "bots/AGENTS_personal.md").read_text(), personal)
+                        self.assertEqual((root / "bots" / role / "AGENTS.md").read_text(), f"Shared instructions\n{role}")
                         mcp = json.loads((link.parent.parent / "mcp.json").read_text())
                         self.assertEqual(
                             mcp["mcpServers"]["linear"]["headers"], {"Authorization": "Bearer ${LINEAR_API_TOKEN}"},
@@ -87,11 +96,11 @@ class PackagingConfigureTests(unittest.TestCase):
                         self.assertNotIn("test-linear", json.dumps(mcp))
                         settings_path = link.parent.parent / "settings.json"
                         if settings_mode == "missing":
+                            expected = {"battutaMemory": {"ownerProfile": role == "pm-bot"}}
                             if role == "pm-bot":
-                                self.assertEqual(json.loads(settings_path.read_text()), {"packages": ["npm:pi-schedule-prompt@0.4.1"]})
-                                self.assertEqual(settings_path.stat().st_mode & 0o777, 0o600)
-                            else:
-                                self.assertFalse(settings_path.exists())
+                                expected["packages"] = ["npm:pi-schedule-prompt@0.4.1"]
+                            self.assertEqual(json.loads(settings_path.read_text()), expected)
+                            self.assertEqual(settings_path.stat().st_mode & 0o777, 0o600)
                             continue
                         settings = json.loads(settings_path.read_text())
                         expected_packages = [
@@ -104,4 +113,4 @@ class PackagingConfigureTests(unittest.TestCase):
                                 {"source": "npm:pi-schedule-prompt@0.4.1", "extensions": ["src/index.ts"]}
                                 if settings_mode == "scheduler" else "npm:pi-schedule-prompt@0.4.1"
                             )
-                        self.assertEqual(settings, {"theme": "dark", "packages": expected_packages})
+                        self.assertEqual(settings, {"theme": "dark", "packages": expected_packages, "battutaMemory": {"ownerProfile": role == "pm-bot"}})

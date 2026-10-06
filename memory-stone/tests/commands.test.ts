@@ -8,7 +8,7 @@ import { MemoryStore } from "../store.ts";
 import { resolveBinding } from "../binding.ts";
 import { registryFixture } from "./fixtures.ts";
 
-test("interactive commands preserve scopes, visibility, and deletion confirmation", async () => {
+test("commands preserve scopes and delete without confirmation or UI", async () => {
   const fixture = await registryFixture();
   const path = join(fixture.directory, "memory.db");
   const store = await MemoryStore.open(path);
@@ -32,13 +32,14 @@ test("interactive commands preserve scopes, visibility, and deletion confirmatio
       defaultConfig,
     );
     const notices: string[] = [];
-    let confirmed = false;
     const ctx = {
       hasUI: true,
       sessionManager: { getSessionId: () => "session" },
       ui: {
         notify: (text: string) => notices.push(text),
-        confirm: () => Promise.resolve(confirmed),
+        confirm: () => {
+          throw new Error("Deletion must not request owner confirmation");
+        },
       },
     } as unknown as ExtensionCommandContext;
     const call = (command: string, args = "") => commands.get(command)!.handler(args, ctx);
@@ -52,14 +53,14 @@ test("interactive commands preserve scopes, visibility, and deletion confirmatio
     expect(notices.pop()).toContain("global");
     await call("memory-last");
     expect(notices.pop()).toContain("No memory injection");
-    await call("memory-forget", `${project.id} --hard`);
-    expect(store.open(atlas, project.id).text).toBe("Use PostgreSQL");
-    confirmed = true;
-    await call("memory-forget", `${project.id} --hard`);
-    expect(() => store.open(atlas, project.id)).toThrow();
+    await call("memory-forget", project.id);
+    expect(store.stone.db.getRecord(project.id)).toBeUndefined();
     await expect(call("memory-forget", `${global.id} --wrong`)).rejects.toThrow("Usage");
+    await expect(call("memory-forget", `${global.id} --hard`)).rejects.toThrow("Usage");
+    Object.assign(ctx, { hasUI: false });
     await call("memory-forget", global.id);
     expect(store.list(null, "global")).toEqual([]);
+    expect(store.stone.db.getRecord(global.id)).toBeUndefined();
   } finally {
     store.close();
     await fixture.cleanup();

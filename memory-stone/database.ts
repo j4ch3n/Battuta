@@ -6,9 +6,11 @@ import { loadStone, type Stone } from "./stone.ts";
 let activePath: string | undefined;
 export class MemoryDatabase {
   readonly stone: Stone;
+  readonly path: string;
   private inTransaction = false;
-  private constructor(stone: Stone) {
+  private constructor(stone: Stone, path: string) {
     this.stone = stone;
+    this.path = path;
   }
 
   static async open(path: string): Promise<MemoryDatabase> {
@@ -25,8 +27,14 @@ export class MemoryDatabase {
       process.env.PI_MEMORY_STONE_DB_PATH = path;
       const stone = await loadStone();
       stone.db.getDb();
+      stone.db.getDb().exec(`CREATE TABLE IF NOT EXISTS battuta_suppression (
+        fingerprint TEXT PRIMARY KEY
+      ); CREATE TABLE IF NOT EXISTS battuta_index_jobs (
+        id TEXT PRIMARY KEY,
+        completed_at INTEGER NOT NULL
+      )`);
       activePath = path;
-      return new MemoryDatabase(stone);
+      return new MemoryDatabase(stone, path);
     } finally {
       await release();
     }

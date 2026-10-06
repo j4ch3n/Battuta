@@ -11,7 +11,7 @@ from bot_setup.instructions import configure_instructions  # noqa: E402
 
 
 class InstructionTests(unittest.TestCase):
-    def test_optional_personal_guidance_is_appended_for_both_bots(self):
+    def test_legacy_personal_guidance_is_preserved_but_not_embedded(self):
         for role, personal in product(("pm-bot", "tl-bot"), (None, "Personal guidance")):
             with self.subTest(role=role, personal=personal), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
@@ -27,7 +27,7 @@ class InstructionTests(unittest.TestCase):
                     personal_path.write_text(personal)
                 for _ in range(2):
                     configure_instructions(bot)
-                    expected = "Shared instructions\nRole instructions" + (f"\n{personal}" if personal else "")
+                    expected = "Shared instructions\nRole instructions"
                     self.assertEqual((bot / "AGENTS.md").read_text(), expected)
                     self.assertTrue((bot / ".pi/skills/memory").is_dir())
                     self.assertEqual(shared.read_text(), "Shared instructions")
