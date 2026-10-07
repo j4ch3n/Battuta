@@ -25,6 +25,7 @@ export default defineConfig(
       "project-spec/**/*.ts",
       "memory-stone/**/*.ts",
       "task-delegation/**/*.ts",
+      "worker-daemon/**/*.ts",
       "bots/**/.pi/extensions/**/*.ts",
     ],
     extends: [js.configs.recommended, tseslint.configs.recommendedTypeChecked],
