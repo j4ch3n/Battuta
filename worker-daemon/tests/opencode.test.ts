@@ -723,3 +723,74 @@ it("blocks malformed pending permission response before any prompt write", async
   );
   expect(requests.every((r) => r.method === "GET")).toBe(true);
 });
+it.each(["history-metadata", "inbox-metadata", "inbox-delivery"])(
+  "refuses conflicting durable %s evidence",
+  async (kind) => {
+    if (kind === "history-metadata") {
+      routes["GET /api/session/ses_example/message?order=asc"] = {
+        data: [
+          {
+            id: promptId,
+            type: "user",
+            time: { created: 10 },
+            text: buildPrompt(task),
+            metadata: { battuta: { task_id: "other" } },
+          },
+          assistant(),
+        ],
+        cursor: {},
+      };
+    } else {
+      routes["GET /api/session/ses_example/inbox"] = {
+        data: [
+          {
+            id: promptId,
+            type: "user",
+            sessionID: "ses_example",
+            delivery: kind === "inbox-delivery" ? "steer" : "queue",
+            payload: {
+              text: buildPrompt(task),
+              ...(kind === "inbox-metadata" ? { metadata: { battuta: { task_id: "other" } } } : {}),
+            },
+          },
+        ],
+      };
+    }
+    const adapter = await createOpenCodeAdapter(config, deps);
+    const snapshot = await adapter.inspect(bound);
+    expect(snapshot.initialInputAdmitted).toBe(false);
+    expect(snapshot.report).toBeUndefined();
+    expect(snapshot.reportError).toMatch(/identity.*ambiguous/);
+  },
+);
+it.each(["history", "inbox"])("accepts matching optional durable %s metadata", async (kind) => {
+  const metadata = {
+    battuta: { schema_version: 1, task_id: task.id, worker_id: "worker-1", delegator_role: "tl" },
+  };
+  if (kind === "history") {
+    routes["GET /api/session/ses_example/message?order=asc"] = {
+      data: [
+        { id: promptId, type: "user", time: { created: 10 }, text: buildPrompt(task), metadata },
+        assistant(),
+      ],
+      cursor: {},
+    };
+  } else {
+    routes["GET /api/session/ses_example/inbox"] = {
+      data: [
+        {
+          id: promptId,
+          type: "user",
+          sessionID: "ses_example",
+          delivery: "queue",
+          payload: { text: buildPrompt(task), metadata },
+        },
+      ],
+    };
+  }
+  const adapter = await createOpenCodeAdapter(config, deps);
+  const snapshot = await adapter.inspect(bound);
+  expect(snapshot.initialInputAdmitted).toBe(true);
+  expect(snapshot.reportError).toBeUndefined();
+  if (kind === "history") expect(snapshot.report).toEqual(report);
+});
