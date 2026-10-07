@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionToolContext } from "@earendil-works/pi-coding-agent";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
@@ -87,6 +87,38 @@ test("first update supplies skill template without inventing initial owner facts
     await f.cleanup();
   }
 });
+
+test.each(["generation", "refresh"])(
+  "%s embeds the canonical template in the system prompt while retaining the full existing profile",
+  async (mode) => {
+    const f = await fixture();
+    try {
+      const template = await readFile(
+        new URL("../../shared-skills/memory/references/ME.template.md", import.meta.url),
+        "utf8",
+      );
+      const legacyDocument =
+        "# About Human Product Owner\n\n## Old interests\n\nEnjoys hiking.\n\n## Background\n\nFounder.\n";
+      const current =
+        mode === "refresh"
+          ? await f.profile.write(legacyDocument, "missing")
+          : await f.profile.read();
+      expect(
+        (await f.update({ ...params, expectedRevision: current.revision })).details,
+      ).toMatchObject({
+        updated: true,
+      });
+      const context = f.complete.mock.calls[0][1];
+      expect(context.systemPrompt).toContain(template);
+      const evidence = JSON.parse(context.messages[0].content as string) as {
+        existingDocument: string;
+      };
+      expect(evidence.existingDocument).toBe(mode === "refresh" ? legacyDocument : template);
+    } finally {
+      await f.cleanup();
+    }
+  },
+);
 
 test.each([
   "no model",

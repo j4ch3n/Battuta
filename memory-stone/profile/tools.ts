@@ -46,14 +46,13 @@ export function registerProfileTools(pi: ExtensionAPI, profile: OwnerProfile) {
         const safe = (text: string) => requireSafeMemory(stone, text);
         safe(params.message);
         safe(params.interpretation);
-        const existingDocument = current.exists
-          ? current.content
-          : await readFile(resource("ME.template.md"), "utf8");
+        const template = await readFile(resource("ME.template.md"), "utf8");
+        const existingDocument = current.exists ? current.content : template;
         safe(existingDocument);
         const response = await ctx.modelRegistry.complete(
           ctx.model,
           {
-            systemPrompt: await readFile(resource("profile-rewrite-prompt.md"), "utf8"),
+            systemPrompt: `${await readFile(resource("profile-rewrite-prompt.md"), "utf8")}\n## Canonical owner profile template\n\n${template}`,
             messages: [
               {
                 role: "user",
