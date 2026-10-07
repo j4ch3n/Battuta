@@ -6,7 +6,15 @@ export default defineConfig({
     testTimeout: 30000,
     coverage: {
       provider: "v8",
-      include: ["config.ts", "lock.ts", "worktree.ts", "opencode.ts", "prompt.ts"],
+      include: [
+        "config.ts",
+        "lock.ts",
+        "worktree.ts",
+        "opencode.ts",
+        "prompt.ts",
+        "daemon.ts",
+        "main.ts",
+      ],
       reporter: ["text", "lcov", "json-summary"],
     },
   },
