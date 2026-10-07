@@ -6,6 +6,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: [
+        "index.ts",
         "client.ts",
         "auth.ts",
         fileURLToPath(new URL("../supabase/functions/_shared/task-contracts.ts", import.meta.url)),

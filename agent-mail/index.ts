@@ -18,9 +18,11 @@ import {
   StoredMessage,
   validate,
   validateCoverage,
+  validateReceivedMessage,
   type Message,
   type MessageReference,
 } from "./schemas.ts";
+import { isWorkerResult } from "./worker-result.ts";
 
 class UncertainWriteError extends Error {}
 
@@ -141,7 +143,17 @@ export default function (pi: ExtensionAPI) {
               .range(offset, offset + 19),
           ),
         );
-        rows.push(...page);
+        for (const row of page) {
+          if (isWorkerResult(row.content)) {
+            try {
+              validateReceivedMessage(row);
+            } catch (error) {
+              log("Invalid worker result", error);
+              continue;
+            }
+          }
+          rows.push(row);
+        }
         if (!live || token !== generation) return;
         if (page.length < 20) break;
       }
@@ -249,6 +261,8 @@ export default function (pi: ExtensionAPI) {
       return message;
     };
     const parent = "parent" in request ? await load(request.parent) : null;
+    if (parent && isWorkerResult(parent.content))
+      throw new Error("Cannot reply to receive-only worker results; replies are PM/TL only");
     if (parent && (parent.recipient !== role || parent.status !== "read")) {
       throw new Error(
         "Reply parent is not addressed to this role, not accepted, or already answered",
@@ -266,6 +280,8 @@ export default function (pi: ExtensionAPI) {
       while (cursor && !seen.has(referenceKey(cursor))) {
         seen.add(referenceKey(cursor));
         const message = await load(cursor);
+        if (isWorkerResult(message.content))
+          throw new Error("related_messages must reference PM/TL exchanges, not worker results");
         if (!(
           (message.sender === role && message.recipient === recipient) ||
           (message.sender === recipient && message.recipient === role)
