@@ -69,7 +69,8 @@ try {
       encoding: "utf8",
     }),
   );
-  if (!status.API_URL || !status.SECRET_KEY) throw new Error("Local Supabase credentials missing");
+  if (!status.API_URL || !status.SECRET_KEY || !status.PUBLISHABLE_KEY)
+    throw new Error("Local Supabase credentials missing");
   server = spawn("supabase", ["--workdir", workdir, "functions", "serve"], {
     cwd: root,
     stdio: ["ignore", log, log],
@@ -115,6 +116,27 @@ try {
     ],
     {
       env: { ...process.env, SUPABASE_URL: status.API_URL, SUPABASE_SECRET_KEY: status.SECRET_KEY },
+    },
+  );
+  run(
+    "pnpm",
+    [
+      "--dir",
+      "task-delegation",
+      "test:integration",
+      "--reporter=default",
+      "--reporter=junit",
+      `--outputFile=${resolve(reports, "task-integration.xml")}`,
+    ],
+    {
+      env: {
+        ...process.env,
+        SUPABASE_URL: status.API_URL,
+        SUPABASE_SECRET_KEY: status.SECRET_KEY,
+        SUPABASE_PUBLISHABLE_KEY: status.PUBLISHABLE_KEY,
+        SUPABASE_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY,
+        SUPABASE_TEST_DB_CONTAINER: "supabase_db_battuta-check",
+      },
     },
   );
 } finally {

@@ -108,7 +108,10 @@ export class TaskClient {
           !(value.next === null || (typeof value.next === "string" && value.next.trim().length > 0))
         )
           throw new Error("Invalid owned tasks response");
-        return { tasks: value.tasks.map(validateTaskRow), next: value.next };
+        const tasks = value.tasks.map(validateTaskRow);
+        if (tasks.some((task) => task.claimed_by === null || task.terminal_report !== null))
+          throw new Error("Unexpected owned task");
+        return { tasks, next: value.next };
       },
       false,
       signal,
