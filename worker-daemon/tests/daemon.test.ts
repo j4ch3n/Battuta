@@ -351,12 +351,151 @@ it("retries finalization only with identical report after bounded backoff", asyn
   await settle();
   expect(finalize).toHaveBeenCalledTimes(1);
   expect(f.options.tasks.client.claim).not.toHaveBeenCalled();
-  f.snapshots.set(task.id, { report: { ...report, summary: "changed" } });
+  f.snapshots.set(task.id, { active: false, report: structuredClone(report) });
   await vi.advanceTimersByTimeAsync(1000);
   expect(vi.mocked(finalize).mock.calls.map((call) => call[1])).toEqual([report, report]);
   f.stop();
   await running;
 });
+
+it.each([
+  { name: "resumed active execution", snapshot: { active: true }, diagnostic: "recovery_required" },
+  { name: "pending question", snapshot: { pendingForms: [{}] }, diagnostic: "waiting" },
+  { name: "pending input", snapshot: { pendingInputs: [{}] }, diagnostic: "recovery_required" },
+  {
+    name: "pending permission",
+    snapshot: { pendingPermissions: [{}] },
+    diagnostic: "recovery_required",
+  },
+  {
+    name: "permission concern",
+    snapshot: { permissionsConcern: "deny" },
+    diagnostic: "recovery_required",
+  },
+  {
+    name: "parse error",
+    snapshot: { reportError: "invalid final text" },
+    diagnostic: "recovery_required",
+  },
+  {
+    name: "missing native report",
+    snapshot: { report: undefined },
+    diagnostic: "recovery_required",
+  },
+  {
+    name: "changed native report",
+    snapshot: { report: { ...report, summary: "changed" } },
+    diagnostic: "recovery_required",
+  },
+] satisfies { name: string; snapshot: Partial<ExecutionSnapshot>; diagnostic: string }[])(
+  "failed finalization cannot bypass current native gates: $name",
+  async ({ snapshot, diagnostic }) => {
+    const f = fixture(2);
+    f.existing();
+    f.snapshots.set(task.id, { active: false, report });
+    const finalize = f.options.tasks.client.finalize;
+    vi.mocked(finalize).mockRejectedValueOnce(new Error("lost acknowledgement"));
+    const running = f.start();
+    await settle();
+    f.snapshots.set(task.id, { active: false, report, ...snapshot });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(finalize).toHaveBeenCalledTimes(1);
+    expect(f.log).toHaveBeenCalledWith(diagnostic, expect.stringContaining(task.id));
+    expect(f.owned).toHaveLength(1);
+    expect(f.options.tasks.client.claim).not.toHaveBeenCalled();
+    // Resolving native blockers may permit replay, but never replace the immutable cached payload.
+    f.snapshots.set(task.id, { active: false, report: structuredClone(report) });
+    f.wake();
+    await settle();
+    expect(vi.mocked(finalize).mock.calls.map((call) => call[1])).toEqual([report, report]);
+    f.stop();
+    await running;
+  },
+);
+
+it("prunes lost-ack finalization only after the full paginated ownership scan confirms disappearance", async () => {
+  const f = fixture();
+  f.existing();
+  f.snapshots.set(task.id, { active: false, report });
+  vi.mocked(f.options.tasks.client.finalize).mockImplementationOnce(() => {
+    f.owned.length = 0;
+    return Promise.reject(new Error("committed but acknowledgement lost"));
+  });
+  const running = f.start();
+  await settle();
+  let finishPage!: () => void;
+  vi.mocked(f.options.tasks.client.listOwned).mockImplementation(async (cursor) => {
+    if (!cursor) return { tasks: [], next: "last" };
+    await new Promise<void>((resolve) => {
+      finishPage = resolve;
+    });
+    return { tasks: [], next: null };
+  });
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(f.log).not.toHaveBeenCalledWith("finalization_reconciled", expect.any(String));
+  finishPage();
+  await settle();
+  expect(f.log).toHaveBeenCalledWith("finalization_reconciled", expect.stringContaining(task.id));
+  expect(f.options.tasks.client.finalize).toHaveBeenCalledOnce();
+  f.stop();
+  await running;
+});
+
+it("aborted partial ownership scan never prunes a pending finalization", async () => {
+  const f = fixture();
+  f.existing();
+  f.snapshots.set(task.id, { active: false, report });
+  vi.mocked(f.options.tasks.client.finalize).mockRejectedValueOnce(new Error("network"));
+  const running = f.start();
+  await settle();
+  let finishPage!: () => void;
+  vi.mocked(f.options.tasks.client.listOwned).mockImplementation(async (cursor) => {
+    if (!cursor) return { tasks: [], next: "last" };
+    await new Promise<void>((resolve) => {
+      finishPage = resolve;
+    });
+    return { tasks: [], next: null };
+  });
+  await vi.advanceTimersByTimeAsync(1000);
+  f.stop();
+  finishPage();
+  await running;
+  expect(f.log).not.toHaveBeenCalledWith("finalization_reconciled", expect.any(String));
+  expect(f.options.tasks.client.finalize).toHaveBeenCalledOnce();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it.each(["first page", "partial page"])(
+  "failed %s ownership scan never prunes cached payload",
+  async (failure) => {
+    const f = fixture();
+    const row = f.existing();
+    f.snapshots.set(task.id, { active: false, report });
+    vi.mocked(f.options.tasks.client.finalize).mockRejectedValueOnce(new Error("network"));
+    const running = f.start();
+    await settle();
+    vi.mocked(f.options.tasks.client.listOwned).mockImplementation((cursor) => {
+      if (failure === "first page" || cursor) return Promise.reject(new Error("page unavailable"));
+      return Promise.resolve({ tasks: [], next: "last" });
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(f.log).not.toHaveBeenCalledWith("finalization_reconciled", expect.any(String));
+    vi.mocked(f.options.tasks.client.listOwned).mockResolvedValue({ tasks: [row], next: null });
+    f.snapshots.set(task.id, { active: false, report: { ...report, summary: "changed" } });
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(f.options.tasks.client.finalize).toHaveBeenCalledOnce();
+    expect(f.log).toHaveBeenCalledWith("recovery_required", expect.stringContaining("differs"));
+    f.snapshots.set(task.id, { active: false, report: structuredClone(report) });
+    f.wake();
+    await settle();
+    expect(vi.mocked(f.options.tasks.client.finalize).mock.calls.map((call) => call[1])).toEqual([
+      report,
+      report,
+    ]);
+    f.stop();
+    await running;
+  },
+);
 
 it.each([
   { role: "worker", worker_id: "other", projects: [task.project] },

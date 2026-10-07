@@ -55,8 +55,8 @@ function fixture() {
 const env = {
   SUPABASE_URL: "http://local",
   SUPABASE_PUBLISHABLE_KEY: "public",
-  TASK_AUTH_EMAIL: "worker@example.test",
-  TASK_AUTH_PASSWORD: "secret",
+  WORKER_TASK_EMAIL: "worker@example.test",
+  WORKER_TASK_PASSWORD: "secret",
 };
 it("locks, authenticates and discovers existing service before running; cleans owned resources", async () => {
   const f = fixture();
@@ -110,10 +110,33 @@ it.each(
 it("rejects missing credentials without exposing values", async () => {
   const f = fixture();
   await expect(
-    main(["--config", "/config.json"], { TASK_AUTH_PASSWORD: "secret" }, f.deps),
+    main(["--config", "/config.json"], { WORKER_TASK_PASSWORD: "secret" }, f.deps),
   ).rejects.toThrow(/Missing/);
   expect(f.deps.connect).not.toHaveBeenCalled();
 });
+it.each([
+  { workerEmail: undefined, missing: "WORKER_TASK_EMAIL" },
+  { workerEmail: "worker@example.test", missing: "WORKER_TASK_PASSWORD" },
+])(
+  "rejects noncontract credential aliases before authentication: $missing",
+  async ({ workerEmail, missing }) => {
+    const f = fixture();
+    await expect(
+      main(
+        ["--config", "/config.json"],
+        {
+          SUPABASE_URL: env.SUPABASE_URL,
+          SUPABASE_PUBLISHABLE_KEY: env.SUPABASE_PUBLISHABLE_KEY,
+          TASK_AUTH_EMAIL: "worker@example.test",
+          TASK_AUTH_PASSWORD: "secret",
+          WORKER_TASK_EMAIL: workerEmail,
+        },
+        f.deps,
+      ),
+    ).rejects.toThrow(`Missing ${missing}`);
+    expect(f.deps.connect).not.toHaveBeenCalled();
+  },
+);
 it("loads CLI with native erasable Node TypeScript without contacting services", async () => {
   const result = await promisify(execFile)(
     process.execPath,
