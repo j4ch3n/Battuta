@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { OpenCode } from "@opencode/client";
-import { mkdtemp, rm, realpath } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdtemp, rm, realpath, writeFile } from "node:fs/promises";
+import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { createOpenCodeAdapter } from "../opencode.ts";
@@ -98,6 +98,16 @@ beforeEach(async () => {
       cursor: {},
     },
     "GET /api/session/ses_example/permission": { data: [] },
+    "POST /api/session/ses_example/prompt": {
+      data: {
+        id: promptId,
+        sessionID: "ses_example",
+        type: "user",
+        time: { created: 10 },
+        payload: { text: buildPrompt(task), metadata: session.metadata },
+        delivery: "queue",
+      },
+    },
   };
   const locationQuery = new URLSearchParams({ "location[directory]": directory }).toString();
   routes[`GET /api/config?${locationQuery}`] = [];
@@ -107,6 +117,7 @@ beforeEach(async () => {
   routes["GET /api/session?order=asc"] = routes["GET /api/session"];
   requests = [];
   deps = {
+    serviceFile: join(root, "service.json"),
     service: {
       discover: () =>
         Promise.resolve({
@@ -141,6 +152,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   vi.useRealTimers();
+  vi.unstubAllEnvs();
   await rm(root, { recursive: true, force: true });
 });
 
@@ -165,7 +177,7 @@ it("refuses incompatible services before any session write", async () => {
   await expect(createOpenCodeAdapter(config, deps)).rejects.toThrow(/version/);
   expect(requests.some((r) => r.method === "POST")).toBe(false);
 });
-it("guards native ensure so it cannot replace or start the human-owned service", async () => {
+it("guards native ensure against version replacement even when registration is absent", async () => {
   deps.service.discover = () => Promise.resolve(undefined);
   deps.service.ensure = (options) => {
     options?.onStart?.("version-mismatch", "2.0.23");
@@ -183,13 +195,29 @@ it("paginates session envelopes using cursor.next without metadata query guesses
     "/api/session?order=asc&cursor=next-page",
   ]);
 });
-it("blocks admission when effective unrestricted policy cannot be established, never bypassing Console", async () => {
+it("admits the exact instruction with deterministic native prompt ID without bypassing policies", async () => {
   const adapter = await createOpenCodeAdapter(config, deps);
-  expect(adapter.admissionBlocker).toMatch(/NEEDS_CONTEXT/);
-  await expect(adapter.admit(bound, "ses_example")).rejects.toThrow(
-    /NEEDS_CONTEXT.*effective.*polic/i,
-  );
-  expect(requests.some((r) => r.path.endsWith("/prompt"))).toBe(false);
+  await adapter.admit(bound, "ses_example");
+  const writes = requests.filter((r) => r.method === "POST");
+  expect(writes).toHaveLength(1);
+  expect(writes[0]).toMatchObject({
+    path: "/api/session/ses_example/prompt",
+    authorization: "Basic fake-auth",
+    body: {
+      id: promptId,
+      text: buildPrompt(task),
+      delivery: "queue",
+      resume: true,
+      metadata: {
+        battuta: {
+          schema_version: 1,
+          task_id: task.id,
+          worker_id: "worker-1",
+          delegator_role: "tl",
+        },
+      },
+    },
+  });
 });
 it("reports configured hard-deny policies without modifying them", async () => {
   routes[
@@ -222,7 +250,7 @@ it("selects only the latest final text after admitted input from paginated messa
   const snapshot = await adapter.inspect(bound);
   expect(snapshot.initialInputAdmitted).toBe(true);
   expect(snapshot.report).toEqual(report);
-  expect(snapshot.permissionsConcern).toMatch(/effective.*polic/i);
+  expect(snapshot.permissionsConcern).toBeUndefined();
 });
 it.each(["active", "inbox", "forms"])(
   "does not parse reports with foreground/pending %s",
@@ -456,3 +484,242 @@ it.each(["permissions", "metadata", "model"])(
     expect(requests.every((r) => r.method === "GET")).toBe(true);
   },
 );
+it("starts exactly one injected service only with absent explicit registration", async () => {
+  const lifecycle: string[] = [];
+  deps.service.discover = (options) => {
+    expect(options?.file).toBe(join(root, "service.json"));
+    lifecycle.push("discover");
+    return Promise.resolve(undefined);
+  };
+  deps.service.ensure = (options) => {
+    expect(options?.file).toBe(join(root, "service.json"));
+    expect(typeof options?.version).toBe("function");
+    if (typeof options?.version === "function") expect(options.version("2.0.24")).toBe(true);
+    options?.onStart?.("missing");
+    lifecycle.push("start");
+    return Promise.resolve({ url: "http://fake", auth: undefined });
+  };
+  const adapter = await createOpenCodeAdapter(config, deps);
+  await adapter.listSessions();
+  expect(lifecycle).toEqual(["discover", "start"]);
+});
+it.each(["unhealthy", "incompatible", "malformed"])(
+  "preserves existing %s registration without ensure/recovery",
+  async (state) => {
+    await writeFile(join(root, "service.json"), state);
+    deps.service.discover = () => Promise.resolve(undefined);
+    let replaced = false;
+    deps.service.ensure = () => {
+      replaced = true;
+      return Promise.resolve({ url: "http://fake" });
+    };
+    await expect(createOpenCodeAdapter(config, deps)).rejects.toThrow(/operator/);
+    expect(replaced).toBe(false);
+  },
+);
+it("synchronous onStart guard refuses registration appearing after discovery", async () => {
+  deps.service.discover = () => Promise.resolve(undefined);
+  deps.service.ensure = async (options) => {
+    await writeFile(join(root, "service.json"), "other service");
+    options?.onStart?.("missing");
+    return { url: "http://fake" };
+  };
+  await expect(createOpenCodeAdapter(config, deps)).rejects.toThrow(/operator/);
+});
+it("rejects a late incompatible version even after native onStart has already announced missing", async () => {
+  deps.service.discover = () => Promise.resolve(undefined);
+  deps.service.ensure = (options) => {
+    options?.onStart?.("missing");
+    if (typeof options?.version === "function") options.version("2.0.23");
+    return Promise.resolve({ url: "http://fake" });
+  };
+  await expect(createOpenCodeAdapter(config, deps)).rejects.toThrow(/operator/);
+});
+it.each([true, false])(
+  "uses pinned XDG default service registration (custom state: %s)",
+  async (custom) => {
+    delete deps.serviceFile;
+    vi.stubEnv("XDG_STATE_HOME", custom ? root : undefined);
+    const expected = join(
+      custom ? root : join(homedir(), ".local", "state"),
+      "opencode",
+      "service.json",
+    );
+    deps.service.discover = (options) => {
+      expect(options?.file).toBe(expected);
+      return Promise.resolve({ url: "http://fake", auth: undefined });
+    };
+    await createOpenCodeAdapter(config, deps);
+  },
+);
+it("bounds uncertain admission without retries or changing IDs", async () => {
+  routes["POST /api/session/ses_example/prompt"] = "hang";
+  const adapter = await createOpenCodeAdapter(config, deps);
+  vi.useFakeTimers();
+  const result = expect(adapter.admit(bound, "ses_example")).rejects.toThrow(/uncertain/);
+  await vi.waitFor(() => expect(requests.some((r) => r.path.endsWith("/prompt"))).toBe(true));
+  await vi.advanceTimersByTimeAsync(30001);
+  await result;
+  expect(requests.filter((r) => r.method === "POST")).toHaveLength(1);
+  expect(requests.find((r) => r.method === "POST")?.body).toMatchObject({ id: promptId });
+});
+it.each([
+  "transport",
+  "wrong-id",
+  "missing-envelope",
+  "wrong-payload",
+  "wrong-metadata",
+  "wrong-session",
+  "wrong-type",
+  "wrong-delivery",
+])("treats %s admission outcome as uncertain, never retries", async (kind) => {
+  if (kind === "transport")
+    routes["POST /api/session/ses_example/prompt"] = new Error("secret transport detail");
+  if (kind === "wrong-id")
+    routes["POST /api/session/ses_example/prompt"] = {
+      data: { id: "msg_other", sessionID: "ses_example" },
+    };
+  if (kind === "missing-envelope") routes["POST /api/session/ses_example/prompt"] = {};
+  if (kind === "wrong-payload")
+    routes["POST /api/session/ses_example/prompt"] = {
+      data: {
+        id: promptId,
+        sessionID: "ses_example",
+        type: "user",
+        payload: { text: "conflicting prompt" },
+        delivery: "queue",
+      },
+    };
+  if (["wrong-metadata", "wrong-session", "wrong-type", "wrong-delivery"].includes(kind)) {
+    const response = routes["POST /api/session/ses_example/prompt"] as {
+      data: Record<string, unknown>;
+    };
+    if (kind === "wrong-metadata")
+      response.data.payload = {
+        text: buildPrompt(task),
+        metadata: { battuta: { task_id: "another" } },
+      };
+    if (kind === "wrong-session") response.data.sessionID = "ses_other";
+    if (kind === "wrong-type") response.data.type = "synthetic";
+    if (kind === "wrong-delivery") response.data.delivery = "steer";
+  }
+  const adapter = await createOpenCodeAdapter(config, deps);
+  await expect(adapter.admit(bound, "ses_example")).rejects.toThrow(/uncertain/);
+  expect(requests.filter((r) => r.method === "POST")).toHaveLength(1);
+});
+it("does not auto-approve pending permission requests before admission", async () => {
+  routes["GET /api/session/ses_example/permission"] = {
+    data: [
+      {
+        id: "permission_pending",
+        sessionID: "ses_example",
+        action: "shell",
+        resources: ["sudo command"],
+      },
+    ],
+  };
+  const adapter = await createOpenCodeAdapter(config, deps);
+  await expect(adapter.admit(bound, "ses_example")).rejects.toThrow(
+    /permission.*pending|pending.*permission/,
+  );
+  expect(requests.every((r) => r.method === "GET")).toBe(true);
+});
+it.each(
+  [
+    {},
+    { data: [] },
+    [{ type: "unsupported" }],
+    [{ type: "document", info: { permissions: "unsupported" } }],
+    [{ type: "document", info: { experimental: { policies: "unsupported" } } }],
+  ].map((response) => [response]),
+)("blocks unsupported configuration response %j", async (response) => {
+  routes[
+    "GET /api/config?" + new URLSearchParams({ "location[directory]": directory }).toString()
+  ] = response;
+  const adapter = await createOpenCodeAdapter(config, deps);
+  await expect(adapter.admit(bound, "ses_example")).rejects.toThrow(
+    /configuration.*unavailable|unsupported/i,
+  );
+  expect(requests.every((r) => r.method === "GET")).toBe(true);
+});
+it.each(["ask", "deny"])(
+  "reports observed authored %s rules without changing them",
+  async (effect) => {
+    routes[
+      "GET /api/config?" + new URLSearchParams({ "location[directory]": directory }).toString()
+    ] = [{ type: "document", info: { permissions: [{ action: "shell", resource: "*", effect }] } }];
+    const adapter = await createOpenCodeAdapter(config, deps);
+    await expect(adapter.admit(bound, "ses_example")).rejects.toThrow(
+      /observed.*ask|observed.*deny/i,
+    );
+    expect(requests.every((r) => r.method === "GET")).toBe(true);
+  },
+);
+it("reuses the same deterministic payload for explicit repeated admissions, never inventing a new ID", async () => {
+  const adapter = await createOpenCodeAdapter(config, deps);
+  await adapter.admit(bound, "ses_example");
+  await adapter.admit(bound, "ses_example");
+  const writes = requests.filter((r) => r.method === "POST");
+  expect(writes).toHaveLength(2);
+  expect(writes[0].body).toEqual(writes[1].body);
+  expect(writes[1].body).toMatchObject({ id: promptId });
+});
+it.each(
+  [
+    undefined,
+    [],
+    [{ action: "*", resource: "*", effect: "deny" }],
+    [{ action: "*", resource: "*", effect: "allow", extra: true }],
+    [
+      { action: "*", resource: "*", effect: "allow" },
+      { action: "shell", resource: "*", effect: "allow" },
+    ],
+  ].map((permissions) => [permissions]),
+)("refuses nonexact returned creation permissions %j", async (permissions) => {
+  const envelope = routes["POST /api/session"] as { data: Record<string, unknown> };
+  envelope.data.permissions = permissions;
+  const adapter = await createOpenCodeAdapter(config, deps);
+  await expect(adapter.create(task, directory)).rejects.toThrow(
+    /uncertain.*permission|permission.*uncertain/i,
+  );
+  expect(requests.filter((r) => r.method === "POST")).toHaveLength(1);
+});
+it("accepts supported config entries with wildcard authored allows and non-permission provider policies", async () => {
+  routes[
+    "GET /api/config?" + new URLSearchParams({ "location[directory]": directory }).toString()
+  ] = [
+    { type: "directory", path: root },
+    {
+      type: "document",
+      info: {
+        permissions: [{ action: "*", resource: "*", effect: "allow" }],
+        agents: { build: { permissions: [] } },
+        experimental: {
+          policies: [{ action: "provider.use", resource: "unused", effect: "deny" }],
+        },
+      },
+    },
+  ];
+  const adapter = await createOpenCodeAdapter(config, deps);
+  await adapter.admit(bound, "ses_example");
+  expect(requests.filter((r) => r.method === "POST")).toHaveLength(1);
+});
+it.each(["active", "inbox", "forms", "permissions"])(
+  "blocks malformed native %s inspection rather than finalizing",
+  async (kind) => {
+    if (kind === "active") routes["GET /api/session/active"] = { data: null };
+    if (kind === "inbox") routes["GET /api/session/ses_example/inbox"] = { data: {} };
+    if (kind === "forms") routes["GET /api/session/ses_example/form"] = { data: {} };
+    if (kind === "permissions") routes["GET /api/session/ses_example/permission"] = { data: {} };
+    const adapter = await createOpenCodeAdapter(config, deps);
+    await expect(adapter.inspect(bound)).rejects.toThrow(/unsupported.*state/i);
+  },
+);
+it("blocks malformed pending permission response before any prompt write", async () => {
+  routes["GET /api/session/ses_example/permission"] = { data: {} };
+  const adapter = await createOpenCodeAdapter(config, deps);
+  await expect(adapter.admit(bound, "ses_example")).rejects.toThrow(
+    /Unsupported native pending permission/,
+  );
+  expect(requests.every((r) => r.method === "GET")).toBe(true);
+});
