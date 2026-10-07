@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { MockInstance } from "vitest";
 import { OpenCode } from "@opencode/client";
-import { mkdtemp, rm, realpath, writeFile } from "node:fs/promises";
-import { tmpdir, homedir } from "node:os";
+import { Service } from "@opencode/client/service";
+import { mkdtemp, rm, realpath, writeFile, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { createOpenCodeAdapter } from "../opencode.ts";
@@ -17,6 +19,8 @@ let config: WorkerConfig;
 let routes: Record<string, unknown>;
 let requests: { method: string; path: string; body: unknown; authorization: string | null }[];
 let deps: AdapterDependencies;
+let ensure: MockInstance<typeof Service.ensure>;
+let stop: MockInstance<typeof Service.stop>;
 const bound = { ...task, opencode_session_id: "ses_example" };
 const promptId = "msg_battuta_12345678123412341234123456789abc";
 const resultBlock = `\`\`\`battuta-result\n${JSON.stringify(report)}\n\`\`\``;
@@ -32,6 +36,8 @@ function assistant(text = resultBlock, created = 20): Record<string, unknown> {
   };
 }
 beforeEach(async () => {
+  ensure = vi.spyOn(Service, "ensure").mockRejectedValue(new Error("must never ensure service"));
+  stop = vi.spyOn(Service, "stop").mockRejectedValue(new Error("must never stop service"));
   root = await mkdtemp(join(await realpath(tmpdir()), "battuta-native-"));
   const checkout = join(root, "checkout");
   execFileSync("git", ["init", "-b", "main", checkout]);
@@ -124,7 +130,6 @@ beforeEach(async () => {
           url: "http://fake",
           auth: { type: "basic", username: "test", password: "secret" },
         }),
-      ensure: () => Promise.reject(new Error("must not start service")),
       headers: () => ({ authorization: "Basic fake-auth" }),
     },
     makeClient: (options) =>
@@ -149,11 +154,19 @@ beforeEach(async () => {
         },
       }),
   };
+  // Extra runtime traps are deliberately outside the discover/headers-only contract.
+  Object.assign(deps.service, { ensure, stop });
 });
 afterEach(async () => {
-  vi.useRealTimers();
-  vi.unstubAllEnvs();
-  await rm(root, { recursive: true, force: true });
+  try {
+    expect(ensure).not.toHaveBeenCalled();
+    expect(stop).not.toHaveBeenCalled();
+  } finally {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 it("reuses an authenticated compatible service and creates native metadata/model/location/permissions", async () => {
@@ -174,16 +187,24 @@ it("reuses an authenticated compatible service and creates native metadata/model
 });
 it("refuses incompatible services before any session write", async () => {
   routes["GET /api/info"] = { version: "2.0.23" };
-  await expect(createOpenCodeAdapter(config, deps)).rejects.toThrow(/version/);
+  await expect(createOpenCodeAdapter(config, deps)).rejects.toThrow(
+    /version.*start.*verify.*background service/i,
+  );
   expect(requests.some((r) => r.method === "POST")).toBe(false);
 });
-it("guards native ensure against version replacement even when registration is absent", async () => {
+it("refuses an endpoint that becomes unhealthy during SDK client verification", async () => {
+  routes["GET /api/info"] = new Error("private transport detail");
+  await expect(createOpenCodeAdapter(config, deps)).rejects.toThrow(
+    /start.*verify.*background service/i,
+  );
+  expect(requests.map((request) => request.path)).toEqual(["/api/info"]);
+});
+it("refuses an absent service with operator startup instructions and no lifecycle calls", async () => {
   deps.service.discover = () => Promise.resolve(undefined);
-  deps.service.ensure = (options) => {
-    options?.onStart?.("version-mismatch", "2.0.23");
-    return Promise.reject(new Error("unsafe fallback reached"));
-  };
-  await expect(createOpenCodeAdapter(config, deps)).rejects.toThrow(/operator|human/);
+  await expect(createOpenCodeAdapter(config, deps)).rejects.toThrow(
+    /start.*verify.*background service/i,
+  );
+  expect(requests).toEqual([]);
 });
 it("paginates session envelopes using cursor.next without metadata query guesses", async () => {
   routes["GET /api/session?order=asc"] = { data: [], cursor: { next: "next-page" } };
@@ -484,74 +505,72 @@ it.each(["permissions", "metadata", "model"])(
     expect(requests.every((r) => r.method === "GET")).toBe(true);
   },
 );
-it("starts exactly one injected service only with absent explicit registration", async () => {
-  const lifecycle: string[] = [];
+it("uses only SDK discovery with the isolated registration path", async () => {
   deps.service.discover = (options) => {
     expect(options?.file).toBe(join(root, "service.json"));
-    lifecycle.push("discover");
-    return Promise.resolve(undefined);
-  };
-  deps.service.ensure = (options) => {
-    expect(options?.file).toBe(join(root, "service.json"));
-    expect(typeof options?.version).toBe("function");
-    if (typeof options?.version === "function") expect(options.version("2.0.24")).toBe(true);
-    options?.onStart?.("missing");
-    lifecycle.push("start");
     return Promise.resolve({ url: "http://fake", auth: undefined });
   };
   const adapter = await createOpenCodeAdapter(config, deps);
   await adapter.listSessions();
-  expect(lifecycle).toEqual(["discover", "start"]);
+  await adapter.close();
 });
 it.each(["unhealthy", "incompatible", "malformed"])(
   "preserves existing %s registration without ensure/recovery",
   async (state) => {
     await writeFile(join(root, "service.json"), state);
     deps.service.discover = () => Promise.resolve(undefined);
-    let replaced = false;
-    deps.service.ensure = () => {
-      replaced = true;
-      return Promise.resolve({ url: "http://fake" });
-    };
-    await expect(createOpenCodeAdapter(config, deps)).rejects.toThrow(/operator/);
-    expect(replaced).toBe(false);
-  },
-);
-it("synchronous onStart guard refuses registration appearing after discovery", async () => {
-  deps.service.discover = () => Promise.resolve(undefined);
-  deps.service.ensure = async (options) => {
-    await writeFile(join(root, "service.json"), "other service");
-    options?.onStart?.("missing");
-    return { url: "http://fake" };
-  };
-  await expect(createOpenCodeAdapter(config, deps)).rejects.toThrow(/operator/);
-});
-it("rejects a late incompatible version even after native onStart has already announced missing", async () => {
-  deps.service.discover = () => Promise.resolve(undefined);
-  deps.service.ensure = (options) => {
-    options?.onStart?.("missing");
-    if (typeof options?.version === "function") options.version("2.0.23");
-    return Promise.resolve({ url: "http://fake" });
-  };
-  await expect(createOpenCodeAdapter(config, deps)).rejects.toThrow(/operator/);
-});
-it.each([true, false])(
-  "uses pinned XDG default service registration (custom state: %s)",
-  async (custom) => {
-    delete deps.serviceFile;
-    vi.stubEnv("XDG_STATE_HOME", custom ? root : undefined);
-    const expected = join(
-      custom ? root : join(homedir(), ".local", "state"),
-      "opencode",
-      "service.json",
+    await expect(createOpenCodeAdapter(config, deps)).rejects.toThrow(
+      /start.*verify.*background service/i,
     );
-    deps.service.discover = (options) => {
-      expect(options?.file).toBe(expected);
-      return Promise.resolve({ url: "http://fake", auth: undefined });
-    };
-    await createOpenCodeAdapter(config, deps);
+    expect(requests).toEqual([]);
+    expect(await readFile(join(root, "service.json"), "utf8")).toBe(state);
   },
 );
+it("delegates the production registration default to SDK discovery", async () => {
+  delete deps.serviceFile;
+  deps.service.discover = (options) => {
+    expect(options?.file).toBeUndefined();
+    return Promise.resolve({ url: "http://fake", auth: undefined });
+  };
+  await createOpenCodeAdapter(config, deps);
+});
+it.each(["resolve", "absent", "reject"])(
+  "discovery timeout leaves only a read pending; late %s never starts activity",
+  async (outcome) => {
+    let settle: () => void = () => {};
+    const discover = vi.fn(
+      () =>
+        new Promise<Awaited<ReturnType<typeof Service.discover>>>((resolve, reject) => {
+          settle = () =>
+            outcome === "reject"
+              ? reject(new Error("late lookup failed"))
+              : resolve(outcome === "absent" ? undefined : { url: "http://fake", auth: undefined });
+        }),
+    );
+    deps.service.discover = discover;
+    vi.useFakeTimers();
+    const result = createOpenCodeAdapter(config, deps).then(
+      () => "unexpected success",
+      (error: unknown) => error,
+    );
+    await vi.advanceTimersByTimeAsync(10001);
+    const error = await result;
+    expect(error).toBeInstanceOf(Error);
+    if (!(error instanceof Error)) throw new Error("Expected discovery timeout error");
+    expect(error.message).toMatch(/start.*verify.*background service/i);
+    settle();
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(discover).toHaveBeenCalledOnce();
+    expect(requests).toEqual([]);
+  },
+);
+it("surfaces SDK discovery errors without native fallback or credential details", async () => {
+  deps.service.discover = () => Promise.reject(new Error("private credential detail"));
+  await expect(createOpenCodeAdapter(config, deps)).rejects.toThrow(
+    /start.*verify.*background service/i,
+  );
+  expect(requests).toEqual([]);
+});
 it("bounds uncertain admission without retries or changing IDs", async () => {
   routes["POST /api/session/ses_example/prompt"] = "hang";
   const adapter = await createOpenCodeAdapter(config, deps);

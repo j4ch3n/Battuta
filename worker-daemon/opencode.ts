@@ -1,8 +1,5 @@
 import { OpenCode } from "@opencode/client";
 import { Service } from "@opencode/client/service";
-import { lstatSync } from "node:fs";
-import { homedir } from "node:os";
-import { isAbsolute, join } from "node:path";
 import type {
   SessionInfo as NativeSession,
   SessionMessageInfo,
@@ -18,7 +15,7 @@ const VERSION = "2.0.24";
 type NativeClient = ReturnType<typeof OpenCode.make>;
 type ClientOptions = Parameters<typeof OpenCode.make>[0];
 export interface AdapterDependencies {
-  service: Pick<typeof Service, "discover" | "ensure" | "headers">;
+  service: Pick<typeof Service, "discover" | "headers">;
   makeClient: (options: ClientOptions) => NativeClient;
   /** Explicit native registration path; tests must use an isolated path. */
   serviceFile?: string;
@@ -148,17 +145,6 @@ function configurationConcern(entries: unknown): string | undefined {
     }
   }
 }
-function registrationExists(file: string): boolean {
-  try {
-    lstatSync(file);
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-    throw new Error("Service registration cannot be inspected; operator inspection required", {
-      cause: error,
-    });
-  }
-}
 function owned(task: TaskRow, config: WorkerConfig): void {
   validateTaskRow(task);
   if (
@@ -189,15 +175,6 @@ export async function createOpenCodeAdapter(
   dependencies: AdapterDependencies = { service: Service, makeClient: OpenCode.make },
 ): Promise<OpenCodeAdapter> {
   const lifetime = new AbortController();
-  // Pinned 2.0.24 Service fallback path, passed explicitly to both lifecycle calls.
-  const serviceFile =
-    dependencies.serviceFile ??
-    join(
-      process.env.XDG_STATE_HOME ?? join(homedir(), ".local", "state"),
-      "opencode",
-      "service.json",
-    );
-  if (!isAbsolute(serviceFile)) throw new Error("Service registration path must be absolute");
   async function bounded<T>(
     operation: (signal: AbortSignal) => Promise<T>,
     write = false,
@@ -225,42 +202,31 @@ export async function createOpenCodeAdapter(
     }
   }
   const endpoint = await bounded(async () => {
+    // SDK-only read-only discovery. A timeout may leave this lookup pending, but
+    // its late settlement cannot launch, repair, replace or stop a shared service.
     const discovered = await dependencies.service.discover({
-      file: serviceFile,
+      file: dependencies.serviceFile,
       version: () => true,
     });
     if (discovered) return discovered;
-    if (registrationExists(serviceFile))
-      throw new Error("Existing service requires operator inspection");
-    // Refuse observed existing registrations without reading their contents. The
-    // synchronous hook rechecks absence before native ensure's first startup announcement.
-    return dependencies.service.ensure({
-      file: serviceFile,
-      // Throw rather than return false: ensure interprets false as replacement, and its
-      // onStart callback is invoked only once even across later polling iterations.
-      version(version) {
-        if (version !== VERSION)
-          throw new Error("Incompatible service version; operator inspection required");
-        return true;
-      },
-      onStart(reason) {
-        if (reason !== "missing" || registrationExists(serviceFile))
-          throw new Error("Existing service requires operator inspection");
-      },
-    });
+    throw new Error("No healthy service discovered");
   }).catch(() => {
     throw new Error(
-      "OpenCode service discovery/start unavailable; operator inspection required (refusing observed existing registrations)",
+      `OpenCode discovery unavailable. Operator must start and verify the ${VERSION} background service with 'opencode service start' and 'opencode service status' before running the daemon; the daemon never manages service lifecycle`,
     );
   });
   const client = dependencies.makeClient({
     baseUrl: endpoint.url,
     headers: dependencies.service.headers(endpoint),
   });
-  const server = await bounded((signal) => client.server.info({ signal }));
+  const server = await bounded((signal) => client.server.info({ signal })).catch(() => {
+    throw new Error(
+      `OpenCode service verification unavailable. Operator must start and verify the ${VERSION} background service before running the daemon; service left untouched`,
+    );
+  });
   if (server?.version !== VERSION)
     throw new Error(
-      `OpenCode server version must match pinned client ${VERSION}; operator upgrade required (service left untouched)`,
+      `OpenCode server version must match pinned client ${VERSION}; operator must start and verify the compatible background service before running the daemon (service left untouched)`,
     );
   const read = <T>(operation: (signal: AbortSignal) => Promise<T>) => bounded(operation);
   async function pages<T>(
