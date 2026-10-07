@@ -45,6 +45,34 @@ test("spec operations do not require project configuration or checkout", async (
   }
 });
 
+test("no-GitHub project supports spec authoring and retains documents after linking", async () => {
+  const f = await fixture();
+  try {
+    const config = {
+      version: 1,
+      project: { name: "atlas", path: join(f.projects, "atlas/code") },
+      github: { repository: null as string | null },
+      linear: { project_id: null, team_id: null },
+    };
+    const path = join(f.projects, "atlas/project.yaml");
+    await writeFile(path, JSON.stringify(config));
+    await f.pm.initSpec(input);
+    await f.tl.writeChecklist(input);
+    assert.equal(
+      (await f.tl.describeSpec("atlas", input.name, true)).contents?.spec,
+      input.content,
+    );
+    config.github.repository = "team/other";
+    await writeFile(path, JSON.stringify(config));
+    const linked = await f.tl.describeSpec("atlas", input.name, true);
+    assert.equal(linked.contents?.spec, input.content);
+    assert.equal(linked.has_checklist, true);
+    assert.deepEqual(linked.spec.versions, ["v1"]);
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test.each(["../atlas", "", " ", ".", "..", "atlas/code", "atlas\\code", "missing"])(
   "spec inventory rejects invalid or missing project %j without creating it",
   async (project) => {

@@ -62,64 +62,20 @@ An empty constitution scaffold is not adopted policy. Apply confirmed project gu
 
 New project initialization creates a rendered summary skeleton. The shared memory bridge handles memory without project-local memory files. Spec tools establish document storage only when authoring is requested. Older projects may lack artifacts: `explain` stays read-only, while requested authoring creates only what is needed. Complete the summary using its shared Markdown reference rather than guessing product context.
 
-`linear create` and `explain` for a linked project contact Linear; GitHub initialization still clones over the network.
-
-## Commands
-
-### Agent document tools
+## Tools and command navigation
 
 Use [project-spec tools](references/spec-tools.md) for named specs, canonical checklist/review, and terminal decisions. Both roles inspect spec inventories and documents. All writes receive complete content; there is no spec/decision CLI or publish stage.
 
-### `battuta-project init <github-repo-url>`
+Read the relevant [command reference](references/commands.md) section before invocation; it owns syntax, outputs, validation, side effects, and failure/recovery behavior.
 
-**Usage:** `battuta-project init https://github.com/team/atlas-api.git`
-
-**Output:** Project root, checkout, config, summary locations, and current selection.
-
-**Process:** Clone with `gh` into a managed checkout, render the summary skeleton, then select the project. Fill the overview during project discovery. Already registered names cause an error; failed initialization preserves the previous selection.
-
-**Linear metadata:** Optional `--linear-project-id <id>` and `--linear-team-id <id>` record existing IDs without querying Linear. Each omitted field defaults to `null`.
-
-### `battuta-project switch <project-name>`
-
-**Usage:** `battuta-project switch atlas-api`
-
-**Output:** Current project and checkout location.
-
-**Process:** Select a registered project by its exact name after validating its checkout. A missing project causes an error. This does not change the shell directory.
-
-### `battuta-project list`
-
-**Usage:** `battuta-project list`
-
-**Output:** A numbered Markdown list of bold project names, each followed by indented `Project Root` (managed directory) and `Code` (checkout) paths. Home-directory paths use `~`.
-
-**Process:** List validated registrations sorted by name, without requiring or changing selection or contacting Linear. An empty registry reports `No registered projects.`; invalid registrations report an error.
-
-### `battuta-project current`
-
-**Usage:** `battuta-project current`
-
-**Output:** `Current Project: <name>`.
-
-**Process:** Read the persisted selection without inspecting project configuration, checkout, or specs, and without contacting Linear. Missing selection reports an error directing you to `init` or `switch`.
-
-### `battuta-project explain`
-
-**Usage:** `battuta-project explain`
-
-**Output:** Managed project directory, checkout and summary locations, full project summary, repository URL, Linear project URL, relative README/AGENTS locations, and a two-level ASCII directory tree. Spec discovery belongs to agent tools.
-
-**Process:** Use the current project; display its existing summary without editing it. Missing/blank summaries show `not written yet`. Discover nested checkout documentation recursively while excluding dependencies, generated directories, and symlinks. Fetch the linked project's URL from Linear; an unlinked project shows `not linked` without a request. Lookup or summary-read failures cause an error. Read applicable instructions before working in the reported checkout.
-
-### `battuta-project linear <operation>`
-
-| Operation | Usage                                                           | Behavior                                                                                                     |
-| --------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `link`    | `battuta-project linear link --project-id <id> --team-id <id>`  | Associate both IDs with the current project; no Linear request.                                              |
-| `create`  | `battuta-project linear create 'Atlas Platform' --team-id <id>` | Create a Linear project, print its ID/URL, and link it to the current local project. Explicit team required. |
-
-IDs and creation names must not be blank. Linear project and team associations belong to the selected project. If creation succeeds but local saving fails, fix the local error and use the error's `switch`/`linear link` recovery commands rather than creating a duplicate. After a creation timeout, inspect Linear before retrying. See [command contracts](references/commands.md#linear-projects).
+| Need                                                       | Command reference                                                                                                                        |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Start a named project, with or without GitHub              | [Initialize a project](references/commands.md#initialize-a-project)                                                                      |
+| Associate a repository later                               | [Link GitHub later](references/commands.md#link-github-later)                                                                            |
+| Discover projects or check selection                       | [List projects](references/commands.md#list-registered-projects), [current selection](references/commands.md#read-the-current-selection) |
+| Change the project for subsequent work                     | [Switch projects](references/commands.md#switch-projects)                                                                                |
+| Read summary, workspace locations, and repository guidance | [Inspect project context](references/commands.md#inspect-project-context)                                                                |
+| Associate an existing Linear project or create one         | [Linear projects](references/commands.md#linear-projects)                                                                                |
 
 ### Project and global memory
 
@@ -127,7 +83,7 @@ Use the `memory` skill for recall and autonomous memory management. Project memo
 
 ## Workflow example
 
-Use `list` to discover registrations or initialize a new repository. Run `current` to confirm selection, then `explain` and retrieve relevant memory before working in the reported checkout. Use `inspect_specs` with the explicit project name for document discovery. Selection is shared by bots using the same OS account; reselect the intended project before commands if another session may have switched it.
+Use `list` to discover registrations or initialize a new project by name, with or without GitHub. Run `current` to confirm selection, then `explain` and retrieve relevant memory before working in the reported checkout. Use `inspect_specs` with the explicit project name for document discovery. Selection is shared by bots using the same OS account; reselect the intended project before commands if another session may have switched it.
 
 ## Reference files
 

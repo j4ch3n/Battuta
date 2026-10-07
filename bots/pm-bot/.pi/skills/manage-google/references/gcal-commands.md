@@ -35,7 +35,5 @@ Invoke as `gog calendar <command>`.
 Adapted from gogcli's generated
 [Calendar skill](https://github.com/openclaw/gogcli/blob/main/.agents/skills/gog-calendar/SKILL.md)
 and [shared gog guidance](https://github.com/openclaw/gogcli/blob/main/.agents/skills/gog/SKILL.md).
-For manual installation and authentication, follow the
-[gogcli setup guide](../../../../../../docs/gogcli-setup.md).
 Consult the [gogcli project](https://github.com/openclaw/gogcli) for
 version-specific command documentation.

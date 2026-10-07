@@ -28,6 +28,16 @@ def _trimmed(ctx, param, value):
     return value
 
 
+def _linear_pair(ctx, param, value):
+    """Parse a complete Linear association for both init and link."""
+    if value is None:
+        return None
+    parts = [part.strip() for part in value.split(",")]
+    if len(parts) != 2 or not all(parts):
+        raise click.BadParameter("expected <project-id>,<team-id> with two nonblank IDs", ctx=ctx, param=param)
+    return LinearConfig(project_id=parts[0], team_id=parts[1])
+
+
 @click.group(cls=_TokenGroup, invoke_without_command=True)
 @click.pass_context
 def main(ctx):
@@ -37,13 +47,12 @@ def main(ctx):
 
 
 @main.command()
-@click.argument("github_url")
-@click.option("--linear-project-id", callback=_trimmed, help="Existing Linear project ID to record locally.")
-@click.option("--linear-team-id", callback=_trimmed, help="Linear team ID to record locally.")
-def init(github_url: str, linear_project_id: str | None, linear_team_id: str | None):
-    """Clone a GitHub repository and select it as the current project."""
-    metadata = LinearConfig(project_id=linear_project_id, team_id=linear_team_id)
-    project = ProjectRegistry().init(github_url, linear=metadata)
+@click.argument("project_name")
+@click.option("--github", help="GitHub repository URL to clone into the workspace.")
+@click.option("--linear", callback=_linear_pair, metavar="<project-id>,<team-id>", help="Existing Linear IDs to record locally.")
+def init(project_name: str, github: str | None, linear: LinearConfig | None):
+    """Create a named project, optionally clone GitHub, and select it."""
+    project = ProjectRegistry().init(project_name, github=github, linear=linear)
     click.echo(render("init.md.j2", project))
 
 
@@ -81,17 +90,30 @@ def explain(token: str):
 
 
 @main.group()
+def github():
+    """Associate a GitHub repository with the current project."""
+
+
+@github.command("link")
+@click.argument("repo_url")
+def github_link(repo_url: str):
+    """Record a repository URL without cloning or modifying workspace files."""
+    registry = ProjectRegistry()
+    project = registry.link_github(registry.current(), repo_url)
+    click.echo(render("github.md.j2", project))
+
+
+@main.group()
 def linear():
     """Link a Linear project or create and link one."""
 
 
 @linear.command()
-@click.option("--project-id", required=True, callback=_trimmed, help="Existing Linear project ID.")
-@click.option("--team-id", required=True, callback=_trimmed, help="Linear team ID.")
-def link(project_id: str, team_id: str):
+@click.argument("association", callback=_linear_pair, metavar="<project-id>,<team-id>")
+def link(association: LinearConfig):
     """Record Linear IDs in the current project without an API request."""
     registry = ProjectRegistry()
-    project = registry.link_linear(registry.current(), LinearConfig(project_id=project_id, team_id=team_id))
+    project = registry.link_linear(registry.current(), association)
     click.echo(render("linear.md.j2", LinearResult(operation="link", project=project)))
 
 
@@ -107,7 +129,7 @@ def create(token: str, name: str, team_id: str):
     try:
         linked = registry.link_linear(project, LinearConfig(project_id=remote.id, team_id=team_id))
     except click.ClickException as error:
-        recovery = shlex.join(["battuta-project", "linear", "link", "--project-id", remote.id, "--team-id", team_id])
+        recovery = shlex.join(["battuta-project", "linear", "link", f"{remote.id},{team_id}"])
         switch = shlex.join(["battuta-project", "switch", project.name])
         raise click.ClickException(
             f"Linear project was created: {remote.id} ({remote.url}), but its local link could not be saved: {error}.\n"

@@ -1,4 +1,4 @@
-"""GitHub checkout initialization and persisted current-project selection."""
+"""Managed workspace initialization and persisted current-project selection."""
 
 from pathlib import Path
 import shutil
@@ -94,7 +94,7 @@ class ProjectRegistry:
     def current_name(self) -> str:
         name = self.state().current_project
         if name is None:
-            raise click.ClickException("No current project. Run battuta-project init <github-url> or switch <project-name>.")
+            raise click.ClickException("No current project. Run battuta-project init <project-name> or switch <project-name>.")
         return name
 
     def current(self) -> ProjectContext:
@@ -118,13 +118,26 @@ class ProjectRegistry:
             self._write_project(project.root, config)
             return project.model_copy(update={"config": config})
 
-    def init(self, url: str, *, linear: LinearConfig | None = None) -> ProjectContext:
+    def link_github(self, project: ProjectContext, url: str) -> ProjectContext:
         try:
             repository = Repository.from_url(url)
         except ValueError as error:
             raise click.ClickException(str(error)) from error
         with file_errors():
-            directory = self._directory(repository.name)
+            project = self.load(project.name)
+            config = project.config.model_copy(update={
+                "github": GithubConfig(repository=f"{repository.owner}/{repository.name}"),
+            })
+            self._write_project(project.root, config)
+            return project.model_copy(update={"config": config})
+
+    def init(self, name: str, *, github: str | None = None, linear: LinearConfig | None = None) -> ProjectContext:
+        try:
+            repository = Repository.from_url(github) if github is not None else None
+        except ValueError as error:
+            raise click.ClickException(str(error)) from error
+        with file_errors():
+            directory = self._directory(name)
             if directory.exists():
                 raise click.ClickException(f"Project directory already exists: {directory}")
             self._check_state()
@@ -132,14 +145,17 @@ class ProjectRegistry:
             directory.mkdir()
             code = directory / "code"
             try:
-                subprocess.run(["gh", "repo", "clone", repository.url, str(code)], check=True)
+                if repository is not None:
+                    subprocess.run(["gh", "repo", "clone", repository.url, str(code)], check=True)
+                else:
+                    code.mkdir()
                 config = ProjectConfig(
-                    project=ProjectMetadata(name=repository.name, path=code),
-                    github=GithubConfig(repository=f"{repository.owner}/{repository.name}"),
+                    project=ProjectMetadata(name=name, path=code),
+                    github=GithubConfig(repository=f"{repository.owner}/{repository.name}" if repository else None),
                     linear=linear or LinearConfig(),
                 )
                 self._write_project(directory, config)
-                project = self.load(repository.name)
+                project = self.load(name)
                 try:
                     summary = render("summary.md.j2", project)
                 except TemplateError as error:

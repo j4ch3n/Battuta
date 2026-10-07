@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "vitest";
 import { join } from "node:path";
+import { rm, writeFile, realpath } from "node:fs/promises";
 import { MemoryStore } from "../store.ts";
 import { resolveBinding } from "../binding.ts";
 import { registryFixture } from "./fixtures.ts";
@@ -16,6 +17,30 @@ async function setup() {
   store = await MemoryStore.open(join(fixture.directory, "memory/memory.db"));
   return { fixture, store, atlas: await resolveBinding(fixture.root) };
 }
+
+test("project memory persists without GitHub or Git and survives metadata linking", async () => {
+  const { fixture, store } = await setup();
+  await rm(join(fixture.projects.atlas, ".git"), { recursive: true });
+  const config = {
+    version: 1,
+    project: { name: "atlas", path: fixture.projects.atlas },
+    github: { repository: null as string | null },
+    linear: { project_id: null, team_id: null },
+  };
+  const path = join(fixture.root, "atlas/project.yaml");
+  await writeFile(path, JSON.stringify(config));
+  const binding = await resolveBinding(fixture.root);
+  expect(binding.projectId).toBe(await realpath(fixture.projects.atlas));
+  const remembered = store.remember(binding, { kind: "decision", text: "Start with planning" });
+  expect(store.search(binding, "planning", "project").map((r) => r.record.id)).toEqual([
+    remembered.record.id,
+  ]);
+  config.github.repository = "team/other";
+  await writeFile(path, JSON.stringify(config));
+  const linked = await resolveBinding(fixture.root);
+  expect(linked).toEqual(binding);
+  expect(store.open(linked, remembered.record.id).text).toBe("Start with planning");
+});
 
 test("isolates identical text across projects and global scope and allows cross-bot recall", async () => {
   const { fixture, store, atlas } = await setup();

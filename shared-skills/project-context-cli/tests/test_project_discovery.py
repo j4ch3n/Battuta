@@ -26,8 +26,8 @@ class DiscoveryTests(ProjectTestCase):
         return result.output
 
     def test_list_sorts_projects_and_renders_both_home_relative_paths(self):
-        self.registry.init("https://github.com/team/harbor-web")
-        self.registry.init("https://github.com/team/aardvark")
+        self.registry.init("harbor-web", github="https://github.com/team/harbor-web")
+        self.registry.init("aardvark", github="https://github.com/team/aardvark")
         selection = self.registry.state_path.read_bytes()
         with linear_http() as requests:
             output = self.invoke("list")
@@ -92,7 +92,7 @@ class DiscoveryTests(ProjectTestCase):
         self.assertEqual(requests, [])
 
     def test_current_reports_switch_and_missing_selection(self):
-        self.registry.init("https://github.com/team/harbor-web")
+        self.registry.init("harbor-web", github="https://github.com/team/harbor-web")
         self.assertEqual(self.invoke("current"), "Current Project: harbor-web\n")
         self.registry.state_path.unlink()
         result = self.runner.invoke(main, ["current"])

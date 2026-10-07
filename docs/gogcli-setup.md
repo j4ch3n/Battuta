@@ -224,7 +224,7 @@ agenda lookup with the selected account and run
 Google access without sending email or invitations.
 
 For a user service, make `gog` available on the PM service's PATH using the
-[bot-service PATH guidance](../shared-skills/project-context/references/installation.md#bot-service-path).
+[release service setup](../RELEASE.md#6-optional-run-as-user-services).
 Shell PATH changes alone do not apply to systemd units. For a file keyring,
 the owner must privately provide the matching `GOG_KEYRING_BACKEND=file`,
 `GOG_KEYRING_PASSWORD`, and `HOME` in the service's runtime environment. Never

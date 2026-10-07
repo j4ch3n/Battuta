@@ -33,6 +33,6 @@ Run source-checkout commands from the repository root. See [development](../.age
 - `bots/{pm-bot,tl-bot}/scripts/configure-bot.py` generates bot instructions and runtime configuration; use `uv run --locked python <script-path> --help` for options.
 - `bots/pm-bot/scripts/run-dev.sh` implements the `dev` and `prod` tmux launch modes.
 - `scripts/refresh-telegram.py` validates and refreshes both Telegram profiles without reinstalling packages or regenerating instructions.
-- `battuta-project` manages project initialization, selection, context indexes, and Linear association. See the [project-context skill](../shared-skills/project-context/SKILL.md) and its [installation reference](../shared-skills/project-context/references/installation.md).
-- Pi memory tools manage shared project/global memory through the [memory skill](../shared-skills/memory/SKILL.md); see [runtime setup](memory-stone.md).
+- `battuta-project` manages project initialization, selection, context indexes, and GitHub/Linear association. See the [project-context skill](../shared-skills/project-context/SKILL.md) and its [command reference](../shared-skills/project-context/references/commands.md).
+- Pi memory tools manage shared project/global memory through the [memory skill](../shared-skills/memory/SKILL.md); see [runtime behavior](memory-stone.md).
 - Release launcher, configuration, and service commands are documented in [release setup](../RELEASE.md); their implementations live in `packaging/`.

@@ -18,6 +18,7 @@ TypeScript on Node.js and Deno, the Pi coding-agent runtime, Telegram, Linear, a
 - For `scripts/`, organize tests in `scripts/tests/test_<script_or_module>.py` by the script or helper they exercise. Keep configuration/parsing tests separate from launcher orchestration; avoid a single catch-all launch test suite. Run discovery through `pnpm check:support`.
 - For shared skills, keep instructions and references under `shared-skills/<skill>/` and tool code, package metadata, dependencies, and tests under `shared-skills/<skill>-cli/`. `pnpm check:support` discovers each CLI's `tests/` directory in its own locked Python environment.
 - Write skills and command references around when and how to use the tool, with concise usage examples and descriptions of user-visible effects. Command references should explain invocation, workflow, and impact rather than serve as code documentation; keep environment prerequisites in installation guidance and schemas, output examples, and implementation details in dedicated technical references when needed.
+- Keep runtime `SKILL.md` files focused on workflows and link to owning command references instead of duplicating command contracts. Installation guides are linked only from [release setup](RELEASE.md), which indexes setup for every extension and skill; runtime skills and command references do not carry installation navigation.
 - Keep skill declarations, discovery triggers, and usage guidance in the owning `SKILL.md`; do not repeat them in bot instruction sources. Bot instructions define enduring responsibilities and authority rather than duplicate the skill catalog.
 - In skill instructions and prompts, link only to prompts, templates, and references owned by that skill. Refer to other skills by skill name (for example, use the `memory` skill), not by file paths or links to their `SKILL.md` or supporting files.
 - Review coverage for changed modules and address meaningful gaps; do not optimize for a percentage alone. Run relevant verification before claiming completion.
@@ -52,4 +53,4 @@ Paths below are relative to the repository root.
 
 Bot `AGENTS.md` files are generated runtime instructions; edit their shared/dedicated sources for lasting changes. Private environment files and bot auth/session state are local configuration, not documentation sources. See [agent mail architecture](docs/agent-mail.md) for messaging behavior.
 
-See [installing Pi extensions](docs/pi-extensions.md) for bot-local package installation, dependency checks, release wiring, and verification.
+Use the [extension and skill setup index](RELEASE.md#extension-and-skill-setup-index) to find installation guidance for bundled components and additional Pi packages.

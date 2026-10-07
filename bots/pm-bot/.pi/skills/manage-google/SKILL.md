@@ -20,9 +20,9 @@ gog schema calendar --json
 ```
 
 Select the intended valid account explicitly with `--account`; inspect its
-service access for the task. Installation and authentication are manual owner
-steps: if missing or invalid, explain the blocker and use the
-[gogcli setup guide](../../../../../docs/gogcli-setup.md). Do not install `gog` or start OAuth automatically. In a
+service access for the task. If `gog` is missing or authentication is invalid,
+stop the affected operation, explain the blocker, and ask the owner to resolve
+tool availability or account access. Do not install `gog` or start OAuth automatically. In a
 service, check from the bot's actual runtime environment; working shell auth
 does not prove that the service can find `gog` or unlock its keyring.
 
