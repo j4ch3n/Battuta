@@ -36,3 +36,9 @@ Run source-checkout commands from the repository root. See [development](../.age
 - `battuta-project` manages project initialization, selection, context indexes, and GitHub/Linear association. See the [project-context skill](../shared-skills/project-context/SKILL.md) and its [command reference](../shared-skills/project-context/references/commands.md).
 - Pi memory tools manage shared project/global memory through the [memory skill](../shared-skills/memory/SKILL.md); see [runtime behavior](memory-stone.md).
 - Release launcher, configuration, and service commands are documented in [release setup](../RELEASE.md); their implementations live in `packaging/`.
+
+## Task worker commands
+
+`pnpm worker --config /absolute/worker.json` (or `node worker-daemon/main.ts --config /absolute/worker.json`) launches the source daemon explicitly against an already-running compatible OpenCode service. `bin/battuta worker --config /absolute/worker.json` is the release equivalent. Neither bot startup nor these worker commands start/repair OpenCode. See [delegation and worker operation](task-delegation.md) for scope, result semantics and recovery boundaries.
+
+`pnpm smoke:worker` is an opt-in, explicitly credentialed/budget-approved test-model check; normal `pnpm test:integration` instead uses real isolated Supabase/Git and a fake V2 HTTP boundary. Neither deterministic tests nor validated worker reporting prove product acceptance.

@@ -109,3 +109,7 @@ pnpm test:integration
 ```
 
 The root integration command starts and stops a separate local Supabase stack, replays migrations, checks database permissions, and runs the Edge Function/plugin integration tests. Docker is required. See the shared [command reference](commands.md) for tooling entry points and links to verification guidance.
+
+## Worker results
+
+Task finalization atomically inserts a receive-only `worker_result` message from `worker.<stable-worker-id>` to the persisted PM/TL delegator and stores its mail reference in `tasks_pool`. Conversational content contains state, readable project/task summary and artifact references, not execution identifiers. Results carry no reply obligation; bot send/reply contracts remain PM/TL-only. See [task delegation](task-delegation.md) for validation and recovery limits. Questions/answer routing are deferred to FIS-50.

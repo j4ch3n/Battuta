@@ -23,6 +23,8 @@
     "test:unit": "pnpm test:node && pnpm test:deno",
     "test:coverage": "pnpm --dir agent-mail test:coverage && pnpm --dir project-spec test:coverage && pnpm --dir memory-stone test:coverage && pnpm --dir task-delegation test:coverage && pnpm --dir worker-daemon test:coverage",
     "test:integration": "node scripts/check-supabase.mjs",
+    "worker": "node worker-daemon/main.ts",
+    "smoke:worker": "pnpm --dir worker-daemon smoke",
     "check:support": "node scripts/check-support.mjs",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm check:support",
     "check:all": "pnpm check && pnpm test:integration",

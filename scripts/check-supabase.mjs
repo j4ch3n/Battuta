@@ -118,27 +118,28 @@ try {
       env: { ...process.env, SUPABASE_URL: status.API_URL, SUPABASE_SECRET_KEY: status.SECRET_KEY },
     },
   );
-  run(
-    "pnpm",
-    [
-      "--dir",
-      "task-delegation",
-      "test:integration",
-      "--reporter=default",
-      "--reporter=junit",
-      `--outputFile=${resolve(reports, "task-integration.xml")}`,
-    ],
-    {
-      env: {
-        ...process.env,
-        SUPABASE_URL: status.API_URL,
-        SUPABASE_SECRET_KEY: status.SECRET_KEY,
-        SUPABASE_PUBLISHABLE_KEY: status.PUBLISHABLE_KEY,
-        SUPABASE_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY,
-        SUPABASE_TEST_DB_CONTAINER: "supabase_db_battuta-check",
+  for (const packageName of ["task-delegation", "worker-daemon"])
+    run(
+      "pnpm",
+      [
+        "--dir",
+        packageName,
+        "test:integration",
+        "--reporter=default",
+        "--reporter=junit",
+        `--outputFile=${resolve(reports, `${packageName}-integration.xml`)}`,
+      ],
+      {
+        env: {
+          ...process.env,
+          SUPABASE_URL: status.API_URL,
+          SUPABASE_SECRET_KEY: status.SECRET_KEY,
+          SUPABASE_PUBLISHABLE_KEY: status.PUBLISHABLE_KEY,
+          SUPABASE_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY,
+          SUPABASE_TEST_DB_CONTAINER: "supabase_db_battuta-check",
+        },
       },
-    },
-  );
+    );
 } finally {
   shutdown();
 }

@@ -31,3 +31,7 @@ Version files and manifests are authoritative; use their current values rather t
 Prettier formats repository-owned TypeScript/JavaScript, JSON, YAML, and Markdown across both runtimes. Typed ESLint handles Node code; Deno handles Edge Function linting and type checks. Follow the existing two-space indentation, double quotes, semicolons, and LF line endings. Deno editor support is scoped to `supabase/functions`; do not use `deno fmt` for Prettier-owned files.
 
 See [development](../.agents/skills/battuta-setup/references/development.md) for source setup, [code checks](../.agents/skills/battuta-verify/references/checks.md) for verification, [commands](commands.md) for tooling entry points, and [release setup](../RELEASE.md) for the prebuilt distribution.
+
+## Task execution boundary
+
+Task delegation and the Node 24 worker use dedicated Supabase Auth machine identities and the task-pool Edge API. Worker sessions use pinned `@opencode/client` **2.0.24** against an already-running OpenCode V2 **2.0.24** service; discovery and native authentication are reused, with no daemon service lifecycle authority. [Worker operation](task-delegation.md) describes single-row persistence, native sessions and verification limits.

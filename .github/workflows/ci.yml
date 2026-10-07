@@ -63,6 +63,8 @@ jobs:
             agent-mail/coverage/
             project-spec/coverage/
             memory-stone/coverage/
+            task-delegation/coverage/
+            worker-daemon/coverage/
           if-no-files-found: ignore
 
   deno:

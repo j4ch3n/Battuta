@@ -2,8 +2,25 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["tests/**/*.test.ts"],
-    testTimeout: 30000,
+    projects: [
+      {
+        test: {
+          name: "unit",
+          include: ["tests/**/*.test.ts"],
+          exclude: ["tests/**/*.integration.test.ts"],
+          testTimeout: 30000,
+        },
+      },
+      {
+        test: {
+          name: "integration",
+          include: ["tests/**/*.integration.test.ts"],
+          testTimeout: 60000,
+          hookTimeout: 30000,
+          fileParallelism: false,
+        },
+      },
+    ],
     coverage: {
       provider: "v8",
       include: [
@@ -14,6 +31,7 @@ export default defineConfig({
         "prompt.ts",
         "daemon.ts",
         "main.ts",
+        "scripts/smoke.ts",
       ],
       reporter: ["text", "lcov", "json-summary"],
     },
