@@ -9,11 +9,13 @@ import {
 } from "../supabase/functions/_shared/task-contracts.ts";
 
 export class UncertainTaskWriteError extends Error {
-  constructor(readonly operation: string) {
+  readonly operation: string;
+  constructor(operation: string) {
     super(
       `Task ${operation} outcome is uncertain; reconcile before retrying with the same identity`,
     );
     this.name = "UncertainTaskWriteError";
+    this.operation = operation;
   }
 }
 export function boundedSignal(signal?: AbortSignal): AbortSignal {
@@ -21,7 +23,10 @@ export function boundedSignal(signal?: AbortSignal): AbortSignal {
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 export class TaskClient {
-  constructor(private readonly supabase: SupabaseClient) {}
+  private readonly supabase: SupabaseClient;
+  constructor(supabase: SupabaseClient) {
+    this.supabase = supabase;
+  }
   private async request<T>(
     operation: string,
     fields: Record<string, unknown>,
