@@ -2,12 +2,10 @@
 
 ## Background and role
 
-## Important goals and values
+## Goals and priorities
+
+## Values and decision-making
 
 ## Life context and interests
-
-## Communication and collaboration
-
-## Decision-making preferences
 
 ## Enduring preferences and constraints
