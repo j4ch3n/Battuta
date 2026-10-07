@@ -438,10 +438,20 @@ export async function createOpenCodeAdapter(
       if (
         originals.length > 1 ||
         queued.length > 1 ||
-        originals.some((m) => m.type !== "user" || m.text !== buildPrompt(task)) ||
+        originals.some(
+          (m) =>
+            m.type !== "user" ||
+            m.text !== buildPrompt(task) ||
+            (m.metadata !== undefined && !matchesMetadata(m.metadata, task, config)),
+        ) ||
         queued.some(
           (m) =>
-            m.type !== "user" || m.sessionID !== sessionID || m.payload.text !== buildPrompt(task),
+            m.type !== "user" ||
+            m.sessionID !== sessionID ||
+            m.delivery !== "queue" ||
+            m.payload.text !== buildPrompt(task) ||
+            (m.payload.metadata !== undefined &&
+              !matchesMetadata(m.payload.metadata, task, config)),
         )
       ) {
         snapshot.reportError = "Original input identity is ambiguous; operator inspection required";
