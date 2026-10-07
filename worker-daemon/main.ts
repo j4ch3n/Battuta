@@ -73,8 +73,8 @@ export async function main(
   const auth = {
     url: required("SUPABASE_URL"),
     publishableKey: required("SUPABASE_PUBLISHABLE_KEY"),
-    email: required("TASK_AUTH_EMAIL"),
-    password: required("TASK_AUTH_PASSWORD"),
+    email: required("WORKER_TASK_EMAIL"),
+    password: required("WORKER_TASK_PASSWORD"),
   };
   const config = await dependencies.loadConfig(args[1]);
   const release = await dependencies.acquireLock(config.lockPath);

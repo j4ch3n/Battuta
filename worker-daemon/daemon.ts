@@ -5,6 +5,7 @@ import type { TaskRow, TerminalReport } from "../supabase/functions/_shared/task
 import type { WorkerConfig } from "./config.ts";
 import type { OpenCodeAdapter, ExecutionSnapshot } from "./opencode.ts";
 import type { prepareWorktree } from "./worktree.ts";
+import { isDeepStrictEqual } from "node:util";
 
 export interface DaemonOptions {
   config: WorkerConfig;
@@ -121,6 +122,16 @@ export async function runDaemon(options: DaemonOptions, signal: AbortSignal): Pr
   const reconcile = async () => {
     const owned = await ownedTasks();
     if (local.signal.aborted) return;
+    // Only a successful complete scan can establish that a lost-ack finalization
+    // is no longer unfinished. Failed/aborted pages never authorize cache eviction.
+    const ownedIds = new Set(owned.map((row) => row.id));
+    for (const id of finalizations.keys()) {
+      if (!ownedIds.has(id) && finalizations.delete(id))
+        log(
+          "finalization_reconciled",
+          `${id}: no longer unfinished after full ownership scan; discarded pending report`,
+        );
+    }
     const sessions = await opencode.listSessions();
     let blocked = uncertainClaim;
     let unfinished = owned.length;
@@ -164,24 +175,36 @@ export async function runDaemon(options: DaemonOptions, signal: AbortSignal): Pr
         blocked = true;
         continue;
       }
-      if (finalizations.has(row.id)) {
-        await finalize(row, finalizations.get(row.id)!);
-        unfinished--;
-        continue;
-      }
       if (snapshot.reportError) {
         recovery(row.id, "native terminal report is invalid or ambiguous");
         blocked = true;
-      } else if (snapshot.pendingForms.length)
+      } else if (snapshot.pendingForms.length) {
         log(
           "waiting",
           `${row.id}: waiting for native question answer; ownership retained (FIS-50)`,
         );
-      else if (snapshot.report && !snapshot.active && !snapshot.pendingInputs.length) {
-        await finalize(row, snapshot.report);
+        if (finalizations.has(row.id)) blocked = true;
+      } else if (snapshot.report && !snapshot.active && !snapshot.pendingInputs.length) {
+        const current = validateReport(snapshot.report, row.instruction);
+        const cached = finalizations.get(row.id);
+        if (cached && !isDeepStrictEqual(current, cached)) {
+          recovery(
+            row.id,
+            "current native report differs from immutable pending finalization report",
+          );
+          blocked = true;
+          continue;
+        }
+        await finalize(row, current);
         unfinished--;
       } else if (!snapshot.active && !snapshot.pendingInputs.length) {
         recovery(row.id, "inactive session without a validated native final report");
+        blocked = true;
+      } else if (finalizations.has(row.id)) {
+        recovery(
+          row.id,
+          "native execution is not quiescent; pending finalization cannot be replayed",
+        );
         blocked = true;
       }
     }
