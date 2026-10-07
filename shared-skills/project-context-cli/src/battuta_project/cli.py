@@ -59,8 +59,9 @@ def init(project_name: str, github: str | None, linear: LinearConfig | None):
 @main.command("list")
 def list_projects():
     """List registered projects and their managed root and checkout paths."""
-    projects = ProjectRegistry().list_projects()
-    click.echo(render("list.md.j2", ProjectList(projects=projects)))
+    registry = ProjectRegistry()
+    projects = registry.list_projects()
+    click.echo(render("list.md.j2", ProjectList(projects=projects)) if projects else registry.discovery.unavailable_message())
 
 
 @main.command()

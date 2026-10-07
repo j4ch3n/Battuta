@@ -57,7 +57,7 @@ battuta-project list
 
 The command returns a numbered Markdown list sorted by project name. Each entry has a bold name followed by indented `Project Root` and `Code` lines: the managed project directory and repository checkout, respectively. Paths under the home directory are abbreviated with `~`; other paths remain absolute.
 
-Listing validates registrations and checkouts but does not require or change current selection, read spec inventories, or contact Linear. Hidden directories, symlinks, and non-directory entries are excluded. An empty or absent registry reports `No registered projects.` without creating it. An invalid registration reports an error.
+Listing validates registrations and checkouts but does not require or change current selection, read spec inventories, or contact Linear. Hidden directories, symlinks, and non-directory entries are excluded. An absent store reports that no Battuta project store has been initialized; an existing empty registry reports `No registered projects.` Both suggest `battuta-project init <project-name>` and succeed without creating state. An invalid registration reports an error.
 
 ## Read the current selection
 
@@ -65,7 +65,7 @@ Listing validates registrations and checkouts but does not require or change cur
 battuta-project current
 ```
 
-The response is a single line, for example `Current Project: atlas-api`. It reads the persisted name only, without loading project configuration, scanning a checkout, inspecting specs, or contacting Linear. Missing selection reports an error directing you to `init` or `switch`. It does not change state.
+The response is a single line, for example `Current Project: atlas-api`. It reads the persisted name only, without loading project configuration, scanning a checkout, inspecting specs, or contacting Linear. When selection is missing, errors distinguish an absent store, an empty registry, and registered projects with no current selection. They direct you to `init`, or `list` and `switch` when projects already exist. It does not change state.
 
 ## Switch projects
 

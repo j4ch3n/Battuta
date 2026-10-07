@@ -60,7 +60,9 @@ class DiscoveryTests(ProjectTestCase):
             with self.subTest(registry_exists=exists):
                 if exists:
                     self.registry.root.mkdir()
-                self.assertEqual(self.invoke("list"), "No registered projects.\n")
+                output = self.invoke("list")
+                self.assertIn("No registered projects" if exists else "No Battuta project store has been initialized", output)
+                self.assertIn("battuta-project init <project-name>", output)
                 self.assertEqual(self.registry.root.exists(), exists)
                 self.assertFalse(self.registry.state_path.exists())
 
@@ -107,3 +109,54 @@ class DiscoveryTests(ProjectTestCase):
                 result = self.runner.invoke(main, [command, "atlas-api"])
                 self.assertNotEqual(result.exit_code, 0)
                 self.assertIn("unexpected extra argument", result.output)
+
+    def test_current_distinguishes_uninitialized_empty_and_unselected(self):
+        for state in ("missing parent", "missing store", "empty registry", "unselected"):
+            with self.subTest(state=state):
+                if self.registry.root.parent.exists():
+                    shutil.rmtree(self.registry.root.parent)
+                if state == "missing store":
+                    self.registry.root.parent.mkdir()
+                elif state == "empty registry":
+                    self.registry.root.mkdir(parents=True)
+                elif state == "unselected":
+                    self.registry.init("atlas-api")
+                    self.registry.state_path.unlink()
+                before = sorted(self.home.rglob("*"))
+                result = self.runner.invoke(main, ["current"])
+                self.assertNotEqual(result.exit_code, 0)
+                expected = {
+                    "missing parent": "No Battuta project store has been initialized",
+                    "missing store": "No Battuta project store has been initialized",
+                    "empty registry": "No registered projects",
+                    "unselected": "No current project is selected",
+                }[state]
+                self.assertIn(expected, result.output)
+                self.assertIn("battuta-project init <project-name>", result.output)
+                if state == "unselected":
+                    self.assertIn("battuta-project switch <project-name>", result.output)
+                self.assertNotIn("ENOENT", result.output)
+                self.assertEqual(sorted(self.home.rglob("*")), before)
+
+    def test_named_project_errors_distinguish_store_empty_and_unknown(self):
+        for state in ("missing store", "empty registry", "unknown"):
+            with self.subTest(state=state):
+                if self.registry.root.exists():
+                    shutil.rmtree(self.registry.root)
+                if state == "empty registry":
+                    self.registry.root.mkdir()
+                elif state == "unknown":
+                    self.registry.init("atlas-api")
+                before = sorted(self.home.rglob("*"))
+                result = self.runner.invoke(main, ["switch", "Battuta"])
+                self.assertNotEqual(result.exit_code, 0)
+                expected = {
+                    "missing store": "No Battuta project store has been initialized",
+                    "empty registry": "No registered projects",
+                    "unknown": "Project 'Battuta' is not registered",
+                }[state]
+                self.assertIn(expected, result.output)
+                self.assertIn("battuta-project init <project-name>", result.output)
+                if state == "unknown":
+                    self.assertIn("battuta-project list", result.output)
+                self.assertEqual(sorted(self.home.rglob("*")), before)
