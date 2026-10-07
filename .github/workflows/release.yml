@@ -50,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots shared-skills agent-mail project-spec memory-stone .env.example RELEASE.md docs/gogcli-setup.md docs/memory-stone.md | tar -x -C dist/stage/battuta
+          git archive HEAD bots shared-skills agent-mail project-spec memory-stone task-delegation worker-daemon supabase/functions/_shared .env.example RELEASE.md docs/gogcli-setup.md docs/memory-stone.md docs/task-delegation.md | tar -x -C dist/stage/battuta
           test -s dist/stage/battuta/RELEASE.md
           test -s dist/stage/battuta/docs/gogcli-setup.md
           test -s dist/stage/battuta/shared-skills/memory/references/ME.template.md
@@ -130,6 +130,9 @@ jobs:
           pnpm --dir dist/stage/battuta/agent-mail install --frozen-lockfile --prod
           pnpm --dir dist/stage/battuta/project-spec install --frozen-lockfile --prod
           pnpm --dir dist/stage/battuta/memory-stone install --frozen-lockfile --prod
+          pnpm --dir dist/stage/battuta/task-delegation install --frozen-lockfile --prod
+          pnpm --dir dist/stage/battuta/worker-daemon install --frozen-lockfile --prod
+          node -e "import('./dist/stage/battuta/worker-daemon/main.ts')"
           test -f dist/stage/battuta/memory-stone/node_modules/pi-memory-stone/src/db/index.ts
           memory_smoke_home="$(mktemp -d)"
           mkdir -p "$memory_smoke_home/agent"

@@ -60,11 +60,12 @@ done
 [[ -d "$repo_dir/agent-mail/node_modules" ]] || { printf 'Install agent-mail dependencies with pnpm --dir agent-mail install\n' >&2; exit 1; }
 [[ -d "$repo_dir/project-spec/node_modules" ]] || { printf 'Install project-spec dependencies with pnpm --dir project-spec install --frozen-lockfile\n' >&2; exit 1; }
 [[ -d "$repo_dir/memory-stone/node_modules" ]] || { printf 'Install memory bridge dependencies with pnpm --dir memory-stone install --frozen-lockfile\n' >&2; exit 1; }
+[[ -d "$repo_dir/task-delegation/node_modules" ]] || { printf 'Install task delegation dependencies with pnpm --dir task-delegation install --frozen-lockfile\n' >&2; exit 1; }
 memory_path="${PI_MEMORY_STONE_DB_PATH:-$HOME/.battuta/memory/memory.db}"
 [[ "$memory_path" = /* ]] || { printf 'PI_MEMORY_STONE_DB_PATH must be an absolute shared path\n' >&2; exit 1; }
 
-printf -v pi_command 'set -a; source %q; set +a; AGENT_ROLE=pm PI_CODING_AGENT_DIR=%q PI_MEMORY_STONE_DB_PATH=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q --extension %q' "$env_file" "$bot_dir/.pi" "$memory_path" "$bot_dir/node_modules/.bin/pi" "$bot_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts" "$repo_dir/memory-stone/index.ts"
-printf -v tl_command 'set -a; source %q; set +a; AGENT_ROLE=tl PI_CODING_AGENT_DIR=%q PI_MEMORY_STONE_DB_PATH=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q --extension %q' "$env_file" "$tl_dir/.pi" "$memory_path" "$tl_dir/node_modules/.bin/pi" "$tl_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts" "$repo_dir/memory-stone/index.ts"
+printf -v pi_command 'set -a; source %q; set +a; AGENT_ROLE=pm PI_CODING_AGENT_DIR=%q PI_MEMORY_STONE_DB_PATH=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q --extension %q --extension %q' "$env_file" "$bot_dir/.pi" "$memory_path" "$bot_dir/node_modules/.bin/pi" "$bot_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts" "$repo_dir/memory-stone/index.ts" "$repo_dir/task-delegation/index.ts"
+printf -v tl_command 'set -a; source %q; set +a; AGENT_ROLE=tl PI_CODING_AGENT_DIR=%q PI_MEMORY_STONE_DB_PATH=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q --extension %q --extension %q' "$env_file" "$tl_dir/.pi" "$memory_path" "$tl_dir/node_modules/.bin/pi" "$tl_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts" "$repo_dir/memory-stone/index.ts" "$repo_dir/task-delegation/index.ts"
 pi_pane="$(tmux new-session -d -P -F '#{pane_id}' -s "$session" -n "$mode" -c "$bot_dir" "$pi_command")"
 if [[ "$mode" == dev ]]; then
   tmux split-window -v -p 30 -t "$pi_pane" -c "$repo_dir" 'exec make functions-serve'

@@ -15,6 +15,17 @@ case "${1:-}" in
   start-prod-screen)
     exec bash "$root/bots/pm-bot/scripts/run-dev.sh" prod
     ;;
+  worker)
+    shift
+    [[ -d "$root/worker-daemon/node_modules" && -d "$root/task-delegation/node_modules" ]] || { printf 'Missing worker/task dependencies\n' >&2; exit 1; }
+    # Worker-only environments need no bot configuration or privileged credentials.
+    if [[ -f "$root/.env.prod" ]]; then
+      set -a
+      source "$root/.env.prod"
+      set +a
+    fi
+    exec "$root/bin/node" "$root/worker-daemon/main.ts" "$@"
+    ;;
   pm|tl)
     role="$1"
     bot_dir="$root/bots/$role-bot"
@@ -26,6 +37,7 @@ case "${1:-}" in
     [[ -d "$root/agent-mail/node_modules" ]] || { printf 'Missing agent-mail dependencies\n' >&2; exit 1; }
     [[ -d "$root/project-spec/node_modules" ]] || { printf 'Missing project-spec dependencies\n' >&2; exit 1; }
     [[ -d "$root/memory-stone/node_modules" ]] || { printf 'Missing memory bridge dependencies\n' >&2; exit 1; }
+    [[ -d "$root/task-delegation/node_modules" ]] || { printf 'Missing task delegation dependencies\n' >&2; exit 1; }
     set -a
     source "$root/.env.prod"
     set +a
@@ -36,13 +48,13 @@ case "${1:-}" in
     export PI_MEMORY_STONE_DB_PATH="${PI_MEMORY_STONE_DB_PATH:-$HOME/.battuta/memory/memory.db}"
     [[ "$PI_MEMORY_STONE_DB_PATH" = /* ]] || { printf 'PI_MEMORY_STONE_DB_PATH must be an absolute shared path\n' >&2; exit 1; }
     cd "$bot_dir"
-    exec "$bot_dir/node_modules/.bin/pi" --approve --continue --session-dir "$bot_dir/.pi/mail-sessions" --extension "$root/agent-mail/index.ts" --extension "$root/project-spec/index.ts" --extension "$root/memory-stone/index.ts"
+    exec "$bot_dir/node_modules/.bin/pi" --approve --continue --session-dir "$bot_dir/.pi/mail-sessions" --extension "$root/agent-mail/index.ts" --extension "$root/project-spec/index.ts" --extension "$root/memory-stone/index.ts" --extension "$root/task-delegation/index.ts"
     ;;
   install-services)
     exec "$root/bin/node" "$root/bin/install-services.mjs"
     ;;
   *)
-    printf 'Usage: %s configure|start-prod-screen|pm|tl|install-services\n' "$0" >&2
+    printf 'Usage: %s configure|start-prod-screen|pm|tl|worker --config <path>|install-services\n' "$0" >&2
     exit 2
     ;;
 esac

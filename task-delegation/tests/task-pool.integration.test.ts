@@ -9,6 +9,7 @@ import { TaskClient } from "../client.ts";
 import type { Principal, TaskRow } from "../../supabase/functions/_shared/task-contracts.ts";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { cleanupOwned } from "./cleanup.ts";
 
 const url = process.env.SUPABASE_URL!;
 const adminKey = process.env.SUPABASE_SECRET_KEY!;
@@ -106,23 +107,32 @@ beforeAll(async () => {
   peer = await identity({ role: "worker", worker_id: `${prefix}-peer`, projects: [project] });
 });
 afterAll(async () => {
-  for (const client of clients) await client.removeAllChannels();
-  const tasks = await admin
-    .from("tasks_pool")
-    .select("result_message_ref")
-    .eq("project", project)
-    .returns<Pick<TaskRow, "result_message_ref">[]>();
-  for (const task of tasks.data ?? [])
-    if (task.result_message_ref)
-      await admin
-        .from("agent_messages")
-        .delete()
-        .eq("conversation_id", task.result_message_ref.conversation_id);
-  await admin.from("tasks_pool").delete().eq("project", project);
-  for (const id of users) {
-    const result = await admin.auth.admin.deleteUser(id);
-    if (result.error) throw result.error;
-  }
+  await cleanupOwned([
+    ...clients.map((client) => () => client.removeAllChannels()),
+    async () => {
+      const tasks = await admin
+        .from("tasks_pool")
+        .select("result_message_ref")
+        .eq("project", project)
+        .returns<Pick<TaskRow, "result_message_ref">[]>();
+      if (tasks.error) throw tasks.error;
+      await cleanupOwned(
+        (tasks.data ?? []).flatMap((task) =>
+          task.result_message_ref
+            ? [
+                async () =>
+                  admin
+                    .from("agent_messages")
+                    .delete()
+                    .eq("conversation_id", task.result_message_ref!.conversation_id),
+              ]
+            : [],
+        ),
+      );
+    },
+    async () => admin.from("tasks_pool").delete().eq("project", project),
+    ...users.map((id) => () => admin.auth.admin.deleteUser(id)),
+  ]);
 });
 it("real Auth attribution, exact delegation retries, role/project denials and public DB isolation", async () => {
   const first = await delegate("one");

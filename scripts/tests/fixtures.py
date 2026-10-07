@@ -80,6 +80,7 @@ class LauncherFixture(ConfigFixture):
         (self.root / "agent-mail/node_modules").mkdir(parents=True)
         (self.root / "project-spec/node_modules").mkdir(parents=True)
         (self.root / "memory-stone/node_modules").mkdir(parents=True)
+        (self.root / "task-delegation/node_modules").mkdir(parents=True)
         (self.root / "supabase").mkdir()
         (self.root / "supabase/.env").touch()
         self.executable("tmux", '''import json, os, sys

@@ -17,6 +17,8 @@ Installation navigation lives here, separate from runtime skill workflows and co
 | Other bot-local Markdown skills                            | Bundled under each bot's `.pi/skills/`; no package installation. Configuration also establishes the shared skill links.                                                                                                                   |
 | Additional Pi packages (source checkouts)                  | Follow the [Pi-extension installation guide](https://github.com/j4ch3n/Battuta/blob/main/docs/pi-extensions.md). This contributor workflow requires source tooling, not just the release archive.                                         |
 | OpenCode contributor skills/plugins (source checkouts)     | Follow [OpenCode setup](https://github.com/j4ch3n/Battuta/blob/main/docs/opencode.md). These development-agent workflows are not the PM/TL runtime skill environment.                                                                     |
+| Task delegation (PM/TL)                                    | Bundled; [task access setup](task-delegation/INSTALL.md) provisions dedicated signed PM/TL authority.                                                                                                                                     |
+| Worker daemon                                              | Bundled; [worker setup](worker-daemon/INSTALL.md), then the mandatory [OpenCode check-first step](#worker-opencode-check-first-before-launch). No worker user service is installed.                                                       |
 
 ## 1. Confirm the target and prerequisites
 
@@ -167,6 +169,48 @@ In the PM pane, confirm `/schedule-prompt` opens the scheduler menu and ask the 
 The release includes `pi-schedule-prompt@0.4.1` for the PM bot. Its jobs and settings live in the PM working directory's `.pi/schedule-prompts.json` and `.pi/schedule-prompts-settings.json`. Schedules fire only while a Pi session is running in that directory; missed runs are not queued. Jobs are session-bound by default, so resume the creating session for its jobs to run. Inspect existing jobs and their scope before relying on them after a restart or update. See the [upstream scheduler guide](https://github.com/tintinweb/pi-schedule-prompt) for recurring jobs, reminders, and session/workdir scope.
 
 ## 6. Optional: run as user services
+
+### Worker OpenCode check-first before launch
+
+This optional worker is independent of PM/TL services. Do these checks as the **same ordinary OS user** who will run the daemon, before `bin/battuta worker`. Bot startup never launches it. Do not change a shared service during automated installation without the owner's approval.
+
+**Already done?** Run read-only CLI/status checks:
+
+```sh
+command -v opencode
+opencode --version
+opencode service status
+```
+
+Require CLI **2.0.24** (the worker pins `@opencode/client@2.0.24`). Status prints the discovered URL or `stopped`; its exit code alone does not establish that a service is running. If a compatible healthy service exists, **skip start/install/login** when the intended provider is already authenticated. Check server version below. If status says stopped but an existing registration or process appears unhealthy/uncertain, pause for operator inspection rather than automatically starting/repairing it. Do not delete service files or run restart/stop/upgrade as an installation shortcut.
+
+**Fresh setup, only when needed and explicitly approved:** if the CLI is absent, use a supported V2 installation method; for a host with npm already available:
+
+```sh
+npm install -g @opencode/cli@2.0.24
+opencode --version
+```
+
+The native binary postinstall must be allowed. The release itself does not bundle npm/OpenCode. For a different installed CLI version or an active incompatible server, stop here and arrange an owner-approved compatibility change; do not silently replace it. After confirming no existing healthy/uncertain service would be displaced, the **operator**, not the daemon, explicitly starts the shared background service:
+
+```sh
+opencode service start
+opencode service status
+opencode api get /api/info
+opencode auth list
+```
+
+Expect a URL from start/status and `/api/info` version exactly `2.0.24`. `api` and `auth` may themselves auto-start through native discovery, so use them **only after** status has confirmed the already-running compatible service, not as the initial check. If the chosen provider is missing, the owner runs `opencode auth login` interactively, selects the intended integration, then rechecks `opencode auth list`. Never export/display auth secrets or submit a model prompt merely to test login. Leave existing authenticated integrations/configuration intact.
+
+These V2 commands are verified against the [CLI guide](https://opencode.ai/v2/docs/cli), [service diagnostics](https://opencode.ai/v2/docs/troubleshooting), and pinned [2.0.24 command source](https://github.com/anomalyco/opencode/blob/e7a34f09bfd9134dfade5a8ddb843f7030bc9a69/packages/cli/src/commands/commands.ts). Native `service start` uses ensure and can recover/replace services; that is why the check-first/operator approval boundary is mandatory. The daemon has **discovery/reuse authority only**.
+
+Only after verifying status/version/auth and configuring a private worker-only environment/config, launch explicitly:
+
+```sh
+bin/battuta worker --config /absolute/worker.json
+```
+
+Do not start a second worker for an existing lock or retained unfinished task. SIGINT/SIGTERM stops monitoring, not OpenCode execution. See the [runtime recovery limits](docs/task-delegation.md#results-and-limitations). Real paid smoke requires explicit test credentials and budget approval; it is not part of release installation verification.
 
 ### Already done?
 

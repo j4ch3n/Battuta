@@ -11,6 +11,23 @@ from fixtures import ConfigFixture, ROOT
 
 
 class ReleaseInstallTests(ConfigFixture):
+    def test_worker_operator_service_check_precedes_explicit_start_and_launch(self):
+        guide = (ROOT / "RELEASE.md").read_text().split("### Worker OpenCode check-first before launch", 1)[1]
+        self.assertLess(guide.index("opencode service status"), guide.index("opencode service start"))
+        self.assertLess(guide.index("opencode api get /api/info"), guide.index("bin/battuta worker --config"))
+        self.assertIn("npm install -g @opencode/cli@2.0.24", guide)
+        self.assertIn("opencode auth login", guide)
+        self.assertIn("discovery/reuse authority only", guide)
+
+    def test_worker_packages_and_shared_contract_are_staged_with_frozen_dependencies(self):
+        workflow = (ROOT / ".github/workflows/release.yml").read_text()
+        archive = next(line for line in workflow.splitlines() if "git archive HEAD" in line)
+        for package in ("task-delegation", "worker-daemon"):
+            self.assertIn(package, archive)
+            self.assertIn(f"pnpm --dir dist/stage/battuta/{package} install --frozen-lockfile --prod", workflow)
+        self.assertIn("supabase/functions/_shared", archive)
+        self.assertIn("docs/task-delegation.md", archive)
+
     def test_packages_are_installed_inside_archive_with_scheduler_only_for_pm(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         loop = re.search(
