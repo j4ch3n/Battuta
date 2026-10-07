@@ -65,7 +65,11 @@ export function createHandler(deps: Dependencies): (req: Request) => Promise<Res
       const owner = { p_worker_id: principal.worker_id };
       if (body.operation === "claim") {
         body.projects.forEach(allowed);
-        const data = await rpc("task_pool_claim", { ...owner, p_projects: body.projects });
+        const data = await rpc("task_pool_claim", {
+          ...owner,
+          p_projects: body.projects,
+          ...(body.task_id === undefined ? {} : { p_task_id: body.task_id }),
+        });
         // PostgREST serializes a SQL NULL composite as an object of NULL columns.
         if (
           data === null ||
@@ -80,7 +84,8 @@ export function createHandler(deps: Dependencies): (req: Request) => Promise<Res
         if (
           task.claimed_by !== principal.worker_id ||
           task.terminal_report !== null ||
-          !body.projects.includes(task.project)
+          !body.projects.includes(task.project) ||
+          (body.task_id !== undefined && task.id !== body.task_id)
         )
           throw new Error("Invalid claim response");
         return Response.json(task);

@@ -190,13 +190,23 @@ it("native CLI refusal provides service operator guidance without contacting ser
     cwd: new URL("..", import.meta.url),
     env: {},
   }).catch((error: unknown) => {
-    if (!error || typeof error !== "object" || !("stderr" in error) || !("code" in error))
+    if (
+      !error ||
+      typeof error !== "object" ||
+      !("stderr" in error) ||
+      typeof error.stderr !== "string" ||
+      !("code" in error)
+    )
       throw error;
     return { stderr: error.stderr, code: error.code };
   });
   expect(result).toHaveProperty("code", 1);
   expect(result.stderr).toContain("opencode service start");
   expect(result.stderr).toContain("opencode service status");
+  expect(result.stderr.indexOf("opencode service status")).toBeLessThan(
+    result.stderr.indexOf("opencode service start"),
+  );
+  expect(result.stderr).toContain("approval");
 });
 it("subscribes only private compatible queued broadcasts and wakes on reconnect; abort removes channels once", async () => {
   const subscriptions: {

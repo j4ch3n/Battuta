@@ -11,6 +11,63 @@ import { createTaskConnection } from "../../task-delegation/auth.ts";
 import { validateReport } from "../../supabase/functions/_shared/task-contracts.ts";
 import { validate, StoredMessage, validateReceivedMessage } from "../../agent-mail/schemas.ts";
 import { isWorkerResult } from "../../agent-mail/worker-result.ts";
+import type { DaemonOptions } from "../daemon.ts";
+
+/** Smoke-only one-shot admission; never claim an unrelated row to inspect/reject it. */
+export function smokeTaskClient(
+  client: DaemonOptions["tasks"]["client"],
+  taskId: string,
+  project: string,
+  workerId: string,
+): DaemonOptions["tasks"]["client"] {
+  if (
+    typeof taskId !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(taskId)
+  )
+    throw new Error("Smoke requires an explicit exact task ID");
+  let attempted = false;
+  const target = (id: string, signal?: AbortSignal) => {
+    signal?.throwIfAborted();
+    if (id !== taskId) throw new Error("Smoke refuses unrelated task identity");
+  };
+  return {
+    async claim(projects, signal) {
+      signal?.throwIfAborted();
+      if (projects.length !== 1 || projects[0] !== project)
+        throw new Error("Smoke refuses unrelated project admission");
+      if (attempted) return null;
+      attempted = true; // null/uncertain/rejected outcomes cannot authorize a retry or broad fallback
+      const task = await client.claim([project], signal, taskId);
+      if (
+        task &&
+        (task.id !== taskId ||
+          task.project !== project ||
+          task.claimed_by !== workerId ||
+          task.terminal_report !== null)
+      )
+        throw new Error("Smoke target claim uncertain; preserve ownership and inspect");
+      return task;
+    },
+    async listOwned(cursor, signal) {
+      const page = await client.listOwned(cursor, signal);
+      if (
+        page.tasks.some(
+          (task) => task.id !== taskId || task.project !== project || task.claimed_by !== workerId,
+        )
+      )
+        throw new Error("Smoke refuses unrelated owned execution; inspect without repair");
+      return page;
+    },
+    async bind(id, session, signal) {
+      target(id, signal);
+      return client.bind(id, session, signal);
+    },
+    async finalize(id, report, signal) {
+      target(id, signal);
+      return client.finalize(id, report, signal);
+    },
+  };
+}
 
 export function smokeSettings(env: NodeJS.ProcessEnv) {
   const required = (key: string) => {
@@ -59,7 +116,8 @@ export async function runSmoke(env: NodeJS.ProcessEnv): Promise<void> {
   if (
     config.capacity !== 1 ||
     !config.model ||
-    Object.keys(config.projects).join() !== settings.project
+    Object.keys(config.projects).length !== 1 ||
+    Object.keys(config.projects)[0] !== settings.project
   )
     throw new Error(
       "Smoke requires exactly one explicitly selected test project, model and capacity one",
@@ -102,12 +160,15 @@ export async function runSmoke(env: NodeJS.ProcessEnv): Promise<void> {
         deliverables: ["Validated terminal report only"],
       },
     };
-    await pm.client.delegate(input, controller.signal);
+    const delegated = await pm.client.delegate(input, controller.signal);
     controller.signal.throwIfAborted();
     running = runDaemon(
       {
         config,
-        tasks: worker,
+        tasks: {
+          principal: worker.principal,
+          client: smokeTaskClient(worker.client, delegated.id, settings.project, config.workerId),
+        },
         opencode: adapter,
         prepareWorktree,
         subscribeQueue: queueSubscriber(worker),

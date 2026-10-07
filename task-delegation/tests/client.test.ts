@@ -93,6 +93,24 @@ it("routes claim/list/bind/finalize without caller identity", async () => {
     report,
   });
 });
+it("claims only the requested task identity and rejects a different acknowledgement without retry", async () => {
+  const owned = { ...row, claimed_by: "host", claimed_at: row.created_at };
+  const { client, invoke } = setup(owned);
+  expect(await client.claim(["Battuta"], undefined, row.id)).toEqual(owned);
+  expect(invoke.mock.calls[0]?.[1].body).toEqual({
+    operation: "claim",
+    projects: ["Battuta"],
+    task_id: row.id,
+  });
+  invoke.mockResolvedValueOnce({
+    data: { ...owned, id: "22345678-1234-4234-8234-123456789abc" },
+    error: null,
+  });
+  await expect(client.claim(["Battuta"], undefined, row.id)).rejects.toBeInstanceOf(
+    UncertainTaskWriteError,
+  );
+  expect(invoke).toHaveBeenCalledTimes(2);
+});
 it.each(["queued", "terminal"])("rejects %s rows in unfinished owned pages", async (state) => {
   const task =
     state === "queued"

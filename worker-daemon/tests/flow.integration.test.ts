@@ -1,4 +1,5 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
+import { setTimeout as delay } from "node:timers/promises";
 import { mkdtemp, realpath, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { OpenCode } from "@opencode/client";
 import { Service } from "@opencode/client/service";
 import { createTaskConnection } from "../../task-delegation/auth.ts";
-import { runDaemon } from "../daemon.ts";
+import { runDaemon, type DaemonOptions } from "../daemon.ts";
 import { queueSubscriber } from "../main.ts";
 import { createOpenCodeAdapter } from "../opencode.ts";
 import { prepareWorktree } from "../worktree.ts";
@@ -24,6 +25,7 @@ import {
   StoredMessage,
 } from "../../agent-mail/schemas.ts";
 import { fakeOpenCode } from "./fixtures/opencode-server.ts";
+import { smokeTaskClient } from "../scripts/smoke.ts";
 
 const url = process.env.SUPABASE_URL!;
 if (
@@ -48,7 +50,7 @@ async function admin<T>(path: string, method = "GET", body?: unknown): Promise<T
   const text = await response.text();
   return (text ? JSON.parse(text) : undefined) as T;
 }
-it("real Auth/Edge/DB/mail and Git run two shared-ticket tasks through one discovered native HTTP endpoint", async () => {
+async function nativeFlow(mode: "daemon" | "smoke") {
   const root = await mkdtemp(join(await realpath(tmpdir()), "battuta-flow-"));
   const project = `flow-${crypto.randomUUID()}`;
   const workerID = `${project}-host`;
@@ -134,18 +136,24 @@ it("real Auth/Edge/DB/mail and Git run two shared-ticket tasks through one disco
       serviceFile,
     });
     const diagnostics: string[] = [];
-    running = runDaemon(
-      {
-        config,
-        tasks: worker,
-        opencode: adapter,
-        prepareWorktree,
-        subscribeQueue: queueSubscriber(worker),
-        log: (kind, detail) => diagnostics.push(`${kind}: ${detail}`),
-      },
-      controller.signal,
-    );
-    void running.catch(() => undefined);
+    const native = adapter;
+    const claim = vi.spyOn(worker.client, "claim");
+    const start = (client: DaemonOptions["tasks"]["client"] = worker.client) =>
+      runDaemon(
+        {
+          config,
+          tasks: { principal: worker.principal, client },
+          opencode: native,
+          prepareWorktree,
+          subscribeQueue: queueSubscriber(worker),
+          log: (kind, detail) => diagnostics.push(`${kind}: ${detail}`),
+        },
+        controller.signal,
+      );
+    if (mode === "daemon") {
+      running = start();
+      void running.catch(() => undefined);
+    }
     const instruction = {
       schema_version: 1 as const,
       summary: "Controlled flow",
@@ -157,7 +165,11 @@ it("real Auth/Edge/DB/mail and Git run two shared-ticket tasks through one disco
       deliverables: ["Report"],
     };
     const finished: TaskRow[] = [];
-    for (const key of ["first", "next"]) {
+    const unrelated: TaskRow[] = [];
+    const enqueueUnrelated = async (key: string) =>
+      unrelated.push(await pm.client.delegate({ key: `${project}-${key}`, project, instruction }));
+    if (mode === "smoke") await enqueueUnrelated("unrelated-prior");
+    for (const key of mode === "daemon" ? ["first", "next"] : ["only-smoke"]) {
       const delegated = await pm.client.delegate({
         key: `${project}-${key}`,
         project,
@@ -165,6 +177,11 @@ it("real Auth/Edge/DB/mail and Git run two shared-ticket tasks through one disco
         instruction,
       });
       expect(delegated.claimed_by).toBeNull();
+      if (mode === "smoke") {
+        await enqueueUnrelated("unrelated-after");
+        running = start(smokeTaskClient(worker.client, delegated.id, project, workerID));
+        void running.catch(() => undefined);
+      }
       await expect
         .poll(
           async () =>
@@ -191,15 +208,40 @@ it("real Auth/Edge/DB/mail and Git run two shared-ticket tasks through one disco
       expect(content).not.toContain(stored.opencode_session_id!);
       expect(content).toContain("Controlled flow");
     }
+    if (mode === "smoke") {
+      await enqueueUnrelated("unrelated-after-completion");
+      await delay(1500); // allow a normal reconciliation pass after completion
+      expect(claim).toHaveBeenCalledTimes(1);
+      expect(claim.mock.calls[0]?.[2]).toBe(finished[0].id);
+      const untouched = await admin<TaskRow[]>(
+        `/rest/v1/tasks_pool?project=eq.${project}&claimed_by=is.null&select=*`,
+      );
+      expect(new Set(untouched.map((row) => row.id))).toEqual(
+        new Set(unrelated.map((row) => row.id)),
+      );
+      expect(
+        untouched.every(
+          (row) =>
+            row.claimed_at === null &&
+            row.opencode_session_id === null &&
+            row.terminal_report === null,
+        ),
+      ).toBe(true);
+    }
     expect(await worker.client.listOwned()).toEqual({ tasks: [], next: null });
-    expect(new Set(finished.map((task) => task.opencode_session_id)).size).toBe(2);
+    expect(new Set(finished.map((task) => task.opencode_session_id)).size).toBe(finished.length);
     expect(
       new Set([...fixture.sessions.values()].map((session) => session.location.directory)).size,
-    ).toBe(2);
+    ).toBe(finished.length);
     for (const task of finished) {
       const session = fixture.sessions.get(task.opencode_session_id!)!;
       expect(session.metadata).toEqual({
-        battuta: { schema_version: 1, task_id: task.id, worker_id: workerID, delegator_role: "pm" },
+        battuta: {
+          schema_version: 1,
+          task_id: task.id,
+          worker_id: workerID,
+          delegator_role: "pm",
+        },
       });
       expect(session.permissions).toEqual([{ action: "*", resource: "*", effect: "allow" }]);
       expect(fixture.prompts.get(session.id)?.id).toBe(initialPromptId(task.id));
@@ -221,7 +263,9 @@ it("real Auth/Edge/DB/mail and Git run two shared-ticket tasks through one disco
         ),
       ).toMatch(/^agent\/fis-40-/);
     }
-    expect(fixture.requests.filter((request) => request.method === "POST")).toHaveLength(4);
+    expect(fixture.requests.filter((request) => request.method === "POST")).toHaveLength(
+      finished.length * 2,
+    );
     expect(await readFile(serviceFile, "utf8")).toBe(registration);
   } catch (error) {
     errors.push(error);
@@ -238,4 +282,8 @@ it("real Auth/Edge/DB/mail and Git run two shared-ticket tasks through one disco
   }
   if (errors.length)
     throw new AggregateError(errors, "Controlled flow or test-owned cleanup failed");
-});
+}
+it.each(["daemon", "smoke"] as const)(
+  "real Auth/Edge/DB/mail and Git native HTTP flow: %s admission",
+  nativeFlow,
+);
