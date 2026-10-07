@@ -2,6 +2,22 @@
 
 This guide is for installing the prebuilt **64-bit Linux ARM** Battuta release on Raspberry Pi OS. An agent helping with installation should work through the steps in order on the target machine. At each step, first perform its **Already done?** check and skip actions that are already complete; inspect results before proceeding, explain any failure, and ask the owner for credentials or interactive authentication when needed. Never print, paste into chat, or commit secrets. Do not assume a command succeeded merely because it was issued.
 
+## Extension and skill setup index
+
+Installation navigation lives here, separate from runtime skill workflows and command contracts. Use the component's setup guide below; bundled resources do not need separate installation. When adding an extension or skill, update this index with its installation guide or explicitly state how the release configures it.
+
+| Component                                                  | Installation and configuration                                                                                                                                                                                                            |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pi, PM/TL runtime extensions, agent mail, and project-spec | Bundled with dependencies; [configure and verify both bots](#5-configure-and-verify-interactively). Deploy the remote Supabase backend separately as required in [prerequisites](#1-confirm-the-target-and-prerequisites).                |
+| Telegram extension (both bots)                             | Bundled; supply credentials in [step 4](#4-prepare-production-credentials), then configure and verify in [step 5](#5-configure-and-verify-interactively).                                                                                 |
+| Prompt scheduler (PM only)                                 | Bundled; [step 5](#5-configure-and-verify-interactively) covers discovery and retained-settings migration. See the [upstream scheduler guide](https://github.com/tintinweb/pi-schedule-prompt) for package setup and scope.               |
+| Shared memory bridge and memory skill (both bots)          | Bundled and exposed by bot configuration; see [memory installation and launch](docs/memory-stone.md#install-and-launch). Do not install the upstream Stone extension separately.                                                          |
+| Project-context skill and `battuta-project`                | The skill is bundled and linked for both bots. Install the CLI using the [project-context installation guide](shared-skills/project-context/references/installation.md), which covers source checkouts, release wheels, and service PATH. |
+| Google management skill (PM only)                          | The skill is bundled; install and authenticate its external `gog` CLI using the [Google setup guide](docs/gogcli-setup.md).                                                                                                               |
+| Other bot-local Markdown skills                            | Bundled under each bot's `.pi/skills/`; no package installation. Configuration also establishes the shared skill links.                                                                                                                   |
+| Additional Pi packages (source checkouts)                  | Follow the [Pi-extension installation guide](https://github.com/j4ch3n/Battuta/blob/main/docs/pi-extensions.md). This contributor workflow requires source tooling, not just the release archive.                                         |
+| OpenCode contributor skills/plugins (source checkouts)     | Follow [OpenCode setup](https://github.com/j4ch3n/Battuta/blob/main/docs/opencode.md). These development-agent workflows are not the PM/TL runtime skill environment.                                                                     |
+
 ## 1. Confirm the target and prerequisites
 
 ### Already done?
@@ -189,7 +205,7 @@ The release workflow bundles Node selected by the source checkout's `.node-versi
 
 Then run `bin/battuta configure` again to migrate both bots, verify native MCP and Telegram interactively as in step 5, and, if using services, run `bin/battuta install-services`, daemon-reload, and enable/start as in step 6.
 
-Reinstall `battuta-project` from the updated release wheels with `--reinstall`. Project registrations and memory live independently under `~/.battuta/projects/`; retain them across release updates.
+Reinstall `battuta-project` from the updated release wheels with `--reinstall`. Project registrations live independently under `~/.battuta/projects/`; shared memory defaults to `~/.battuta/memory/memory.db` (or the configured absolute override), with its recovery queue beside it. Retain these stores across release updates.
 
 The remote Linear webhook also now reads `LINEAR_API_TOKEN`. Before deploying the updated Edge Function, the backend owner must provide that named secret in Supabase. For GitHub Actions deployment, rename the repository secret to `LINEAR_API_TOKEN`; the deployment workflow sets the matching Supabase secret. Confirm the updated webhook works before removing the obsolete `LINEAR_API_KEY` secret.
 

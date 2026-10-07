@@ -39,7 +39,5 @@ recipients, so inspect the final recipients before sending.
 Adapted from gogcli's generated
 [Gmail skill](https://github.com/openclaw/gogcli/blob/main/.agents/skills/gog-gmail/SKILL.md)
 and [shared gog guidance](https://github.com/openclaw/gogcli/blob/main/.agents/skills/gog/SKILL.md).
-For manual installation and authentication, follow the
-[gogcli setup guide](../../../../../../docs/gogcli-setup.md).
 Consult the [gogcli project](https://github.com/openclaw/gogcli) for
 version-specific command documentation.
