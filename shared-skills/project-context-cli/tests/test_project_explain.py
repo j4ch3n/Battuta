@@ -123,4 +123,4 @@ class ExplainTests(ProjectTestCase):
             "config": self.project.config.model_copy(update={"github": GithubConfig()}),
         })
         output = render("explain.md.j2", explain_project(project))
-        self.assertIn("Repository URL: not configured", output)
+        self.assertIn("Repository URL: no GitHub repository linked yet", output)

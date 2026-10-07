@@ -21,7 +21,7 @@ class ProjectTestCase(unittest.TestCase):
         clone = patch("battuta_project.registry.subprocess.run", side_effect=self.clone_repo)
         clone.start()
         self.addCleanup(clone.stop)
-        self.project = self.registry.init("https://github.com/team/atlas-api")
+        self.project = self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
 
     @staticmethod
     def clone_repo(args, **kwargs):

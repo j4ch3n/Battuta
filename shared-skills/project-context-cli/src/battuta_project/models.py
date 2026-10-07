@@ -11,8 +11,8 @@ Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 def project_name(value: str) -> str:
-    if not value or value in {".", "..", ".config.json"} or "/" in value or "\x00" in value:
-        raise ValueError("project name must be a direct folder name (not '/', NUL, '.', '..', or '.config.json')")
+    if not value.strip() or value.startswith(".") or any(char in value for char in ("/", "\\", "\x00")):
+        raise ValueError("project name must be a nonblank, nonhidden direct folder name (no '/', '\\', or NUL)")
     return value
 
 

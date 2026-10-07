@@ -20,7 +20,7 @@ systemctl --version
 tmux -V
 ```
 
-Expect `aarch64`/`arm64` and Python **3.12+**. The release bundles Node, Pi, and bot dependencies; it does not require pnpm, Docker, or local Supabase. Project-context tooling requires uv, Git, and GitHub CLI; its bundled wheels target Python **3.12** on Linux ARM64. Install it using the [project-context installation reference](shared-skills/project-context/references/installation.md) before project work. If Python is missing or too old, arrange a supported installation without replacing the OS Python, then recheck. `tmux` is needed for the interactive screen launcher; on Raspberry Pi OS install it if missing with `sudo apt update && sudo apt install tmux`. `script` and working `systemctl --user` are needed only for the optional services in step 6. Check those separately before choosing services; follow the OS's supported user-session setup if unavailable. Do not continue until the tools for the chosen launch method work.
+Expect `aarch64`/`arm64` and Python **3.12+**. The release bundles Node, Pi, and bot dependencies; it does not require pnpm, Docker, or local Supabase. Project-context tooling requires uv; Git and GitHub CLI are needed only for GitHub cloning, not name-only initialization or metadata linking. Its bundled wheels target Python **3.12** on Linux ARM64. Install it using the [project-context installation reference](shared-skills/project-context/references/installation.md) before project work. If Python is missing or too old, arrange a supported installation without replacing the OS Python, then recheck. `tmux` is needed for the interactive screen launcher; on Raspberry Pi OS install it if missing with `sudo apt update && sudo apt install tmux`. `script` and working `systemctl --user` are needed only for the optional services in step 6. Check those separately before choosing services; follow the OS's supported user-session setup if unavailable. Do not continue until the tools for the chosen launch method work.
 
 Confirm with the owner that a **remote Supabase project** has already been deployed with Battuta's database migrations and Edge Functions, and that they have two distinct Telegram bot tokens, their numeric Telegram user ID, a Linear API key, and remote Supabase URL and secret key. This archive does not deploy Supabase. If the remote backend is not ready, pause here and arrange its deployment before launching the bots.
 
@@ -61,7 +61,7 @@ test -x bin/battuta && test -f .env.example && test -f RELEASE.md
 
 Run subsequent commands from this extracted installation directory. If the final check fails, stop and inspect the extraction.
 
-Install `battuta-project` from the included wheels as described in the [installation reference](shared-skills/project-context/references/installation.md). Verify GitHub authentication as the bot user; defer `battuta-project --help` until step 4 has made the required Linear token available.
+Install `battuta-project` from the included wheels as described in the [installation reference](shared-skills/project-context/references/installation.md). If GitHub cloning is needed, verify GitHub authentication as the bot user; defer `battuta-project --help` until step 4 has made the required Linear token available.
 
 ## 4. Prepare production credentials
 

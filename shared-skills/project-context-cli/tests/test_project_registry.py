@@ -31,7 +31,7 @@ class RegistryTests(unittest.TestCase):
         return subprocess.CompletedProcess(args, 0)
 
     def test_init_clones_into_code_and_selects_project(self):
-        project = self.registry.init("https://github.com/team/atlas-api.git")
+        project = self.registry.init("atlas-api", github="https://github.com/team/atlas-api.git")
         self.assertEqual(project.name, "atlas-api")
         self.assertEqual(project.code, self.root / "atlas-api" / "code")
         self.run.assert_called_once_with(
@@ -56,11 +56,11 @@ class RegistryTests(unittest.TestCase):
             "git@github.com:team/harbor-web.git", "ssh://git@github.com/team/harbor-web.git",
         ):
             with self.subTest(url=url), tempfile.TemporaryDirectory() as temp:
-                project = ProjectRegistry(Path(temp) / "projects").init(url)
+                project = ProjectRegistry(Path(temp) / "projects").init("harbor-web", github=url)
                 self.assertEqual(project.name, "harbor-web")
 
     def test_init_creates_summary_scaffold_beside_checkout(self):
-        project = self.registry.init("https://github.com/team/atlas-api")
+        project = self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
         summary = project.root / "SUMMARY.md"
         self.assertTrue(summary.is_file())
         content = summary.read_text(encoding="utf-8")
@@ -74,24 +74,24 @@ class RegistryTests(unittest.TestCase):
         self.assertFalse((project.root / "specs").exists())
 
     def test_rendering_failure_preserves_selection_and_removes_new_project(self):
-        self.registry.init("https://github.com/team/atlas-api")
+        self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
         for index, error in enumerate((TemplateNotFound("summary.md.j2"), UndefinedError("missing project name"))):
             with self.subTest(error=type(error).__name__):
                 name = f"harbor-web-{index}"
                 with patch("battuta_project.registry.render", side_effect=error):
                     with self.assertRaisesRegex(click.ClickException, "summary"):
-                        self.registry.init(f"https://github.com/team/{name}")
+                        self.registry.init(name, github=f"https://github.com/team/{name}")
                 self.assertEqual(self.registry.current().name, "atlas-api")
                 self.assertFalse((self.root / name).exists())
 
     def test_legacy_registration_loads_without_recreating_artifacts(self):
-        project = self.registry.init("https://github.com/team/atlas-api")
+        project = self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
         (project.root / "SUMMARY.md").unlink()
         self.assertEqual(self.registry.switch("atlas-api").code, project.code)
         self.assertEqual(sorted(p.name for p in project.root.iterdir()), ["code", "project.yaml"])
 
     def test_summary_creation_failure_preserves_selection_and_removes_new_project(self):
-        self.registry.init("https://github.com/team/atlas-api")
+        self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
         from battuta_project.storage import atomic_write
 
         def write(path, text):
@@ -101,7 +101,7 @@ class RegistryTests(unittest.TestCase):
 
         with patch("battuta_project.registry.atomic_write", side_effect=write):
             with self.assertRaisesRegex(click.ClickException, "summary disk full"):
-                self.registry.init("https://github.com/team/harbor-web")
+                self.registry.init("harbor-web", github="https://github.com/team/harbor-web")
         self.assertEqual(self.registry.current().name, "atlas-api")
         self.assertFalse((self.root / "harbor-web").exists())
 
@@ -110,7 +110,7 @@ class RegistryTests(unittest.TestCase):
                        {"project_id": "project-1", "team_id": "team-1"}):
             with self.subTest(fields=fields), tempfile.TemporaryDirectory() as temp:
                 registry = ProjectRegistry(Path(temp) / "projects")
-                project = registry.init("https://github.com/team/atlas-api", linear=LinearConfig(**fields))
+                project = registry.init("atlas-api", github="https://github.com/team/atlas-api", linear=LinearConfig(**fields))
                 config = yaml.safe_load((project.root / "project.yaml").read_text())
                 self.assertEqual(config["linear"], {
                     "project_id": fields.get("project_id"), "team_id": fields.get("team_id"),
@@ -120,8 +120,8 @@ class RegistryTests(unittest.TestCase):
                 })
 
     def test_link_updates_captured_project_and_preserves_latest_metadata(self):
-        project = self.registry.init("https://github.com/team/atlas-api")
-        self.registry.init("https://github.com/team/harbor-web")
+        project = self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
+        self.registry.init("harbor-web", github="https://github.com/team/harbor-web")
         path = project.root / "project.yaml"
         config = yaml.safe_load(path.read_text())
         config["github"]["repository"] = "other/atlas-api"
@@ -138,7 +138,7 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(self.registry.load("atlas-api").config.linear.project_id, "project-2")
 
     def test_failed_link_write_preserves_existing_project_configuration(self):
-        project = self.registry.init("https://github.com/team/atlas-api")
+        project = self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
         path = project.root / "project.yaml"
         original = path.read_text()
         original_files = sorted(p.name for p in project.root.iterdir())
@@ -156,13 +156,13 @@ class RegistryTests(unittest.TestCase):
             "https://github.com/team/repo#readme", "--help", "team/repo",
         ):
             with self.subTest(url=url), self.assertRaises(click.ClickException):
-                self.registry.init(url)
+                self.registry.init("linth", github=url)
         self.assertFalse(self.root.exists())
         self.run.assert_not_called()
 
     def test_switch_matches_exact_folder_and_preserves_other_state_on_error(self):
-        self.registry.init("https://github.com/team/atlas-api")
-        self.registry.init("https://github.com/team/harbor-web")
+        self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
+        self.registry.init("harbor-web", github="https://github.com/team/harbor-web")
         self.registry.switch("atlas-api")
         for name in ("atlas", "Atlas-api", "missing", "../atlas-api", ".config.json"):
             with self.subTest(name=name), self.assertRaises(click.ClickException):
@@ -170,21 +170,21 @@ class RegistryTests(unittest.TestCase):
             self.assertEqual(self.registry.current().name, "atlas-api")
 
     def test_collision_does_not_overwrite_existing_project(self):
-        self.registry.init("https://github.com/team/atlas-api")
+        self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
         marker = self.root / "atlas-api" / "code" / "work.txt"
         marker.write_text("uncommitted work")
         with self.assertRaises(click.ClickException):
-            self.registry.init("https://github.com/other/atlas-api")
+            self.registry.init("atlas-api", github="https://github.com/other/atlas-api")
         self.assertEqual(marker.read_text(), "uncommitted work")
         self.assertEqual(self.run.call_count, 1)
 
     def test_clone_failures_remove_only_new_project_and_preserve_selection(self):
-        self.registry.init("https://github.com/team/atlas-api")
+        self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
         for error in (FileNotFoundError("gh"), subprocess.CalledProcessError(1, ["gh"])):
             with self.subTest(error=type(error).__name__):
                 self.run.side_effect = error
                 with self.assertRaises(click.ClickException):
-                    self.registry.init("https://github.com/team/harbor-web")
+                    self.registry.init("harbor-web", github="https://github.com/team/harbor-web")
                 self.assertFalse((self.root / "harbor-web").exists())
                 self.assertEqual(self.registry.current().name, "atlas-api")
 
@@ -193,7 +193,7 @@ class RegistryTests(unittest.TestCase):
             self.registry.current()
 
     def test_invalid_current_state_is_rejected_without_overwriting(self):
-        self.registry.init("https://github.com/team/atlas-api")
+        self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
         state = self.root / ".config.json"
         for value in ('not json', '{"currentProject": 3}', '{"currentProject": "../outside"}'):
             with self.subTest(value=value):
@@ -216,11 +216,11 @@ class RegistryTests(unittest.TestCase):
     def test_selection_preserves_unrelated_state_and_per_project_linear_ids(self):
         atlas = LinearConfig(project_id="project-1", team_id="team-1")
         harbor = LinearConfig(project_id="project-2", team_id="team-2")
-        self.registry.init("https://github.com/team/atlas-api", linear=atlas)
+        self.registry.init("atlas-api", github="https://github.com/team/atlas-api", linear=atlas)
         self.registry.state_path.write_text(json.dumps({
             "currentProject": "atlas-api", "custom": {"keep": True},
         }))
-        self.registry.init("https://github.com/team/harbor-web", linear=harbor)
+        self.registry.init("harbor-web", github="https://github.com/team/harbor-web", linear=harbor)
         self.assertEqual(json.loads(self.registry.state_path.read_text()), {
             "currentProject": "harbor-web", "custom": {"keep": True},
         })
@@ -232,7 +232,7 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(self.registry.load("harbor-web").config.linear, harbor)
 
     def test_invalid_project_config_is_rejected(self):
-        self.registry.init("https://github.com/team/atlas-api")
+        self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
         config = self.root / "atlas-api" / "project.yaml"
         original = yaml.safe_load(config.read_text())
         variants = [dict(original, version=2), dict(original, project={"name": "other", "path": "code"}),
@@ -244,7 +244,7 @@ class RegistryTests(unittest.TestCase):
                     self.registry.switch("atlas-api")
 
     def test_checkout_path_outside_registration_is_rejected(self):
-        self.registry.init("https://github.com/team/atlas-api")
+        self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
         config = self.root / "atlas-api" / "project.yaml"
         data = yaml.safe_load(config.read_text())
         data["project"]["path"] = str(Path(self.temp.name) / "external")
@@ -253,7 +253,7 @@ class RegistryTests(unittest.TestCase):
             self.registry.switch("atlas-api")
 
     def test_symlink_state_and_project_files_cannot_redirect_access(self):
-        self.registry.init("https://github.com/team/atlas-api")
+        self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
         outside = Path(self.temp.name) / "outside"
         outside.write_text("preserve me")
         for file in (self.root / ".config.json", self.root / "atlas-api" / "project.yaml"):
@@ -268,7 +268,7 @@ class RegistryTests(unittest.TestCase):
                 file.write_text(content)
 
     def test_project_and_checkout_symlinks_are_rejected(self):
-        self.registry.init("https://github.com/team/atlas-api")
+        self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
         (self.root / "alias").symlink_to(self.root / "atlas-api", target_is_directory=True)
         with self.assertRaises(click.ClickException):
             self.registry.switch("alias")
@@ -283,16 +283,41 @@ class RegistryTests(unittest.TestCase):
             with self.subTest(component=component), tempfile.TemporaryDirectory() as temp:
                 base = Path(temp)
                 registry = ProjectRegistry(base / ".battuta" / "projects")
-                project = registry.init("https://github.com/team/atlas-api")
+                project = registry.init("atlas-api", github="https://github.com/team/atlas-api")
                 (project.root / "SUMMARY.md").write_text("Preserve me\n")
                 link = registry.root if component == "projects" else registry.root.parent
                 outside = base / "external"
                 link.rename(outside)
                 link.symlink_to(outside, target_is_directory=True)
                 for action in (registry.current, lambda: registry.switch("atlas-api"),
-                               lambda: registry.init("https://github.com/team/harbor-web")):
+                               lambda: registry.init("harbor-web", github="https://github.com/team/harbor-web")):
                     with self.assertRaises(click.ClickException):
                         action()
                 redirected_root = outside if component == "projects" else outside / "projects"
                 self.assertEqual((redirected_root / "atlas-api" / "SUMMARY.md").read_text(), "Preserve me\n")
                 self.assertFalse((redirected_root / "harbor-web").exists())
+
+    def test_name_only_initialization_does_not_run_git_or_gh(self):
+        project = self.registry.init("linth")
+        self.run.assert_not_called()
+        self.assertEqual(project.code, self.root / "linth" / "code")
+        self.assertTrue(project.code.is_dir())
+        config = yaml.safe_load((project.root / "project.yaml").read_text())
+        self.assertEqual(config["github"], {"repository": None})
+        self.assertEqual(self.registry.current().name, "linth")
+        self.assertEqual([p.name for p in self.registry.list_projects()], ["linth"])
+
+    def test_invalid_names_are_rejected_before_cloning_or_creating_registry(self):
+        for name in ("", " ", ".", "..", ".hidden", ".config.json", "../outside", "a/b", "a\\b", "a\x00b"):
+            with self.subTest(name=name), self.assertRaises(click.ClickException):
+                self.registry.init(name, github="https://github.com/team/other")
+        self.run.assert_not_called()
+        self.assertFalse(self.root.exists())
+
+    def test_name_only_rendering_failure_preserves_previous_selection(self):
+        self.registry.init("atlas-api")
+        with patch("battuta_project.registry.render", side_effect=UndefinedError("missing name")):
+            with self.assertRaisesRegex(click.ClickException, "summary"):
+                self.registry.init("linth")
+        self.assertEqual(self.registry.current().name, "atlas-api")
+        self.assertFalse((self.root / "linth").exists())

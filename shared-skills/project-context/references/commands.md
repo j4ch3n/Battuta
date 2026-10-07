@@ -7,33 +7,47 @@ A bare `battuta-project` invocation displays command help.
 ## Initialize a project
 
 ```sh
-battuta-project init <github-repo-url>
+battuta-project init <project-name> [--github <repo-url>] [--linear <project-id>,<team-id>]
 ```
 
-Use `init` once to register a repository, clone it into a managed checkout, render a summary skeleton, and select it as the current project. Authenticate with `gh auth login` first. Use the locations printed by the command. Fill the overview from confirmed conversation and repository evidence during project discovery.
+Use `init` once to register a named project, create its managed workspace, render a summary skeleton, and select it as the current project. GitHub is optional: without `--github`, the code directory is empty and repository metadata is null. With `--github`, the repository is cloned into that directory. The output reports managed project, code, configuration, and summary locations and current selection. Use those locations rather than assuming storage paths. Fill the overview from confirmed conversation and available repository evidence during project discovery.
+
+```sh
+battuta-project init linth
+```
+
+The project name must be a nonblank, nonhidden direct folder name without slashes, backslashes, or NUL. Quote names containing spaces. Memory uses the shared store bound to the managed code directory even without Git metadata; no project-local memory store is created. Spec tools operate on managed project storage without requiring GitHub.
 
 The summary has Purpose, Users and use cases, Scope, Current capabilities, and Specifications sections with explicit unknowns. Initialization does not establish spec storage or a constitution. Managed documents are created by spec tools only when requested.
 
 Accepted URL forms include:
 
 ```sh
-battuta-project init https://github.com/team/atlas-api.git
-battuta-project init git@github.com:team/atlas-api.git
-battuta-project init ssh://git@github.com/team/atlas-api.git
+battuta-project init atlas --github https://github.com/team/atlas-api.git
+battuta-project init atlas --github git@github.com:team/atlas-api.git
+battuta-project init atlas --github ssh://git@github.com/team/atlas-api.git
 ```
 
 Choose one form for the repository. The `.git` suffix is optional. Use a repository URL, not a branch or file URL; query strings and non-GitHub hosts are rejected.
 
-The repository basename becomes the project name. Initialization never overwrites an existing folder, so repositories with the same basename collide. Use `switch` for an already registered project. A failed clone preserves the previous selection.
+The explicit project name is retained independently of the repository basename. Initialization never overwrites an existing folder. Use `switch` for an already registered project. Failed initialization preserves the previous selection and removes only the new project directory.
 
 Optionally record existing Linear IDs during initialization:
 
 ```sh
-battuta-project init https://github.com/team/atlas-api.git \
-  --linear-project-id <project-id> --linear-team-id <team-id>
+battuta-project init linth --linear <project-id>,<team-id>
 ```
 
-Both options are independently optional. Supplied IDs are trimmed and must not be blank. The command records these values locally without a Linear API request. GitHub cloning still uses the network.
+The `--linear` option requires exactly two comma-separated, nonblank IDs in project/team order. Surrounding whitespace is trimmed; quote the value if it contains spaces. Missing components or extra commas are rejected before initialization. Omitting the option leaves both IDs null. The command records supplied IDs locally without a Linear API request. GitHub cloning still uses the network.
+
+## Link GitHub later
+
+```sh
+battuta-project switch linth
+battuta-project github link https://github.com/team/linth.git
+```
+
+Linking records or replaces GitHub metadata for the selected project without a network request. It preserves the project name, selection, code directory, summary, Linear association, memory, and specs. It does not clone or configure Git remotes; populating or connecting a local Git checkout is a separate operation. The same HTTPS/SSH repository URL forms accepted by `init --github` are supported.
 
 ## List registered projects
 
@@ -66,7 +80,7 @@ battuta-project switch atlas-api
 battuta-project switch 'My Project'
 ```
 
-The command validates the project's configuration and checkout before updating the persisted selection. It does not change your shell's working directory. If the name is unknown or the configuration is invalid, the previous selection is preserved.
+The command validates the project's configuration and checkout before updating the persisted selection, then reports the current project name, managed root, and code location. It does not change your shell's working directory. If the name is unknown or the configuration is invalid, the previous selection is preserved.
 
 Selection is shared by bots and sessions using the same OS account. Reselect the intended project before commands if another session may have switched it.
 
@@ -75,10 +89,10 @@ Selection is shared by bots and sessions using the same OS account. Reselect the
 ### Link an existing Linear project
 
 ```sh
-battuta-project linear link --project-id <project-id> --team-id <team-id>
+battuta-project linear link <project-id>,<team-id>
 ```
 
-Select a local project first. Both IDs are required, trimmed, and must not be blank. Linking replaces any previous Linear association while preserving the project's other settings. It records the supplied IDs locally without querying Linear or verifying that they exist remotely.
+Select a local project first. The argument uses the same two-ID comma-separated format as `init --linear`; both IDs are required, trimmed, and must not be blank. Linking replaces any previous Linear association while preserving the project's other settings. It records the supplied IDs locally without querying Linear or verifying that they exist remotely, then reports the local project name and linked project/team IDs.
 
 ### Create and link a Linear project
 
@@ -86,7 +100,7 @@ Select a local project first. Both IDs are required, trimmed, and must not be bl
 battuta-project linear create 'Atlas Platform' --team-id <team-id>
 ```
 
-Select the local project you want to link before creating. The name and explicit team ID are required. The command creates a new Linear project associated with the supplied team, then links it to the selected local project. Use this command only when a new remote project is needed; use `linear link` for an existing one.
+Select the local project you want to link before creating. The name and explicit team ID are required, trimmed, and must not be blank. The command creates a new Linear project associated with the supplied team, then links it to the selected local project. It reports the created project's name, ID, and URL, followed by the local project name and linked project/team IDs. Use this command only when a new remote project is needed; use `linear link` for an existing one.
 
 If remote creation succeeds but saving the local link fails, the error includes the created project's ID, URL, and recovery commands. Fix the local error, select the original project, then run the supplied `linear link` command. This saves the link without creating another remote project. Creation is not automatically retried; if a request times out, inspect Linear before trying creation again.
 
@@ -104,7 +118,7 @@ The output distinguishes the Managed Project Directory from Project Root (the re
 
 The Project Summary section displays the managed `SUMMARY.md` as Markdown. Missing or blank summaries show `Project summary: not written yet`; unreadable, invalid UTF-8, symlink, or non-file summaries produce a file error. `explain` never edits the summary or creates artifact directories. Older registrations without a summary remain valid.
 
-The output includes the repository URL and the linked Linear project's URL. Repository information comes from the local registration; `not configured` means it is absent. For a linked project, the command fetches its actual URL from Linear and requires network access and a token with access to that project. An unlinked project shows `not linked` without contacting Linear. Lookup failures are reported as errors; the command does not change the project or its selection.
+The output includes the repository URL and the linked Linear project's URL. Repository information comes from the local registration; `no GitHub repository linked yet` means it is absent. For a linked project, the command fetches its actual URL from Linear and requires network access and a token with access to that project. An unlinked project shows `not linked` without contacting Linear. Lookup failures are reported as errors; the command does not change the project or its selection.
 
 Use the documentation index to find and read applicable `README.md` and `AGENTS.md` files, then work from the displayed Project Root. Documentation paths are relative to that checkout. Discovery is recursive, while the directory tree is limited to two levels. Symlinks, dependencies, and generated directories are excluded.
 
@@ -129,14 +143,14 @@ Use the `memory` skill for scoped Pi tools and autonomous memory management. Pro
 Register a new project and inspect its context:
 
 ```sh
-battuta-project init https://github.com/team/atlas-api.git
+battuta-project init atlas-api --github https://github.com/team/atlas-api.git
 battuta-project explain
 ```
 
 Register another repository when needed:
 
 ```sh
-battuta-project init https://github.com/team/harbor-web.git
+battuta-project init harbor-web --github https://github.com/team/harbor-web.git
 battuta-project explain
 ```
 

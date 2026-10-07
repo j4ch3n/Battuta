@@ -70,15 +70,21 @@ New project initialization creates a rendered summary skeleton. The shared memor
 
 Use [project-spec tools](references/spec-tools.md) for named specs, canonical checklist/review, and terminal decisions. Both roles inspect spec inventories and documents. All writes receive complete content; there is no spec/decision CLI or publish stage.
 
-### `battuta-project init <github-repo-url>`
+### `battuta-project init <project-name>`
 
-**Usage:** `battuta-project init https://github.com/team/atlas-api.git`
+**Usage:** `battuta-project init linth` or `battuta-project init atlas --github https://github.com/team/atlas-api.git --linear project-id,team-id`.
 
 **Output:** Project root, checkout, config, summary locations, and current selection.
 
-**Process:** Clone with `gh` into a managed checkout, render the summary skeleton, then select the project. Fill the overview during project discovery. Already registered names cause an error; failed initialization preserves the previous selection.
+**Process:** Create a managed workspace with an empty code directory, render the summary skeleton, then select the project. Optional `--github <repo-url>` clones with `gh` instead of creating an empty code directory; the explicit project name is retained even when the repository name differs. Without GitHub, repository metadata is null and memory/spec workflows still use the managed storage. Fill the overview during project discovery. Already registered names cause an error; failed initialization preserves the previous selection.
 
-**Linear metadata:** Optional `--linear-project-id <id>` and `--linear-team-id <id>` record existing IDs without querying Linear. Each omitted field defaults to `null`.
+**Linear metadata:** Optional `--linear <project-id>,<team-id>` records both existing IDs without querying Linear. Exactly two nonblank IDs are required and surrounding whitespace is trimmed. Omitting the option leaves both IDs null.
+
+### `battuta-project github link <repo-url>`
+
+**Usage:** `battuta-project github link https://github.com/team/linth.git`
+
+**Process:** Record or replace the current project's GitHub association locally. This does not clone, configure Git remotes, rename the project, or replace workspace files, summaries, memory, or specs. Use this after name-only initialization when a repository becomes available. `explain` reports `no GitHub repository linked yet` until linked.
 
 ### `battuta-project switch <project-name>`
 
@@ -116,7 +122,7 @@ Use [project-spec tools](references/spec-tools.md) for named specs, canonical ch
 
 | Operation | Usage                                                           | Behavior                                                                                                     |
 | --------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `link`    | `battuta-project linear link --project-id <id> --team-id <id>`  | Associate both IDs with the current project; no Linear request.                                              |
+| `link`    | `battuta-project linear link <project-id>,<team-id>`            | Associate both IDs with the current project; no Linear request. Exactly two nonblank IDs are required.       |
 | `create`  | `battuta-project linear create 'Atlas Platform' --team-id <id>` | Create a Linear project, print its ID/URL, and link it to the current local project. Explicit team required. |
 
 IDs and creation names must not be blank. Linear project and team associations belong to the selected project. If creation succeeds but local saving fails, fix the local error and use the error's `switch`/`linear link` recovery commands rather than creating a duplicate. After a creation timeout, inspect Linear before retrying. See [command contracts](references/commands.md#linear-projects).
@@ -127,7 +133,7 @@ Use the `memory` skill for recall and autonomous memory management. Project memo
 
 ## Workflow example
 
-Use `list` to discover registrations or initialize a new repository. Run `current` to confirm selection, then `explain` and retrieve relevant memory before working in the reported checkout. Use `inspect_specs` with the explicit project name for document discovery. Selection is shared by bots using the same OS account; reselect the intended project before commands if another session may have switched it.
+Use `list` to discover registrations or initialize a new project by name, with or without GitHub. Run `current` to confirm selection, then `explain` and retrieve relevant memory before working in the reported checkout. Use `inspect_specs` with the explicit project name for document discovery. Selection is shared by bots using the same OS account; reselect the intended project before commands if another session may have switched it.
 
 ## Reference files
 
