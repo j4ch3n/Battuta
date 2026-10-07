@@ -10,6 +10,7 @@ from pydantic import ValidationError
 import yaml
 
 from .models import CurrentConfig, GithubConfig, LinearConfig, ProjectConfig, ProjectContext, ProjectMetadata, Repository, project_name
+from .discovery import ProjectDiscovery
 from .presentation import render
 from .storage import atomic_write, check_registry_root, file_errors, regular_file
 
@@ -17,6 +18,7 @@ from .storage import atomic_write, check_registry_root, file_errors, regular_fil
 class ProjectRegistry:
     def __init__(self, root: Path | None = None):
         self.root = (root or Path.home() / ".battuta" / "projects").expanduser().absolute()
+        self.discovery = ProjectDiscovery(self.root)
 
     @property
     def state_path(self) -> Path:
@@ -61,12 +63,7 @@ class ProjectRegistry:
     def load(self, name: str) -> ProjectContext:
         with file_errors():
             directory = self._directory(name)
-            if not directory.is_dir():
-                available = self.names()
-                raise click.ClickException(
-                    f"Project '{name}' was not found under {self.root}.\n"
-                    f"Available projects: {', '.join(available) or 'none'}"
-                )
+            self.discovery.require_project(directory, name)
             path = directory / "project.yaml"
             regular_file(path)
             try:
@@ -83,19 +80,13 @@ class ProjectRegistry:
             return ProjectContext(name=name, root=directory, code=code, config=config)
 
     def names(self) -> list[str]:
-        with file_errors():
-            check_registry_root(self.root)
-            return sorted(p.name for p in self.root.iterdir()
-                          if p.is_dir() and not p.is_symlink() and not p.name.startswith(".")) if self.root.is_dir() else []
+        return self.discovery.names()
 
     def list_projects(self) -> list[ProjectContext]:
         return [self.load(name) for name in self.names()]
 
     def current_name(self) -> str:
-        name = self.state().current_project
-        if name is None:
-            raise click.ClickException("No current project. Run battuta-project init <project-name> or switch <project-name>.")
-        return name
+        return self.discovery.require_current(self.state().current_project)
 
     def current(self) -> ProjectContext:
         return self.load(self.current_name())

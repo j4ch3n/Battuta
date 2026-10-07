@@ -4,7 +4,7 @@ Use these Pi tools for managed specifications and documents. They are loaded for
 
 ## Read first
 
-1. Use `battuta-project list` to discover registered projects, or `battuta-project current` to read the selected name. For workspace context, select the intended project and run `explain`. Call `inspect_specs` with the explicit project name to obtain its spec inventory; spec reads do not change CLI selection.
+1. Use `battuta-project list` to discover registered projects, or `battuta-project current` to read the selected name. For workspace context, select the intended project and run `explain`. Call `inspect_specs` with the explicit project name to obtain its spec inventory; spec reads do not require or change CLI selection. Discovery errors distinguish an uninitialized store, an empty registry, and an unknown project name, directing you to the project CLI to discover or initialize projects.
 2. Use `describe_spec` with `project` and the exact display `name`. It returns version history, summaries, presence, coverage, fingerprints, and paths in one locked snapshot. Set `include_content: true` to get the full documents paired with those fingerprints; use this mode for reviewing rather than separately reading files that can change.
 3. Use the responsibility prompt/template linked from SKILL.md to shape the requested document. These are authoring guidance, not permission to edit a saved version or invent implementation authorization.
 
