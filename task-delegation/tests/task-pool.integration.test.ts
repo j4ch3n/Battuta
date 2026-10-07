@@ -444,3 +444,30 @@ it("an Edge finalization error rolls back both the inserted mail and task report
     failed,
   );
 });
+it("targeted atomic claims preserve unrelated earlier/later queue rows, grants and sticky ownership", async () => {
+  const before = await delegate("target-prior");
+  const target = await delegate("target-only");
+  const after = await delegate("target-after");
+  await status(pm, { operation: "claim", projects: [project], task_id: target.id }, 403);
+  await status(other, { operation: "claim", projects: [project], task_id: target.id }, 403);
+  const contenders = [new TaskClient(worker), new TaskClient(peer)];
+  const claims = await Promise.all(
+    contenders.map((client) => client.claim([project], undefined, target.id)),
+  );
+  expect(claims.filter(Boolean)).toHaveLength(1);
+  const winner = claims.findIndex(Boolean);
+  expect(claims[winner]!.id).toBe(target.id);
+  expect(await contenders[1 - winner].claim([project], undefined, target.id)).toBeNull();
+  const rows = await admin
+    .from("tasks_pool")
+    .select("*")
+    .in("id", [before.id, after.id])
+    .returns<TaskRow[]>();
+  if (rows.error) throw rows.error;
+  expect(
+    rows.data.every((row) => row.claimed_by === null && row.opencode_session_id === null),
+  ).toBe(true);
+  expect(await contenders[winner].claim([project], undefined, crypto.randomUUID())).toBeNull();
+  await contenders[winner].finalize(target.id, failed);
+  expect(await contenders[winner].claim([project], undefined, target.id)).toBeNull();
+});

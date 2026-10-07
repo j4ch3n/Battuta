@@ -5,7 +5,7 @@ import {
 } from "../_shared/task-contracts.ts";
 export type TaskRequest =
   | ({ operation: "delegate" } & DelegateInput)
-  | { operation: "claim"; projects: string[] }
+  | { operation: "claim"; projects: string[]; task_id?: string }
   | { operation: "list_owned"; cursor?: string }
   | { operation: "bind"; task_id: string; session_id: string }
   | { operation: "finalize"; task_id: string; report: unknown };
@@ -30,7 +30,12 @@ export function parseRequest(value: unknown): TaskRequest {
       return { operation, ...validateDelegate(input) };
     }
     case "claim":
-      closed(body, ["operation", "projects"]);
+      closed(body, ["operation", "projects", "task_id"], ["task_id"]);
+      if (
+        Object.hasOwn(body, "task_id") &&
+        (typeof body.task_id !== "string" || !uuid.test(body.task_id))
+      )
+        throw new Error("Invalid task ID");
       validatePrincipal({ role: "pm", projects: body.projects });
       if ((body.projects as string[]).length === 0) throw new Error("Invalid request");
       break;

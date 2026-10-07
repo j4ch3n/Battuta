@@ -117,7 +117,7 @@ export async function main(
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   void main(process.argv.slice(2), process.env).catch(() => {
     console.error(
-      "Worker daemon stopped: check configuration and signed worker authority. Before launching with --config /absolute/config.json, start and verify OpenCode 2.0.24 using opencode service start / opencode service status. Retained tasks require inspection; daemon never starts or repairs the service.",
+      "Worker daemon stopped: check configuration and signed worker authority. Before launching with --config /absolute/config.json, check OpenCode with read-only opencode service status and RELEASE.md check-first guidance. Use opencode service start only for a verified absent service after operator inspection and approval; verify version 2.0.24 before launch. Retained tasks require inspection; daemon never starts or repairs the service.",
     );
     process.exitCode = 1;
   });

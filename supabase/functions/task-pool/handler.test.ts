@@ -121,6 +121,41 @@ Deno.test("claim returns null without inventing an execution", async () => {
     args: { p_worker_id: "host", p_projects: ["Battuta"] },
   });
 });
+Deno.test("targeted claim forwards the exact ID through the authorized worker RPC", async () => {
+  const { send, calls } = setup();
+  const response = await send({ operation: "claim", projects: ["Battuta"], task_id: row.id });
+  assertEquals(response.status, 200);
+  assertEquals(calls, [
+    {
+      name: "task_pool_claim",
+      args: { p_worker_id: "host", p_projects: ["Battuta"], p_task_id: row.id },
+    },
+  ]);
+});
+for (const task_id of [null, "", "bad", 3])
+  Deno.test(`rejects invalid targeted claim ID ${task_id}`, async () => {
+    const { send, calls } = setup();
+    assertEquals((await send({ operation: "claim", projects: ["Battuta"], task_id })).status, 400);
+    assertEquals(calls.length, 0);
+  });
+Deno.test("targeted claim retains role and project authorization before RPC", async () => {
+  for (const [role, projects] of [
+    ["pm", ["Battuta"]],
+    ["worker", ["Other"]],
+  ] as const) {
+    const { send, calls } = setup(role);
+    assertEquals((await send({ operation: "claim", projects, task_id: row.id })).status, 403);
+    assertEquals(calls.length, 0);
+  }
+});
+Deno.test("targeted claim rejects an unexpected task response", async () => {
+  const response = await setup().send({
+    operation: "claim",
+    projects: ["Battuta"],
+    task_id: "22345678-1234-4234-8234-123456789abc",
+  });
+  assertEquals(response.status, 500);
+});
 Deno.test("PostgREST's null composite claim is exposed as JSON null", async () => {
   const empty = Object.fromEntries(Object.keys(row).map((key) => [key, null]));
   const response = await setup("worker", empty).send({ operation: "claim", projects: ["Battuta"] });

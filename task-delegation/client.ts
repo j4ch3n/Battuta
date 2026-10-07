@@ -77,17 +77,18 @@ export class TaskClient {
       signal,
     );
   }
-  claim(projects: string[], signal?: AbortSignal): Promise<TaskRow | null> {
+  claim(projects: string[], signal?: AbortSignal, taskId?: string): Promise<TaskRow | null> {
     return this.request(
       "claim",
-      { projects },
+      { projects, ...(taskId === undefined ? {} : { task_id: taskId }) },
       (data) => {
         if (data === null) return null;
         const task = validateTaskRow(data);
         if (
           task.claimed_by === null ||
           task.terminal_report !== null ||
-          !projects.includes(task.project)
+          !projects.includes(task.project) ||
+          (taskId !== undefined && task.id !== taskId)
         )
           throw new Error("Unexpected claim acknowledgement");
         return task;

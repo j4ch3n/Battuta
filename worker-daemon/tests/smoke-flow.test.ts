@@ -1,21 +1,29 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { DelegateInput } from "../../supabase/functions/_shared/task-contracts.ts";
+import type { DelegateInput, TaskRow } from "../../supabase/functions/_shared/task-contracts.ts";
+import type { DaemonOptions } from "../daemon.ts";
 import { task } from "./fixtures.ts";
 import { runSmoke } from "../scripts/smoke.ts";
 
-const state = vi.hoisted(() => ({
-  close: vi.fn(() => Promise.resolve()),
-  release: vi.fn(() => Promise.resolve()),
-  open: vi.fn(() => Promise.resolve({ close: () => Promise.resolve() })),
-  run: vi.fn(() => Promise.resolve()),
-  completed: true,
-  mail: true,
-}));
+const state = vi.hoisted(() => {
+  const projects: Record<string, object> = { "isolated-smoke": {} };
+  return {
+    close: vi.fn(() => Promise.resolve()),
+    release: vi.fn(() => Promise.resolve()),
+    open: vi.fn(() => Promise.resolve({ close: () => Promise.resolve() })),
+    run: vi.fn<(options: DaemonOptions, signal: AbortSignal) => Promise<void>>(() =>
+      Promise.resolve(),
+    ),
+    claim: vi.fn<DaemonOptions["tasks"]["client"]["claim"]>(),
+    projects,
+    completed: true,
+    mail: true,
+  };
+});
 vi.mock("../config.ts", () => ({
   loadConfig: () =>
     Promise.resolve({
       workerId: "worker-1",
-      projects: { "isolated-smoke": {} },
+      projects: state.projects,
       capacity: 1,
       model: { providerID: "fake", modelID: "fake" },
       lockPath: "/test/lock",
@@ -33,6 +41,9 @@ vi.mock("../../task-delegation/auth.ts", () => ({
       close: state.close,
       supabase: {},
       client: {
+        claim: state.claim,
+        bind: () => Promise.reject(new Error("unexpected bind")),
+        finalize: () => Promise.reject(new Error("unexpected finalize")),
         listOwned: () => Promise.resolve({ tasks: [] }),
         delegate: (input: DelegateInput) =>
           Promise.resolve({
@@ -78,6 +89,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.completed = true;
   state.mail = true;
+  state.projects = { "isolated-smoke": {} };
   vi.stubGlobal("fetch", () =>
     Promise.resolve(
       Response.json(
@@ -108,6 +120,24 @@ beforeEach(() => {
       ),
     ),
   );
+});
+it("passes only a one-shot exact-target task client to daemon monitoring", async () => {
+  state.run.mockImplementationOnce(async (options, signal) => {
+    const claimed: TaskRow | null = await options.tasks.client.claim(["isolated-smoke"], signal);
+    expect(claimed?.id).toBe(task.id);
+    expect(await options.tasks.client.claim(["isolated-smoke"], signal)).toBeNull();
+  });
+  // Match the chosen project; the real native boundary tests exercise the full row.
+  state.claim.mockResolvedValue({ ...task, project: "isolated-smoke", opencode_session_id: null });
+  await runSmoke(env);
+  expect(state.claim).toHaveBeenCalledTimes(1);
+  expect(state.claim.mock.calls[0]?.[2]).toBe(task.id);
+});
+it("rejects comma-joined multiple project keys before acquiring resources", async () => {
+  state.projects = { one: {}, two: {} };
+  await expect(runSmoke({ ...env, BATTUTA_SMOKE_PROJECT: "one,two" })).rejects.toThrow();
+  expect(state.release).not.toHaveBeenCalled();
+  expect(state.close).not.toHaveBeenCalled();
 });
 afterEach(() => {
   vi.unstubAllGlobals();
