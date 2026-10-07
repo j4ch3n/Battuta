@@ -419,3 +419,7 @@ enabled = true
 
 [functions.agent-mail]
 verify_jwt = false
+
+[functions.task-pool]
+# Current Auth access tokens are verified with getUser inside the handler.
+verify_jwt = false

@@ -54,8 +54,9 @@ it("routes claim/list/bind/finalize without caller identity", async () => {
   const { client, invoke } = setup(null);
   expect(await client.claim(["Battuta"])).toBeNull();
   expect(invoke.mock.calls[0]?.[1].body).toEqual({ operation: "claim", projects: ["Battuta"] });
-  invoke.mockResolvedValueOnce({ data: { tasks: [row], next: "cursor-1" }, error: null });
-  expect(await client.listOwned("cursor-0")).toEqual({ tasks: [row], next: "cursor-1" });
+  const owned = { ...row, claimed_by: "host", claimed_at: row.created_at };
+  invoke.mockResolvedValueOnce({ data: { tasks: [owned], next: "cursor-1" }, error: null });
+  expect(await client.listOwned("cursor-0")).toEqual({ tasks: [owned], next: "cursor-1" });
   expect(invoke.mock.calls[1]?.[1].body).toEqual({ operation: "list_owned", cursor: "cursor-0" });
   const bound = {
     ...row,
@@ -91,6 +92,29 @@ it("routes claim/list/bind/finalize without caller identity", async () => {
     task_id: row.id,
     report,
   });
+});
+it.each(["queued", "terminal"])("rejects %s rows in unfinished owned pages", async (state) => {
+  const task =
+    state === "queued"
+      ? row
+      : {
+          ...row,
+          claimed_by: "host",
+          claimed_at: row.created_at,
+          terminal_report: {
+            schema_version: 1,
+            state: "failed",
+            summary: "Failed",
+            checks: [],
+            artifacts: [],
+            failure: "Build failed",
+          },
+          finished_at: row.created_at,
+          result_message_ref: { conversation_id: row.id, id: "abcdef123456" },
+        };
+  await expect(setup({ tasks: [task], next: null }).client.listOwned()).rejects.toThrow(
+    "Unexpected owned task",
+  );
 });
 it.each([
   new FunctionsFetchError(new Error("offline")),
