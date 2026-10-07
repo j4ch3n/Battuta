@@ -11,6 +11,7 @@ import type {
 import type { Static } from "typebox";
 import { SendArguments, type Message, type MessageReference } from "../schemas.ts";
 import { content, requestContent, completedContent } from "./fixtures.ts";
+import { isWorkerResult } from "../worker-result.ts";
 
 type Delivery = {
   customType: string;
@@ -298,7 +299,9 @@ test("complete reports cover original requirements, including after an initial p
       /Do not create duplicate retry work/,
     );
     const report = await lead.execute("send_agent_message", followup);
-    assert.equal((await row(report.details.message_ref)).content.result?.state, "complete");
+    const reportContent = (await row(report.details.message_ref)).content;
+    assert.ok(!isWorkerResult(reportContent));
+    assert.equal(reportContent.result?.state, "complete");
   } finally {
     await lead.stop();
     await cleanup([lead.id, conversation]);

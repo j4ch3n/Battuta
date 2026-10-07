@@ -1,6 +1,7 @@
 import { Type, type Static, type TSchema } from "typebox";
 import { Format } from "typebox/format";
 import { Value } from "typebox/value";
+import { isWorkerResult, validateWorkerMessage, WorkerResultSchema } from "./worker-result.ts";
 import {
   MessageContentSchema,
   MessageReferenceSchema,
@@ -100,7 +101,7 @@ export const StoredMessage = Type.Object(
     sender: Type.String(),
     recipient: Type.String(),
     message_type: MessageType,
-    content: Content,
+    content: Type.Union([Content, WorkerResultSchema]),
     status: Type.Union([Type.Literal("created"), Type.Literal("read"), Type.Literal("replied")]),
     in_reply_to: Type.Union([Type.Null(), MessageRef.properties.id]),
     response_due: Type.Union([Type.Null(), Type.String({ format: "date-time" })]),
@@ -116,8 +117,14 @@ export const reference = (message: Message): MessageReference => ({
   id: message.id,
 });
 export const referenceKey = (ref: MessageReference) => `${ref.conversation_id}:${ref.id}`;
+export function validateReceivedMessage(message: Message) {
+  if (isWorkerResult(message.content))
+    validateWorkerMessage({ ...message, content: message.content });
+  else validateContent(message.content);
+  return message;
+}
 export function envelope(message: Message) {
-  validateContent(message.content);
+  validateReceivedMessage(message);
   return {
     message_ref: reference(message),
     in_reply_to:
