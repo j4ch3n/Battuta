@@ -110,13 +110,16 @@ function harness(
         },
         or: () => query,
         order: () => query,
-        range: () =>
+        range: (start: number, end: number) =>
           Promise.resolve({
-            data: rows.filter(
-              (row) =>
-                row.recipient === "pm" &&
-                (row.status === "created" || (row.status === "read" && row.response_due !== null)),
-            ),
+            data: rows
+              .filter(
+                (row) =>
+                  row.recipient === "pm" &&
+                  (row.status === "created" ||
+                    (row.status === "read" && row.response_due !== null)),
+              )
+              .slice(start, end + 1),
             error: null,
           }),
         single: () =>
@@ -265,6 +268,55 @@ it("does not let invalid worker routing starve ordinary PM/TL mail", async () =>
   await h.accept();
   expect(h.rows[1].status).toBe("read");
   expect(h.rows[0].status).toBe("created");
+  await h.stop();
+});
+it.each(
+  [
+    { ...workerContent, task_id: "private" },
+    { ...workerContent, text: " " },
+    { ...workerContent, references: [{ locator: "x", description: "wrong shape" }] },
+  ].flatMap((content) => [0, 20].map((offset) => ({ content, offset }))),
+)(
+  "skips malformed worker content $content at offset $offset without starvation or acknowledgement",
+  async ({ content: invalidContent, offset }) => {
+    const rows: Record<string, unknown>[] = Array.from({ length: 23 }, (_, index) => ({
+      ...workerRow,
+      id: (index + 1).toString(16).padStart(12, "0"),
+      ...(index % 2 === 0 ? { sender: "tl", content: content("Ordinary update") } : {}),
+    }));
+    rows[offset] = { ...rows[offset], sender: workerRow.sender, content: invalidContent };
+    const invalid = structuredClone(rows[offset]);
+    const h = harness(rows);
+    await h.start();
+    expect(h.messages).toHaveLength(22);
+    expect(h.messages.some((message) => message.details.message_ref.id === invalid.id)).toBe(false);
+    expect(h.messages.some((message) => message.details.message_ref.id === rows[22].id)).toBe(true);
+    for (const message of h.messages) await h.accept(message);
+    expect(h.invoke.mock.calls).toHaveLength(22);
+    expect(
+      h.invoke.mock.calls.some(
+        ([, options]) => (options.body.message_ref as typeof ref).id === invalid.id,
+      ),
+    ).toBe(false);
+    expect(rows[offset]).toEqual(invalid);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining("Invalid worker result"));
+    await h.stop();
+  },
+);
+it("keeps ordinary malformed content strict rather than silently skipping it", async () => {
+  const h = harness([
+    { ...workerRow },
+    {
+      ...workerRow,
+      id: "222222222222",
+      sender: "tl",
+      content: { ...content("Update"), extra: true },
+    },
+  ]);
+  await h.start();
+  expect(h.messages).toEqual([]);
+  expect(h.invoke).not.toHaveBeenCalled();
+  expect(console.error).toHaveBeenCalledWith(expect.stringContaining("Reconciliation failed"));
   await h.stop();
 });
 it("retains ordinary request obligations, exact coverage, and stored replies", async () => {

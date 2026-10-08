@@ -130,7 +130,7 @@ export default function (pi: ExtensionAPI) {
       const rows: Message[] = [];
       for (let offset = 0; ; offset += 20) {
         const page = validate(
-          Type.Array(StoredMessage),
+          Type.Array(Type.Unknown()),
           unwrap(
             await db
               .from("agent_messages")
@@ -143,14 +143,27 @@ export default function (pi: ExtensionAPI) {
               .range(offset, offset + 19),
           ),
         );
-        for (const row of page) {
-          if (isWorkerResult(row.content)) {
-            try {
-              validateReceivedMessage(row);
-            } catch (error) {
+        for (const raw of page) {
+          let row: Message;
+          try {
+            row = validate(StoredMessage, raw);
+            if (isWorkerResult(row.content)) validateReceivedMessage(row);
+          } catch (error) {
+            // Detect the receive-only variant before strict row/content validation.
+            // Ordinary malformed mail still fails the scan; its schemas are unchanged.
+            if (
+              raw &&
+              typeof raw === "object" &&
+              "content" in raw &&
+              raw.content &&
+              typeof raw.content === "object" &&
+              "kind" in raw.content &&
+              raw.content.kind === "worker_result"
+            ) {
               log("Invalid worker result", error);
               continue;
             }
+            throw error;
           }
           rows.push(row);
         }

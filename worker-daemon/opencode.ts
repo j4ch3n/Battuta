@@ -39,10 +39,10 @@ export interface ExecutionSnapshot {
   reportError?: string;
 }
 export interface OpenCodeAdapter {
-  listSessions(): Promise<SessionInfo[]>;
-  create(task: TaskRow, directory: string): Promise<SessionInfo>;
-  admit(task: TaskRow, sessionId: string): Promise<void>;
-  inspect(task: TaskRow): Promise<ExecutionSnapshot>;
+  listSessions(signal?: AbortSignal): Promise<SessionInfo[]>;
+  create(task: TaskRow, directory: string, signal?: AbortSignal): Promise<SessionInfo>;
+  admit(task: TaskRow, sessionId: string, signal?: AbortSignal): Promise<void>;
+  inspect(task: TaskRow, signal?: AbortSignal): Promise<ExecutionSnapshot>;
   events(signal: AbortSignal): AsyncIterable<unknown>;
   close(): Promise<void>;
 }
@@ -178,14 +178,19 @@ export async function createOpenCodeAdapter(
   async function bounded<T>(
     operation: (signal: AbortSignal) => Promise<T>,
     write = false,
+    callerSignal?: AbortSignal,
   ): Promise<T> {
     const controller = new AbortController();
-    const signal = AbortSignal.any([controller.signal, lifetime.signal]);
+    const signal = AbortSignal.any([
+      controller.signal,
+      lifetime.signal,
+      ...(callerSignal ? [callerSignal] : []),
+    ]);
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let onAbort: (() => void) | undefined;
     const aborted = new Promise<never>((_resolve, reject) => {
-      signal.addEventListener("abort", () => reject(new Error("request interrupted")), {
-        once: true,
-      });
+      onAbort = () => reject(new Error("request interrupted"));
+      signal.addEventListener("abort", onAbort, { once: true });
       timer = setTimeout(() => controller.abort(), write ? 30000 : 10000);
     });
     try {
@@ -199,6 +204,7 @@ export async function createOpenCodeAdapter(
       );
     } finally {
       clearTimeout(timer);
+      if (onAbort) signal.removeEventListener("abort", onAbort);
     }
   }
   const endpoint = await bounded(async () => {
@@ -228,7 +234,8 @@ export async function createOpenCodeAdapter(
     throw new Error(
       `OpenCode server version must match pinned client ${VERSION}; operator must start and verify the compatible background service before running the daemon (service left untouched)`,
     );
-  const read = <T>(operation: (signal: AbortSignal) => Promise<T>) => bounded(operation);
+  const read = <T>(operation: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal) =>
+    bounded(operation, false, signal);
   async function pages<T>(
     fetchPage: (cursor?: string) => Promise<{ data: T[]; cursor: { next?: string | null } }>,
   ): Promise<T[]> {
@@ -247,22 +254,29 @@ export async function createOpenCodeAdapter(
     } while (cursor);
     return items;
   }
-  async function permissionsConcern(session: NativeSession): Promise<string | undefined> {
+  async function permissionsConcern(
+    session: NativeSession,
+    callerSignal?: AbortSignal,
+  ): Promise<string | undefined> {
     const rules = session.permissions;
     if (!unrestricted(rules))
       return "NEEDS_CONTEXT: returned session permissions are not unrestricted";
     const location = { directory: session.location.directory };
-    const entries = await read((signal) => client.config.get({ location }, { signal }));
+    const entries = await read(
+      (signal) => client.config.get({ location }, { signal }),
+      callerSignal,
+    );
     // Observations are not universal policy proof. Dynamic Console restrictions remain
     // enforced by OpenCode; absence of observable denies is sufficient for admission.
     return configurationConcern(entries);
   }
-  async function get(task: TaskRow): Promise<NativeSession> {
+  async function get(task: TaskRow, callerSignal?: AbortSignal): Promise<NativeSession> {
     owned(task, config);
     if (!task.opencode_session_id)
       throw new Error("Task session binding missing; operator inspection required");
-    return read((signal) =>
-      client.session.get({ sessionID: task.opencode_session_id! }, { signal }),
+    return read(
+      (signal) => client.session.get({ sessionID: task.opencode_session_id! }, { signal }),
+      callerSignal,
     );
   }
   async function validate(task: TaskRow, session: NativeSession): Promise<void> {
@@ -270,17 +284,19 @@ export async function createOpenCodeAdapter(
     await validateWorktreeLocation(task, config, session.location.directory);
   }
   return {
-    async listSessions() {
+    async listSessions(callerSignal) {
       return (
         await pages((cursor) =>
-          read((signal) => client.session.list({ order: "asc", cursor }, { signal })),
+          read((signal) => client.session.list({ order: "asc", cursor }, { signal }), callerSignal),
         )
       ).map(info);
     },
-    async create(task, directory) {
+    async create(task, directory, callerSignal) {
+      callerSignal?.throwIfAborted();
       owned(task, config);
       if (task.opencode_session_id !== null) throw new Error("Fresh unbound task required");
       await validateWorktreeLocation(task, config, directory);
+      callerSignal?.throwIfAborted();
       const session = await bounded(
         (signal) =>
           client.session.create(
@@ -296,6 +312,7 @@ export async function createOpenCodeAdapter(
             { signal },
           ),
         true,
+        callerSignal,
       );
       // A rejected/malformed response may still have created a session; never create again blindly.
       try {
@@ -309,17 +326,21 @@ export async function createOpenCodeAdapter(
       }
       return info(session);
     },
-    async admit(task, sessionId) {
+    async admit(task, sessionId, callerSignal) {
+      callerSignal?.throwIfAborted();
       owned(task, config);
       if (task.opencode_session_id !== sessionId)
         throw new Error("Persisted session binding required before admission");
-      const session = await get(task);
+      const session = await get(task, callerSignal);
+      callerSignal?.throwIfAborted();
       await validate(task, session);
+      callerSignal?.throwIfAborted();
       // No permission bypass/approval or mutation of global configuration is permitted.
-      const concern = await permissionsConcern(session);
+      const concern = await permissionsConcern(session, callerSignal);
       if (concern) throw new Error(concern);
-      const pending = await read((signal) =>
-        client.permission.list({ sessionID: sessionId }, { signal }),
+      const pending = await read(
+        (signal) => client.permission.list({ sessionID: sessionId }, { signal }),
+        callerSignal,
       );
       if (!Array.isArray(pending))
         throw new Error("Unsupported native pending permission response");
@@ -327,9 +348,13 @@ export async function createOpenCodeAdapter(
         throw new Error("Native permission requests pending; human/operator decision required");
       const text = buildPrompt(task);
       const id = initialPromptId(task.id);
+      callerSignal?.throwIfAborted();
       const admitted = await bounded(
-        (signal) =>
-          client.session.prompt(
+        (signal) => {
+          // Aborting local transport must never become a native cancel/interrupt.
+          // Once submitted, an interrupted POST remains an uncertain write.
+          signal.throwIfAborted();
+          return client.session.prompt(
             {
               sessionID: sessionId,
               id,
@@ -339,8 +364,10 @@ export async function createOpenCodeAdapter(
               metadata: metadata(task, config),
             },
             { signal },
-          ),
+          );
+        },
         true,
+        callerSignal,
       );
       if (
         !admitted ||
@@ -355,8 +382,8 @@ export async function createOpenCodeAdapter(
           "Prompt admission response uncertain; inspect inbox/history before retrying",
         );
     },
-    async inspect(task) {
-      const session = await get(task);
+    async inspect(task, callerSignal) {
+      const session = await get(task, callerSignal);
       const snapshot: ExecutionSnapshot = {
         session: info(session),
         valid: false,
@@ -368,21 +395,25 @@ export async function createOpenCodeAdapter(
       };
       try {
         await validate(task, session);
+        callerSignal?.throwIfAborted();
         snapshot.valid = true;
       } catch (error) {
         snapshot.validationError =
           error instanceof Error ? error.message : "Invalid binding/location";
         return snapshot;
       }
-      snapshot.permissionsConcern = await permissionsConcern(session);
+      snapshot.permissionsConcern = await permissionsConcern(session, callerSignal);
       const sessionID = session.id;
       const [active, inbox, forms, pendingPermissions, messages] = await Promise.all([
-        read((signal) => client.session.active({ signal })),
-        read((signal) => client.session.inbox.list({ sessionID }, { signal })),
-        read((signal) => client.session.form.list({ sessionID }, { signal })),
-        read((signal) => client.permission.list({ sessionID }, { signal })),
+        read((signal) => client.session.active({ signal }), callerSignal),
+        read((signal) => client.session.inbox.list({ sessionID }, { signal }), callerSignal),
+        read((signal) => client.session.form.list({ sessionID }, { signal }), callerSignal),
+        read((signal) => client.permission.list({ sessionID }, { signal }), callerSignal),
         pages((cursor) =>
-          read((signal) => client.message.list({ sessionID, order: "asc", cursor }, { signal })),
+          read(
+            (signal) => client.message.list({ sessionID, order: "asc", cursor }, { signal }),
+            callerSignal,
+          ),
         ),
       ]);
       if (
@@ -442,7 +473,11 @@ export async function createOpenCodeAdapter(
         latest &&
         (assistants[1]?.time.created === latest.time.created ||
           messages.some(
-            (message) => message.type === "user" && message.time.created >= latest.time.created,
+            (message) =>
+              // Delivered inbox execution inputs; lifecycle/configuration records
+              // (idle, compaction, model/location selection) are informational.
+              (message.type === "user" || message.type === "synthetic") &&
+              message.time.created >= latest.time.created,
           ))
       ) {
         snapshot.reportError =

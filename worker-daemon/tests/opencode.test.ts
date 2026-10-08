@@ -12,12 +12,21 @@ import type { WorkerConfig } from "../config.ts";
 import { prepareWorktree } from "../worktree.ts";
 import { buildPrompt } from "../prompt.ts";
 import { task, report } from "./fixtures.ts";
+import { runDaemon } from "../daemon.ts";
+import type { TaskRow } from "../../supabase/functions/_shared/task-contracts.ts";
+import type { OpenCodeAdapter } from "../opencode.ts";
 
 let root: string;
 let directory: string;
 let config: WorkerConfig;
 let routes: Record<string, unknown>;
-let requests: { method: string; path: string; body: unknown; authorization: string | null }[];
+let requests: {
+  method: string;
+  path: string;
+  body: unknown;
+  authorization: string | null;
+  signal?: AbortSignal | null;
+}[];
 let deps: AdapterDependencies;
 let ensure: MockInstance<typeof Service.ensure>;
 let stop: MockInstance<typeof Service.stop>;
@@ -144,8 +153,9 @@ beforeEach(async () => {
             path: url.pathname + url.search,
             body: typeof init?.body === "string" ? (JSON.parse(init.body) as unknown) : undefined,
             authorization: new Headers(init?.headers).get("authorization"),
+            signal: init?.signal,
           });
-          const value = routes[key];
+          const value = await routes[key];
           if (value instanceof Error) throw value;
           if (value instanceof Response) return value;
           if (value === "hang") return new Promise<Response>(() => {});
@@ -157,6 +167,144 @@ beforeEach(async () => {
   // Extra runtime traps are deliberately outside the discover/headers-only contract.
   Object.assign(deps.service, { ensure, stop });
 });
+
+function daemonFixture(adapter: OpenCodeAdapter, initial: TaskRow[]) {
+  const owned = initial;
+  const controller = new AbortController();
+  const cleanup = vi.fn();
+  const log = vi.fn();
+  const claim = vi.fn(() => {
+    const row = structuredClone(task);
+    owned.push(row);
+    return Promise.resolve(row);
+  });
+  const finalize = vi.fn(() => Promise.resolve(bound));
+  const close = vi.spyOn(adapter, "close");
+  const running = runDaemon(
+    {
+      config,
+      tasks: {
+        principal: { role: "worker", worker_id: "worker-1", projects: [task.project] },
+        client: {
+          listOwned: () => Promise.resolve({ tasks: [...owned], next: null }),
+          claim,
+          bind: (id, sessionID) => {
+            const row = owned.find((row) => row.id === id)!;
+            row.opencode_session_id = sessionID;
+            return Promise.resolve(row);
+          },
+          finalize,
+        },
+      },
+      opencode: {
+        ...adapter,
+        events: async function* (signal) {
+          await new Promise<void>((resolve) => {
+            if (signal.aborted) resolve();
+            else signal.addEventListener("abort", () => resolve(), { once: true });
+          });
+          yield { type: "closed" };
+        },
+      },
+      prepareWorktree: () => Promise.resolve(directory),
+      subscribeQueue: () => Promise.resolve(cleanup),
+      log,
+    },
+    controller.signal,
+  );
+  return { owned, controller, cleanup, close, log, claim, finalize, running };
+}
+
+it.each(["user", "synthetic"])(
+  "retains ownership and blocks finalization/new claims after later delivered %s input",
+  async (type) => {
+    routes["GET /api/session/ses_example/message?order=asc"] = {
+      data: [
+        { id: promptId, type: "user", time: { created: 10 }, text: buildPrompt(task) },
+        assistant(),
+        { id: "msg_later", type, time: { created: 30 }, text: "more work" },
+        { id: "msg_idle", type: "idle", time: { created: 40 }, outcome: "interrupted" },
+      ],
+      cursor: {},
+    };
+    const adapter = await createOpenCodeAdapter(config, deps);
+    const snapshot = await adapter.inspect(bound);
+    const f = daemonFixture(adapter, [structuredClone(bound)]);
+    await vi.waitFor(() =>
+      expect(f.log).toHaveBeenCalledWith("recovery_required", expect.any(String)),
+    );
+    f.controller.abort();
+    await f.running;
+    expect(snapshot.active).toBe(false);
+    expect(snapshot.pendingInputs).toEqual([]);
+    expect(snapshot.report).toBeUndefined();
+    expect(f.finalize).not.toHaveBeenCalled();
+    expect(f.claim).not.toHaveBeenCalled();
+    expect(f.owned).toEqual([bound]);
+    expect(f.cleanup).toHaveBeenCalledOnce();
+  },
+);
+
+it.each([20, 30, 40])(
+  "checks synthetic input ordering against final assistant at %s",
+  async (created) => {
+    routes["GET /api/session/ses_example/message?order=asc"] = {
+      data: [
+        { id: promptId, type: "user", time: { created: 10 }, text: buildPrompt(task) },
+        assistant(),
+        { id: "msg_synthetic", type: "synthetic", time: { created: 30 }, text: "continue" },
+        ...(created === 20 ? [] : [assistant(resultBlock, created)]),
+        { id: "msg_idle", type: "idle", time: { created: 50 }, outcome: "succeeded" },
+      ],
+      cursor: {},
+    };
+    const adapter = await createOpenCodeAdapter(config, deps);
+    const snapshot = await adapter.inspect(bound);
+    if (created === 40) expect(snapshot.report).toEqual(report);
+    else {
+      expect(snapshot.report).toBeUndefined();
+      expect(snapshot.reportError).toMatch(/ambiguous/);
+    }
+  },
+);
+
+it.each(["config", "permission"])(
+  "shutdown during deferred native %s preflight never POSTs",
+  async (kind) => {
+    routes["GET /api/session?order=asc"] = { data: [], cursor: {} };
+    const key =
+      kind === "config"
+        ? "GET /api/config?" + new URLSearchParams({ "location[directory]": directory }).toString()
+        : "GET /api/session/ses_example/permission";
+    let release!: (value: unknown) => void;
+    routes[key] = new Promise((resolve) => {
+      release = resolve;
+    });
+    const adapter = await createOpenCodeAdapter(config, deps);
+    const f = daemonFixture(adapter, []);
+    await vi.waitFor(() =>
+      expect(requests.some((request) => `${request.method} ${request.path}` === key)).toBe(true),
+    );
+    f.controller.abort();
+    await vi.waitFor(() => expect(f.cleanup).toHaveBeenCalledOnce());
+    expect(
+      requests.find((request) => `${request.method} ${request.path}` === key)?.signal?.aborted,
+    ).toBe(true);
+    release(kind === "config" ? [] : { data: [] });
+    await f.running;
+    expect(requests.filter((request) => request.path.endsWith("/prompt"))).toEqual([]);
+    expect(
+      requests.filter((request) => request.method !== "GET").map((request) => request.path),
+    ).toEqual(["/api/session"]);
+    expect(f.owned).toEqual([bound]);
+    expect(f.finalize).not.toHaveBeenCalled();
+    expect(f.claim).toHaveBeenCalledOnce();
+    expect(f.cleanup).toHaveBeenCalledOnce();
+    expect(f.close).toHaveBeenCalledOnce();
+    expect(await realpath(directory)).toBe(directory);
+    await expect(adapter.listSessions()).rejects.toThrow(/read unavailable/);
+  },
+);
 afterEach(async () => {
   try {
     expect(ensure).not.toHaveBeenCalled();
@@ -582,6 +730,59 @@ it("bounds uncertain admission without retries or changing IDs", async () => {
   expect(requests.filter((r) => r.method === "POST")).toHaveLength(1);
   expect(requests.find((r) => r.method === "POST")?.body).toMatchObject({ id: promptId });
 });
+it("aborting an in-flight prompt preserves uncertainty without any native cancellation", async () => {
+  routes["POST /api/session/ses_example/prompt"] = "hang";
+  const adapter = await createOpenCodeAdapter(config, deps);
+  const controller = new AbortController();
+  const result = expect(adapter.admit(bound, "ses_example", controller.signal)).rejects.toThrow(
+    /write uncertain/,
+  );
+  await vi.waitFor(() =>
+    expect(requests.some((request) => request.path.endsWith("/prompt"))).toBe(true),
+  );
+  controller.abort();
+  await result;
+  expect(
+    requests.filter((request) => request.method !== "GET").map((request) => request.path),
+  ).toEqual(["/api/session/ses_example/prompt"]);
+  expect(requests.find((request) => request.path.endsWith("/prompt"))?.signal?.aborted).toBe(true);
+  await adapter.close();
+});
+it.each(["list", "create", "inspect"])(
+  "bounds %s local HTTP activity with the caller shutdown signal",
+  async (kind) => {
+    const key =
+      kind === "list"
+        ? "GET /api/session?order=asc"
+        : kind === "create"
+          ? "POST /api/session"
+          : "GET /api/session/ses_example";
+    routes[key] = "hang";
+    const adapter = await createOpenCodeAdapter(config, deps);
+    const controller = new AbortController();
+    const operation =
+      kind === "list"
+        ? adapter.listSessions(controller.signal)
+        : kind === "create"
+          ? adapter.create(task, directory, controller.signal)
+          : adapter.inspect(bound, controller.signal);
+    const result = expect(operation).rejects.toThrow(
+      kind === "create" ? /write uncertain/ : /read unavailable/,
+    );
+    await vi.waitFor(() =>
+      expect(requests.some((request) => `${request.method} ${request.path}` === key)).toBe(true),
+    );
+    controller.abort();
+    try {
+      expect(
+        requests.find((request) => `${request.method} ${request.path}` === key)?.signal?.aborted,
+      ).toBe(true);
+    } finally {
+      await adapter.close();
+      await result;
+    }
+  },
+);
 it.each([
   "transport",
   "wrong-id",

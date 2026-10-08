@@ -132,7 +132,7 @@ export async function runDaemon(options: DaemonOptions, signal: AbortSignal): Pr
           `${id}: no longer unfinished after full ownership scan; discarded pending report`,
         );
     }
-    const sessions = await opencode.listSessions();
+    const sessions = await opencode.listSessions(local.signal);
     let blocked = uncertainClaim;
     let unfinished = owned.length;
     for (const row of owned) {
@@ -155,7 +155,7 @@ export async function runDaemon(options: DaemonOptions, signal: AbortSignal): Pr
       }
       let snapshot: ExecutionSnapshot;
       try {
-        snapshot = await opencode.inspect(row);
+        snapshot = await opencode.inspect(row, local.signal);
       } catch {
         recovery(row.id, "native execution inspection is unavailable or unsupported");
         throw new Error("Execution inspection unavailable");
@@ -236,11 +236,11 @@ export async function runDaemon(options: DaemonOptions, signal: AbortSignal): Pr
       try {
         const directory = await options.prepareWorktree(row, config);
         if (local.signal.aborted) return;
-        const session = await opencode.create(row, directory);
+        const session = await opencode.create(row, directory, local.signal);
         if (local.signal.aborted) return;
         const bound = await tasks.client.bind(row.id, session.id, local.signal);
         if (local.signal.aborted) return;
-        await opencode.admit(bound, session.id);
+        await opencode.admit(bound, session.id, local.signal);
       } catch {
         recovery(
           row.id,

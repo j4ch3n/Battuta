@@ -154,6 +154,7 @@ it("executes a claim in order, finalizes native report and accepts the next task
   expect(f.options.opencode.admit).toHaveBeenCalledWith(
     expect.objectContaining({ opencode_session_id: `ses_${task.id}` }),
     `ses_${task.id}`,
+    expect.any(AbortSignal),
   );
   f.snapshots.set(task.id, { active: false, report });
   f.queue.push({ ...structuredClone(task), id: "22345678-1234-1234-1234-123456789abc" });
