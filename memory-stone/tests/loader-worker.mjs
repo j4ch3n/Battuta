@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { pathToFileURL } from "node:url";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, realpath, writeFile } from "node:fs/promises";
 
 const [database, agentDirectory, hostPiEntry] = process.argv.slice(2);
 const piModule = hostPiEntry
-  ? pathToFileURL(hostPiEntry).href
+  ? pathToFileURL(await realpath(hostPiEntry)).href
   : import.meta.resolve("@earendil-works/pi-coding-agent");
 const { discoverAndLoadExtensions } = await import(piModule);
 const { normalizeBuildSystemPromptOptions, buildSystemPromptState } = await import(
