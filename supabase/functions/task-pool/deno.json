@@ -1,0 +1,11 @@
+{
+  "tasks": {
+    "lint": "deno lint .",
+    "check": "deno check --frozen .",
+    "test": "deno test --frozen ."
+  },
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.117.1",
+    "@std/assert": "jsr:@std/assert@1.0.14"
+  }
+}

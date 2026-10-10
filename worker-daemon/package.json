@@ -1,0 +1,22 @@
+{
+  "name": "battuta-worker-daemon",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.20.0",
+  "dependencies": {
+    "@opencode/client": "2.0.24"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/node": "24.19.1",
+    "@vitest/coverage-v8": "4.1.11",
+    "vitest": "4.1.11"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run --project unit",
+    "test:coverage": "vitest run --project unit --coverage",
+    "test:integration": "vitest run --project integration",
+    "smoke": "node scripts/smoke.ts"
+  }
+}

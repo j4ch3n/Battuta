@@ -18,9 +18,11 @@ import {
   StoredMessage,
   validate,
   validateCoverage,
+  validateReceivedMessage,
   type Message,
   type MessageReference,
 } from "./schemas.ts";
+import { isWorkerResult } from "./worker-result.ts";
 
 class UncertainWriteError extends Error {}
 
@@ -128,7 +130,7 @@ export default function (pi: ExtensionAPI) {
       const rows: Message[] = [];
       for (let offset = 0; ; offset += 20) {
         const page = validate(
-          Type.Array(StoredMessage),
+          Type.Array(Type.Unknown()),
           unwrap(
             await db
               .from("agent_messages")
@@ -141,7 +143,30 @@ export default function (pi: ExtensionAPI) {
               .range(offset, offset + 19),
           ),
         );
-        rows.push(...page);
+        for (const raw of page) {
+          let row: Message;
+          try {
+            row = validate(StoredMessage, raw);
+            if (isWorkerResult(row.content)) validateReceivedMessage(row);
+          } catch (error) {
+            // Detect the receive-only variant before strict row/content validation.
+            // Ordinary malformed mail still fails the scan; its schemas are unchanged.
+            if (
+              raw &&
+              typeof raw === "object" &&
+              "content" in raw &&
+              raw.content &&
+              typeof raw.content === "object" &&
+              "kind" in raw.content &&
+              raw.content.kind === "worker_result"
+            ) {
+              log("Invalid worker result", error);
+              continue;
+            }
+            throw error;
+          }
+          rows.push(row);
+        }
         if (!live || token !== generation) return;
         if (page.length < 20) break;
       }
@@ -249,6 +274,8 @@ export default function (pi: ExtensionAPI) {
       return message;
     };
     const parent = "parent" in request ? await load(request.parent) : null;
+    if (parent && isWorkerResult(parent.content))
+      throw new Error("Cannot reply to receive-only worker results; replies are PM/TL only");
     if (parent && (parent.recipient !== role || parent.status !== "read")) {
       throw new Error(
         "Reply parent is not addressed to this role, not accepted, or already answered",
@@ -266,6 +293,8 @@ export default function (pi: ExtensionAPI) {
       while (cursor && !seen.has(referenceKey(cursor))) {
         seen.add(referenceKey(cursor));
         const message = await load(cursor);
+        if (isWorkerResult(message.content))
+          throw new Error("related_messages must reference PM/TL exchanges, not worker results");
         if (!(
           (message.sender === role && message.recipient === recipient) ||
           (message.sender === recipient && message.recipient === role)

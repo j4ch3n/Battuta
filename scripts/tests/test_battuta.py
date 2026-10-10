@@ -40,6 +40,23 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"],
                 self.assertEqual(response["memory"], str(Path.home() / ".battuta/memory/memory.db"))
                 self.assertIn(str(self.root / "project-spec/index.ts"), response["args"])
                 self.assertIn(str(self.root / "memory-stone/index.ts"), response["args"])
+                self.assertIn(str(self.root / "task-delegation/index.ts"), response["args"])
+
+    def test_worker_launch_needs_no_bot_configuration_or_admin_credentials(self):
+        shutil.rmtree(self.root / "bots")
+        (self.root / ".env.prod").write_text("SUPABASE_URL=http://localhost:54321\nSUPABASE_PUBLISHABLE_KEY=public\nWORKER_TASK_EMAIL=worker@test.local\nWORKER_TASK_PASSWORD=private\n")
+        (self.root / "worker-daemon/node_modules").mkdir(parents=True)
+        (self.root / "task-delegation/node_modules").mkdir(parents=True, exist_ok=True)
+        self.executable("node", '''import json, os, sys
+print(json.dumps({"args": sys.argv[1:], "email": os.environ.get("WORKER_TASK_EMAIL"), "admin": os.environ.get("SUPABASE_SECRET_KEY")}))
+''')
+        env = {key: value for key, value in os.environ.items() if not key.startswith("SUPABASE_")}
+        result = subprocess.run(["bash", str(self.bin / "battuta"), "worker", "--config", "/private/config.json"], env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        response = json.loads(result.stdout)
+        self.assertEqual(response["args"], [str(self.root / "worker-daemon/main.ts"), "--config", "/private/config.json"])
+        self.assertEqual(response["email"], "worker@test.local")
+        self.assertIsNone(response["admin"])
 
     def test_both_roles_honor_the_same_database_override(self):
         path = self.root / "custom memory/shared.db"

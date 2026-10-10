@@ -34,12 +34,14 @@ setup-pm-bot:
 	pnpm --dir agent-mail install
 	pnpm --dir project-spec install --frozen-lockfile
 	pnpm --dir memory-stone install --frozen-lockfile
+	pnpm --dir task-delegation install --frozen-lockfile
 
 setup-tl-bot:
 	uv run --locked python bots/tl-bot/scripts/configure-bot.py
 	pnpm --dir agent-mail install
 	pnpm --dir project-spec install --frozen-lockfile
 	pnpm --dir memory-stone install --frozen-lockfile
+	pnpm --dir task-delegation install --frozen-lockfile
 
 setup-bot: setup-pm-bot setup-tl-bot
 

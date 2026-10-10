@@ -1,0 +1,10 @@
+{
+  "workerId": "example-host",
+  "projects": {
+    "example": { "checkout": "/home/battuta/projects/example", "baseRef": "main" }
+  },
+  "worktreeRoot": "/home/battuta/worktrees",
+  "capacity": 1,
+  "reconcileMs": 10000,
+  "model": { "providerID": "openai", "modelID": "owner-selected-model" }
+}
