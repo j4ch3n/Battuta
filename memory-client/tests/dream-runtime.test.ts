@@ -206,3 +206,27 @@ test("a failed reflection retries independently of confirmed mutations", async (
   expect(f.applied).toHaveLength(3);
   expect(f.plans()).toBe(1);
 });
+
+test("a terminal conflict logs only confirmed changes and leaves dependent cleanup unapplied", async () => {
+  const f = await fixture();
+  const call = f.dependencies.call,
+    complete = f.dependencies.complete;
+  f.dependencies.call = (name, args, signal) =>
+    name === "memory_update"
+      ? Promise.reject(Object.assign(new Error("private backend detail"), { retryable: false }))
+      : call(name, args, signal);
+  f.dependencies.complete = (prompt, input, signal) => {
+    if (prompt.startsWith("Write a private")) {
+      expect(input).toContain('"partial":true');
+      expect(input).not.toContain("private backend detail");
+      return Promise.resolve(
+        "I combined overlapping details, but a concurrent correction prevented the remaining changes. This dream was only partially applied.",
+      );
+    }
+    return complete(prompt, input, signal);
+  };
+  const result = await runDream(f.dependencies, new AbortController().signal);
+  expect(result).toContain("partially applied");
+  expect(f.applied).toEqual(["memory_remember"]);
+  expect(f.records.has(duplicate)).toBe(true);
+});

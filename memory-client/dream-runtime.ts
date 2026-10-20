@@ -53,6 +53,7 @@ const checkpointSchema = z.object({
   base_profile: z.string().optional(),
   profile_published: z.boolean(),
   reflection: z.string().optional(),
+  conflict: z.boolean().optional(),
   completed: z.boolean(),
   handled: z.record(z.string(), z.string()),
 });
@@ -201,32 +202,41 @@ export async function runDream(deps: DreamDependencies, signal: AbortSignal): Pr
     await save();
     for (const operation of state.operations) {
       signal.throwIfAborted();
+      if (state.conflict) break;
       if (state.results.some((r) => r.id === operation.id)) continue;
-      const request = mutationRequest(operation, state.records, state.run_id);
-      if (operation.type === "forget" && operation.replacement_id) {
-        const replacement = state.results.find((r) => r.id === operation.replacement_id);
-        const replacementRef = ref.parse(replacement?.result.ref);
-        if (replacementRef === operation.ref)
-          throw new Error("Cannot forget the merge replacement");
-        await deps.call("memory_get", { ref: replacementRef }, signal);
-        Object.assign(request.arguments, { replacement_ref: replacementRef });
+      try {
+        const request = mutationRequest(operation, state.records, state.run_id);
+        if (operation.type === "forget" && operation.replacement_id) {
+          const replacement = state.results.find((r) => r.id === operation.replacement_id);
+          const replacementRef = ref.parse(replacement?.result.ref);
+          if (replacementRef === operation.ref)
+            throw new Error("Cannot forget the merge replacement");
+          await deps.call("memory_get", { ref: replacementRef }, signal);
+          Object.assign(request.arguments, { replacement_ref: replacementRef });
+        }
+        const result = z
+          .object({ ref })
+          .passthrough()
+          .parse(await deps.call(request.name, request.arguments, signal));
+        if (operation.type === "forget" && result.forgotten !== true)
+          throw new Error("Forget not acknowledged");
+        state.results.push({
+          id: operation.id,
+          result,
+          before:
+            operation.type === "insert"
+              ? null
+              : state.records.find((r) => r.ref === operation.ref)!.content,
+          after: operation.type === "forget" ? null : operation.content,
+        });
+        await save();
+      } catch (error) {
+        if (!(error instanceof Error) || !("retryable" in error) || error.retryable !== false)
+          throw error;
+        state.conflict = true;
+        await save();
+        break;
       }
-      const result = z
-        .object({ ref })
-        .passthrough()
-        .parse(await deps.call(request.name, request.arguments, signal));
-      if (operation.type === "forget" && result.forgotten !== true)
-        throw new Error("Forget not acknowledged");
-      state.results.push({
-        id: operation.id,
-        result,
-        before:
-          operation.type === "insert"
-            ? null
-            : state.records.find((r) => r.ref === operation.ref)!.content,
-        after: operation.type === "forget" ? null : operation.content,
-      });
-      await save();
     }
     await refreshProfile(deps, state, save, signal);
     if (!state.reflection) {
@@ -235,6 +245,10 @@ export async function runDream(deps: DreamDependencies, signal: AbortSignal): Pr
         state.run_id,
         {
           confirmed_changes: state.results,
+          partial: state.conflict ?? false,
+          unapplied_operation_ids: state.operations
+            .filter((op) => !state.results.some((r) => r.id === op.id))
+            .map((op) => op.id),
           profile_before: state.base_profile,
           profile_after: state.profile?.content,
           profile_published: state.profile_published,
@@ -246,7 +260,15 @@ export async function runDream(deps: DreamDependencies, signal: AbortSignal): Pr
     signal.throwIfAborted();
     await publishDreamLog(deps.directory, state.run_id, state.reflection);
     const final = await snapshot(deps, state.window_start, state.window_end, signal);
-    state.handled = Object.fromEntries(final.records.map((r) => [r.ref, r.revision]));
+    const confirmedRefs = new Set(state.results.map((r) => r.result.ref));
+    state.handled = state.conflict
+      ? {
+          ...state.handled,
+          ...Object.fromEntries(
+            final.records.filter((r) => confirmedRefs.has(r.ref)).map((r) => [r.ref, r.revision]),
+          ),
+        }
+      : Object.fromEntries(final.records.map((r) => [r.ref, r.revision]));
     state.completed = true;
     await save();
     return state.reflection;
