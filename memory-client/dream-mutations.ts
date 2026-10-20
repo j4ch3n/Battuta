@@ -107,8 +107,11 @@ export function validateDreamPlan(input: unknown, records: MemoryRecord[], recen
 export function mutationRequest(operation: DreamOperation, records: MemoryRecord[], runId: string) {
   const evidence = records.filter((r) => operation.source_refs.includes(r.ref));
   const guards = evidence.map(({ ref, revision }) => ({ ref, revision }));
+  const target =
+    operation.type === "insert" ? undefined : records.find((r) => r.ref === operation.ref);
+  const citedRecords = operation.type === "update" && target ? [target, ...evidence] : evidence;
   const sources = [
-    ...new Map(evidence.flatMap((r) => r.sources).map((s) => [JSON.stringify(s), s])).values(),
+    ...new Map(citedRecords.flatMap((r) => r.sources).map((s) => [JSON.stringify(s), s])).values(),
   ];
   if (sources.length > 200) throw new Error("Too many source citations");
   if (operation.type === "insert") {
@@ -124,7 +127,6 @@ export function mutationRequest(operation: DreamOperation, records: MemoryRecord
       },
     };
   }
-  const target = records.find((r) => r.ref === operation.ref);
   if (!target) throw new Error("Unknown mutation target");
   const args = { ref: target.ref, expected_revision: target.revision, evidence: guards };
   return operation.type === "update"

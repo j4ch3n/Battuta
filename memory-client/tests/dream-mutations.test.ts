@@ -113,6 +113,29 @@ test("updates include unioned cited sources and reject source overflow before di
   );
 });
 
+test("preflights update citation limits including uncited existing target sources", () => {
+  const first = memoryRecordSchema.parse(record());
+  first.sources = Array.from({ length: 150 }, (_, i) => ({
+    agent_id: "pm",
+    session_id: "target",
+    entry_id: String(i),
+  }));
+  const second = memoryRecordSchema.parse(record(b));
+  second.sources = Array.from({ length: 150 }, (_, i) => ({
+    agent_id: "pm",
+    session_id: "evidence",
+    entry_id: String(i),
+  }));
+  const plan = validateDreamPlan(
+    { operations: [{ ...update, source_refs: [b] }] },
+    [first, second],
+    [b],
+  );
+  expect(() => mutationRequest(plan.operations[0], [first, second], "run")).toThrow(
+    "Too many source",
+  );
+});
+
 test.each([
   ["unknown citation", [{ ...update, source_refs: [b] }]],
   ["unknown target", [{ ...update, ref: b }]],
