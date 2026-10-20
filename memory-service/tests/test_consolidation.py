@@ -2,6 +2,7 @@
 import asyncio
 import copy
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -9,6 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 from battuta_memory.service import MemoryService
 from battuta_memory.state import StateStore
+from battuta_memory.upstream import UpstreamAdapter
 
 
 RUN = "2026-10-21T03:00:00Z"
@@ -92,17 +94,36 @@ class ConsolidationTests(unittest.IsolatedAsyncioTestCase):
         self.adapter.analyze_global.side_effect = RuntimeError("analysis unavailable")
         with self.assertRaises(RuntimeError):
             await self.consolidate()
-        entered = asyncio.Event()
-        async def wait(_):
-            entered.set()
-            await asyncio.Event().wait()
-        self.adapter.analyze_global.side_effect = wait
-        task = asyncio.create_task(self.consolidate())
-        await asyncio.wait_for(entered.wait(), 1)
-        task.cancel()
-        with self.assertRaises(asyncio.CancelledError):
-            await task
         self.derived = {"clusters": [], "edges": []}
+        entered, release = asyncio.Event(), threading.Event()
+        loop = asyncio.get_running_loop()
+        worker = UpstreamAdapter(None)
+        calls = 0
+        async def threaded_analysis(_):
+            nonlocal calls
+            calls += 1
+            loop.call_soon_threadsafe(entered.set)
+            if not release.wait(5):
+                raise RuntimeError("test worker was not released")
+            return copy.deepcopy(self.derived)
+        with patch.object(worker, "_analyze_global", side_effect=threaded_analysis):
+            self.adapter.analyze_global.side_effect = worker.analyze_global
+            task = asyncio.create_task(self.consolidate())
+            retry = None
+            try:
+                await asyncio.wait_for(entered.wait(), 1)
+                task.cancel()
+                retry = asyncio.create_task(self.consolidate())
+                done, _ = await asyncio.wait({task, retry}, timeout=0.05)
+                self.assertEqual(done, set(), "Cancelled analysis must still serialize its live worker")
+                self.assertEqual(calls, 1)
+                task.cancel()  # Repeated cancellation cannot bypass the join.
+                done, _ = await asyncio.wait({task, retry}, timeout=0.05)
+                self.assertEqual(done, set())
+            finally:
+                release.set()
+                results = await asyncio.gather(*([task, retry] if retry else [task]), return_exceptions=True)
+            self.assertIsInstance(results[0], asyncio.CancelledError)
         self.adapter.analyze_global.side_effect = lambda _: copy.deepcopy(self.derived)
         published = await asyncio.wait_for(self.consolidate(), 1)
         self.assertEqual((published["cluster_count"], published["edge_count"]), (0, 0))

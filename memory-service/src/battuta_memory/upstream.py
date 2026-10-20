@@ -228,7 +228,23 @@ class UpstreamAdapter:
     async def analyze_global(self, snapshot):
         # Upstream async methods do CPU work. Run with private, in-memory values
         # in a worker: cancellation cannot leave a background storage writer.
-        return await asyncio.to_thread(lambda: asyncio.run(self._analyze_global(snapshot)))
+        worker = asyncio.create_task(asyncio.to_thread(lambda: asyncio.run(self._analyze_global(snapshot))))
+        try:
+            return await asyncio.shield(worker)
+        except asyncio.CancelledError:
+            # Threads cannot be cancelled. Keep the caller's builder lock until
+            # actual work ends, including across repeated transport cancellation.
+            # No canonical mutation lock is held while joining the worker.
+            while not worker.done():
+                try:
+                    await asyncio.shield(worker)
+                except asyncio.CancelledError:
+                    continue
+                except Exception:
+                    break
+            if not worker.cancelled():
+                worker.exception()  # Observe a failed cancelled worker, then propagate cancellation.
+            raise
 
     async def _analyze_global(self, snapshot):
         from mcp_memory_service.models.memory import Memory
