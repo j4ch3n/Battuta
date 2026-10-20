@@ -66,6 +66,21 @@ export type DreamOperation = z.infer<typeof operationSchema>;
 export const scopeKey = (record: MemoryRecord) =>
   record.scope.global ? "global" : [...record.scope.projects].sort().join(",");
 
+// Call with preceding planned operations for preflight, and only acknowledged
+// operations for dispatch. Never substitute externally withdrawn citations.
+export function mergeCleanupSources(
+  operation: Extract<DreamOperation, { type: "forget" }>,
+  preceding: DreamOperation[],
+) {
+  const replaced = new Set([operation.ref]); // target is guarded by expected_revision
+  for (const prior of preceding) {
+    if (prior.id === operation.replacement_id && prior.type === "update") replaced.add(prior.ref);
+    if (prior.type === "forget" && prior.replacement_id === operation.replacement_id)
+      replaced.add(prior.ref);
+  }
+  return [...new Set(operation.source_refs)].filter((r) => !replaced.has(r));
+}
+
 export function validateDreamPlan(input: unknown, records: MemoryRecord[], recentRefs: string[]) {
   const plan = dreamPlanSchema.parse(input);
   const lookup = new Map(records.map((r) => [r.ref, r]));
@@ -97,6 +112,8 @@ export function validateDreamPlan(input: unknown, records: MemoryRecord[], recen
           scopeKey(lookup.get(replacement.source_refs[0])!) !== scope
         )
           throw new Error("Merge requires an earlier same-scope replacement");
+        if (mergeCleanupSources(operation, [...seen.values()]).length + 1 > 100)
+          throw new Error("Merge exceeds evidence guard limit");
       }
     }
     seen.set(operation.id, operation);

@@ -88,6 +88,36 @@ test("requires a saved same-scope replacement before forgetting merged sources",
   );
 });
 
+test("preflight reserves a guard for merge replacement before any writes", () => {
+  const refs = Array.from({ length: 101 }, (_, i) => i.toString(16).padStart(64, "0"));
+  const records = refs.map((ref) => memoryRecordSchema.parse(record(ref)));
+  const insert = {
+    id: "merge",
+    type: "insert",
+    content: "Combined fact",
+    kind: "decision",
+    source_refs: refs.slice(0, 100),
+  };
+  const cleanup = {
+    id: "cleanup",
+    type: "forget",
+    ref: refs[0],
+    reason: "Merged",
+    replacement_id: "merge",
+    source_refs: refs.slice(1),
+  };
+  expect(() => validateDreamPlan({ operations: [insert, cleanup] }, records, refs)).toThrow(
+    "evidence guard limit",
+  );
+  expect(() =>
+    validateDreamPlan(
+      { operations: [insert, { ...cleanup, source_refs: refs.slice(0, 100) }] },
+      records,
+      refs,
+    ),
+  ).not.toThrow();
+});
+
 test("updates include unioned cited sources and reject source overflow before dispatch", () => {
   const first = memoryRecordSchema.parse(record());
   const second = memoryRecordSchema.parse({

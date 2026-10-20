@@ -8,6 +8,7 @@ import {
   mutationRequest,
   scopeKey,
   validateDreamPlan,
+  mergeCleanupSources,
 } from "./dream-mutations.ts";
 import {
   personalProfileSchema,
@@ -310,16 +311,14 @@ export async function runDream(deps: DreamDependencies, signal: AbortSignal): Pr
           if (replacementRef === operation.ref)
             throw new Error("Cannot forget the merge replacement");
           await deps.call("memory_get", { ref: replacementRef }, signal);
-          const replacementOperation = state.operations.find(
-            (op) => op.id === operation.replacement_id,
-          );
           const guards = request.arguments.evidence as { ref: string; revision: string }[];
-          // Only this exact acknowledged update may supersede a frozen citation.
-          // Unrelated stale sources still fail the server's locked evidence check.
-          const evidence = guards.filter(
-            (guard) =>
-              replacementOperation?.type !== "update" || guard.ref !== replacementOperation.ref,
+          const retained = new Set(
+            mergeCleanupSources(
+              operation,
+              state.operations.filter((op) => state.results.some((ack) => ack.id === op.id)),
+            ),
           );
+          const evidence = guards.filter((guard) => retained.has(guard.ref));
           evidence.push({ ref: replacementRef, revision: ref.parse(replacement?.result.revision) });
           Object.assign(request.arguments, { replacement_ref: replacementRef, evidence });
         }

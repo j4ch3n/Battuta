@@ -304,6 +304,61 @@ test("update-based merge cleanup guards its acknowledged replacement instead of 
   expect(f.records.get(hash("Current decision"))?.content).toBe("Current decision");
 });
 
+test.each([false, true])(
+  "a three-source merge retires all sources across cleanup recovery=%s",
+  async (recover) => {
+    const f = await fixture();
+    const extra = hash("extra duplicate");
+    f.records.set(extra, record(extra, "Additional redundant detail"));
+    const complete = f.dependencies.complete;
+    const refs = [old, duplicate, extra];
+    f.dependencies.complete = (prompt, input, signal) => {
+      if (prompt.startsWith("Consolidate"))
+        return Promise.resolve(
+          JSON.stringify({
+            operations: [
+              {
+                id: "merge",
+                type: "update",
+                ref: old,
+                content: "Current decision",
+                reason: "Combine",
+                source_refs: refs,
+              },
+              ...[duplicate, extra].map((ref, index) => ({
+                id: `cleanup${index}`,
+                type: "forget",
+                ref,
+                reason: "Merged",
+                replacement_id: "merge",
+                source_refs: refs,
+              })),
+            ],
+          }),
+        );
+      if (!prompt.startsWith("Refresh")) expect(parseEvidence(input).partial).toBe(false);
+      return complete(prompt, input, signal);
+    };
+    if (recover) {
+      const call = f.dependencies.call;
+      let lost = false;
+      f.dependencies.call = (name, args, signal) => {
+        if (!lost && name === "memory_forget") {
+          lost = true;
+          f.loseNextAck();
+        }
+        return call(name, args, signal);
+      };
+      await expect(runDream(f.dependencies, new AbortController().signal)).rejects.toThrow(
+        "lost acknowledgement",
+      );
+    }
+    await runDream(f.dependencies, new AbortController().signal);
+    expect(f.applied).toEqual(["memory_update", "memory_forget", "memory_forget"]);
+    expect(refs.some((ref) => f.records.has(ref))).toBe(false);
+  },
+);
+
 test("resumes a frozen plan after a lost acknowledgement without repeating model synthesis or writes", async () => {
   const f = await fixture();
   f.loseNextAck();
