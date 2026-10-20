@@ -2,7 +2,7 @@
 
 A headless, framework-independent MCP server for shared scoped memories, wrapping pinned mcp-memory-service storage and local ONNX embeddings.
 
-- Global and multi-project memory with equal PM/TL access.
+- Global and multi-project memory in one trusted local store.
 - Versioned corrections, tombstone forgetting, and recoverable capture ingestion.
 - One shared SQLite store and verified offline embedding model.
 
