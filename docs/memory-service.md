@@ -1,5 +1,7 @@
 # Shared memory architecture and operations
 
+The [component design](../memory-service/DESIGN.md) explains memory layers, scope versus kind, data ownership, capture, retrieval, and lifecycle invariants. This reference covers configuration and operations.
+
 `memory-service/` exposes nine tailored MCP tools on loopback Streamable HTTP (`/mcp`, default port 8901). It composes mcp-memory-service 12.1.1's SQLite/embedding implementation through one pinned adapter; no upstream source is copied or forked. `memory-client/` is a thin Pi lifecycle integration, not another memory database. Other MCP clients can use the server independently of Pi.
 
 ## Persistence and scope
