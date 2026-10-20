@@ -448,6 +448,38 @@ test("rebases a saved draft on owner edits instead of overwriting or stranding i
   expect(f.applied).toHaveLength(3);
 });
 
+test("detects owner edits during synthesis and safely rebases on retry", async () => {
+  const f = await fixture();
+  const complete = f.dependencies.complete;
+  let drafts = 0;
+  f.dependencies.complete = async (prompt, input, signal) => {
+    if (prompt.startsWith("Refresh")) {
+      drafts++;
+      if (drafts === 1) {
+        await writeFile(join(f.dependencies.directory, "ME.md"), "Owner writes poetry.");
+        return complete(prompt, input, signal);
+      }
+      expect(parseEvidence(input).current_profile).toBe("Owner writes poetry.");
+      return JSON.stringify({
+        sections: {
+          ...emptyProfile().sections,
+          lifeContextAndInterests: [{ text: "Owner writes poetry.", source_refs: [] }],
+        },
+      });
+    }
+    return complete(prompt, input, signal);
+  };
+  await expect(runDream(f.dependencies, new AbortController().signal)).rejects.toThrow(
+    "Owner profile changed",
+  );
+  expect(await readFile(join(f.dependencies.directory, "ME.md"), "utf8")).toBe(
+    "Owner writes poetry.",
+  );
+  await runDream(f.dependencies, new AbortController().signal);
+  expect(drafts).toBe(2);
+  expect(f.applied).toHaveLength(3);
+});
+
 test("reflection uses authoritative reused content, not a proposed insertion", async () => {
   const f = await fixture();
   const reused = hash("Combined implementation detail");
@@ -547,39 +579,45 @@ test("a source forgotten after planning rejects derived inserts as a terminal pa
   expect(f.applied).toEqual([]);
 });
 
-test("context captured after the frozen cutoff stays eligible even when present in the initial inventory", async () => {
-  const f = await fixture();
-  const external = hash("after cutoff");
-  f.records.set(external, record(external, "Captured after frozen cutoff"));
-  const call = f.dependencies.call;
-  let day = 1,
-    plans = 0;
-  f.dependencies.now = () => new Date(`2026-10-${day === 1 ? "21" : "22"}T04:00:00Z`);
-  f.dependencies.call = async (name, args, signal) => {
-    const result = await call(name, args, signal);
-    return name === "memory_inventory" && day === 1
-      ? { ...(result as Record<string, unknown>), recent_refs: [pref, old, duplicate] }
-      : result;
-  };
-  f.dependencies.complete = (prompt, input) => {
-    if (prompt.startsWith("Consolidate")) {
-      if (day === 2) {
-        plans++;
-        expect(parseEvidence(input).groups.flatMap((g) => g.recent_refs)).toEqual([external]);
+test.each(["atlas", "beacon"])(
+  "post-cutoff initial context in scope %s stays eligible next day, including unvisited scopes",
+  async (project) => {
+    const f = await fixture();
+    const external = hash("after cutoff");
+    f.records.set(external, {
+      ...record(external, "Captured after frozen cutoff"),
+      scope: { global: false, projects: [project] },
+    });
+    const call = f.dependencies.call;
+    let day = 1,
+      plans = 0;
+    f.dependencies.now = () => new Date(`2026-10-${day === 1 ? "21" : "22"}T04:00:00Z`);
+    f.dependencies.call = async (name, args, signal) => {
+      const result = await call(name, args, signal);
+      return name === "memory_inventory" && day === 1
+        ? { ...(result as Record<string, unknown>), recent_refs: [pref, old, duplicate] }
+        : result;
+    };
+    f.dependencies.complete = (prompt, input) => {
+      if (prompt.startsWith("Consolidate")) {
+        if (day === 2) {
+          plans++;
+          expect(parseEvidence(input).groups.flatMap((g) => g.recent_refs)).toEqual([external]);
+        }
+        return Promise.resolve('{"operations":[]}');
       }
-      return Promise.resolve('{"operations":[]}');
-    }
-    return Promise.resolve(
-      prompt.startsWith("Refresh")
-        ? JSON.stringify(emptyProfile())
-        : "No material personal understanding changed.",
-    );
-  };
-  await runDream(f.dependencies, new AbortController().signal);
-  day = 2;
-  await runDream(f.dependencies, new AbortController().signal);
-  expect(plans).toBe(1);
-});
+      return Promise.resolve(
+        prompt.startsWith("Refresh")
+          ? JSON.stringify(emptyProfile())
+          : "No material personal understanding changed.",
+      );
+    };
+    await runDream(f.dependencies, new AbortController().signal);
+    day = 2;
+    await runDream(f.dependencies, new AbortController().signal);
+    expect(plans).toBe(1);
+  },
+);
 
 test("only the acknowledged output revision is handled, not a later external membership edit", async () => {
   const f = await fixture();
