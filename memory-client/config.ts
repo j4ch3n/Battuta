@@ -1,5 +1,25 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { z } from "zod";
+
+const settingsSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    batchMessages: z.number().int().min(1).max(100).default(6),
+  })
+  .strict();
+export async function captureSettings(directory: string) {
+  try {
+    const settings: unknown = JSON.parse(await readFile(join(directory, "settings.json"), "utf8"));
+    return settingsSchema.parse(
+      (settings as { battutaMemoryCapture?: unknown })?.battutaMemoryCapture ?? {},
+    );
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return settingsSchema.parse({});
+    throw error;
+  }
+}
 
 export function clientConfig() {
   const role = process.env.AGENT_ROLE;

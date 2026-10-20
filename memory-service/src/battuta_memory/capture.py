@@ -27,8 +27,9 @@ class CaptureService:
             try:
                 receipt = await self.service.remember(request)
                 results.append({"item_id": item.item_id, "status": "completed", **receipt})
-            except Exception:
-                results.append({"item_id": item.item_id, "status": "failed", "error": "Capture item could not be stored"})
+            except Exception as error:
+                results.append({"item_id": item.item_id, "status": "failed", "error": "Capture item could not be stored",
+                    "code": "embedding_limit" if isinstance(error, ValueError) and str(error).startswith("Memory exceeds embedding token limit") else "capture_failed"})
         result = {"batch_id": batch.batch_id, "complete": all(r["status"] == "completed" for r in results), "items": results}
         if result["complete"]:
             state.complete_capture(key, result)

@@ -14,6 +14,8 @@ export function canonical(value: unknown): string {
 export const digest = (value: unknown) =>
   createHash("sha256").update(canonical(value)).digest("hex");
 export interface CaptureJob {
+  rephraseAttempts?: number;
+  blocked?: boolean;
   id: string;
   session_id: string;
   segment: CaptureSegment;

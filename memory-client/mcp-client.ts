@@ -20,9 +20,11 @@ export class MemoryMcpClient {
         { signal, timeout: 30000 },
       );
       const envelope = result.structuredContent as
-        { ok?: boolean; data?: { complete?: boolean } } | undefined;
+        { ok?: boolean; data?: { complete?: boolean; items?: { code?: string }[] } } | undefined;
       if (result.isError || !envelope?.ok || !envelope.data?.complete)
-        throw new Error("Memory capture incomplete");
+        throw Object.assign(new Error("Memory capture incomplete"), {
+          rephrase: envelope?.data?.items?.some((i) => i.code === "embedding_limit") ?? false,
+        });
       return envelope.data;
     } finally {
       await client.close();
