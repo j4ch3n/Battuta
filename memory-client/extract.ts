@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { digest, type CaptureJob } from "./capture-queue.ts";
 import { redact } from "./privacy.ts";
+import { abortable } from "./abortable.ts";
 
 const itemSchema = z
   .object({
@@ -17,20 +18,6 @@ const itemSchema = z
   })
   .strict();
 const schema = z.object({ items: z.array(itemSchema).max(20) }).strict();
-
-async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  let abort!: () => void;
-  const cancelled = new Promise<never>((_, reject) => {
-    abort = () => reject(new Error("Extraction cancelled"));
-    signal.addEventListener("abort", abort, { once: true });
-    if (signal.aborted) abort();
-  });
-  try {
-    return await Promise.race([promise, cancelled]);
-  } finally {
-    signal.removeEventListener("abort", abort);
-  }
-}
 
 export async function extractMemories(
   job: CaptureJob,
