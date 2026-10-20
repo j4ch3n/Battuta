@@ -31,10 +31,10 @@ class InstallTests(ConfigFixture):
     def test_installs_only_telegram_with_bot_local_state(self):
         bot = self.root / "bots/pm-bot"
         with patch("bot_setup.install.shutil.which", return_value="pnpm"), patch("bot_setup.install.subprocess.run") as run:
-            install_packages(bot, "npm:@llblab/pi-telegram@0.50.1")
+            install_packages(bot, "npm:@llblab/pi-telegram@0.57.3")
         self.assertEqual([call.args[0] for call in run.call_args_list], [
             ("pnpm", "install", "--frozen-lockfile"),
-            ("pnpm", "exec", "pi", "install", "-l", "--approve", "npm:@llblab/pi-telegram@0.50.1"),
+            ("pnpm", "exec", "pi", "install", "-l", "--approve", "npm:@llblab/pi-telegram@0.57.3"),
             ("pnpm", "exec", "pi", "list"),
         ])
         for call in run.call_args_list:

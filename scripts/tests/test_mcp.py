@@ -38,7 +38,7 @@ class MCPConfigTests(ConfigFixture):
                     }}))
                     settings = bot / ".pi/settings.json"
                     settings.write_text(json.dumps({"theme": "dark", "packages": [
-                        "npm:@llblab/pi-telegram@0.50.1", package, "npm:pi-web-access@0.35.0",
+                        "npm:@llblab/pi-telegram@0.57.3", package, "npm:pi-web-access@0.43.0",
                         {"source": "npm:custom-tools@1.0.0", "extensions": ["read.ts"]},
                         "npm:pi-mcp-adapter-extra@1.0.0",
                     ]}))
@@ -53,7 +53,7 @@ class MCPConfigTests(ConfigFixture):
                     self.assertEqual(data["mcpServers"]["memory"]["exposure"], "codemode")
                     self.assertTrue(data["custom"])
                     self.assertEqual(json.loads(settings.read_text()), {"theme": "dark", "packages": [
-                        "npm:@llblab/pi-telegram@0.50.1", "npm:pi-web-access@0.35.0",
+                        "npm:@llblab/pi-telegram@0.57.3", "npm:pi-web-access@0.43.0",
                         {"source": "npm:custom-tools@1.0.0", "extensions": ["read.ts"]},
                         "npm:pi-mcp-adapter-extra@1.0.0",
                     ]})

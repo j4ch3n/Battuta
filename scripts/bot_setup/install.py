@@ -8,7 +8,7 @@ import subprocess
 import click
 
 
-TELEGRAM_PACKAGE = "npm:@llblab/pi-telegram@0.50.1"
+TELEGRAM_PACKAGE = "npm:@llblab/pi-telegram@0.57.3"
 SCHEDULE_PACKAGE = "npm:pi-schedule-prompt@0.4.1"
 
 
