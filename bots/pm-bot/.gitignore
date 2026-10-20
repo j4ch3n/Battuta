@@ -2,6 +2,7 @@
 AGENTS.md
 .pi/*
 !.pi/settings.json
+!.pi/web-search.json
 !.pi/skills/
 .pi/skills/*
 !.pi/skills/memory/
