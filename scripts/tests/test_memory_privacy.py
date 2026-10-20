@@ -17,14 +17,16 @@ class MemoryPrivacyTests(unittest.TestCase):
             "bots/pm-bot/.pi/ME.md.id.tmp", "bots/pm-bot/.pi/ME.md.lock",
             "bots/AGENTS_personal.md", "memory.db", "memory.db-wal",
             "memory.db.queue/job.job.json", "memory.db.queue/job.state.json",
+            "capture-queue/pm/state.json", "onnx_models/all-MiniLM-L6-v2/model.onnx",
         ]
-        public = ["shared-skills/memory/references/ME.template.md", "shared-skills/memory/references/profile-rewrite-prompt.md"]
+        public = [f"bots/{role}-bot/.pi/skills/memory/{resource}" for role in ("pm", "tl") for resource in ("SKILL.md", "references/tools.md")]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
-            for name in (".gitignore", ".gitattributes"):
+            for name in (".gitignore", ".gitattributes", "bots/pm-bot/.gitignore", "bots/tl-bot/.gitignore"):
                 source = ROOT / name
                 if source.exists():
+                    (root / name).parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(source, root / name)
             for name in private + public:
                 path = root / name

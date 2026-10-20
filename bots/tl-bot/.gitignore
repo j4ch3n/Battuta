@@ -4,6 +4,7 @@ AGENTS.md
 !.pi/settings.json
 !.pi/skills/
 .pi/skills/*
+!.pi/skills/memory/
 !.pi/skills/communicate-with-pm/
 !.pi/skills/define-implementation-tasks/
 !.pi/skills/use-subagent/

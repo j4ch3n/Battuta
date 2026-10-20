@@ -1,0 +1,9 @@
+# Battuta memory service
+
+A headless, framework-independent MCP server for shared scoped memories, wrapping pinned mcp-memory-service storage and local ONNX embeddings.
+
+- Global and multi-project memory in one trusted local store.
+- Versioned corrections, tombstone forgetting, and recoverable capture ingestion.
+- One shared SQLite store and verified offline embedding model.
+
+See [design: memory layers, scope, and lifecycle](DESIGN.md), [release setup](../RELEASE.md#extension-and-skill-setup-index), [operations](../docs/memory-service.md), and [tool workflow](../bots/pm-bot/.pi/skills/memory/references/tools.md).

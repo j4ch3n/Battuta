@@ -8,7 +8,8 @@ export default defineConfig(
   globalIgnores([
     "**/node_modules/**",
     "**/vendor/**",
-    ".venv/**",
+    "**/.venv/**",
+    ".memory-spike/**",
     "supabase/**",
     "dist/**",
     "**/coverage/**",
@@ -23,7 +24,7 @@ export default defineConfig(
     files: [
       "agent-mail/**/*.ts",
       "project-spec/**/*.ts",
-      "memory-stone/**/*.ts",
+      "memory-client/**/*.ts",
       "bots/**/.pi/extensions/**/*.ts",
     ],
     extends: [js.configs.recommended, tseslint.configs.recommendedTypeChecked],

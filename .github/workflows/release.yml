@@ -50,16 +50,21 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots shared-skills agent-mail project-spec memory-stone .env.example RELEASE.md docs/gogcli-setup.md docs/memory-stone.md | tar -x -C dist/stage/battuta
+          git archive HEAD bots shared-skills agent-mail project-spec memory-client memory-service scripts/setup-memory.sh .env.example RELEASE.md docs/gogcli-setup.md docs/memory-service.md docs/memory-service-setup.md | tar -x -C dist/stage/battuta
           test -s dist/stage/battuta/RELEASE.md
           test -s dist/stage/battuta/docs/gogcli-setup.md
-          test -s dist/stage/battuta/shared-skills/memory/references/ME.template.md
-          test -s dist/stage/battuta/shared-skills/memory/references/profile-rewrite-prompt.md
+          test -s dist/stage/battuta/bots/pm-bot/.pi/skills/memory/references/tools.md
+          test -s dist/stage/battuta/bots/tl-bot/.pi/skills/memory/references/tools.md
           test ! -e dist/stage/battuta/bots/AGENTS_personal.md
           cli_dir="$PWD/dist/stage/battuta/shared-skills/project-context-cli"
           uv export --project "$cli_dir" --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/project-requirements.txt"
           uv build --project "$cli_dir" --wheel --out-dir "$cli_dir/wheels"
           python3 -m pip download --require-hashes --no-deps --only-binary=:all: --dest "$cli_dir/wheels" -r "$RUNNER_TEMP/project-requirements.txt"
+          memory_dir="$PWD/dist/stage/battuta/memory-service"
+          uv export --project "$memory_dir" --locked --no-dev --no-emit-project --format requirements-txt --output-file "$memory_dir/requirements.txt"
+          uv build "$memory_dir" --wheel --out-dir "$memory_dir/wheels"
+          python3 -m pip download --require-hashes --no-deps --only-binary=:all: --dest "$memory_dir/wheels" -r "$memory_dir/requirements.txt"
+          (cd "$memory_dir/wheels" && sha256sum *.whl > SHA256SUMS)
           cp "$(command -v node)" dist/stage/battuta/bin/node
           cp packaging/battuta dist/stage/battuta/bin/battuta
           cp packaging/configure.mjs dist/stage/battuta/bin/configure.mjs
@@ -69,7 +74,9 @@ jobs:
           for bot in pm-bot tl-bot; do
             mkdir -p "dist/stage/battuta/bots/$bot/.pi/skills"
             test ! -e "dist/stage/battuta/bots/$bot/.pi/ME.md"
-            for skill in project-context memory; do
+            test ! -L "dist/stage/battuta/bots/$bot/.pi/skills/memory"
+            test -f "dist/stage/battuta/bots/$bot/.pi/skills/memory/SKILL.md"
+            for skill in project-context; do
               ln -s "../../../../shared-skills/$skill" "dist/stage/battuta/bots/$bot/.pi/skills/$skill"
               test -f "dist/stage/battuta/bots/$bot/.pi/skills/$skill/SKILL.md"
             done
@@ -129,23 +136,25 @@ jobs:
           done
           pnpm --dir dist/stage/battuta/agent-mail install --frozen-lockfile --prod
           pnpm --dir dist/stage/battuta/project-spec install --frozen-lockfile --prod
-          pnpm --dir dist/stage/battuta/memory-stone install --frozen-lockfile --prod
-          test -f dist/stage/battuta/memory-stone/node_modules/pi-memory-stone/src/db/index.ts
+          pnpm --dir dist/stage/battuta/memory-client install --frozen-lockfile --prod
           memory_smoke_home="$(mktemp -d)"
           mkdir -p "$memory_smoke_home/agent"
-          HOME="$memory_smoke_home" node dist/stage/battuta/memory-stone/tests/loader-worker.mjs "$memory_smoke_home/memory.db" "$memory_smoke_home/agent" "$PWD/dist/stage/battuta/bots/pm-bot/node_modules/@earendil-works/pi-coding-agent/dist/index.js"
+          HOME="$memory_smoke_home" node dist/stage/battuta/memory-client/tests/loader-worker.mjs "$memory_smoke_home/agent" "$PWD/dist/stage/battuta/bots/pm-bot/node_modules/@earendil-works/pi-coding-agent/dist/index.js"
+          uv venv --python 3.12 "$RUNNER_TEMP/memory-smoke"
+          uv pip install --python "$RUNNER_TEMP/memory-smoke/bin/python" --offline --no-index --find-links "$memory_dir/wheels" battuta-memory
+          "$RUNNER_TEMP/memory-smoke/bin/battuta-memory" --help
           rm -rf "$memory_smoke_home"
           test -x dist/stage/battuta/bots/pm-bot/node_modules/.bin/pi
           test -x dist/stage/battuta/bots/tl-bot/node_modules/.bin/pi
           test -d dist/stage/battuta/agent-mail/node_modules
           test -d dist/stage/battuta/project-spec/node_modules
-          test -d dist/stage/battuta/memory-stone/node_modules
+          test -d dist/stage/battuta/memory-client/node_modules
           test ! -e dist/stage/battuta/.env
           test ! -e dist/stage/battuta/bots/pm-bot/.pi/auth.json
           test ! -e dist/stage/battuta/bots/tl-bot/.pi/auth.json
           test ! -e dist/stage/battuta/bots/pm-bot/.pi/telegram.json
           test ! -e dist/stage/battuta/bots/tl-bot/.pi/telegram.json
-          tar -C dist/stage -czf "dist/battuta-$TAG-linux-arm64.tar.gz" battuta
+          tar -C dist/stage --exclude='battuta/memory-service/.venv' -czf "dist/battuta-$TAG-linux-arm64.tar.gz" battuta
           (cd dist && sha256sum "battuta-$TAG-linux-arm64.tar.gz" > "battuta-$TAG-linux-arm64.tar.gz.sha256")
 
       - name: Publish GitHub Release

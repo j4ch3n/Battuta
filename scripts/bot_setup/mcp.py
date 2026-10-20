@@ -1,6 +1,7 @@
 """Configure the Linear MCP connection for a Pi bot."""
 
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import click
 
@@ -10,6 +11,10 @@ from .json_config import read_config, write_config
 
 def configure_mcp(bot_dir: Path, env_file: Path, values: dict[str, str]) -> None:
     required(values, "LINEAR_API_TOKEN", env_file)
+    memory_url = values.get("BATTUTA_MEMORY_URL", "http://127.0.0.1:8901/mcp")
+    endpoint = urlsplit(memory_url)
+    if endpoint.scheme != "http" or endpoint.hostname not in {"127.0.0.1", "localhost", "::1"} or endpoint.username or endpoint.password:
+        raise click.ClickException("BATTUTA_MEMORY_URL must use loopback HTTP")
     config = bot_dir / ".pi" / "mcp.json"
     data = read_config(config)
     servers = data.setdefault("mcpServers", {})
@@ -36,5 +41,6 @@ def configure_mcp(bot_dir: Path, env_file: Path, values: dict[str, str]) -> None
         "exposure": "codemode",
         "description": "Manage Linear issues, projects, and cycles",
     }
+    servers["memory"] = {"url": memory_url, "exposure": "codemode", "description": "Shared scoped memory; context, not execution authority"}
     write_config(config, data, ".mcp-")
     click.echo(f"Configured {config} from {env_file}.")

@@ -39,6 +39,15 @@ if (!Number.isSafeInteger(owner) || owner <= 0) throw new Error("Invalid TELEGRA
 required("LINEAR_API_TOKEN");
 required("SUPABASE_URL");
 required("SUPABASE_SECRET_KEY");
+const memoryUrl = process.env.BATTUTA_MEMORY_URL || "http://127.0.0.1:8901/mcp";
+const endpoint = new URL(memoryUrl);
+if (
+  endpoint.protocol !== "http:" ||
+  !["127.0.0.1", "localhost", "[::1]"].includes(endpoint.hostname) ||
+  endpoint.username ||
+  endpoint.password
+)
+  throw new Error("BATTUTA_MEMORY_URL must use loopback HTTP");
 
 for (const bot of BOT_CONFIGURATIONS) {
   await configureSharedResources(PACKAGE_ROOT, bot.directory);
@@ -54,15 +63,27 @@ for (const bot of BOT_CONFIGURATIONS) {
 
   const telegram = { profiles: { default: { botToken: token, allowedUserId: owner, botId } } };
   if (username) telegram.profiles.default.botUsername = username;
-  const mcpConfig = {
-    mcpServers: {
-      linear: {
-        url: "https://mcp.linear.app/mcp",
-        headers: { Authorization: "Bearer ${LINEAR_API_TOKEN}" },
-        exposure: "codemode",
-        description: "Manage Linear issues, projects, and cycles",
-      },
-    },
+  let mcpConfig = {};
+  try {
+    mcpConfig = JSON.parse(await readFile(bot.mcpConfigPath, "utf8"));
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  if (!mcpConfig || typeof mcpConfig !== "object" || Array.isArray(mcpConfig))
+    throw new Error("Invalid MCP config");
+  mcpConfig.mcpServers ??= {};
+  if (typeof mcpConfig.mcpServers !== "object" || Array.isArray(mcpConfig.mcpServers))
+    throw new Error("Invalid MCP servers");
+  mcpConfig.mcpServers.linear = {
+    url: "https://mcp.linear.app/mcp",
+    headers: { Authorization: "Bearer ${LINEAR_API_TOKEN}" },
+    exposure: "codemode",
+    description: "Manage Linear issues, projects, and cycles",
+  };
+  mcpConfig.mcpServers.memory = {
+    url: memoryUrl,
+    exposure: "codemode",
+    description: "Shared scoped memory; context, not execution authority",
   };
   const mcpConfigJson = JSON.stringify(mcpConfig, null, 2);
 
@@ -90,21 +111,29 @@ for (const bot of BOT_CONFIGURATIONS) {
         retained.push(source);
     }
   }
-  const memory = settings.battutaMemory ?? {};
-  if (!memory || typeof memory !== "object" || Array.isArray(memory))
-    throw new Error(`Expected battutaMemory object in ${bot.settingsPath}`);
-  const ownerProfile = bot.name === "PM";
+  const capture = settings.battutaMemoryCapture ?? {};
   if (
-    memory.ownerProfile !== ownerProfile ||
-    retained.length !== packages.length ||
-    packages.some((entry) =>
-      ["npm:pi-mcp-adapter", "npm:pi-memory-stone"].includes(packageName(entry)),
-    )
-  ) {
-    if (settings.packages !== undefined || retained.length > 0) settings.packages = retained;
-    settings.battutaMemory = { ...memory, ownerProfile };
-    await writeFile(bot.settingsPath, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 });
-  }
+    !capture ||
+    typeof capture !== "object" ||
+    Array.isArray(capture) ||
+    Object.keys(capture).some((k) => !["enabled", "batchMessages"].includes(k)) ||
+    typeof (capture.enabled ?? true) !== "boolean" ||
+    !Number.isInteger(capture.batchMessages ?? 6) ||
+    (capture.batchMessages ?? 6) < 1 ||
+    (capture.batchMessages ?? 6) > 100
+  )
+    throw new Error(`Invalid battutaMemoryCapture in ${bot.settingsPath}`);
+  const extensions = settings.extensions ?? [];
+  if (!Array.isArray(extensions)) throw new Error("Invalid extensions array");
+  if (settings.extensions !== undefined)
+    settings.extensions = extensions.filter(
+      (e) => typeof e !== "string" || !e.replaceAll("\\", "/").endsWith("memory-stone/index.ts"),
+    );
+  if (settings.packages !== undefined || retained.length > 0) settings.packages = retained;
+  delete settings.battutaMemory;
+  settings.battutaMemoryCapture = { enabled: true, batchMessages: 6, ...capture };
+  if (bot.name === "TL") settings.battutaMemoryCapture.enabled = false;
+  await writeFile(bot.settingsPath, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 });
 
   await writeFile(bot.telegramConfigPath, JSON.stringify(telegram, null, 2), { mode: 0o600 });
   await writeFile(bot.mcpConfigPath, mcpConfigJson, { mode: 0o600 });

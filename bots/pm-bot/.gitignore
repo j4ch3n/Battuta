@@ -4,6 +4,7 @@ AGENTS.md
 !.pi/settings.json
 !.pi/skills/
 .pi/skills/*
+!.pi/skills/memory/
 !.pi/skills/problem-framing/
 !.pi/skills/user-story/
 !.pi/skills/prd/

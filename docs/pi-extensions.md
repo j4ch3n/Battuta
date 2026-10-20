@@ -42,4 +42,4 @@ For a standard Battuta extension, update its owning setup and release paths:
 
 Keep runtime data out of source control. Extend the relevant tests in `scripts/tests/` for installation, retained-settings migration, and launcher environment behavior. See [local setup](../.agents/skills/battuta-setup/references/development.md) for full bot configuration and launch instructions.
 
-Memory is supplied by the shared [Battuta memory bridge](memory-stone.md), whose pinned Stone utilities are installed with `pnpm` in `memory-stone/`. Load the bridge through the existing launchers; do not separately install Stone's upstream extension or skill into either bot.
+Memory is supplied by the shared [headless MCP service and thin Pi client](memory-service.md). Existing launchers load `memory-client/index.ts`; native MCP configuration exposes the shared tools. The retired Stone extension must not be loaded alongside it.

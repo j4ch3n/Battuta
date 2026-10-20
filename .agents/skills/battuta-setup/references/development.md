@@ -6,6 +6,8 @@ Run the Project Manager and Tech Lead bots from a source checkout with Python **
 
 ## Contributor tooling
 
+Before launching bots with shared memory, follow the memory service entry in the [release setup index](../../../../RELEASE.md#extension-and-skill-setup-index). Provisioning uses `bash scripts/setup-memory.sh`; it does not start or restart bots. A source tmux session adds one shared memory window; do not also run a systemd instance on the same data directory/port.
+
 Install Node.js from `.node-version`, pnpm **10.20.0**, Deno from `.deno-version`, Python **3.12+**, uv, and the Supabase CLI version from `.supabase-version`. Docker must be running for integration checks.
 
 For nvm users, run `nvm install` and `nvm use` from the repository root. `.nvmrc` pins the same Node version as `.node-version`, which CI and release packaging consume; update both together when upgrading Node.

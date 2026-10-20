@@ -24,10 +24,6 @@ class PackagingConfigureTests(unittest.TestCase):
                 source = root / "shared-skills" / "project-context"
                 source.mkdir(parents=True)
                 (source / "SKILL.md").write_text("Shared project context")
-                memory_skill = root / "shared-skills/memory"
-                memory_skill.mkdir()
-                (memory_skill / "SKILL.md").write_text("Memory scope guidance")
-                shutil.copytree(ROOT / "shared-skills/memory/references", memory_skill / "references")
                 references = source / "references"
                 summary = references / "summary"
                 summary.mkdir(parents=True)
@@ -41,6 +37,7 @@ class PackagingConfigureTests(unittest.TestCase):
                     bot = root / "bots" / role
                     skills = bot / ".pi" / "skills"
                     skills.mkdir(parents=True)
+                    shutil.copytree(ROOT / "bots" / role / ".pi/skills/memory", skills / "memory")
                     if personal is not None:
                         (bot / ".pi/ME.md").write_text("Private profile")
                     (bot / "AGENTS_dedicated.md").write_text(role)
@@ -55,7 +52,10 @@ class PackagingConfigureTests(unittest.TestCase):
                     if settings_mode == "scheduler" and role == "pm-bot":
                         packages.append({"source": "npm:pi-schedule-prompt@0.4.1", "extensions": ["src/index.ts"]})
                     if settings_mode != "missing":
-                        (bot / ".pi/settings.json").write_text(json.dumps({"theme": "dark", "packages": packages}))
+                        settings = {"theme": "dark", "packages": packages}
+                        if settings_mode == "legacy":
+                            settings["battutaMemoryCapture"] = {"enabled": True, "batchMessages": 6}
+                        (bot / ".pi/settings.json").write_text(json.dumps(settings))
                     if existing:
                         (skills / "project-context").symlink_to(existing, target_is_directory=True)
                 env = {
@@ -80,9 +80,9 @@ class PackagingConfigureTests(unittest.TestCase):
                         self.assertEqual((link / "references" / "summary" / "template.md").read_text(), "Runtime summary template")
                         self.assertEqual(link.resolve(), source.resolve())
                         self.assertFalse(link.readlink().is_absolute())
-                        self.assertEqual((link.parent / "memory/SKILL.md").read_text(), "Memory scope guidance")
-                        for resource in ("ME.template.md", "profile-rewrite-prompt.md"):
-                            self.assertEqual((link.parent / "memory/references" / resource).read_text(), (ROOT / "shared-skills/memory/references" / resource).read_text())
+                        self.assertFalse((link.parent / "memory").is_symlink())
+                        for resource in ("SKILL.md", "references/tools.md"):
+                            self.assertEqual((link.parent / "memory" / resource).read_text(), (ROOT / "bots" / role / ".pi/skills/memory" / resource).read_text())
                         profile = link.parent.parent / "ME.md"
                         self.assertEqual(profile.read_text() if profile.exists() else None, "Private profile" if personal is not None else None)
                         if personal is not None:
@@ -96,7 +96,7 @@ class PackagingConfigureTests(unittest.TestCase):
                         self.assertNotIn("test-linear", json.dumps(mcp))
                         settings_path = link.parent.parent / "settings.json"
                         if settings_mode == "missing":
-                            expected = {"battutaMemory": {"ownerProfile": role == "pm-bot"}}
+                            expected = {"battutaMemoryCapture": {"enabled": role == "pm-bot", "batchMessages": 6}}
                             if role == "pm-bot":
                                 expected["packages"] = ["npm:pi-schedule-prompt@0.4.1"]
                             self.assertEqual(json.loads(settings_path.read_text()), expected)
@@ -113,4 +113,4 @@ class PackagingConfigureTests(unittest.TestCase):
                                 {"source": "npm:pi-schedule-prompt@0.4.1", "extensions": ["src/index.ts"]}
                                 if settings_mode == "scheduler" else "npm:pi-schedule-prompt@0.4.1"
                             )
-                        self.assertEqual(settings, {"theme": "dark", "packages": expected_packages, "battutaMemory": {"ownerProfile": role == "pm-bot"}})
+                        self.assertEqual(settings, {"theme": "dark", "packages": expected_packages, "battutaMemoryCapture": {"enabled": role == "pm-bot", "batchMessages": 6}})

@@ -4,7 +4,25 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PATH="$root/bin:$PATH"
 
+load_memory_environment() {
+  if [[ -f "$root/.env.prod" ]]; then
+    set -a
+    source "$root/.env.prod"
+    set +a
+  fi
+}
+
 case "${1:-}" in
+  setup-memory)
+    shift
+    load_memory_environment
+    exec bash "$root/scripts/setup-memory.sh" "$@"
+    ;;
+  memory)
+    load_memory_environment
+    [[ -x "$root/memory-service/.venv/bin/battuta-memory" ]] || { printf 'Run bin/battuta setup-memory first\n' >&2; exit 1; }
+    exec "$root/memory-service/.venv/bin/battuta-memory" serve
+    ;;
   configure)
     [[ -f "$root/.env.prod" ]] || { printf 'Copy %s/.env.example to %s/.env.prod and fill it in first\n' "$root" "$root" >&2; exit 1; }
     set -a
@@ -25,7 +43,7 @@ case "${1:-}" in
     }
     [[ -d "$root/agent-mail/node_modules" ]] || { printf 'Missing agent-mail dependencies\n' >&2; exit 1; }
     [[ -d "$root/project-spec/node_modules" ]] || { printf 'Missing project-spec dependencies\n' >&2; exit 1; }
-    [[ -d "$root/memory-stone/node_modules" ]] || { printf 'Missing memory bridge dependencies\n' >&2; exit 1; }
+    [[ -d "$root/memory-client/node_modules" ]] || { printf 'Missing memory client dependencies\n' >&2; exit 1; }
     set -a
     source "$root/.env.prod"
     set +a
@@ -33,16 +51,15 @@ case "${1:-}" in
       [[ -n "${!key:-}" ]] || { printf 'Set %s in .env.prod\n' "$key" >&2; exit 1; }
     done
     export AGENT_ROLE="$role" PI_CODING_AGENT_DIR="$bot_dir/.pi"
-    export PI_MEMORY_STONE_DB_PATH="${PI_MEMORY_STONE_DB_PATH:-$HOME/.battuta/memory/memory.db}"
-    [[ "$PI_MEMORY_STONE_DB_PATH" = /* ]] || { printf 'PI_MEMORY_STONE_DB_PATH must be an absolute shared path\n' >&2; exit 1; }
+    export BATTUTA_MEMORY_URL="${BATTUTA_MEMORY_URL:-http://127.0.0.1:8901/mcp}"
     cd "$bot_dir"
-    exec "$bot_dir/node_modules/.bin/pi" --approve --continue --session-dir "$bot_dir/.pi/mail-sessions" --extension "$root/agent-mail/index.ts" --extension "$root/project-spec/index.ts" --extension "$root/memory-stone/index.ts"
+    exec "$bot_dir/node_modules/.bin/pi" --approve --continue --session-dir "$bot_dir/.pi/mail-sessions" --extension "$root/agent-mail/index.ts" --extension "$root/project-spec/index.ts" --extension "$root/memory-client/index.ts"
     ;;
   install-services)
     exec "$root/bin/node" "$root/bin/install-services.mjs"
     ;;
   *)
-    printf 'Usage: %s configure|start-prod-screen|pm|tl|install-services\n' "$0" >&2
+    printf 'Usage: %s configure|setup-memory|memory|start-prod-screen|pm|tl|install-services\n' "$0" >&2
     exit 2
     ;;
 esac

@@ -1,13 +1,14 @@
-"""Keep direct Stone resources disabled; the shared bridge owns memory."""
+"""Configure new capture defaults and remove retired owned runtime entries."""
 
 from pathlib import Path
+from typing import Literal
 
 import click
 
 from .json_config import read_config, write_config
 
 
-def configure_memory_settings(bot_dir: Path) -> None:
+def configure_memory_settings(bot_dir: Path, *, role: Literal["pm", "tl"]) -> None:
     path = bot_dir / ".pi" / "settings.json"
     settings = read_config(path)
     packages = settings.get("packages", [])
@@ -19,16 +20,21 @@ def configure_memory_settings(bot_dir: Path) -> None:
         if isinstance(source, str) and source.split("@", 1)[0] == "npm:pi-memory-stone":
             continue
         retained.append(package)
-    changed = retained != packages
-    if changed:
+    original = dict(settings)
+    if retained != packages:
         settings["packages"] = retained
-    if bot_dir.name in {"pm-bot", "tl-bot"}:
-        memory = settings.get("battutaMemory", {})
-        if not isinstance(memory, dict):
-            raise click.ClickException("battutaMemory must be a JSON object")
-        enabled = bot_dir.name == "pm-bot"
-        if memory.get("ownerProfile") is not enabled:
-            settings["battutaMemory"] = {**memory, "ownerProfile": enabled}
-            changed = True
-    if changed:
+    settings.pop("battutaMemory", None)
+    extensions = settings.get("extensions", [])
+    if not isinstance(extensions, list):
+        raise click.ClickException("extensions must be a JSON array")
+    cleaned = [e for e in extensions if not (isinstance(e, str) and e.replace("\\", "/").endswith("memory-stone/index.ts"))]
+    if cleaned != extensions:
+        settings["extensions"] = cleaned
+    capture = settings.get("battutaMemoryCapture", {})
+    if not isinstance(capture, dict) or set(capture) - {"enabled", "batchMessages"} or not isinstance(capture.get("enabled", True), bool) or type(capture.get("batchMessages", 6)) is not int or not 1 <= capture.get("batchMessages", 6) <= 100:
+        raise click.ClickException("Invalid battutaMemoryCapture settings")
+    settings["battutaMemoryCapture"] = {"enabled": True, "batchMessages": 6, **capture}
+    if role == "tl":
+        settings["battutaMemoryCapture"]["enabled"] = False
+    if settings != original:
         write_config(path, settings, ".settings-")

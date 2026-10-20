@@ -13,8 +13,9 @@ async function linkSkill(root, botDirectory, name) {
     if (!stat.isSymbolicLink()) throw new Error(`Refusing to replace existing skill: ${link}`);
     const existing = await readlink(link);
     if (existing === target) return;
-    if (name !== "project-context" || existing !== "../../../shared-skills/project-context")
-      throw new Error(`Refusing to replace existing skill: ${link}`);
+    const ownedProject =
+      name === "project-context" && existing === "../../../shared-skills/project-context";
+    if (!ownedProject) throw new Error(`Refusing to replace existing skill: ${link}`);
     await unlink(link);
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
@@ -23,7 +24,7 @@ async function linkSkill(root, botDirectory, name) {
 }
 
 export async function configureSharedResources(root, botDirectory) {
-  for (const name of ["project-context", "memory"]) await linkSkill(root, botDirectory, name);
+  await linkSkill(root, botDirectory, "project-context");
   const shared = await readFile(join(root, "bots", "AGENTS_shared.md"), "utf8");
   const dedicated = await readFile(join(botDirectory, "AGENTS_dedicated.md"), "utf8");
   const sections = [shared, dedicated];
