@@ -18,6 +18,7 @@ class StateStore:
             CREATE TABLE IF NOT EXISTS intents(key TEXT PRIMARY KEY, digest TEXT NOT NULL, payload TEXT, result TEXT);
             CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS captures(key TEXT PRIMARY KEY, digest TEXT NOT NULL, result TEXT);
+            CREATE TABLE IF NOT EXISTS global_graph(slot TEXT PRIMARY KEY CHECK(slot IN ('active','draft')), payload TEXT NOT NULL);
             PRAGMA user_version=1;
         """)
         return cls(conn)
@@ -65,3 +66,36 @@ class StateStore:
 
     def close(self):
         self.conn.close()
+
+    def _graph(self, slot):
+        row = self.conn.execute("SELECT payload FROM global_graph WHERE slot=?", (slot,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def graph_active(self):
+        return self._graph("active")
+
+    def graph_draft(self, input_fingerprint, algorithm_fingerprint):
+        draft = self._graph("draft")
+        if draft and (draft["input_fingerprint"], draft["algorithm_fingerprint"]) == (input_fingerprint, algorithm_fingerprint):
+            return draft
+        return None
+
+    def save_graph_draft(self, draft):
+        with self.conn:
+            self.conn.execute("INSERT OR REPLACE INTO global_graph VALUES('draft',?)", (json.dumps(draft, allow_nan=False),))
+
+    def activate_graph(self, generation_id):
+        active = self.graph_active()
+        if active and active["generation_id"] == generation_id:
+            return active
+        draft = self._graph("draft")
+        if not draft or draft["generation_id"] != generation_id:
+            raise ValueError("Graph draft unavailable")
+        with self.conn:
+            self.conn.execute("INSERT OR REPLACE INTO global_graph VALUES('active',?)", (json.dumps(draft, allow_nan=False),))
+            self.conn.execute("DELETE FROM global_graph WHERE slot='draft'")
+        return draft
+
+    def discard_graph_draft(self):
+        with self.conn:
+            self.conn.execute("DELETE FROM global_graph WHERE slot='draft'")

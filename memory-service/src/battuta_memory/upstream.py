@@ -5,6 +5,8 @@ import fcntl
 import hashlib
 import json
 import math
+import struct
+from dataclasses import asdict
 from importlib.metadata import version
 from pathlib import Path
 
@@ -179,6 +181,83 @@ class UpstreamAdapter:
                 inactive.append({"ref": record["ref"], "superseded_by": record["superseded_by"]})
         return {"records": records, "inactive": inactive, "recent_refs": recent,
             "window_start": request.window_start, "window_end": request.window_end}
+
+    @staticmethod
+    def _global_engines():
+        from mcp_memory_service.consolidation.base import ConsolidationConfig
+        from mcp_memory_service.consolidation.clustering import SemanticClusteringEngine
+        from mcp_memory_service.consolidation.associations import CreativeAssociationEngine
+        from mcp_memory_service.consolidation.relationship_inference import RelationshipInferenceEngine
+        config = ConsolidationConfig(decay_enabled=False, compression_enabled=False, forgetting_enabled=False)
+        clustering = SemanticClusteringEngine(config)
+        config.clustering_algorithm = clustering.algorithm
+        inference = RelationshipInferenceEngine()
+        return config, clustering, CreativeAssociationEngine(config), inference
+
+    @staticmethod
+    def _fingerprint(value):
+        return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+
+    async def global_snapshot(self, max_records=500):
+        rows = await self._rows("""SELECT m.*, e.content_embedding FROM memories m
+            LEFT JOIN memory_embeddings e ON e.rowid=m.id
+            WHERE m.deleted_at IS NULL AND COALESCE(m.superseded_by,'')=''
+            AND instr(',' || m.tags || ',', ',scope:global,') > 0
+            ORDER BY m.content_hash LIMIT ?""", (max_records + 1,))
+        if len(rows) > max_records:
+            raise ValueError("Global graph inventory exceeds record limit")
+        records = []
+        for row in rows:
+            record = self.record(row)
+            if record["scope"]["projects"] or row.get("embedding_pending"):
+                raise ValueError("Inconsistent global graph input")
+            blob = row.get("content_embedding")
+            if blob is None or len(blob) != DIMENSION * 4:
+                raise ValueError("Global graph embedding unavailable")
+            embedding = list(struct.unpack(f"<{DIMENSION}f", blob))
+            if not all(math.isfinite(x) for x in embedding) or not any(embedding):
+                raise ValueError("Invalid global graph embedding")
+            records.append({**record, "embedding": embedding})
+        config, _, _, inference = self._global_engines()
+        return {"records": records,
+            "input_fingerprint": self._fingerprint(sorted((r["ref"], r["revision"]) for r in records)),
+            "algorithm_fingerprint": self._fingerprint({"format": 1, "package": version("mcp-memory-service"),
+                "model": self.manifest, "settings": asdict(config), "inference": {
+                    key: getattr(inference, key) for key in ("min_confidence", "min_typed_confidence", "min_typed_similarity", "typed_edges_enabled")}})}
+
+    async def analyze_global(self, snapshot):
+        # Upstream async methods do CPU work. Run with private, in-memory values
+        # in a worker: cancellation cannot leave a background storage writer.
+        return await asyncio.to_thread(lambda: asyncio.run(self._analyze_global(snapshot)))
+
+    async def _analyze_global(self, snapshot):
+        from mcp_memory_service.models.memory import Memory
+        from mcp_memory_service.consolidation.relationship_inference import apply_review_band
+        _, clustering, associations, inference = self._global_engines()
+        records = {r["ref"]: r for r in snapshot["records"]}
+        if not records:
+            return {"clusters": [], "edges": []}
+        memories = [Memory(content=r["content"], content_hash=r["ref"], tags=r["tags"],
+            memory_type=self.storage_kind(r["kind"]), embedding=r["embedding"], created_at=r["created_at"])
+            for r in records.values()]
+        clusters = await clustering.process(memories)
+        discovered = await associations.process(memories, existing_associations=set())
+        edges = {}
+        for association in discovered:
+            source, target = (records[ref] for ref in association.source_memory_hashes[:2])
+            relationship, confidence = await inference.infer_relationship_type(
+                source_type=self.storage_kind(source["kind"]), target_type=self.storage_kind(target["kind"]),
+                source_content=source["content"], target_content=target["content"],
+                source_timestamp=source["created_at"], target_timestamp=target["created_at"],
+                source_tags=source["tags"], target_tags=target["tags"], similarity=association.similarity_score)
+            relationship, review = apply_review_band(relationship, confidence)
+            edge = {"source_ref": source["ref"], "source_revision": source["revision"],
+                "target_ref": target["ref"], "target_revision": target["revision"],
+                "similarity": float(association.similarity_score), "relationship_type": relationship,
+                "confidence": float(confidence), "needs_review": review}
+            edges[(source["ref"], target["ref"], relationship)] = edge
+        return {"clusters": sorted(({"member_refs": sorted(c.memory_hashes)} for c in clusters), key=lambda c: c["member_refs"]),
+            "edges": sorted(edges.values(), key=lambda e: (-e["similarity"], e["source_ref"], e["target_ref"], e["relationship_type"]))}
 
     async def history(self, ref):
         # Parent links are hashes; walk both directions without recursive cycles.
