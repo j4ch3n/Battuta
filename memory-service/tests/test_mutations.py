@@ -44,6 +44,40 @@ class StorageFixture(unittest.IsolatedAsyncioTestCase):
 
 
 class MutationTests(StorageFixture):
+    async def test_optional_guards_preserve_legacy_receipt_identities(self):
+        request = self.note(key="legacy")
+        legacy = request.model_dump(mode="json", by_alias=True)
+        legacy.pop("evidence", None)
+        receipt = {"ref": "a" * 64, "outcome": "created"}
+        self.state.prepare_intent("remember:legacy", self.service.digest(legacy), {"unused": True})
+        self.state.complete_intent("remember:legacy", receipt)
+        self.assertEqual(await self.service.remember(request), receipt)
+        update = UpdateRequest(ref="a" * 64, content="New", reason="legacy")
+        public = update.model_dump(mode="json", by_alias=True)
+        public.pop("evidence", None)
+        public.pop("sources", None)
+        keyed = update.model_dump()
+        keyed.pop("evidence", None)
+        keyed.pop("sources", None)
+        key = "update:" + self.service.digest(keyed)
+        self.state.prepare_intent(key, self.service.digest(public), {"unused": True})
+        self.state.complete_intent(key, receipt)
+        self.assertEqual(await self.service.update(update), receipt)
+
+    async def test_frozen_evidence_rejects_membership_change_and_earlier_plan_update(self):
+        source = await self.service.remember(self.note("Evidence"))
+        record = await self.adapter.get(source["ref"])
+        guard = [{"ref": record["ref"], "revision": record["revision"]}]
+        await self.service.link_projects(LinkRequest(ref=source["ref"], add=["beacon"]))
+        request = {**self.note("Derived").model_dump(by_alias=True), "evidence": guard}
+        with self.assertRaisesRegex(ValueError, "evidence"):
+            await self.service.remember(RememberRequest(**request))
+        current = await self.adapter.get(source["ref"])
+        guard[0]["revision"] = current["revision"]
+        await self.service.update(UpdateRequest(ref=source["ref"], content="Corrected evidence", reason="earlier operation", evidence=guard))
+        with self.assertRaisesRegex(ValueError, "evidence"):
+            await self.service.remember(RememberRequest(**request))
+
     async def test_evidence_guards_reject_forgotten_and_changed_sources_but_receipts_win(self):
         source = await self.service.remember(self.note("Evidence"))
         record = await self.adapter.get(source["ref"])

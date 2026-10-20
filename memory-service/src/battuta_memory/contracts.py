@@ -54,7 +54,7 @@ class EvidenceGuard(Contract):
     evidence: list[EvidenceRef] = Field(default_factory=list, max_length=100)
 
 
-class RememberRequest(Tagged, EvidenceGuard):
+class RememberContent(Tagged):
     content: str = Field(min_length=1, max_length=16000)
     scope: Scope
     kind: str = Field(default="observation", pattern=r"^[a-z][a-z0-9_-]{0,39}$")
@@ -67,6 +67,10 @@ class RememberRequest(Tagged, EvidenceGuard):
         if not value.strip():
             raise ValueError("Empty memory content")
         return value
+
+
+class RememberRequest(RememberContent, EvidenceGuard):
+    pass
 
 
 class Selector(Tagged):
@@ -149,7 +153,7 @@ class ForgetRequest(GetRequest, EvidenceGuard):
     dry_run: bool = False
 
 
-class CaptureItem(RememberRequest):
+class CaptureItem(RememberContent):
     item_id: str = Field(min_length=1, max_length=200)
 
 

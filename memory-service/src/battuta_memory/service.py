@@ -3,6 +3,7 @@ import hashlib
 import json
 import uuid
 from .scope import resolve_selector, resolve_scope, registered
+from .contracts import UpdateRequest
 from .upstream import TerminalMutationError
 
 
@@ -46,6 +47,17 @@ class MemoryService:
     def digest(value):
         return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
 
+    @staticmethod
+    def request_value(request, by_alias=True):
+        value = request.model_dump(mode="json", by_alias=by_alias)
+        # Preserve pre-extension receipt keys/digests when optional guards and
+        # extra update citations were not supplied.
+        if not value.get("evidence"):
+            value.pop("evidence", None)
+        if isinstance(request, UpdateRequest) and not value.get("sources"):
+            value.pop("sources", None)
+        return value
+
     async def _apply(self, key, payload):
         try:
             await getattr(self.adapter, payload["operation"])(payload)
@@ -68,7 +80,7 @@ class MemoryService:
             await self._recover()
 
     async def _mutation(self, key, request, planner):
-        digest = self.digest(request.model_dump(mode="json", by_alias=True))
+        digest = self.digest(self.request_value(request))
         async with self.mutations:
             await self._recover()
             prior = self.state.receipt(key, digest)
@@ -138,7 +150,7 @@ class MemoryService:
                 "tags": scope_tags + (request.tags if request.tags is not None else current["tags"]) + [f"kind:{kind}"],
                 "kind": kind, "reason": request.reason, "sources": sources,
                 "result": {"ref": ref, "predecessor_ref": request.ref, "before": current["content"]}}
-        return await self._mutation("update:" + self.digest(request.model_dump()), request, plan)
+        return await self._mutation("update:" + self.digest(self.request_value(request, by_alias=False)), request, plan)
 
     async def link_projects(self, request):
         async def plan():
