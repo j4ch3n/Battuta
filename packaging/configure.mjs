@@ -132,6 +132,7 @@ for (const bot of BOT_CONFIGURATIONS) {
   if (settings.packages !== undefined || retained.length > 0) settings.packages = retained;
   delete settings.battutaMemory;
   settings.battutaMemoryCapture = { enabled: true, batchMessages: 6, ...capture };
+  if (bot.name === "TL") settings.battutaMemoryCapture.enabled = false;
   await writeFile(bot.settingsPath, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 });
 
   await writeFile(bot.telegramConfigPath, JSON.stringify(telegram, null, 2), { mode: 0o600 });

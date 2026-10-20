@@ -100,6 +100,8 @@ Bot `.pi/settings.json` accepts:
 ```
 
 - `batchMessages` defaults to **6**, with an allowed range of **1–100**.
+- `enabled` controls automatic collection, extraction, and uploads, including retries of queued work. It defaults to **true for PM**, **false for TL**; an explicit boolean overrides the client default. Memory reads are unaffected. Disabled capture leaves existing queue files untouched.
+- Source and release setup configure TL capture as **disabled**, including previously enabled TL configurations; PM's explicit setting is preserved. Setup does not delete queues.
 - Settings load when the adapter initializes; restart after changes.
 - Queues retain private source text until acknowledged. Inspect stuck queues locally; do not paste them into chat or indiscriminately delete them.
 - Capture is best-effort understanding, not guaranteed preservation of every conversation fact.

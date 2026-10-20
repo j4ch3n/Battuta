@@ -55,7 +55,10 @@ class PackagingConfigureTests(unittest.TestCase):
                     if settings_mode == "scheduler" and role == "pm-bot":
                         packages.append({"source": "npm:pi-schedule-prompt@0.4.1", "extensions": ["src/index.ts"]})
                     if settings_mode != "missing":
-                        (bot / ".pi/settings.json").write_text(json.dumps({"theme": "dark", "packages": packages}))
+                        settings = {"theme": "dark", "packages": packages}
+                        if settings_mode == "legacy":
+                            settings["battutaMemoryCapture"] = {"enabled": True, "batchMessages": 6}
+                        (bot / ".pi/settings.json").write_text(json.dumps(settings))
                     if existing:
                         (skills / "project-context").symlink_to(existing, target_is_directory=True)
                 env = {
@@ -96,7 +99,7 @@ class PackagingConfigureTests(unittest.TestCase):
                         self.assertNotIn("test-linear", json.dumps(mcp))
                         settings_path = link.parent.parent / "settings.json"
                         if settings_mode == "missing":
-                            expected = {"battutaMemoryCapture": {"enabled": True, "batchMessages": 6}}
+                            expected = {"battutaMemoryCapture": {"enabled": role == "pm-bot", "batchMessages": 6}}
                             if role == "pm-bot":
                                 expected["packages"] = ["npm:pi-schedule-prompt@0.4.1"]
                             self.assertEqual(json.loads(settings_path.read_text()), expected)
@@ -113,4 +116,4 @@ class PackagingConfigureTests(unittest.TestCase):
                                 {"source": "npm:pi-schedule-prompt@0.4.1", "extensions": ["src/index.ts"]}
                                 if settings_mode == "scheduler" else "npm:pi-schedule-prompt@0.4.1"
                             )
-                        self.assertEqual(settings, {"theme": "dark", "packages": expected_packages, "battutaMemoryCapture": {"enabled": True, "batchMessages": 6}})
+                        self.assertEqual(settings, {"theme": "dark", "packages": expected_packages, "battutaMemoryCapture": {"enabled": role == "pm-bot", "batchMessages": 6}})

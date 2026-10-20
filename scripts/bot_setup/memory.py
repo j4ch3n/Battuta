@@ -1,13 +1,14 @@
 """Configure new capture defaults and remove retired owned runtime entries."""
 
 from pathlib import Path
+from typing import Literal
 
 import click
 
 from .json_config import read_config, write_config
 
 
-def configure_memory_settings(bot_dir: Path) -> None:
+def configure_memory_settings(bot_dir: Path, *, role: Literal["pm", "tl"]) -> None:
     path = bot_dir / ".pi" / "settings.json"
     settings = read_config(path)
     packages = settings.get("packages", [])
@@ -33,5 +34,7 @@ def configure_memory_settings(bot_dir: Path) -> None:
     if not isinstance(capture, dict) or set(capture) - {"enabled", "batchMessages"} or not isinstance(capture.get("enabled", True), bool) or type(capture.get("batchMessages", 6)) is not int or not 1 <= capture.get("batchMessages", 6) <= 100:
         raise click.ClickException("Invalid battutaMemoryCapture settings")
     settings["battutaMemoryCapture"] = {"enabled": True, "batchMessages": 6, **capture}
+    if role == "tl":
+        settings["battutaMemoryCapture"]["enabled"] = False
     if settings != original:
         write_config(path, settings, ".settings-")

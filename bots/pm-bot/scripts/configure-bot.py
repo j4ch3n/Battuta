@@ -36,7 +36,7 @@ def main(bot_dir: Path, env_file: Path, env_prefix: str, telegram_package: str) 
     required(values, "LINEAR_API_TOKEN", env_file)
     configure_telegram(bot_dir, env_file, env_prefix, values)
     configure_mcp(bot_dir, env_file, values)
-    configure_memory_settings(bot_dir)
+    configure_memory_settings(bot_dir, role="pm")
     install_packages(bot_dir, telegram_package, extra_packages=(SCHEDULE_PACKAGE,))
     warn_running_session(bot_dir)
 

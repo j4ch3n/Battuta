@@ -9,14 +9,15 @@ const settingsSchema = z
     batchMessages: z.number().int().min(1).max(100).default(6),
   })
   .strict();
-export async function captureSettings(directory: string) {
+export async function captureSettings(directory: string, role: "pm" | "tl" = "pm") {
+  const schema = settingsSchema.extend({ enabled: z.boolean().default(role === "pm") });
   try {
     const settings: unknown = JSON.parse(await readFile(join(directory, "settings.json"), "utf8"));
-    return settingsSchema.parse(
+    return schema.parse(
       (settings as { battutaMemoryCapture?: unknown })?.battutaMemoryCapture ?? {},
     );
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return settingsSchema.parse({});
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return schema.parse({});
     throw error;
   }
 }

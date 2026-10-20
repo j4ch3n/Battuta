@@ -33,3 +33,25 @@ test("capture configuration validates new defaults and explicit disable", async 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test.each([
+  ["pm", true],
+  ["tl", false],
+] as const)(
+  "%s capture defaults to %s when settings are absent or partial",
+  async (role, enabled) => {
+    const dir = await mkdtemp(join(tmpdir(), "memory-role-test-"));
+    try {
+      expect(await captureSettings(dir, role)).toEqual({ enabled, batchMessages: 6 });
+      await writeFile(join(dir, "settings.json"), '{"battutaMemoryCapture":{"batchMessages":4}}');
+      expect(await captureSettings(dir, role)).toEqual({ enabled, batchMessages: 4 });
+      await writeFile(
+        join(dir, "settings.json"),
+        JSON.stringify({ battutaMemoryCapture: { enabled: !enabled } }),
+      );
+      expect((await captureSettings(dir, role)).enabled).toBe(!enabled);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  },
+);

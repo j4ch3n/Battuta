@@ -15,7 +15,7 @@ export default function memoryClient(pi: ExtensionAPI) {
     context = ctx;
     if (!runtime) {
       const config = clientConfig();
-      const settings = await captureSettings(config.directory);
+      const settings = await captureSettings(config.directory, config.role);
       if (!settings.enabled) throw new Error("Capture disabled");
       const client = new MemoryMcpClient(config.url);
       runtime = new CaptureRuntime(
