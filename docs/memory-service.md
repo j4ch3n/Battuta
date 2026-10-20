@@ -2,12 +2,12 @@
 
 The [component design](../memory-service/DESIGN.md) explains memory layers, scope versus kind, data ownership, capture, retrieval, and lifecycle invariants. This reference covers configuration and operations.
 
-| Component         | Responsibility                                                                                         |
-| ----------------- | ------------------------------------------------------------------------------------------------------ |
-| `memory-service/` | Tailored MCP tools over loopback Streamable HTTP: `/mcp`, default port `8901`.                         |
-| Upstream adapter  | Composes mcp-memory-service **12.1.1** storage and embeddings; no upstream source is copied or forked. |
-| `memory-client/`  | Thin Pi lifecycle integration, not another memory database.                                            |
-| Other MCP clients | Can use the shared server independently of Pi.                                                         |
+| Component         | Responsibility                                                                                                                    |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `memory-service/` | Tailored MCP tools over loopback Streamable HTTP: `/mcp`, default port `8901`.                                                    |
+| Upstream adapter  | Composes mcp-memory-service **12.1.1** storage, embeddings, and read-only graph analysis; no upstream source is copied or forked. |
+| `memory-client/`  | Thin Pi lifecycle integration, not another memory database.                                                                       |
+| Other MCP clients | Can use the shared server independently of Pi.                                                                                    |
 
 ## Persistence and scope
 
@@ -17,7 +17,7 @@ The [component design](../memory-service/DESIGN.md) explains memory layers, scop
 | --------------------- | --------------------------------------------------------------------------------------- |
 | Shared data directory | `~/.battuta/memory/`; override with `BATTUTA_MEMORY_DATA_DIR`.                          |
 | `memory.db`           | Upstream-owned memory records and embeddings.                                           |
-| `state.db`            | Application-owned mutation journal and receipts.                                        |
+| `state.db`            | Application-owned mutation journal, receipts, and derived global graph generations.     |
 | Service lock          | Allows one server to own the data directory.                                            |
 | `capture-queue/`      | Private per-role delivery state.                                                        |
 | Model weights         | Remain under the service user's HOME cache, independent of the data-directory override. |
@@ -123,8 +123,11 @@ Bot `.pi/settings.json` accepts:
 
 - The PM's existing prompt scheduler triggers one isolated dream session at **03:00**, using `0 0 3 * * *`, an explicit provider/model, workdir scope and `notify:false`. It runs only while PM is running. The process's local timezone determines 03:00; set the same `TZ` for PM processes if a specific zone is required.
 - Pi owns the scheduler and daily orchestration. The memory client supplies `memory_dream` and its deterministic worker, not another scheduler. Its pinned scheduler **development dependency** is used only by offline compatibility tests and is excluded from production client installs.
-- A frozen rolling **72-hour** window identifies facts to revisit. A bounded all-scope inventory supplies older active context and inactive references. The default limit is **500 stored records** (including inactive records); excess inventory or model-input budgets fail explicitly rather than silently truncate evidence. Optional clustering is not enabled.
+- A frozen rolling **72-hour** window identifies facts to revisit. A bounded all-scope inventory supplies older active context and inactive references. The default limit is **500 stored records** (including inactive records); excess inventory or model-input budgets fail explicitly rather than silently truncate evidence. Three days is a change window, not a replacement for accumulated understanding.
 - A model proposes scoped inserts, versioned updates and forgetting. Deterministic validation checks the whole plan before writes. Server mutations use revision preconditions and journaled receipts; a merge saves its replacement before retiring redundant sources. Project `SUMMARY.md` and canonical documents are not dream outputs.
+- After cleanup, the server uses upstream clustering and association/relationship analysis on **all surviving active global memories**, not projects or just the recent window. Results are derived graph generations in `state.db`, not extra memory facts or upstream graph rows. No automatic upstream compression, forgetting, decay writes, or superseding runs. The server needs no LLM credential for this stage.
+- A generation is published only against matching canonical refs/revisions and analysis/model settings. Analysis does not hold the canonical mutation lock; if global evidence changes, at most two analysis attempts are made before a retryable failure. Small corpora can produce a valid empty graph. Global changes invalidate old hints; edges are not blindly migrated to corrected or merged memories.
+- Future cleanup planning may use up to 100 current relationship hints, checked against its global inventory. Inferred relationships are heuristic context, not canonical evidence or execution authority. Stale/unavailable hints are omitted. Ordinary recall ranking stays unchanged.
 - A separate model call refreshes the entire owner profile using active global personal evidence, preserving canonical headings and supported existing understanding. Evidence references live outside `ME.md`. Project facts are not owner traits, and profile content never grants execution authority.
 - After confirmed changes, a separate bounded model call writes a meaningful reflection to `dream.log`: one timestamped line, **at most 149 words including timestamp and separator**. The log is private prose, not a raw-entry dump, transcript, generic operation count, or new memory input. One invalid-output rewrite is allowed; provider or publication failure is not reported as success.
 - A cross-process SQLite run lock releases on process exit. Private atomic checkpoints preserve the validated plan, acknowledgements, profile draft and reflection for replay without repeating confirmed writes or paid synthesis. A startup catch-up uses the same worker and run identity, not one run per missed day and not a second daily timer.
@@ -138,6 +141,7 @@ The child exposes only `memory_dream`, with no active shell/file/MCP tools or or
 The shared memory directory also contains `dream-lock.db`, `dream-state.json`, `dream-profile.json`, `ME.md` and `dream.log`. Treat all of these and capture queues as private data; checkpoint files can contain before/after fact text. They are separate from the server's database transactions. Numeric model usage/cost fields are recorded separately in `dream-usage.jsonl` because isolated child sessions have no durable session journal; this file contains no prompt or generated text and has no automatic rotation.
 
 - Transient service/provider failures leave a pending checkpoint for retry. Never delete it merely to retry: an operation may have succeeded before its acknowledgement was lost.
+- Graph failure occurs before new profile publication and leaves the run incomplete. Retry resumes acknowledged canonical work and reuses matching graph drafts/generations rather than resampling after a lost acknowledgement. Current code reads version-1 checkpoints and writes version 2 without replaying confirmed mutations or discarding already published artifacts; completed same-day legacy runs stay completed.
 - A terminal mutation conflict stops dependent cleanup, preserves source facts, and records only confirmed changes as an explicitly partial reflection. Unapplied changes remain eligible for reconsideration on a later run.
 - An edited owner profile or invalidated source during publication must not be overwritten by a stale draft. Recovery re-synthesizes against current evidence without repeating acknowledged mutations. Inspect persistent failures locally, without pasting private checkpoint content into chat.
 - Log publication is reconciled by run identity. A retry after publication must not append a second reflection for that run.

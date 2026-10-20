@@ -30,6 +30,12 @@ Preview with `memory_forget({"ref":"<ref>","dry_run":true})`, then omit dry_run 
 
 `memory_health({})` reports content-free backend/model readiness. If unavailable, report the failure rather than claiming no memories exist.
 
+## Derived global relationships
+
+`memory_global_relationships({})` reads up to 100 global relationship hints. Check `status`: only `current` results contain usable edges; `stale` or `unavailable` means no current graph, not an absence of remembered facts. `truncated:true` means more edges were omitted. Inferred connections and contradictions are heuristic hints: read the cited memories before interpreting them, and never treat an edge as permission to correct or forget a fact. Ordinary recall remains semantic, not graph-ranked.
+
+`memory_consolidate_global({"run_id":"2026-10-21T03:00:00Z"})` is normally called by the approved dream worker after canonical cleanup. For an explicitly requested maintenance run, supply its timezone-aware ISO run identity and confirm the returned published generation. This derives global clusters/edges without changing facts, projects, the profile, or upstream graph rows. It does not enable upstream compression, forgetting, or automatic superseding. Empty graph results can be valid; continued concurrent changes return a retryable failure rather than a partially published graph.
+
 ## Background capture
 
 `memory_capture` is normally called by the lifecycle adapter, not manually reconstructed by the agent. It uploads validated extracted facts with frozen scope, source entry refs, batch/item IDs and payload digest. Replays resume partial batches without recreating forgotten records. An empty extraction is valid. The model runs in the bot; the memory server embeds locally and never needs model-provider credentials.

@@ -26,6 +26,8 @@ class RealModelTests(unittest.IsolatedAsyncioTestCase):
                 (folder / "project.yaml").write_text(f"version: 1\nproject:\n  name: {name}\n  path: {folder}/code\n")
             config = MemoryConfig(data_dir=root / "data", registry_root=root / "projects")
             ref = None
+            generation = None
+            run_id = "2026-10-21T03:00:00Z"
             for restart in (False, True):
                 sock = socket.socket()
                 sock.bind(("127.0.0.1", 0))
@@ -49,9 +51,11 @@ class RealModelTests(unittest.IsolatedAsyncioTestCase):
                             self.assertTrue((await call(pm, "health"))["ready"])
                             if restart:
                                 self.assertEqual((await call(tl, "get", ref=ref))["content"], "Atlas stores project data in SQLite.")
+                                self.assertEqual((await call(pm, "consolidate_global", run_id=run_id))["generation_id"], generation)
+                                self.assertEqual((await call(pm, "global_relationships"))["status"], "current")
                                 continue
                             first = await call(pm, "remember", content="Atlas stores project data in Postgres.", scope={"global": False, "projects": ["atlas"]})
-                            await call(tl, "remember", content="The owner prefers concise replies.", scope={"global": True})
+                            personal = await call(pm, "remember", content="The owner prefers concise replies.", scope={"global": True})
                             await call(tl, "remember", content="Beacon stores project data in Postgres.", scope={"global": False, "projects": ["beacon"]})
                             with sqlite3.connect(config.database) as db:
                                 db.enable_load_extension(True)
@@ -71,6 +75,14 @@ class RealModelTests(unittest.IsolatedAsyncioTestCase):
                             self.assertEqual([r["ref"] for r in recalled["records"]], [ref])
                             inventory = await call(pm, "list", selector="all")
                             self.assertEqual(inventory["total"], 3)
+                            personal = await call(pm, "update", ref=personal["ref"], content="The owner prefers concise replies with enough context to decide.", reason="Owner clarified the preference")
+                            consolidated = await call(pm, "consolidate_global", run_id=run_id)
+                            generation = consolidated["generation_id"]
+                            self.assertEqual(consolidated["input_count"], 1)
+                            hints = await call(pm, "global_relationships")
+                            self.assertEqual(hints["status"], "current")
+                            self.assertEqual(hints["edges"], [])  # A single global survivor has no pair.
+                            self.assertEqual((await call(pm, "list", selector="all"))["total"], 3)
                             too_long = await pm.call_tool("memory_remember", {"content": "word " * 300, "scope": {"global": True}})
                             self.assertTrue(too_long.isError)
                 finally:

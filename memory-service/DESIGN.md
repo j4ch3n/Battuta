@@ -92,11 +92,12 @@ Any other MCP client → the same shared tools and storage
 | `memory-client/`                       | Pi lifecycle hooks, existing PM profile loading, bounded conversation extraction, private queue, MCP upload. |
 | `contracts.py`, `scope.py`             | Public request validation, registry resolution, and relevance selection.                                     |
 | `service.py`, `capture.py`, `state.py` | Memory workflows, serialized mutations, durable intent/receipt state, capture deduplication.                 |
-| `upstream.py`                          | The pinned boundary to mcp-memory-service 12.1.1 storage, embeddings, and existing schema.                   |
+| `upstream.py`                          | The pinned boundary to mcp-memory-service 12.1.1 storage, embeddings, schema, and read-only graph analysis.  |
+| `consolidation.py`                     | Snapshot-verified, recoverable publication of derived global clusters and relationships.                     |
 | `model_setup.py`                       | Explicit model provisioning, archive/file verification, and model identity.                                  |
 | `server.py`                            | Tailored tools over loopback Streamable HTTP; no upstream server/dashboard is exposed.                       |
 
-One process owns the shared data directory. Upstream owns `memory.db`; Battuta owns `state.db` for recovery and receipts. These are **not a single transaction**. Per-role capture queues are delivery state, not separate memory stores. No per-project database or `MEMORY.md` is created, and no upstream source/schema is forked or patched.
+One process owns the shared data directory. Upstream owns `memory.db`; Battuta owns `state.db` for recovery, receipts, and derived global graph generations. These are **not a single transaction**. Per-role capture queues are delivery state, not separate memory stores. No per-project database or `MEMORY.md` is created, and no upstream source/schema is forked or patched.
 
 ## Capture: conversation to durable facts
 
@@ -141,10 +142,18 @@ Mutation receipts may retain before/after fact content so replay can distinguish
 
 The PM client uses the existing prompt scheduler for a daily isolated session. Its dedicated tool takes a bounded inventory, partitions exact scopes, asks the configured model for cited mutations, validates the whole plan and applies server operations under revision preconditions. It refreshes the complete canonical personal profile from global evidence, then obtains an LLM reflection grounded in confirmed changes. The service does not run a separate consolidation scheduler or accept model-authored arbitrary commands.
 
+Between canonical cleanup and profile publication, `memory_consolidate_global` derives clusters and relationships from all surviving active global memories, using the pinned upstream clustering, association, and relationship-inference components. The three-day window triggers LLM reconciliation; it does not replace accumulated historical state or limit graph inputs. Existing project-memory cleanup stays unchanged; project/multi-project records and upstream graph rows are excluded from the new analysis. No compression, forgetting, decay writes, automatic superseding, or synthetic association memories run. Upstream's full consolidation orchestrator and horizon schedules are not used.
+
+Analysis receives private in-memory values with stored embeddings, never a write-capable storage handle. It runs off the event loop without holding the canonical mutation lock. The server fingerprints active-global refs/revisions plus model/configuration identity, persists calculated results as a draft in `state.db`, then rechecks the snapshot under the mutation lock before atomic activation. A stale snapshot permits at most two analysis attempts; continued churn is retryable. Keep only an active generation and one draft. A global change invalidates the old generation rather than transferring relationships blindly to replacement hashes; project-only changes do not. This is a derived view, not another canonical memory database or a transaction spanning both databases.
+
+`memory_global_relationships` returns current hints capped at 100 edges with explicit truncation, or stale/unavailable status without edges. Future dream planning accepts only hints whose global endpoints/revisions match its canonical inventory. Relationships, including inferred contradictions, are heuristic context, never canonical evidence or mutation authority. Ordinary recall ranking and personal-profile citation rules remain unchanged. A small corpus may legitimately publish an empty graph.
+
 The client persists its immutable plan, acknowledgements, profile evidence and reflection in private atomic files under the shared data directory. A crash-released run lock prevents concurrent workers; replay resumes confirmed work rather than recomputing proposals. Log publication is idempotent by scheduled run identity. Failed or partial work is not described as fully applied. These files and server databases are not a single transaction; each boundary has its own recovery checks.
+
+Version-2 checkpoints add the acknowledged graph generation before profile publication. Lost graph acknowledgements reuse a matching published generation or saved draft without repeating canonical writes. Recovery rechecks graph currency; graph failure leaves the run incomplete, not silently completed. Legacy version-1 checkpoints preserve acknowledged operations and published profile/reflection artifacts; completed same-day runs are not forcibly repeated. Concurrent capture is not swept into the handled map merely because it appeared in a later graph/profile snapshot.
 
 ## Deliberately deferred
 
-Upstream automatic semantic merging, confidence/importance-based tiers, automatic global promotion, historical Stone import, multilingual-model adoption, model migration tooling, remote authentication, dashboards and per-agent permission boundaries are not implemented. Dream uses Battuta's validated server APIs rather than enabling upstream's direct-storage consolidation engine.
+Upstream automatic semantic merging/compression/forgetting, confidence/importance-based tiers, automatic global promotion, project graphs, graph-based recall ranking, historical Stone import, multilingual-model adoption, model migration tooling, remote authentication, dashboards and per-agent permission boundaries are not implemented. Dream uses Battuta's validated server APIs and selected read-only upstream analysis components rather than enabling upstream's direct-storage consolidation engine.
 
 For operational configuration, recovery, and cutover, see [memory operations](../docs/memory-service.md). For invocation examples and user-visible tool behavior, see [tool workflow](../bots/pm-bot/.pi/skills/memory/references/tools.md).
