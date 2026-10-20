@@ -5,6 +5,7 @@ import uuid
 from .scope import resolve_selector, resolve_scope, registered
 from .contracts import UpdateRequest
 from .upstream import TerminalMutationError
+from .consolidation import GlobalConsolidation
 
 
 class MemoryService:
@@ -13,6 +14,13 @@ class MemoryService:
         self.config = config
         self.state = state
         self.mutations = asyncio.Lock()
+        self.consolidation = GlobalConsolidation(adapter, state, self.mutations, self._recover)
+
+    async def consolidate_global(self, request):
+        return await self.consolidation.consolidate(request.run_id)
+
+    async def global_relationships(self, request):
+        return await self.consolidation.relationships()
 
     async def recall(self, request):
         selected = resolve_selector(request, self.config.registry_root)

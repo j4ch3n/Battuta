@@ -1,6 +1,7 @@
 """Validated, framework-neutral public requests. Reserved metadata is never caller-controlled."""
 
 import re
+from datetime import datetime
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -109,6 +110,18 @@ class InventoryRequest(Contract):
         if self.window_start >= self.window_end:
             raise ValueError("Inventory window must be ordered")
         return self
+
+
+class ConsolidateGlobalRequest(Contract):
+    run_id: str = Field(min_length=1, max_length=64)
+
+    @field_validator("run_id")
+    @classmethod
+    def explicit_instant(cls, value):
+        instant = datetime.fromisoformat(value)
+        if "T" not in value or instant.utcoffset() is None:
+            raise ValueError("Run identity must be an explicit instant")
+        return value
 
 
 class GetRequest(Contract):

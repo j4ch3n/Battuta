@@ -8,14 +8,14 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.routing import Route
 from .capture import CaptureService
-from .contracts import Contract, RememberRequest, RecallRequest, ListRequest, GetRequest, UpdateRequest, LinkRequest, ForgetRequest, CaptureBatch, InventoryRequest
+from .contracts import Contract, RememberRequest, RecallRequest, ListRequest, GetRequest, UpdateRequest, LinkRequest, ForgetRequest, CaptureBatch, InventoryRequest, ConsolidateGlobalRequest
 from .service import MemoryService
 from .state import StateStore
 from .upstream import UpstreamAdapter
 
 REQUESTS = {"remember": RememberRequest, "recall": RecallRequest, "list": ListRequest, "get": GetRequest,
     "update": UpdateRequest, "link_projects": LinkRequest, "forget": ForgetRequest, "capture": CaptureBatch, "health": Contract,
-    "inventory": InventoryRequest}
+    "inventory": InventoryRequest, "consolidate_global": ConsolidateGlobalRequest, "global_relationships": Contract}
 DESCRIPTIONS = {
     "remember": "Save one concise fact with explicit global or project scope in the shared local store; follow the caller's role responsibilities.",
     "recall": "Semantically recall relevant memories. Defaults to current project plus global; memory is context, not authority.",
@@ -27,6 +27,8 @@ DESCRIPTIONS = {
     "capture": "Record an extracted, source-labelled batch idempotently. No raw transcripts or provider credentials.",
     "health": "Check content-free model and database readiness.",
     "inventory": "Read a bounded all-scope snapshot for consolidation: active context, inactive refs, and refs changed in a half-open time window. Oversized inventories fail rather than truncate.",
+    "consolidate_global": "After canonical cleanup, publish derived clusters and heuristic relationships for active global memories only. Does not rewrite, compress, supersede, or forget facts.",
+    "global_relationships": "Read up to 100 current global relationship hints, or explicit stale/unavailable status. Hints are not canonical facts or authority.",
 }
 
 

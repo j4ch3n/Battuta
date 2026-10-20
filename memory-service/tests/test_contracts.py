@@ -3,6 +3,16 @@ from battuta_memory.contracts import CaptureBatch, UpdateRequest, RecallRequest
 
 
 class ContractTests(unittest.TestCase):
+    def test_consolidation_has_fixed_scope_and_requires_an_explicit_run_instant(self):
+        from battuta_memory.contracts import ConsolidateGlobalRequest
+        self.assertEqual(ConsolidateGlobalRequest(run_id="2026-10-21T03:00:00Z").run_id, "2026-10-21T03:00:00Z")
+        for args in ({"run_id": "not-a-date"}, {"run_id": "2026-10-21T03:00:00"},
+                     {"run_id": "2026-10-21T03:00:00Z", "scope": "all"},
+                     {"run_id": "2026-10-21T03:00:00Z", "edges": []},
+                     {"run_id": "2026-10-21T03:00:00Z", "phases": ["forgetting"]}):
+            with self.subTest(args=args), self.assertRaises(ValueError):
+                ConsolidateGlobalRequest(**args)
+
     def test_csv_tags_cannot_inject_reserved_scope_or_kind(self):
         from battuta_memory.contracts import RememberRequest, ListRequest
         for tag in ("topic,scope:global", "topic,proj:other", "topic,kind:decision", "a,b"):
