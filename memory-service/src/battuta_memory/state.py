@@ -17,6 +17,7 @@ class StateStore:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS intents(key TEXT PRIMARY KEY, digest TEXT NOT NULL, payload TEXT, result TEXT);
             CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS captures(key TEXT PRIMARY KEY, digest TEXT NOT NULL, result TEXT);
             PRAGMA user_version=1;
         """)
         return cls(conn)
@@ -39,6 +40,20 @@ class StateStore:
 
     def recover_intents(self):
         return [{"key": key, "payload": json.loads(payload)} for key, payload in self.conn.execute("SELECT key,payload FROM intents WHERE result IS NULL ORDER BY rowid")]
+
+    def capture_receipt(self, key, digest):
+        row = self.conn.execute("SELECT digest,result FROM captures WHERE key=?", (key,)).fetchone()
+        if row and row[0] != digest:
+            raise ValueError("Capture batch conflict")
+        if row:
+            return json.loads(row[1]) if row[1] else None
+        with self.conn:
+            self.conn.execute("INSERT INTO captures VALUES(?,?,NULL)", (key, digest))
+        return None
+
+    def complete_capture(self, key, result):
+        with self.conn:
+            self.conn.execute("UPDATE captures SET result=? WHERE key=?", (json.dumps(result), key))
 
     def close(self):
         self.conn.close()

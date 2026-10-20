@@ -10,6 +10,9 @@ dependencies = [
   "pyyaml>=6,<7",
 ]
 
+[project.scripts]
+battuta-memory = "battuta_memory.cli:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

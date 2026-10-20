@@ -10,7 +10,7 @@ from battuta_memory.state import StateStore
 from battuta_memory.upstream import UpstreamAdapter
 
 
-class MutationTests(unittest.IsolatedAsyncioTestCase):
+class StorageFixture(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -42,6 +42,8 @@ class MutationTests(unittest.IsolatedAsyncioTestCase):
     def note(self, content="Original fact", project="atlas", key=None):
         return RememberRequest(content=content, scope={"global": project is None, "projects": [project] if project else []}, idempotency_key=key)
 
+
+class MutationTests(StorageFixture):
     async def test_exact_duplicates_link_projects_not_global(self):
         first = await self.service.remember(self.note())
         second = await self.service.remember(self.note(project="beacon"))
