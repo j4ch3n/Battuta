@@ -113,12 +113,48 @@ async function fixture() {
   const receipts = new Map<string, unknown>();
   const inactive = new Map<string, { ref: string; superseded_by: string | null }>();
   const applied: string[] = [];
+  const stages: string[] = [];
+  const graphBuilds: string[] = [];
+  let graph: ReturnType<typeof graphReceipt> | undefined;
+  const globalFingerprint = () =>
+    hash(
+      JSON.stringify(
+        [...records.values()]
+          .filter((r) => r.scope.global)
+          .map((r) => [r.ref, r.revision])
+          .sort(),
+      ),
+    );
   let planCalls = 0,
     loseAck = false;
   const dependencies: DreamDependencies = {
     directory,
     now: () => new Date("2026-10-21T04:00:00Z"),
     call: (name, args) => {
+      if (name === "memory_global_relationships") {
+        const status = graph
+          ? graph.input_fingerprint === globalFingerprint()
+            ? "current"
+            : "stale"
+          : "unavailable";
+        return Promise.resolve({
+          status,
+          generation_id: graph?.generation_id ?? null,
+          input_fingerprint: graph?.input_fingerprint ?? null,
+          algorithm_fingerprint: graph?.algorithm_fingerprint ?? null,
+          edges: [],
+          truncated: false,
+        });
+      }
+      if (name === "memory_consolidate_global") {
+        const fingerprint = globalFingerprint();
+        if (graph?.input_fingerprint !== fingerprint) {
+          graph = graphReceipt(fingerprint);
+          graphBuilds.push(graph.generation_id);
+          stages.push("graph");
+        }
+        return Promise.resolve(graph);
+      }
       if (name === "memory_inventory")
         return Promise.resolve({
           records: [...records.values()],
@@ -175,6 +211,7 @@ async function fixture() {
         };
       }
       applied.push(name);
+      stages.push(name);
       receipts.set(identity, result);
       if (loseAck) {
         loseAck = false;
@@ -215,7 +252,8 @@ async function fixture() {
           }),
         );
       }
-      if (prompt.startsWith("Refresh"))
+      if (prompt.startsWith("Refresh")) {
+        stages.push("profile");
         return Promise.resolve(
           JSON.stringify({
             sections: {
@@ -229,6 +267,7 @@ async function fixture() {
             },
           }),
         );
+      }
       expect(evidence).toContain("Old decision");
       expect(evidence).toContain("Current decision");
       return Promise.resolve(
@@ -240,12 +279,24 @@ async function fixture() {
     dependencies,
     records,
     applied,
+    stages,
+    graphBuilds,
     plans: () => planCalls,
     loseNextAck: () => {
       loseAck = true;
     },
   };
 }
+
+const graphReceipt = (fingerprint: string) => ({
+  generation_id: hash(fingerprint),
+  input_fingerprint: fingerprint,
+  algorithm_fingerprint: hash("algorithm"),
+  input_count: 1,
+  cluster_count: 0,
+  edge_count: 0,
+  status: "published" as const,
+});
 
 test("applies insert/update/forget, publishes the whole profile, and appends a reflection once", async () => {
   const f = await fixture();
@@ -254,6 +305,13 @@ test("applies insert/update/forget, publishes the whole profile, and appends a r
   const result = await runDream(f.dependencies, signal);
   expect(result).toContain("corrected the project decision");
   expect(f.applied).toEqual(["memory_remember", "memory_update", "memory_forget"]);
+  expect(f.stages).toEqual([
+    "memory_remember",
+    "memory_update",
+    "memory_forget",
+    "graph",
+    "profile",
+  ]);
   expect(await readFile(join(f.dependencies.directory, "ME.md"), "utf8")).toContain(
     "Prefers concise replies.",
   );
@@ -262,6 +320,7 @@ test("applies insert/update/forget, publishes the whole profile, and appends a r
   );
   expect(await runDream(f.dependencies, signal)).toBe(result);
   expect(f.plans()).toBe(1);
+  expect(f.graphBuilds).toHaveLength(1);
   expect(
     (await readFile(join(f.dependencies.directory, "dream.log"), "utf8")).trim().split("\n"),
   ).toHaveLength(1);
@@ -359,17 +418,36 @@ test.each([false, true])(
   },
 );
 
-test("resumes a frozen plan after a lost acknowledgement without repeating model synthesis or writes", async () => {
-  const f = await fixture();
-  f.loseNextAck();
-  await expect(runDream(f.dependencies, new AbortController().signal)).rejects.toThrow(
-    "lost acknowledgement",
-  );
-  expect(f.applied).toEqual(["memory_remember"]);
-  await runDream(f.dependencies, new AbortController().signal);
-  expect(f.plans()).toBe(1);
-  expect(f.applied).toEqual(["memory_remember", "memory_update", "memory_forget"]);
-});
+test.each(["mutation", "graph-lost-ack", "graph-unavailable", "graph-invalid-ack"])(
+  "resumes a frozen plan after %s without repeating synthesis or writes",
+  async (failure) => {
+    const f = await fixture();
+    if (failure === "mutation") f.loseNextAck();
+    else {
+      const call = f.dependencies.call;
+      let fail = true;
+      f.dependencies.call = async (name, args, signal) => {
+        if (name === "memory_consolidate_global" && fail) {
+          fail = false;
+          if (failure === "graph-lost-ack") await call(name, args, signal);
+          if (failure === "graph-invalid-ack")
+            return { ...graphReceipt(hash("bad")), generation_id: "invalid" };
+          throw new Error("lost acknowledgement");
+        }
+        return call(name, args, signal);
+      };
+    }
+    await expect(runDream(f.dependencies, new AbortController().signal)).rejects.toThrow();
+    expect(f.applied).toHaveLength(failure === "mutation" ? 1 : 3);
+    await expect(readFile(join(f.dependencies.directory, "ME.md"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    await runDream(f.dependencies, new AbortController().signal);
+    expect(f.plans()).toBe(1);
+    expect(f.applied).toEqual(["memory_remember", "memory_update", "memory_forget"]);
+    expect(f.graphBuilds).toHaveLength(1);
+  },
+);
 
 test("rejects an invalid whole plan before the first mutation and preserves ME.md", async () => {
   const f = await fixture();
@@ -385,22 +463,111 @@ test("rejects an invalid whole plan before the first mutation and preserves ME.m
   );
 });
 
-test("a failed reflection retries independently of confirmed mutations", async () => {
-  const f = await fixture();
-  const complete = f.dependencies.complete;
-  f.dependencies.complete = (prompt, input, signal) =>
-    prompt.startsWith("Write a private")
-      ? Promise.reject(new Error("provider down"))
-      : complete(prompt, input, signal);
-  await expect(runDream(f.dependencies, new AbortController().signal)).rejects.toThrow(
-    "provider down",
-  );
-  expect(f.applied).toHaveLength(3);
-  f.dependencies.complete = complete;
-  await runDream(f.dependencies, new AbortController().signal);
-  expect(f.applied).toHaveLength(3);
-  expect(f.plans()).toBe(1);
-});
+test.each(["unchanged", "project", "global"])(
+  "a failed reflection retries independently of mutations with %s changes",
+  async (changed) => {
+    const f = await fixture();
+    const complete = f.dependencies.complete;
+    f.dependencies.complete = (prompt, input, signal) =>
+      prompt.startsWith("Write a private")
+        ? Promise.reject(new Error("provider down"))
+        : complete(prompt, input, signal);
+    await expect(runDream(f.dependencies, new AbortController().signal)).rejects.toThrow(
+      "provider down",
+    );
+    expect(f.applied).toHaveLength(3);
+    expect(f.graphBuilds).toHaveLength(1);
+    if (changed !== "unchanged") {
+      const ref = changed === "global" ? pref : hash("Current decision");
+      f.records.set(ref, { ...f.records.get(ref)!, revision: hash("new revision") });
+    }
+    f.dependencies.complete = complete;
+    await runDream(f.dependencies, new AbortController().signal);
+    expect(f.applied).toHaveLength(3);
+    expect(f.plans()).toBe(1);
+    expect(f.graphBuilds).toHaveLength(changed === "global" ? 2 : 1);
+  },
+);
+
+test.each(["unpublished", "profile", "reflection", "completed"])(
+  "legacy %s checkpoint preserves acknowledged work",
+  async (stage) => {
+    const f = await fixture();
+    const signal = new AbortController().signal;
+    const result = await runDream(f.dependencies, signal);
+    const path = join(f.dependencies.directory, "dream-state.json");
+    const state = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+    state.version = 1;
+    delete state.consolidation;
+    state.completed = stage === "completed";
+    if (stage === "unpublished") state.profile_published = false;
+    if (stage === "unpublished" || stage === "profile") delete state.reflection;
+    await writeFile(path, JSON.stringify(state));
+    const profilePath = join(f.dependencies.directory, "ME.md");
+    if (stage !== "unpublished") await writeFile(profilePath, "Owner's current private text");
+    expect(await runDream(f.dependencies, signal)).toBe(result);
+    expect(f.applied).toHaveLength(3);
+    expect(f.plans()).toBe(1);
+    const saved = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+    expect(saved.version).toBe(stage === "completed" ? 1 : 2);
+    if (stage !== "completed") expect(saved.consolidation).toMatchObject({ status: "published" });
+    if (stage !== "unpublished")
+      expect(await readFile(profilePath, "utf8")).toBe("Owner's current private text");
+  },
+);
+
+test.each(["current", "stale", "unavailable", "missing", "revision", "invalid", "outage"])(
+  "cleanup treats %s global relationships only as verified optional hints",
+  async (mode) => {
+    const f = await fixture();
+    const other = hash("another global fact");
+    f.records.set(other, record(other, "Owner values careful decisions", true));
+    const edge = {
+      source_ref: pref,
+      source_revision: f.records.get(pref)!.revision,
+      target_ref: mode === "missing" ? old : other,
+      target_revision: mode === "revision" ? hash("stale") : f.records.get(other)!.revision,
+      similarity: mode === "invalid" ? NaN : 0.6,
+      confidence: 0.5,
+      relationship_type: "related",
+      needs_review: false,
+    };
+    const call = f.dependencies.call;
+    f.dependencies.call = (name, args, signal) => {
+      if (name !== "memory_global_relationships") return call(name, args, signal);
+      if (mode === "outage") return Promise.reject(new Error("outage"));
+      return Promise.resolve({
+        ...graphReceipt(hash("hints")),
+        edges: ["stale", "unavailable"].includes(mode) ? [] : [edge],
+        truncated: false,
+        status: ["stale", "unavailable"].includes(mode) ? mode : "current",
+      });
+    };
+    let planned = false;
+    f.dependencies.complete = (prompt, input) => {
+      if (prompt.startsWith("Consolidate")) {
+        planned = true;
+        const evidence = JSON.parse(input) as {
+          groups: { scope: string; global_relationships?: unknown[] }[];
+        };
+        expect(
+          evidence.groups.find((g) => g.scope === "global")?.global_relationships ?? [],
+        ).toEqual(mode === "current" ? [edge] : []);
+        expect(
+          evidence.groups.filter((g) => g.scope !== "global").every((g) => !g.global_relationships),
+        ).toBe(true);
+        return Promise.resolve('{"operations":[]}');
+      }
+      return Promise.resolve(
+        prompt.startsWith("Refresh") ? JSON.stringify(emptyProfile()) : "Nothing material changed.",
+      );
+    };
+    await runDream(f.dependencies, new AbortController().signal);
+    expect(planned).toBe(true);
+    expect(f.applied).toEqual([]);
+    expect(f.graphBuilds).toHaveLength(1);
+  },
+);
 
 test("a terminal conflict logs only confirmed changes and leaves dependent cleanup unapplied", async () => {
   const f = await fixture();
@@ -453,7 +620,7 @@ test("next day revisits concurrent captures and membership revisions, not the fi
     }
     if (prompt.startsWith("Refresh")) {
       if (day === 1) {
-        f.records.set(external, record(external, "Concurrent capture"));
+        f.records.set(external, record(external, "Concurrent capture", true));
         f.records.set(old, {
           ...f.records.get(old)!,
           scope: { global: false, projects: ["atlas", "beacon"] },
@@ -468,6 +635,7 @@ test("next day revisits concurrent captures and membership revisions, not the fi
   day = 2;
   await runDream(f.dependencies, new AbortController().signal);
   expect(secondDayPlans).toBe(1);
+  expect(f.graphBuilds).toHaveLength(2);
 });
 
 test("lost-ack historical receipt after external forgetting is not reflected as a current fact", async () => {

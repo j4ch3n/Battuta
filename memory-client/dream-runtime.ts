@@ -18,6 +18,11 @@ import {
 import { createDreamReflection, publishDreamLog, type DreamComplete } from "./dream-result.ts";
 import { readOwnerProfile } from "./profile-loader.ts";
 import { redact } from "./privacy.ts";
+import {
+  consolidationReceiptSchema,
+  ensureGlobalConsolidation,
+  readGlobalHints,
+} from "./dream-consolidation.ts";
 
 export interface DreamDependencies {
   directory: string;
@@ -35,7 +40,7 @@ const inventorySchema = z.object({
 });
 const profileSchema = personalProfileSchema.extend({ content: z.string().max(32000) });
 const checkpointSchema = z.object({
-  version: z.literal(1),
+  version: z.union([z.literal(1), z.literal(2)]),
   run_id: z.string().datetime(),
   window_start: z.number(),
   window_end: z.number(),
@@ -61,6 +66,7 @@ const checkpointSchema = z.object({
   conflict: z.boolean().optional(),
   completed: z.boolean(),
   handled: z.record(z.string(), z.string()),
+  consolidation: consolidationReceiptSchema.optional(),
 });
 type Checkpoint = z.infer<typeof checkpointSchema>;
 
@@ -97,6 +103,7 @@ async function prepare(
   const end = now.getTime() / 1000,
     start = end - 3 * 86400;
   const inventory = await snapshot(deps, start, end, signal);
+  const hints = await readGlobalHints(deps.call, inventory.records, signal);
   const recent = inventory.recent_refs.filter((r) =>
     inventory.records.some(
       (record) => record.ref === r && record.revision !== previous?.handled[r],
@@ -109,6 +116,7 @@ async function prepare(
       recent_refs: recent.filter((ref) =>
         inventory.records.some((r) => r.ref === ref && scopeKey(r) === key),
       ),
+      ...(key === "global" ? { global_relationships: hints } : {}),
     }))
     .filter((g) => g.recent_refs.length);
   const input = groups.length
@@ -125,7 +133,7 @@ async function prepare(
   for (const operation of plan.operations)
     mutationRequest(operation, inventory.records, dreamRunId(now));
   return {
-    version: 1,
+    version: 2,
     run_id: dreamRunId(now),
     window_start: start,
     window_end: end,
@@ -292,6 +300,7 @@ export async function runDream(deps: DreamDependencies, signal: AbortSignal): Pr
       return previous.reflection!;
     const state =
       previous && !previous.completed ? previous : await prepare(deps, previous, signal);
+    state.version = 2;
     const save = () => atomicPrivateWrite(path, JSON.stringify(state));
     await save();
     for (const operation of state.operations) {
@@ -344,6 +353,13 @@ export async function runDream(deps: DreamDependencies, signal: AbortSignal): Pr
       }
       await observeAcknowledgement(deps, state, state.results.at(-1)!, save, signal);
     }
+    state.consolidation = await ensureGlobalConsolidation(
+      deps.call,
+      state.run_id,
+      state.consolidation,
+      signal,
+    );
+    await save();
     await refreshProfile(deps, state, save, signal);
     if (!state.reflection) {
       // Recheck current state for historical receipts and outputs withdrawn by

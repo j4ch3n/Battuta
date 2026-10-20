@@ -27,21 +27,24 @@ afterEach(() => {
   transport.request = undefined;
 });
 
-test("returns structured inventory and closes the client", async () => {
-  transport.result = { structuredContent: { ok: true, data: { records: [] } } };
-  expect(
-    await new MemoryMcpClient("http://127.0.0.1:8901/mcp").call(
-      "memory_inventory",
-      { window_start: 0, window_end: 1 },
-      new AbortController().signal,
-    ),
-  ).toEqual({ records: [] });
-  expect(transport.request).toEqual({
-    name: "memory_inventory",
-    arguments: { window_start: 0, window_end: 1 },
-  });
-  expect(transport.closed).toBe(1);
-});
+test.each(["memory_inventory", "memory_consolidate_global", "memory_global_relationships"])(
+  "dispatches %s and closes the client",
+  async (name) => {
+    transport.result = { structuredContent: { ok: true, data: { records: [] } } };
+    expect(
+      await new MemoryMcpClient("http://127.0.0.1:8901/mcp").call(
+        name,
+        { window_start: 0, window_end: 1 },
+        new AbortController().signal,
+      ),
+    ).toEqual({ records: [] });
+    expect(transport.request).toEqual({
+      name,
+      arguments: { window_start: 0, window_end: 1 },
+    });
+    expect(transport.closed).toBe(1);
+  },
+);
 
 test.each([false, true])(
   "propagates retryability without leaking server content (%s)",

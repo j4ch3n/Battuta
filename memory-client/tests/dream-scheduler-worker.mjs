@@ -98,20 +98,44 @@ const server = createServer(async (req, res) => {
       } else {
         assert.notEqual(req.url, "/native", "Native MCP tool must never execute");
         assert.equal(input.method, "tools/call");
-        assert.equal(input.params.name, "memory_inventory");
+        assert.ok(
+          ["memory_inventory", "memory_consolidate_global", "memory_global_relationships"].includes(
+            input.params.name,
+          ),
+        );
         if (holdService) {
           holdRequest?.();
           return;
         }
-        inventoryCalls++;
+        if (input.params.name === "memory_inventory") inventoryCalls++;
         const args = input.params.arguments;
-        const data = {
-          records: [],
-          recent_refs: [],
-          inactive: [],
-          window_start: args.window_start,
-          window_end: args.window_end,
-        };
+        const data =
+          input.params.name === "memory_global_relationships"
+            ? {
+                status: "unavailable",
+                generation_id: null,
+                input_fingerprint: null,
+                algorithm_fingerprint: null,
+                edges: [],
+                truncated: false,
+              }
+            : input.params.name === "memory_consolidate_global"
+              ? {
+                  status: "published",
+                  generation_id: "a".repeat(64),
+                  input_fingerprint: "b".repeat(64),
+                  algorithm_fingerprint: "c".repeat(64),
+                  input_count: 0,
+                  cluster_count: 0,
+                  edge_count: 0,
+                }
+              : {
+                  records: [],
+                  recent_refs: [],
+                  inactive: [],
+                  window_start: args.window_start,
+                  window_end: args.window_end,
+                };
         result = {
           content: [{ type: "text", text: JSON.stringify(data) }],
           structuredContent: { ok: true, data },

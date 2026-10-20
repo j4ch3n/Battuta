@@ -18,6 +18,8 @@ export class MemoryMcpClient {
         "memory_remember",
         "memory_update",
         "memory_forget",
+        "memory_consolidate_global",
+        "memory_global_relationships",
       ].includes(name)
     )
       throw new Error("Unsupported dream memory operation");
