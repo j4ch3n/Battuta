@@ -11,6 +11,24 @@ from fixtures import ConfigFixture, ROOT
 
 
 class ReleaseInstallTests(ConfigFixture):
+    def test_archive_links_role_specific_memory_skills(self):
+        workflow = (ROOT / ".github/workflows/release.yml").read_text()
+        loop = re.search(
+            r'^          for bot in pm-bot tl-bot; do\n            mkdir .*?^          done$',
+            workflow, re.MULTILINE | re.DOTALL,
+        )
+        self.assertIsNotNone(loop)
+        stage = self.root / "dist/stage/battuta"
+        for name in ("project-context", "memory", "memory-tl"):
+            source = stage / "shared-skills" / name
+            source.mkdir(parents=True)
+            (source / "SKILL.md").write_text(name)
+        (stage / "shared-skills/project-context/references").mkdir()
+        result = subprocess.run(["bash", "-euc", textwrap.dedent(loop.group())], cwd=self.root, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for role in ("pm-bot", "tl-bot"):
+            self.assertEqual((stage / "bots" / role / ".pi/skills/memory/SKILL.md").read_text(), "memory-tl" if role == "tl-bot" else "memory")
+
     def test_packages_are_installed_inside_archive_with_scheduler_only_for_pm(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         loop = re.search(

@@ -1,6 +1,7 @@
 """Shared skill installation and migration for both management bots."""
 
 from pathlib import Path
+from itertools import product
 import sys
 import tempfile
 import unittest
@@ -13,28 +14,37 @@ from bot_setup.skills import link_project_context, link_shared_skills  # noqa: E
 
 class SharedSkillTests(unittest.TestCase):
     def test_memory_link_is_relative_and_custom_entries_are_preserved(self):
-        for existing in (None, "directory", "symlink"):
-            with self.subTest(existing=existing), tempfile.TemporaryDirectory() as directory:
+        for role, existing in product(("pm", "tl"), (None, "owned", "directory", "symlink", "file")):
+            with self.subTest(role=role, existing=existing), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                for name in ("project-context", "memory"):
+                for name in ("project-context", "memory", "memory-tl"):
                     skill = root / "shared-skills" / name
                     skill.mkdir(parents=True)
                     (skill / "SKILL.md").write_text(name)
-                bot = root / "bots/tl-bot"
+                bot = root / "bots/custom-assistant"
                 link = bot / ".pi/skills/memory"
                 link.parent.mkdir(parents=True)
                 if existing == "directory":
                     link.mkdir()
                 elif existing == "symlink":
                     link.symlink_to("custom-memory")
-                if existing:
+                elif existing == "owned":
+                    link.symlink_to("../../../../shared-skills/memory")
+                elif existing == "file":
+                    link.write_text("Custom memory")
+                if existing in ("directory", "symlink", "file"):
                     with self.assertRaises(click.ClickException):
-                        link_shared_skills(bot)
-                    self.assertEqual(link.readlink(), Path("custom-memory")) if existing == "symlink" else self.assertTrue(link.is_dir())
+                        link_shared_skills(bot, role=role)
+                    if existing == "symlink":
+                        self.assertEqual(link.readlink(), Path("custom-memory"))
+                    elif existing == "file":
+                        self.assertEqual(link.read_text(), "Custom memory")
+                    else:
+                        self.assertTrue(link.is_dir())
                 else:
                     for _ in range(2):
-                        link_shared_skills(bot)
-                        self.assertEqual((link / "SKILL.md").read_text(), "memory")
+                        link_shared_skills(bot, role=role)
+                        self.assertEqual((link / "SKILL.md").read_text(), "memory-tl" if role == "tl" else "memory")
                         self.assertFalse(link.readlink().is_absolute())
 
     def test_install_and_migrate_links_for_both_bots(self):

@@ -28,7 +28,7 @@ def main(bot_dir: Path, env_file: Path, env_prefix: str, telegram_package: str) 
     env_file = env_file.resolve()
     if not (bot_dir / "package.json").is_file():
         raise click.ClickException(f"Missing {bot_dir / 'package.json'}")
-    configure_instructions(bot_dir)
+    configure_instructions(bot_dir, role="tl", root=ROOT)
 
     values = read_env(env_file)
     required(values, f"{env_prefix}_TELEGRAM_TOKEN", env_file)

@@ -54,6 +54,7 @@ jobs:
           test -s dist/stage/battuta/RELEASE.md
           test -s dist/stage/battuta/docs/gogcli-setup.md
           test -s dist/stage/battuta/shared-skills/memory/references/tools.md
+          test -s dist/stage/battuta/shared-skills/memory-tl/references/tools.md
           test ! -e dist/stage/battuta/bots/AGENTS_personal.md
           cli_dir="$PWD/dist/stage/battuta/shared-skills/project-context-cli"
           uv export --project "$cli_dir" --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/project-requirements.txt"
@@ -74,7 +75,9 @@ jobs:
             mkdir -p "dist/stage/battuta/bots/$bot/.pi/skills"
             test ! -e "dist/stage/battuta/bots/$bot/.pi/ME.md"
             for skill in project-context memory; do
-              ln -s "../../../../shared-skills/$skill" "dist/stage/battuta/bots/$bot/.pi/skills/$skill"
+              source_skill="$skill"
+              if [ "$bot" = tl-bot ] && [ "$skill" = memory ]; then source_skill=memory-tl; fi
+              ln -s "../../../../shared-skills/$source_skill" "dist/stage/battuta/bots/$bot/.pi/skills/$skill"
               test -f "dist/stage/battuta/bots/$bot/.pi/skills/$skill/SKILL.md"
             done
             source_references="dist/stage/battuta/shared-skills/project-context/references"

@@ -28,6 +28,11 @@ class PackagingConfigureTests(unittest.TestCase):
                 memory_skill.mkdir()
                 (memory_skill / "SKILL.md").write_text("Memory scope guidance")
                 shutil.copytree(ROOT / "shared-skills/memory/references", memory_skill / "references")
+                tl_skill = root / "shared-skills/memory-tl"
+                tl_skill.mkdir()
+                (tl_skill / "SKILL.md").write_text("Read-only memory guidance")
+                (tl_skill / "references").mkdir()
+                (tl_skill / "references/tools.md").write_text("Read-only tools")
                 references = source / "references"
                 summary = references / "summary"
                 summary.mkdir(parents=True)
@@ -61,6 +66,7 @@ class PackagingConfigureTests(unittest.TestCase):
                         (bot / ".pi/settings.json").write_text(json.dumps(settings))
                     if existing:
                         (skills / "project-context").symlink_to(existing, target_is_directory=True)
+                        (skills / "memory").symlink_to("../../../../shared-skills/memory", target_is_directory=True)
                 env = {
                     **os.environ,
                     "TELEGRAM_ALLOWED_USER_ID": "123",
@@ -83,9 +89,9 @@ class PackagingConfigureTests(unittest.TestCase):
                         self.assertEqual((link / "references" / "summary" / "template.md").read_text(), "Runtime summary template")
                         self.assertEqual(link.resolve(), source.resolve())
                         self.assertFalse(link.readlink().is_absolute())
-                        self.assertEqual((link.parent / "memory/SKILL.md").read_text(), "Memory scope guidance")
+                        self.assertEqual((link.parent / "memory/SKILL.md").read_text(), "Read-only memory guidance" if role == "tl-bot" else "Memory scope guidance")
                         for resource in ("tools.md",):
-                            self.assertEqual((link.parent / "memory/references" / resource).read_text(), (ROOT / "shared-skills/memory/references" / resource).read_text())
+                            self.assertEqual((link.parent / "memory/references" / resource).read_text(), "Read-only tools" if role == "tl-bot" else (ROOT / "shared-skills/memory/references" / resource).read_text())
                         profile = link.parent.parent / "ME.md"
                         self.assertEqual(profile.read_text() if profile.exists() else None, "Private profile" if personal is not None else None)
                         if personal is not None:
