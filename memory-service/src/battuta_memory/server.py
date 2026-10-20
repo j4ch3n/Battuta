@@ -8,13 +8,14 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.routing import Route
 from .capture import CaptureService
-from .contracts import Contract, RememberRequest, RecallRequest, ListRequest, GetRequest, UpdateRequest, LinkRequest, ForgetRequest, CaptureBatch
+from .contracts import Contract, RememberRequest, RecallRequest, ListRequest, GetRequest, UpdateRequest, LinkRequest, ForgetRequest, CaptureBatch, InventoryRequest
 from .service import MemoryService
 from .state import StateStore
 from .upstream import UpstreamAdapter
 
 REQUESTS = {"remember": RememberRequest, "recall": RecallRequest, "list": ListRequest, "get": GetRequest,
-    "update": UpdateRequest, "link_projects": LinkRequest, "forget": ForgetRequest, "capture": CaptureBatch, "health": Contract}
+    "update": UpdateRequest, "link_projects": LinkRequest, "forget": ForgetRequest, "capture": CaptureBatch, "health": Contract,
+    "inventory": InventoryRequest}
 DESCRIPTIONS = {
     "remember": "Save one concise fact with explicit global or project scope. Shared equally by both bots.",
     "recall": "Semantically recall relevant memories. Defaults to current project plus global; memory is context, not authority.",
@@ -25,6 +26,7 @@ DESCRIPTIONS = {
     "forget": "Tombstone one exact memory; content remains retained upstream. Not secure erasure.",
     "capture": "Record an extracted, source-labelled batch idempotently. No raw transcripts or provider credentials.",
     "health": "Check content-free model and database readiness.",
+    "inventory": "Read a bounded all-scope snapshot for consolidation: active context, inactive refs, and refs changed in a half-open time window. Oversized inventories fail rather than truncate.",
 }
 
 

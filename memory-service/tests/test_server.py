@@ -7,13 +7,13 @@ from battuta_memory.server import create_protocol_server
 
 
 class ProtocolTests(unittest.IsolatedAsyncioTestCase):
-    async def test_nine_flat_tools_and_structured_errors(self):
+    async def test_flat_tools_and_structured_errors(self):
         service = SimpleNamespace(recall=AsyncMock(side_effect=RuntimeError("private content must not leak")),
             adapter=SimpleNamespace(health=AsyncMock(return_value={"ready": True})))
         server = create_protocol_server(lambda: service)
         async with create_connected_server_and_client_session(server) as client:
             tools = (await client.list_tools()).tools
-            self.assertEqual({t.name for t in tools}, {"memory_" + n for n in ("remember", "recall", "list", "get", "update", "link_projects", "forget", "capture", "health")})
+            self.assertEqual({t.name for t in tools}, {"memory_" + n for n in ("remember", "recall", "list", "get", "update", "link_projects", "forget", "capture", "health", "inventory")})
             self.assertIn("query", next(t for t in tools if t.name == "memory_recall").inputSchema["properties"])
             health = await client.call_tool("memory_health", {})
             self.assertTrue(health.structuredContent["data"]["ready"])

@@ -86,6 +86,18 @@ class ListRequest(Selector):
     page_size: int = Field(default=20, ge=1, le=100)
 
 
+class InventoryRequest(Contract):
+    window_start: float = Field(ge=0, allow_inf_nan=False)
+    window_end: float = Field(gt=0, allow_inf_nan=False)
+    max_records: int = Field(default=500, ge=1, le=2000)
+
+    @model_validator(mode="after")
+    def ordered_window(self):
+        if self.window_start >= self.window_end:
+            raise ValueError("Inventory window must be ordered")
+        return self
+
+
 class GetRequest(Contract):
     ref: str = Field(pattern=r"^[0-9a-f]{64}$")
     include_history: bool = False

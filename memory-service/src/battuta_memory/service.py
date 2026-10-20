@@ -34,6 +34,14 @@ class MemoryService:
             record["history"] = await self.adapter.history(request.ref)
         return record
 
+    async def inventory(self, request):
+        # Includes every scope explicitly; no selected-project fallback. Mutations
+        # and pending recovery cannot interleave with the inventory read.
+        async with self.mutations:
+            if self.state is not None:
+                await self._recover()
+            return await self.adapter.inventory(request)
+
     @staticmethod
     def digest(value):
         return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()

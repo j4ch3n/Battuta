@@ -156,6 +156,27 @@ class UpstreamAdapter:
         rows = await self._rows("SELECT * FROM memories WHERE content_hash=?" + ("" if include_deleted else " AND deleted_at IS NULL"), (ref,))
         return self.record(rows[0]) if rows else None
 
+    async def inventory(self, request):
+        # One statement supplies a consistent read snapshot. Fail closed rather
+        # than paginate a moving corpus or silently drop old correction targets.
+        rows = await self._rows("SELECT * FROM memories ORDER BY content_hash LIMIT ?", (request.max_records + 1,))
+        if len(rows) > request.max_records:
+            raise ValueError("Dream inventory exceeds record limit")
+        if any(row.get("embedding_pending") for row in rows):
+            raise ValueError("Dream inventory has pending embeddings")
+        records, inactive, recent = [], [], []
+        for row in rows:
+            record = self.record(row)
+            changed = max(row.get("created_at") or 0, row.get("updated_at") or 0, row.get("deleted_at") or 0)
+            if request.window_start <= changed < request.window_end:
+                recent.append(record["ref"])
+            if record["active"]:
+                records.append(record)
+            else:
+                inactive.append({"ref": record["ref"], "superseded_by": record["superseded_by"]})
+        return {"records": records, "inactive": inactive, "recent_refs": recent,
+            "window_start": request.window_start, "window_end": request.window_end}
+
     async def history(self, ref):
         # Parent links are hashes; walk both directions without recursive cycles.
         record = await self.get(ref)

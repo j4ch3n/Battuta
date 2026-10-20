@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from battuta_memory.config import MemoryConfig
-from battuta_memory.contracts import GetRequest, ListRequest, RecallRequest
+from battuta_memory.contracts import GetRequest, ListRequest, RecallRequest, InventoryRequest
 from battuta_memory.service import MemoryService
 from battuta_memory.upstream import UpstreamAdapter
 
@@ -80,3 +80,24 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
         result = await self.service.recall(RecallRequest(query="note"))
         self.assertTrue(result["warnings"])
         self.assertEqual([r["content"] for r in result["records"]], ["Global note"])
+
+    async def test_inventory_keeps_older_context_and_recent_invalidations(self):
+        self.conn.execute("UPDATE memories SET updated_at=10 WHERE content_hash=?", ("a" * 64,))
+        self.conn.execute("UPDATE memories SET deleted_at=11 WHERE content_hash=?", ("c" * 64,))
+        result = await self.service.inventory(InventoryRequest(window_start=10, window_end=12))
+        self.assertEqual([r["ref"] for r in result["records"]], ["a" * 64, "b" * 64])
+        self.assertEqual(result["recent_refs"], ["a" * 64, "c" * 64])
+        self.assertEqual({r["ref"] for r in result["inactive"]}, {"c" * 64, "d" * 64})
+        self.assertNotIn("content", result["inactive"][0])
+
+    async def test_inventory_window_is_half_open_and_bounded_without_truncation(self):
+        self.conn.execute("UPDATE memories SET updated_at=12 WHERE content_hash=?", ("a" * 64,))
+        result = await self.service.inventory(InventoryRequest(window_start=10, window_end=12))
+        self.assertEqual(result["recent_refs"], [])
+        with self.assertRaisesRegex(ValueError, "limit"):
+            await self.service.inventory(InventoryRequest(window_start=0, window_end=12, max_records=2))
+
+    def test_inventory_rejects_invalid_time_windows(self):
+        for start, end in [(12, 12), (13, 12), (-1, 12), (0, float("inf")), (float("nan"), 12)]:
+            with self.subTest(start=start, end=end), self.assertRaises(ValueError):
+                InventoryRequest(window_start=start, window_end=end)
