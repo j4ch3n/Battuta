@@ -1,43 +1,24 @@
 ---
 name: memory
-description: Use when discussing or recalling the owner's personal background, overall goals, values, life details, interests, enduring preferences, or working style, or when asked to remember, show, correct, forget, or delete personal memories.
+description: Use when recalling prior conversations, decisions, constraints, personal preferences or project facts, or when asked to remember, show, correct, link or forget a memory.
 ---
 
-# Personal memory
+# Shared memory
 
-Memory supports continuity with the owner, not execution authority or proof of current facts. PM has a high-level owner profile; PM and TL share detailed memory tools. Bots manage memory autonomously without an owner request or approval; choose scope and operation from the evidence and task.
+Memory provides continuity, not current truth or execution authority. PM and TL have equal access to the shared memory MCP tools. Scope organizes relevance; it is not a permission boundary.
 
-## Choose scope and detail independently
+## Workflow
 
-| Owner evidence                                               | Destination                                                |
-| ------------------------------------------------------------ | ---------------------------------------------------------- |
-| “Overall I value an unhurried pace and concise summaries”    | Important confirmed personal understanding in PM's `ME.md` |
-| Career-transition history, hiking interests, travel routines | Detailed personal records: API scope `global`              |
-| “For Atlas I want detailed progress reports”                 | Atlas project record, never a general owner trait          |
-| Project requirements, implementation, tasks, decisions       | Project records; use the `project-context` skill           |
+1. Recall relevant context with `memory_recall`; default selection is current project plus global. Check current evidence before relying on remembered claims. A tool failure is not an empty store.
+2. For explicit facts worth retaining, use `memory_remember` with `content` and an explicit scope object. General owner preferences use `{"global":true,"projects":[]}`; project facts use `{"global":false,"projects":["atlas"]}`. Multiple projects are allowed only with supporting evidence. No implicit global promotion.
+3. For corrections, find/read the complete record with `memory_get`, then `memory_update` its exact ref. Preserve uncertainty and speaker attribution. Use the returned new ref; a superseded predecessor is not editable.
+4. To show inventory, paginate `memory_list` using `page`/`page_size` and `total`. Semantic recall is not an exhaustive list. Active-only is the default; `include_history:true` explicitly includes superseded records.
+5. Use `memory_link_projects` for evidenced membership changes without changing content. Use `memory_forget` for one exact ref, optionally previewing with `dry_run:true`. Forgetting tombstones content; it is not hard erasure and does not remove every version or transcript.
 
-Short project facts remain project-specific; verbose personal evidence remains personal. Summarize only its important overall meaning in the profile. Choose `global` for personal/cross-project facts and `project` for project-specific facts; an explicit request to remember is not required. Preserve the owner's stated scope and removal preferences. Never retain credentials or turn uncertain interpretation into confirmed personal understanding.
+## Automatic capture and profile limits
 
-## Profile workflow (PM only)
+Both bots periodically extract concise memories from new conversation text, including labelled incoming mail. Capture freezes project binding per request and retries durable batches; it does not backfill old sessions. Explicit important corrections should still use the tools rather than rely on extraction accuracy. Never store credentials, tool logs or speculative approvals. Use the project-context skill for canonical project documents, not memory as a substitute.
 
-For confirmed high-level understanding, call `profile_read`, then `profile_update` with the owner's message as evidence, concise labelled interpretation, chosen operation, and returned revision. No owner approval is required. Supply evidence, not replacement Markdown. A separate completion receives the **full existing document**, preserves unaffected confirmed understanding, and rewrites the summary. Interpretation is not confirmation.
+Only PM preloads the existing private `ME.md`. This version cannot generate, rewrite or update that file: do not offer profile tools, direct edits, or shell-based workarounds. If asked to update it, explain that only SQLite memory can be updated now. TL does not preload a profile. SQLite changes never imply a profile change.
 
-Missing profile is normal: the skill's [template](references/ME.template.md) starts the first evidence-based rewrite. Do not invent facts or initiate a questionnaire. Read the result; successful changes load on the next request. Rewrites are best-effort semantic edits, not guaranteed fact erasure. If tools are unavailable, report that rather than writing the file directly.
-
-## Detailed records
-
-Use `memory_search` with explicit scope and `memory_open` for full content. To show all records, paginate `memory_list` through `nextOffset`; search is not an inventory. Defaults show active records; use explicit `status: "soft_forgotten"` to inspect retired ones. Label personal/cross-project (`global`) and project results separately; unavailable tools do not mean an empty store.
-
-| Intent                                            | Tool and effect                                                                   |
-| ------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Remember a fact                                   | `memory_remember`; choose `scope: "project"` or `"global"`                        |
-| Correct an active reference                       | Inspect, then `memory_replace`: atomically save correction and retire predecessor |
-| Permanently delete active or historical reference | `memory_forget` with `ref`; may run autonomously without owner confirmation       |
-
-The request-start project binding lasts through settlement. Project switches take effect next request. Never substitute another project's records or personal results for the requested scope. Verify current evidence before treating recalled context as live truth.
-
-## Independent stores and results
-
-`ME.md` and detailed SQLite records are independent. Profile changes do not change detailed records; deleting a detailed reference does not remove an idea from the profile. For a one-store request, change only that store. For an explicit two-store request, perform and report each operation separately; partial failure is not total success. Neither operation erases already-sent prompts or transcripts. Report the actual affected store, scope, any downgrade, and confirmed outcome.
-
-See [tool usage](references/tools.md) for arguments and examples.
+Report actual confirmed scope, returned references and any partial failure. See [tool usage](references/tools.md) for invocation and examples.

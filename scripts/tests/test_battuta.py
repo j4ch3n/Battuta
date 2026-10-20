@@ -19,7 +19,7 @@ class BattutaLauncherTests(LauncherFixture):
             pi.write_text(f"#!{sys.executable}\n" + '''import json, os, sys
 print(json.dumps({"role": os.environ["AGENT_ROLE"],
                    "token": os.environ.get("LINEAR_API_TOKEN"),
-                   "memory": os.environ.get("PI_MEMORY_STONE_DB_PATH"), "args": sys.argv[1:]}))
+                   "memory": os.environ.get("BATTUTA_MEMORY_URL"), "args": sys.argv[1:]}))
 ''')
             pi.chmod(0o700)
 
@@ -37,14 +37,14 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"],
                 response = json.loads(result.stdout)
                 self.assertEqual(response["role"], role)
                 self.assertEqual(response["token"], "linear-test")
-                self.assertEqual(response["memory"], str(Path.home() / ".battuta/memory/memory.db"))
+                self.assertEqual(response["memory"], "http://127.0.0.1:8901/mcp")
                 self.assertIn(str(self.root / "project-spec/index.ts"), response["args"])
-                self.assertIn(str(self.root / "memory-stone/index.ts"), response["args"])
+                self.assertIn(str(self.root / "memory-client/index.ts"), response["args"])
 
-    def test_both_roles_honor_the_same_database_override(self):
-        path = self.root / "custom memory/shared.db"
+    def test_both_roles_honor_the_same_endpoint_override(self):
+        path = "http://127.0.0.1:8989/mcp"
         with (self.root / ".env.prod").open("a") as output:
-            output.write(f'PI_MEMORY_STONE_DB_PATH="{path}"\n')
+            output.write(f'BATTUTA_MEMORY_URL="{path}"\n')
         for role in ("pm", "tl"):
             response = self.launch(role)
             self.assertEqual(response.returncode, 0, response.stderr)

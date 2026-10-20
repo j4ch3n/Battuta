@@ -1,67 +1,37 @@
-# Memory tools
+# Shared memory tool workflow
 
-PM profile tools affect only `ME.md`. Detailed-record tools are available to PM and TL and affect only SQLite. There is no memory CLI or line-index editing. All memory operations may run autonomously without an owner request or approval. Choose scope and operation from the evidence and task; bot interpretation does not establish a confirmed fact.
+Discover the `memory` MCP server's tools through native tool discovery. Calls use flat JSON arguments, not a nested `request`. Successful responses have `ok:true`, `data` and `warnings`; failures have `ok:false` and MCP `isError:true`. Read those results before claiming a write succeeded.
 
-## High-level owner profile
-
-1. Call `profile_read({})`; read `content`, `exists`, and `revision`. A missing profile returns revision `missing` without creating a file.
-2. Call `profile_update` with `message` (the owner's evidence/request), `interpretation` (concise labelled supporting interpretation), chosen `operation` (`remember`, `correct`, `retire`, or `delete`), and `expectedRevision` from the read.
-3. Read `updated`, affected `store`, `path`, new `revision`, and nested-model `usage`, or the error. On conflict read again and reassess the evidence; do not blindly overwrite.
-
-Human: “Remember in my profile that overall I value an unhurried pace.” After reading revision `abc`:
+## Remember and recall
 
 ```json
 {
-  "message": "Remember in my profile that overall I value an unhurried pace.",
-  "interpretation": "Owner-confirmed overall collaboration preference, not a project deadline.",
-  "operation": "remember",
-  "expectedRevision": "abc"
+  "content": "The owner prefers concise replies.",
+  "scope": { "global": true, "projects": [] },
+  "kind": "preference"
 }
 ```
 
-The tool supplies the full current document (or skill template) to a separate completion using the configured session model. Do not provide replacement Markdown or arbitrary paths. No available model, invalid output, cancellation, or revision conflict leaves the file unchanged. Successful rewrites load on the next request. Removing an idea is a best-effort profile edit, not a guarantee of semantic erasure.
+Pass this to `memory_remember`. For Atlas's database choice, instead use `content:"Atlas uses SQLite rather than Postgres."`, `scope:{"global":false,"projects":["atlas"]}` and `kind:"decision"`. A fact can belong to multiple evidenced registered project slugs. Extra `tags` cannot use reserved `scope:`, `proj:` or `kind:` prefixes.
 
-## Detailed personal and project records
+`memory_recall({"query":"database choice"})` searches current project plus global. Choose `selector:"projects",projects:["atlas"],include_global:false` for Atlas only; `selector:"global"` for general facts or `selector:"all"` for explicitly cross-project recall. Kind and additional tag filters narrow that selection; they never broaden it. No current selection produces labelled global-only results. Both bots may explicitly search any project.
 
-API scope `global` means personal/cross-project; `project` means the request-bound project. Non-sensitive background, interests, goals, preferences, and working style are eligible personal content. Project details are not personal just because the owner said them. Tasks and implementation resolutions remain project-scoped. Read returned scope/downgrade rather than claiming the requested scope was used.
+## Inspect, correct, and link
 
-| Tool              | Invocation and effect                                                                                                                                               |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `memory_search`   | `query`, explicit `scope`, optional `kind`, `limit` (1–20, default 5). Active matches and references.                                                               |
-| `memory_list`     | Explicit `scope`, optional `offset`, `limit` (1–50, default 20), `status` (`active` default or `soft_forgotten`). Follow `nextOffset` until null for an inventory.  |
-| `memory_open`     | `ref`, optional `status` (`active` default or `soft_forgotten`). Full visible content.                                                                              |
-| `memory_remember` | `kind`, `text`, chosen `scope` (`project` or `global`; omitted defaults to project). Optional `tags`, `importance` (0–1). No owner approval.                        |
-| `memory_replace`  | `ref`, `kind`, corrected `text`; optional `tags`, `importance`. Atomically corrects in the predecessor's scope and retires it. No owner approval.                   |
-| `memory_forget`   | `ref` only. Always permanently deletes an active or historical reference immediately, without owner request or confirmation. Project visibility checks still apply. |
+Use `memory_list({"selector":"all","page":1,"page_size":20})` for inventory; increment page until all `total` records are consumed. `memory_get({"ref":"<full returned content hash>"})` reads one complete record. `include_history:true` exposes predecessor/successor lineage, excluding deleted content from discovery.
 
-Kinds: `decision`, `preference`, `task`, `error_resolution`, `turn_summary`, `session_summary`. Use `preference` for personal preferences/background/interests. Background history indexing remains project-scoped; bots choose the scope for tool-created records. Correction and deletion use the reference's scope and cannot access another project's records.
+After reading an incorrect record, call `memory_update({"ref":"<old ref>","content":"Atlas uses SQLite.","reason":"Owner corrected the database decision"})`. This creates a new version and returns a new ref. It inherits scope unless changed through the membership tool; default recall/list omit the predecessor. Existing-content collisions and stale refs are conflicts, not permission to overwrite unrelated history.
 
-Human: “Remember across conversations that I enjoy hiking and am learning Spanish”:
+`memory_link_projects({"ref":"<ref>","add":["beacon"],"remove":[]})` adds evidence-backed membership without recomputing embeddings. Removing the final project or attaching projects to a global record is rejected. Repeated exact-content remembers reuse or link a record; they never silently promote project facts to global.
 
-```json
-{
-  "kind": "preference",
-  "text": "The owner enjoys hiking and is learning Spanish.",
-  "scope": "global"
-}
-```
+## Forget and check health
 
-For “For Atlas only, remember I want detailed progress reports,” use `scope: "project"` only when already bound to Atlas; otherwise select Atlas and wait until the next request. Do not update the owner profile from that project-specific preference.
+Preview with `memory_forget({"ref":"<ref>","dry_run":true})`, then omit dry_run to tombstone exactly that ref. Upstream retains original content internally. This is neither secure erasure nor removal from transcripts, every historical version, or `ME.md`. No bulk deletion is exposed.
 
-For a correction, inspect the active reference, then use `memory_replace` to save the correction and retain its predecessor as inactive history atomically. To inspect that history, use `memory_open({"ref":"mem-2","status":"soft_forgotten"})`. To delete that reference, use `memory_forget({"ref":"mem-2"})`; verify tool success before reporting deletion.
+`memory_health({})` reports content-free backend/model readiness. If unavailable, report the failure rather than claiming no memories exist.
 
-Use `memory_forget` for permanent deletion; there is no soft-forget mode or owner-confirmation step. Deletion and correction suppress automatic replay of the removed or superseded content; an intentional `memory_remember` call can restore it without owner approval. Background history indexing cannot restore it. This does not erase queued files, transcripts, backups, or already-sent prompts.
+## Background capture
 
-## Store-specific requests
+`memory_capture` is normally called by the lifecycle adapter, not manually reconstructed by the agent. It uploads validated extracted facts with frozen scope, source entry refs, batch/item IDs and payload digest. Replays resume partial batches without recreating forgotten records. An empty extraction is valid. The model runs in the bot; the memory server embeds locally and never needs model-provider credentials.
 
-“Remove hiking from my profile only” → read profile, then `profile_update` with `operation: "delete"` and the exact request as evidence; do not call detailed-record tools. “Delete this SQLite reference, leave ME.md alone” → only `memory_forget`. When changing both stores, report the two outcomes independently. No synchronized deletion or cleanup is implied.
-
-## Interactive commands
-
-- `/memory-status`: database path, bound project, personal-entry count, recall state.
-- `/memory-search <keywords>`: project search; `--global` selects personal scope.
-- `/memory-open <ref>`: open an active visible entry.
-- `/memory-forget <ref>`: permanently deletes a record immediately without confirmation.
-- `/memory-last`: this session's last audited recall packet.
-
-The Battuta memory bridge owns these commands and their request-bound project scope.
+There are no profile-writing tools. When a request includes both “remember this” and “update ME.md”, perform the supported SQLite operation, report its result, and explicitly state that the read-only profile was not changed.

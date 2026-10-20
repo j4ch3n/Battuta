@@ -81,7 +81,7 @@ class PackagingConfigureTests(unittest.TestCase):
                         self.assertEqual(link.resolve(), source.resolve())
                         self.assertFalse(link.readlink().is_absolute())
                         self.assertEqual((link.parent / "memory/SKILL.md").read_text(), "Memory scope guidance")
-                        for resource in ("ME.template.md", "profile-rewrite-prompt.md"):
+                        for resource in ("tools.md",):
                             self.assertEqual((link.parent / "memory/references" / resource).read_text(), (ROOT / "shared-skills/memory/references" / resource).read_text())
                         profile = link.parent.parent / "ME.md"
                         self.assertEqual(profile.read_text() if profile.exists() else None, "Private profile" if personal is not None else None)
@@ -96,7 +96,7 @@ class PackagingConfigureTests(unittest.TestCase):
                         self.assertNotIn("test-linear", json.dumps(mcp))
                         settings_path = link.parent.parent / "settings.json"
                         if settings_mode == "missing":
-                            expected = {"battutaMemory": {"ownerProfile": role == "pm-bot"}}
+                            expected = {"battutaMemoryCapture": {"enabled": True, "batchMessages": 6}}
                             if role == "pm-bot":
                                 expected["packages"] = ["npm:pi-schedule-prompt@0.4.1"]
                             self.assertEqual(json.loads(settings_path.read_text()), expected)
@@ -113,4 +113,4 @@ class PackagingConfigureTests(unittest.TestCase):
                                 {"source": "npm:pi-schedule-prompt@0.4.1", "extensions": ["src/index.ts"]}
                                 if settings_mode == "scheduler" else "npm:pi-schedule-prompt@0.4.1"
                             )
-                        self.assertEqual(settings, {"theme": "dark", "packages": expected_packages, "battutaMemory": {"ownerProfile": role == "pm-bot"}})
+                        self.assertEqual(settings, {"theme": "dark", "packages": expected_packages, "battutaMemoryCapture": {"enabled": True, "batchMessages": 6}})

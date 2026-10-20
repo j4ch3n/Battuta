@@ -23,7 +23,6 @@ export default defineConfig(
     files: [
       "agent-mail/**/*.ts",
       "project-spec/**/*.ts",
-      "memory-stone/**/*.ts",
       "memory-client/**/*.ts",
       "bots/**/.pi/extensions/**/*.ts",
     ],

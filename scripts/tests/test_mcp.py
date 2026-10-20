@@ -24,6 +24,7 @@ class MCPConfigTests(ConfigFixture):
                          {"Authorization": "Bearer ${LINEAR_API_TOKEN}"})
         self.assertEqual(json.loads(config)["mcpServers"]["linear"]["exposure"], "codemode")
         self.assertNotIn("private-token", config)
+        self.assertEqual(json.loads(config)["mcpServers"]["memory"]["url"], "http://127.0.0.1:8901/mcp")
 
     def test_migrates_adapter_config_and_preserves_unrelated_settings(self):
         for role in ("pm", "tl"):
@@ -49,6 +50,7 @@ class MCPConfigTests(ConfigFixture):
                     self.assertNotIn("auth", data["mcpServers"]["linear"])
                     self.assertNotIn("bearerTokenEnv", data["mcpServers"]["linear"])
                     self.assertEqual(data["mcpServers"]["other"], {"command": "other-server"})
+                    self.assertEqual(data["mcpServers"]["memory"]["exposure"], "codemode")
                     self.assertTrue(data["custom"])
                     self.assertEqual(json.loads(settings.read_text()), {"theme": "dark", "packages": [
                         "npm:@llblab/pi-telegram@0.50.1", "npm:pi-web-access@0.35.0",

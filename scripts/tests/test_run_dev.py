@@ -13,7 +13,7 @@ class RunDevTests(LauncherFixture):
         for role in ("pm", "tl"):
             pi = self.root / f"bots/{role}-bot/node_modules/.bin/pi"
             pi.write_text(f"#!{sys.executable}\n" + '''import os
-print(os.environ["AGENT_ROLE"] + ":" + os.environ.get("LINEAR_API_TOKEN", "") + ":" + os.environ.get("PI_MEMORY_STONE_DB_PATH", ""))
+print(os.environ["AGENT_ROLE"] + ":" + os.environ.get("LINEAR_API_TOKEN", "") + ":" + os.environ.get("BATTUTA_MEMORY_URL", ""))
 ''')
         result = self.run_launcher("prod", existing=False)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -26,16 +26,16 @@ print(os.environ["AGENT_ROLE"] + ":" + os.environ.get("LINEAR_API_TOKEN", "") + 
                                       capture_output=True, text=True)
                 self.assertEqual(pane.returncode, 0, pane.stderr)
                 outputs.append(pane.stdout.strip())
-        path = str(Path.home() / ".battuta/memory/memory.db")
+        path = "http://127.0.0.1:8901/mcp"
         self.assertEqual(outputs, [f"pm:linear-test:{path}", f"tl:linear-test:{path}"])
 
-    def test_shared_database_override_reaches_both_processes(self):
-        override = str(self.root / "shared memory/custom.db")
+    def test_shared_endpoint_override_reaches_both_processes(self):
+        override = "http://127.0.0.1:8989/mcp"
         with (self.root / ".env.prod").open("a") as output:
-            output.write(f'PI_MEMORY_STONE_DB_PATH="{override}"\n')
+            output.write(f'BATTUTA_MEMORY_URL="{override}"\n')
         for role in ("pm", "tl"):
             pi = self.root / f"bots/{role}-bot/node_modules/.bin/pi"
-            pi.write_text(f"#!{sys.executable}\nimport os\nprint(os.environ['PI_MEMORY_STONE_DB_PATH'])\n")
+            pi.write_text(f"#!{sys.executable}\nimport os\nprint(os.environ['BATTUTA_MEMORY_URL'])\n")
         result = self.run_launcher("prod", existing=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         for command in self.commands():
@@ -69,7 +69,7 @@ print(os.environ["AGENT_ROLE"] + ":" + os.environ.get("LINEAR_API_TOKEN", "") + 
                     if "AGENT_ROLE=" in command[-1]:
                         self.assertIn(str(selected), command[-1].replace("\\ ", " "))
                         self.assertIn(str(self.root / "project-spec/index.ts"), command[-1].replace("\\ ", " "))
-                        self.assertIn(str(self.root / "memory-stone/index.ts"), command[-1].replace("\\ ", " "))
+                        self.assertIn(str(self.root / "memory-client/index.ts"), command[-1].replace("\\ ", " "))
                 self.assertEqual(self.commands()[-1], ["attach-session", "-t", f"=battuta-{mode}"])
 
     def test_existing_session_only_attaches(self):

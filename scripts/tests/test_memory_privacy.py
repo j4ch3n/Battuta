@@ -18,7 +18,7 @@ class MemoryPrivacyTests(unittest.TestCase):
             "bots/AGENTS_personal.md", "memory.db", "memory.db-wal",
             "memory.db.queue/job.job.json", "memory.db.queue/job.state.json",
         ]
-        public = ["shared-skills/memory/references/ME.template.md", "shared-skills/memory/references/profile-rewrite-prompt.md"]
+        public = ["shared-skills/memory/references/tools.md"]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             subprocess.run(["git", "init", "-q", str(root)], check=True)

@@ -7,3 +7,9 @@ bots/AGENTS_personal.md export-ignore
 *.db-shm export-ignore
 *.db.queue export-ignore
 *.db.queue/** export-ignore
+**/capture-queue/** export-ignore
+**/onnx_models/** export-ignore
+**/.venv/** export-ignore
+**/node_modules/** export-ignore
+.memory-spike/** export-ignore
+.superpowers/** export-ignore
