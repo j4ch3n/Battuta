@@ -148,5 +148,9 @@ class MemoryService:
             current = await self._active(request.ref)
             if request.expected_revision is not None and current["revision"] != request.expected_revision:
                 raise ValueError("Memory changed since inventory")
+            if request.replacement_ref is not None:
+                replacement = await self._active(request.replacement_ref)
+                if request.replacement_ref == request.ref or replacement["scope"] != current["scope"]:
+                    raise ValueError("Merge replacement must be distinct and have identical scope")
             return {"operation": "delete", "ref": request.ref, "result": {"ref": request.ref, "forgotten": True, "retention": "Tombstone retains content; not secure erasure"}}
         return await self._mutation("forget:" + request.ref, request, plan)

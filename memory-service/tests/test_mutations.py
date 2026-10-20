@@ -44,6 +44,21 @@ class StorageFixture(unittest.IsolatedAsyncioTestCase):
 
 
 class MutationTests(StorageFixture):
+    async def test_merge_forget_requires_an_active_distinct_same_scope_replacement(self):
+        first = await self.service.remember(self.note())
+        replacement = await self.service.remember(self.note("Merged fact"))
+        other_scope = await self.service.remember(self.note("Other scope", project=None))
+        for ref in (first["ref"], other_scope["ref"]):
+            with self.subTest(ref=ref), self.assertRaises(ValueError):
+                await self.service.forget(ForgetRequest(ref=first["ref"], replacement_ref=ref))
+        source = await self.service.remember(self.note("Redundant fact"))
+        result = await self.service.forget(ForgetRequest(ref=source["ref"], replacement_ref=replacement["ref"]))
+        self.assertTrue(result["forgotten"])
+        await self.service.forget(ForgetRequest(ref=replacement["ref"]))
+        with self.assertRaises(ValueError):
+            await self.service.forget(ForgetRequest(ref=first["ref"], replacement_ref=replacement["ref"]))
+        self.assertTrue((await self.adapter.get(first["ref"]))["active"])
+
     async def test_dream_preconditions_reject_changed_membership_without_mutation(self):
         first = await self.service.remember(self.note())
         revision = (await self.adapter.get(first["ref"]))["revision"]

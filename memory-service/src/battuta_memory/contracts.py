@@ -135,6 +135,7 @@ class LinkRequest(GetRequest):
 
 class ForgetRequest(GetRequest):
     expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    replacement_ref: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     dry_run: bool = False
 
 
