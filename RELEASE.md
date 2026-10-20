@@ -11,7 +11,7 @@ Installation navigation lives here, separate from runtime skill workflows and co
 | Pi, PM/TL runtime extensions, agent mail, and project-spec | Bundled with dependencies; [configure and verify both bots](#5-configure-and-verify-interactively). Deploy the remote Supabase backend separately as required in [prerequisites](#1-confirm-the-target-and-prerequisites).                |
 | Telegram extension (both bots)                             | Bundled; supply credentials in [step 4](#4-prepare-production-credentials), then configure and verify in [step 5](#5-configure-and-verify-interactively).                                                                                 |
 | Prompt scheduler (PM only)                                 | Bundled; [step 5](#5-configure-and-verify-interactively) covers discovery and retained-settings migration. See the [upstream scheduler guide](https://github.com/tintinweb/pi-schedule-prompt) for package setup and scope.               |
-| Shared memory bridge and memory skill (both bots)          | Bundled and exposed by bot configuration; see [memory installation and launch](docs/memory-stone.md#install-and-launch). Do not install the upstream Stone extension separately.                                                          |
+| Shared memory MCP and thin client (both bots)              | See [memory service setup](docs/memory-service-setup.md). Configuration exposes one local MCP endpoint; setup provisions the Python runtime and verified ONNX model.                                                                      |
 | Project-context skill and `battuta-project`                | The skill is bundled and linked for both bots. Install the CLI using the [project-context installation guide](shared-skills/project-context/references/installation.md), which covers source checkouts, release wheels, and service PATH. |
 | Google management skill (PM only)                          | The skill is bundled; install and authenticate its external `gog` CLI using the [Google setup guide](docs/gogcli-setup.md).                                                                                                               |
 | Other bot-local Markdown skills                            | Bundled under each bot's `.pi/skills/`; no package installation. Configuration also establishes the shared skill links.                                                                                                                   |
@@ -168,6 +168,8 @@ The release includes `pi-schedule-prompt@0.4.1` for the PM bot. Its jobs and set
 
 ## 6. Optional: run as user services
 
+First run `bin/battuta setup-memory` as the bot login user; the memory setup guide above covers offline provisioning and failure remediation. GitHub's ARM64 build is not Raspberry Pi hardware validation. Setup never restarts bots or migrates old memories.
+
 ### Already done?
 
 Ask whether unattended services are wanted. If not, skip this step. Check existing units with `systemctl --user is-enabled battuta-pm.service battuta-tl.service` and `systemctl --user is-active battuta-pm.service battuta-tl.service`. If both are enabled, active, and responding, leave them running; do not repeat installation or start a screen session. If units exist but are inactive or point at a different install root, inspect their status and paths before changing them; follow step 7 for a path change. Only install or enable what is missing.
@@ -179,8 +181,8 @@ Only choose this after interactive login and verification. Check `command -v scr
 ```sh
 bin/battuta install-services
 systemctl --user daemon-reload
-systemctl --user enable --now battuta-pm.service battuta-tl.service
-systemctl --user status battuta-pm.service battuta-tl.service
+systemctl --user enable --now battuta-memory.service battuta-pm.service battuta-tl.service
+systemctl --user status battuta-memory.service battuta-pm.service battuta-tl.service
 ```
 
 Expect both services to be active/running. If not, inspect `journalctl --user -u battuta-pm.service -f` and the corresponding Tech Lead service logs, fix the cause, and recheck. `install-services` only writes user units; enabling/starting is a separate step. To run services at boot without an interactive login, an administrator can enable linger with `sudo loginctl enable-linger "$USER"`. Never run tmux bots alongside active services.
@@ -205,22 +207,23 @@ The release workflow bundles Node selected by the source checkout's `.node-versi
 
 Then run `bin/battuta configure` again to migrate both bots, verify native MCP and Telegram interactively as in step 5, and, if using services, run `bin/battuta install-services`, daemon-reload, and enable/start as in step 6.
 
-Reinstall `battuta-project` from the updated release wheels with `--reinstall`. Project registrations live independently under `~/.battuta/projects/`; shared memory defaults to `~/.battuta/memory/memory.db` (or the configured absolute override), with its recovery queue beside it. Retain these stores across release updates.
+Reinstall `battuta-project` from the updated release wheels with `--reinstall`. Project registrations live independently under `~/.battuta/projects/`. New shared memory uses `~/.battuta/memory-service/`; preserve both databases and the capture queue. This is a breaking replacement: old Stone databases/queues are untouched and never automatically imported. PM retains read-only loading of its existing `ME.md`; profile-writing tools are removed. Run `bin/battuta setup-memory` before starting the new service. See [cutover and rollback](docs/memory-service.md#breaking-replacement-and-cutover).
 
 The remote Linear webhook also now reads `LINEAR_API_TOKEN`. Before deploying the updated Edge Function, the backend owner must provide that named secret in Supabase. For GitHub Actions deployment, rename the repository secret to `LINEAR_API_TOKEN`; the deployment workflow sets the matching Supabase secret. Confirm the updated webhook works before removing the obsolete `LINEAR_API_KEY` secret.
 
-If the installation path changes, stop/disable services first. Their generated units use absolute paths; the installer rejects units pointing to another root. Move only the two Battuta unit files aside before installing from the new path:
+If the installation path changes, stop/disable all three services first. Generated units use absolute paths; the installer rejects units pointing to another root. Move only the owned Battuta unit files aside before installing from the new path. Existing units from an older release also need to be moved aside explicitly before installing the changed units:
 
 ```sh
 unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 backup_dir="$unit_dir/battuta-backup-$(date +%Y%m%d%H%M%S)"
 mkdir -p "$backup_dir"
 mv "$unit_dir/battuta-pm.service" "$unit_dir/battuta-tl.service" "$backup_dir/"
+# If installed, also move battuta-memory.service into that backup directory.
 # From the new installation directory:
 bin/battuta configure
 bin/battuta install-services
 systemctl --user daemon-reload
-systemctl --user enable --now battuta-pm.service battuta-tl.service
+systemctl --user enable --now battuta-memory.service battuta-pm.service battuta-tl.service
 ```
 
 Check both service statuses and bot responses again. Do not move an installation while its services are active.

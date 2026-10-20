@@ -7,7 +7,7 @@ export PATH="$root/bin:$PATH"
 case "${1:-}" in
   setup-memory)
     shift
-    exec uv run --no-project --managed-python --python 3.12 python "$root/scripts/setup-memory.py" "$@"
+    exec bash "$root/scripts/setup-memory.sh" "$@"
     ;;
   memory)
     [[ -x "$root/memory-service/.venv/bin/battuta-memory" ]] || { printf 'Run bin/battuta setup-memory first\n' >&2; exit 1; }

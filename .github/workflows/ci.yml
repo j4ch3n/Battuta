@@ -62,7 +62,7 @@ jobs:
           path: |
             agent-mail/coverage/
             project-spec/coverage/
-            memory-stone/coverage/
+            memory-client/coverage/
           if-no-files-found: ignore
 
   deno:

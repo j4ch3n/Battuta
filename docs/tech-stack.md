@@ -1,5 +1,7 @@
 # Tech stack
 
+Shared memory uses an isolated Python 3.12 MCP service with pinned mcp-memory-service 12.1.1, SQLite/sqlite-vec and local ONNX MiniLM CPU embeddings. A TypeScript Pi adapter performs conversation extraction/upload and PM-only read-only profile loading. See [memory architecture](memory-service.md).
+
 ## Main application and support tooling
 
 | Layer                      | Technology and responsibility                                                            | Version source                                             |

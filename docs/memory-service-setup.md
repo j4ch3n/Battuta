@@ -11,7 +11,7 @@ Use 64-bit Raspberry Pi OS Bookworm or newer: `uname -m` must report `aarch64`, 
 Source checkout:
 
 ```sh
-uv run --locked python scripts/setup-memory.py
+bash scripts/setup-memory.sh
 memory-service/.venv/bin/battuta-memory serve
 ```
 

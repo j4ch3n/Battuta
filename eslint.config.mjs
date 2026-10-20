@@ -8,7 +8,8 @@ export default defineConfig(
   globalIgnores([
     "**/node_modules/**",
     "**/vendor/**",
-    ".venv/**",
+    "**/.venv/**",
+    ".memory-spike/**",
     "supabase/**",
     "dist/**",
     "**/coverage/**",
