@@ -1,6 +1,6 @@
-# Shared memory tool workflow
+# PM memory tool workflow
 
-Discover the `memory` MCP server's tools through native tool discovery. Calls use flat JSON arguments, not a nested `request`. Successful responses have `ok:true`, `data` and `warnings`; failures have `ok:false` and MCP `isError:true`. Read those results before claiming a write succeeded.
+Discover the `memory` MCP server's tools through native tool discovery. PM may read and mutate memories; TL's role is read-only even if the server exposes writes. Calls use flat JSON arguments, not a nested `request`. Successful responses have `ok:true`, `data` and `warnings`; failures have `ok:false` and MCP `isError:true`. Read those results before claiming a write succeeded. Report actual confirmed scope and returned references, warnings, and partial failures. Do not retry a conflict by overwriting unrelated records.
 
 ## Remember and recall
 
@@ -34,4 +34,4 @@ Preview with `memory_forget({"ref":"<ref>","dry_run":true})`, then omit dry_run 
 
 `memory_capture` is normally called by the lifecycle adapter, not manually reconstructed by the agent. It uploads validated extracted facts with frozen scope, source entry refs, batch/item IDs and payload digest. Replays resume partial batches without recreating forgotten records. An empty extraction is valid. The model runs in the bot; the memory server embeds locally and never needs model-provider credentials.
 
-There are no profile-writing tools. When a request includes both “remember this” and “update ME.md”, perform the supported SQLite operation, report its result, and explicitly state that the read-only profile was not changed.
+Conversation tools do not directly edit the owner profile. When a request includes both “remember this” and “update ME.md”, perform the supported server-memory operation and report its confirmed result separately from profile maintenance. Never edit ME.md directly or claim its contents changed without confirmation from the dedicated dream workflow.
