@@ -24,6 +24,8 @@ bin/battuta memory
 
 The release installs a hash-verified ARM64 wheelhouse into a target-created virtualenv. Source setup resolves only locked dependencies. Setup checks actual sqlite-vec extension loading and ONNX Runtime CPU availability; it never falls back to pseudo-embeddings or installs with sudo.
 
+Release `bin/battuta setup-memory` and `bin/battuta memory` load `.env.prod` when present, matching the bot commands' data-directory settings. Direct source setup uses the calling shell's environment; export any custom `BATTUTA_MEMORY_DATA_DIR` before provisioning.
+
 Model setup downloads the approximately 80 MB pinned MiniLM ONNX archive, verifies its SHA256, and atomically installs weights/tokenizer under `~/.cache/mcp_memory/onnx_models/all-MiniLM-L6-v2/onnx/`. This cache follows HOME, not the database setting. An unknown existing cache is not overwritten: move it aside yourself if you want to replace it. A verified cache is reused offline. Runtime downloads are disabled.
 
 For disconnected provisioning, copy the archive from `https://chroma-onnx-models.s3.amazonaws.com/all-MiniLM-L6-v2/onnx.tar.gz` and run setup with `--archive /path/onnx.tar.gz`. Expected SHA256: `913d7300ceae3b2dbc2c50d1de4baacab4be7b9380491c27fab7418616a16ec3`. The release wheelhouse works offline; uv's managed Python must already be available if the Pi has no network.

@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from battuta_memory.config import MemoryConfig
-from battuta_memory.contracts import RememberRequest, UpdateRequest, LinkRequest, ForgetRequest
+from battuta_memory.contracts import RememberRequest, UpdateRequest, LinkRequest, ForgetRequest, ListRequest
 from battuta_memory.service import MemoryService
 from battuta_memory.state import StateStore
 from battuta_memory.upstream import UpstreamAdapter
@@ -44,6 +44,43 @@ class StorageFixture(unittest.IsolatedAsyncioTestCase):
 
 
 class MutationTests(StorageFixture):
+    async def test_compensated_version_failure_does_not_poison_recovery(self):
+        import sqlite3
+        first = await self.service.remember(self.note())
+        request = UpdateRequest(ref=first["ref"], content="Corrected fact", reason="owner")
+        execute = self.adapter.storage._execute_with_retry
+        async def fail_lineage_once(operation, *args, **kwargs):
+            if operation.__name__ == "_link_and_supersede":
+                raise sqlite3.OperationalError("injected transient lineage error")
+            return await execute(operation, *args, **kwargs)
+        with patch.object(self.adapter.storage, "_execute_with_retry", side_effect=fail_lineage_once):
+            with self.assertRaises(RuntimeError):
+                await self.service.update(request)
+        target = self.adapter.content_ref(request.content)
+        self.assertIsNone(await self.adapter.get(target))
+        # Recovery must terminally receipt the failed correction, not revive its tombstone.
+        await self.service.recover()
+        self.assertEqual(self.state.recover_intents(), [])
+        unrelated = await self.service.remember(self.note("Unrelated fact"))
+        self.assertIsNotNone(await self.adapter.get(unrelated["ref"]))
+        with self.assertRaisesRegex(ValueError, "correction failed"):
+            await self.service.update(request)
+        self.assertTrue((await self.adapter.get(first["ref"]))["active"])
+        self.assertIsNone(await self.adapter.get(target))
+
+    async def test_wrapper_kinds_survive_upstream_normalization_and_corrections(self):
+        for kind in ("preference", "constraint"):
+            with self.subTest(kind=kind):
+                note = RememberRequest(content=f"An explicit {kind}", scope={"global": True}, kind=kind)
+                first = await self.service.remember(note)
+                self.assertEqual((await self.adapter.get(first["ref"]))["kind"], kind)
+                inventory = await self.service.list(ListRequest(selector="all", kind=kind))
+                self.assertEqual([r["ref"] for r in inventory["records"]], [first["ref"]])
+                changed = await self.service.update(UpdateRequest(ref=first["ref"], content=f"Corrected {kind}", reason="owner"))
+                self.assertEqual((await self.adapter.get(changed["ref"]))["kind"], kind)
+                inventory = await self.service.list(ListRequest(selector="all", kind=kind))
+                self.assertEqual([r["ref"] for r in inventory["records"]], [changed["ref"]])
+
     async def test_exact_duplicates_link_projects_not_global(self):
         first = await self.service.remember(self.note())
         second = await self.service.remember(self.note(project="beacon"))

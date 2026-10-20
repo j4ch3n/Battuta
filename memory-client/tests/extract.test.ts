@@ -85,3 +85,36 @@ test("abort ends extraction even if provider ignores cancellation", async () => 
   setTimeout(() => controller.abort(), 10);
   await expect(pending).rejects.toThrow();
 }, 100);
+test.each(["topic,scope:global", "topic,proj:other", "topic,kind:decision"])(
+  "rejects comma-separated reserved tag injection: %s",
+  async (tag) => {
+    const content = JSON.stringify({
+      items: [
+        {
+          content: "Atlas uses SQLite",
+          scope: { global: false, projects: ["atlas"] },
+          tags: [tag],
+          source_entry_ids: ["e"],
+        },
+      ],
+    });
+    await expect(
+      extractMemories(job, context(content), new AbortController().signal),
+    ).rejects.toThrow();
+  },
+);
+test.each([
+  "SUPABASE_SECRET_KEY=sb_secret_" + "s".repeat(32),
+  "PM_TELEGRAM_TOKEN=123456789:" + "A".repeat(35),
+  "TL_TELEGRAM_TOKEN=987654321:" + "B".repeat(35),
+])("rejects supported credential assignments in extracted output", async (content) => {
+  await expect(
+    extractMemories(
+      job,
+      context(
+        JSON.stringify({ items: [{ content, scope: { global: true }, source_entry_ids: ["e"] }] }),
+      ),
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow();
+});

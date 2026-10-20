@@ -10,6 +10,10 @@ from pathlib import Path
 from .config import DIMENSION, MODEL, MemoryConfig
 
 
+class TerminalMutationError(ValueError):
+    """A journaled mutation cannot safely be retried; never resurrect its target."""
+
+
 class UpstreamAdapter:
     def __init__(self, storage, lock=None, manifest=None):
         self.storage = storage
@@ -105,7 +109,7 @@ class UpstreamAdapter:
             "ref": row["content_hash"], "content": row["content"],
             "scope": {"global": "scope:global" in tags, "projects": sorted(t[5:] for t in tags if t.startswith("proj:"))},
             "tags": sorted(t for t in tags if not t.startswith(("scope:", "proj:", "kind:"))),
-            "kind": row["memory_type"] or "observation", "sources": metadata.get("sources", []),
+            "kind": next((t[5:] for t in tags if t.startswith("kind:")), row["memory_type"] or "observation"), "sources": metadata.get("sources", []),
             "created_at": row["created_at"], "updated_at": row["updated_at"],
             "parent_ref": row.get("parent_id"), "superseded_by": row.get("superseded_by"),
             "active": not row.get("superseded_by") and row.get("deleted_at") is None,
@@ -122,8 +126,9 @@ class UpstreamAdapter:
             clauses.append("(" + " OR ".join("instr(',' || m.tags || ',', ',' || ? || ',') > 0" for _ in resolved.tags) + ")")
             params.extend(resolved.tags)
         if request.kind:
-            clauses.append("m.memory_type=?")
-            params.append(request.kind)
+            # Wrapper kinds are owned reserved tags; upstream has a narrower ontology.
+            clauses.append("(instr(',' || m.tags || ',', ',' || ? || ',') > 0 OR (instr(',' || m.tags || ',', ',kind:') = 0 AND m.memory_type=?))")
+            params.extend(["kind:" + request.kind, request.kind])
         if request.tags:
             conditions = []
             for tag in request.tags:
@@ -178,6 +183,11 @@ class UpstreamAdapter:
         from mcp_memory_service.utils.hashing import generate_content_hash
         return generate_content_hash(content)
 
+    @staticmethod
+    def storage_kind(kind):
+        from mcp_memory_service.models.ontology import MemoryTypeOntology
+        return kind if MemoryTypeOntology.validate_memory_type(kind) else "observation"
+
     async def store(self, payload):
         from mcp_memory_service.models.memory import Memory
         current = await self.get(payload["ref"], include_deleted=True)
@@ -187,7 +197,7 @@ class UpstreamAdapter:
             # Only recovery of our journaled write may reach this branch.
             return
         ok, message = await self.storage.store(Memory(content=payload["content"], content_hash=payload["ref"],
-            tags=payload["tags"], memory_type=payload["kind"], metadata={"sources": payload["sources"]}), skip_semantic_dedup=True)
+            tags=payload["tags"], memory_type=self.storage_kind(payload["kind"]), metadata={"sources": payload["sources"]}), skip_semantic_dedup=True)
         if not ok:
             raise RuntimeError("Upstream memory store failed")
 
@@ -205,12 +215,15 @@ class UpstreamAdapter:
         if current and current["superseded_by"] == payload["ref"] and target and target["parent_ref"] == payload["old_ref"]:
             return
         if not current or not current["active"]:
-            raise ValueError("Memory is inactive")
+            raise TerminalMutationError("Memory correction failed: version state conflicts; use the current ref and revised content")
         if target:
             # A process can die inside upstream update_memory_versioned after store()
             # commits but before lineage linking. Repair only this exact journal target.
             if not target["active"] or target["parent_ref"]:
-                raise ValueError("Version target conflict")
+                # Upstream may compensate a failed lineage transaction by tombstoning
+                # the newly committed row. Receipt this failure instead of reviving it
+                # or letting the pending intent block every subsequent write/startup.
+                raise TerminalMutationError("Memory correction failed: replacement is inactive or conflicting; use revised content")
             def link():
                 conn = self.storage.conn
                 with conn:
@@ -222,7 +235,7 @@ class UpstreamAdapter:
             await self.storage._execute_with_retry(link)
         else:
             ok, _, ref = await self.storage.update_memory_versioned(payload["old_ref"], payload["content"],
-                new_tags=payload["tags"], new_memory_type=payload["kind"], reason=payload["reason"])
+                new_tags=payload["tags"], new_memory_type=self.storage_kind(payload["kind"]), reason=payload["reason"])
             if not ok or ref != payload["ref"]:
                 raise RuntimeError("Upstream version update failed")
 

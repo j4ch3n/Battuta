@@ -4,12 +4,22 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PATH="$root/bin:$PATH"
 
+load_memory_environment() {
+  if [[ -f "$root/.env.prod" ]]; then
+    set -a
+    source "$root/.env.prod"
+    set +a
+  fi
+}
+
 case "${1:-}" in
   setup-memory)
     shift
+    load_memory_environment
     exec bash "$root/scripts/setup-memory.sh" "$@"
     ;;
   memory)
+    load_memory_environment
     [[ -x "$root/memory-service/.venv/bin/battuta-memory" ]] || { printf 'Run bin/battuta setup-memory first\n' >&2; exit 1; }
     exec "$root/memory-service/.venv/bin/battuta-memory" serve
     ;;

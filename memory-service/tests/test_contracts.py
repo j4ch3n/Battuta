@@ -3,6 +3,15 @@ from battuta_memory.contracts import CaptureBatch, UpdateRequest, RecallRequest
 
 
 class ContractTests(unittest.TestCase):
+    def test_csv_tags_cannot_inject_reserved_scope_or_kind(self):
+        from battuta_memory.contracts import RememberRequest, ListRequest
+        for tag in ("topic,scope:global", "topic,proj:other", "topic,kind:decision", "a,b"):
+            for model, args in ((RememberRequest, {"content": "fact", "scope": {"global": True}}),
+                                (ListRequest, {}),
+                                (UpdateRequest, {"ref": "a" * 64, "content": "fact", "reason": "correction"})):
+                with self.subTest(tag=tag, model=model.__name__), self.assertRaises(ValueError):
+                    model(**args, tags=[tag])
+
     def test_blank_replacement_cannot_create_empty_memory(self):
         with self.assertRaises(ValueError):
             UpdateRequest(ref="a" * 64, content="   ", reason="correction")

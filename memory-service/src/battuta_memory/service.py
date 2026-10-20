@@ -3,6 +3,7 @@ import hashlib
 import json
 import uuid
 from .scope import resolve_selector, resolve_scope, registered
+from .upstream import TerminalMutationError
 
 
 class MemoryService:
@@ -38,9 +39,13 @@ class MemoryService:
         return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
 
     async def _apply(self, key, payload):
-        await getattr(self.adapter, payload["operation"])(payload)
-        self.state.complete_intent(key, payload["result"])
-        return payload["result"]
+        try:
+            await getattr(self.adapter, payload["operation"])(payload)
+            result = payload["result"]
+        except TerminalMutationError as error:
+            result = {"error": str(error)}
+        self.state.complete_intent(key, result)
+        return result
 
     async def _recover(self):
         for intent in self.state.recover_intents():
@@ -56,10 +61,14 @@ class MemoryService:
             await self._recover()
             prior = self.state.receipt(key, digest)
             if prior is not None:
-                return prior
-            payload = await planner()
-            self.state.prepare_intent(key, digest, payload)
-            return await self._apply(key, payload)
+                result = prior
+            else:
+                payload = await planner()
+                self.state.prepare_intent(key, digest, payload)
+                result = await self._apply(key, payload)
+            if "error" in result:
+                raise ValueError(result["error"])
+            return result
 
     async def remember(self, request):
         async def plan():

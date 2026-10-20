@@ -11,6 +11,23 @@ from fixtures import LauncherFixture, ROOT
 
 
 class BattutaLauncherTests(LauncherFixture):
+    def test_memory_commands_load_the_same_production_data_override(self):
+        data = str(self.root / "private memory")
+        with (self.root / ".env.prod").open("a") as output:
+            output.write(f'BATTUTA_MEMORY_DATA_DIR="{data}"\n')
+        setup = self.root / "scripts/setup-memory.sh"
+        setup.parent.mkdir(exist_ok=True)
+        setup.write_text('printf "%s" "$BATTUTA_MEMORY_DATA_DIR"\n')
+        cli = self.root / "memory-service/.venv/bin/battuta-memory"
+        cli.parent.mkdir(parents=True)
+        cli.write_text('#!/usr/bin/env bash\nprintf "%s" "$BATTUTA_MEMORY_DATA_DIR"\n')
+        cli.chmod(0o700)
+        for command in ("setup-memory", "memory"):
+            with self.subTest(command=command):
+                result = self.launch(command)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, data)
+
     def setUp(self):
         super().setUp()
         shutil.copy2(ROOT / "packaging" / "battuta", self.bin / "battuta")

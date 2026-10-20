@@ -10,9 +10,13 @@ Global facts use `scope:global`; project facts use `proj:<registered-name>`. One
 
 Exact duplicates reuse content identity and can attach evidenced project membership. Semantic near-duplicates remain distinct. Global/project collisions or inactive references are conflicts, not implicit scope broadening. Content updates create a new hash/version; membership changes reuse the stored embedding. Default recall/list/get omit superseded records. Forget tombstones one ref and retains content upstream; it is not secure erasure.
 
+Wrapper kinds (including `preference`) are preserved in owned `kind:` tags independently of upstream's narrower type ontology. User-supplied tags cannot contain commas or reserved prefixes; this prevents CSV tag serialization from manufacturing extra scope or kind metadata.
+
 The adapter uses serialized, read-only queries against the pinned schema for error-propagating inventory and exact filtered sqlite-vec distance ranking. This avoids swallowed upstream errors and global candidate-limit omissions, at the cost of linear work within the selected corpus. A narrow journal-owned orphan-lineage repair handles a process dying inside upstream's multi-commit version update. Upstream dependency upgrades require rerunning adapter contract tests.
 
 Mutations journal intent in state.db before upstream writes, then record receipts. These two databases are not one transaction. Restart reconciles pending intents before accepting new operations. Completed receipts prevent replay from recreating later-forgotten content. Pending intents contain requested content until completed; completion clears the logical payload, not necessarily old SQLite/WAL/backup pages. This system makes no hard-erasure promise. Back up both databases consistently with the server stopped or via SQLite backup, along with any desired pending capture queue.
+
+If upstream compensates a failed correction by tombstoning its replacement, recovery records a terminal failure instead of resurrecting that target or blocking unrelated writes. The original stays unchanged; retry a correction using current evidence and revised content rather than recycling the tombstoned target.
 
 ## Embeddings
 

@@ -40,7 +40,7 @@ class Tagged(Contract):
     @classmethod
     def tags_valid(cls, tags):
         tags = sorted(set(t.strip().lower() for t in tags))
-        if any(not t or len(t) > 100 or t.startswith(("proj:", "scope:", "kind:")) for t in tags):
+        if any(not t or len(t) > 100 or "," in t or t.startswith(("proj:", "scope:", "kind:")) for t in tags):
             raise ValueError("Invalid or reserved tag")
         return tags
 

@@ -74,7 +74,7 @@ export async function extractMemories(
   const items = parsed.items.map((item, i) => {
     if (
       redact(item.content) !== item.content ||
-      item.tags.some((t) => redact(t) !== t || /^(scope|proj|kind):/.test(t))
+      item.tags.some((t) => redact(t) !== t || t.includes(",") || /^(scope|proj|kind):/.test(t))
     )
       throw new Error("Unsafe extracted memory");
     const projects = [...new Set(item.scope.projects)].sort();
