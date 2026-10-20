@@ -11,7 +11,7 @@ from fixtures import ConfigFixture, ROOT
 
 
 class ReleaseInstallTests(ConfigFixture):
-    def test_archive_links_role_specific_memory_skills(self):
+    def test_archive_preserves_local_memory_skills_and_links_shared_context(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         loop = re.search(
             r'^          for bot in pm-bot tl-bot; do\n            mkdir .*?^          done$',
@@ -19,15 +19,21 @@ class ReleaseInstallTests(ConfigFixture):
         )
         self.assertIsNotNone(loop)
         stage = self.root / "dist/stage/battuta"
-        for name in ("project-context", "memory", "memory-tl"):
+        for name in ("project-context",):
             source = stage / "shared-skills" / name
             source.mkdir(parents=True)
             (source / "SKILL.md").write_text(name)
         (stage / "shared-skills/project-context/references").mkdir()
+        for role in ("pm-bot", "tl-bot"):
+            shutil.copytree(ROOT / "bots" / role / ".pi/skills/memory", stage / "bots" / role / ".pi/skills/memory")
         result = subprocess.run(["bash", "-euc", textwrap.dedent(loop.group())], cwd=self.root, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         for role in ("pm-bot", "tl-bot"):
-            self.assertEqual((stage / "bots" / role / ".pi/skills/memory/SKILL.md").read_text(), "memory-tl" if role == "tl-bot" else "memory")
+            memory = stage / "bots" / role / ".pi/skills/memory"
+            self.assertFalse(memory.is_symlink())
+            self.assertEqual((memory / "SKILL.md").read_text(), (ROOT / "bots" / role / ".pi/skills/memory/SKILL.md").read_text())
+            self.assertTrue((memory / "references/tools.md").is_file())
+            self.assertTrue((memory.parent / "project-context").is_symlink())
 
     def test_packages_are_installed_inside_archive_with_scheduler_only_for_pm(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()

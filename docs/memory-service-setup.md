@@ -39,9 +39,9 @@ Run doctor before starting the server; it takes the same single-owner data lock.
 
 ## Bot skill exposure
 
-Source bot configuration (`bots/pm-bot/scripts/configure-bot.py` and `bots/tl-bot/scripts/configure-bot.py`) and release `bin/battuta configure` expose each role's skill at `.pi/skills/memory`: PM links to `shared-skills/memory`, TL to `shared-skills/memory-tl`. Source `--bot-dir` selects a custom workspace without changing the script's explicit role. Both skill frontmatters are named `memory`; do not install both into one bot. Project-context links are unchanged.
+Each bot owns a tracked `.pi/skills/memory/` directory: PM's skill is read/write and TL's is read-only. Pi discovers these local files directly; ordinary source/release configuration does not install or link a memory skill. Both frontmatters are named `memory`; do not install both into one bot. Project-context remains shared and linked.
 
-Setup migrates TL's known old `../../../../shared-skills/memory` link to the read-only source. It refuses unrelated custom links, files, or directories rather than replacing them; review and move a custom entry aside explicitly before retrying. PM capture defaults on and TL capture defaults off. The shared server may still expose write tools: TL's read-only boundary is role guidance, not server-side access control. Setup does not edit private profiles or start bots.
+For source `--bot-dir` workspaces outside the bundled bot directory, configuration copies the role's memory skill only when missing, or replaces its known old shared-memory link with a local copy. Existing local directories are preserved; unrelated links/files are refused rather than overwritten. Release configuration leaves memory entries alone. PM capture defaults on and TL capture defaults off. The shared server may still expose write tools: TL's read-only boundary is role guidance, not server-side access control. Setup does not edit private profiles or start bots.
 
 ## Services
 

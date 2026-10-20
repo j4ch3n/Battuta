@@ -147,4 +147,4 @@ The client persists its immutable plan, acknowledgements, profile evidence and r
 
 Upstream automatic semantic merging, confidence/importance-based tiers, automatic global promotion, historical Stone import, multilingual-model adoption, model migration tooling, remote authentication, dashboards and per-agent permission boundaries are not implemented. Dream uses Battuta's validated server APIs rather than enabling upstream's direct-storage consolidation engine.
 
-For operational configuration, recovery, and cutover, see [memory operations](../docs/memory-service.md). For invocation examples and user-visible tool behavior, see [tool workflow](../shared-skills/memory/references/tools.md).
+For operational configuration, recovery, and cutover, see [memory operations](../docs/memory-service.md). For invocation examples and user-visible tool behavior, see [tool workflow](../bots/pm-bot/.pi/skills/memory/references/tools.md).

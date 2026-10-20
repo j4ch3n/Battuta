@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { expect, test } from "vitest";
 import { renderOwnerProfile, ownerProfileSchema } from "../dream-profile.ts";
 
@@ -10,12 +9,15 @@ const empty = {
   enduringPreferencesAndConstraints: "",
 };
 
-test("renders every canonical section even without evidence", async () => {
-  const template = await readFile(
-    new URL("../../shared-skills/memory/references/ME.template.md", import.meta.url),
-    "utf8",
+test("renders every canonical section even without evidence", () => {
+  expect(renderOwnerProfile(empty)).toBe(
+    "# About Human Product Owner\n\n" +
+      "## Background and role\n\n" +
+      "## Goals and priorities\n\n" +
+      "## Values and decision-making\n\n" +
+      "## Life context and interests\n\n" +
+      "## Enduring preferences and constraints\n",
   );
-  expect(renderOwnerProfile(empty)).toBe(template);
 });
 
 test("preserves Unicode understanding under the appropriate heading", () => {

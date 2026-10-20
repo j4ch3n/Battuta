@@ -20,13 +20,17 @@ class InstructionTests(unittest.TestCase):
                 (root / "bots").mkdir(parents=True)
                 (root / "bots/AGENTS_shared.md").write_text("Shared")
                 (bot / "AGENTS_dedicated.md").write_text("Dedicated")
-                for name in ("project-context", "memory", "memory-tl"):
+                for name in ("project-context",):
                     source = root / "shared-skills" / name
                     source.mkdir(parents=True)
                     (source / "SKILL.md").write_text(name)
+                source = root / f"bots/{role}-bot/.pi/skills/memory"
+                source.mkdir(parents=True)
+                (source / "SKILL.md").write_text(f"{role} memory")
                 configure_instructions(bot, role=role, root=root)
                 self.assertEqual((bot / "AGENTS.md").read_text(), "Shared\nDedicated")
-                self.assertEqual((bot / ".pi/skills/memory/SKILL.md").read_text(), "memory-tl" if role == "tl" else "memory")
+                self.assertEqual((bot / ".pi/skills/memory/SKILL.md").read_text(), f"{role} memory")
+                self.assertFalse((bot / ".pi/skills/memory").is_symlink())
 
     def test_legacy_personal_guidance_is_preserved_but_not_embedded(self):
         for role, personal in product(("pm-bot", "tl-bot"), (None, "Personal guidance")):
@@ -37,8 +41,10 @@ class InstructionTests(unittest.TestCase):
                 shared = root / "bots/AGENTS_shared.md"
                 shared.write_text("Shared instructions")
                 (bot / "AGENTS_dedicated.md").write_text("Role instructions")
-                for name in ("project-context", "memory", "memory-tl"):
-                    (root / "shared-skills" / name).mkdir(parents=True)
+                (root / "shared-skills/project-context").mkdir(parents=True)
+                memory = bot / ".pi/skills/memory"
+                memory.mkdir(parents=True)
+                (memory / "SKILL.md").write_text("Local memory")
                 personal_path = root / "bots/AGENTS_personal.md"
                 if personal is not None:
                     personal_path.write_text(personal)

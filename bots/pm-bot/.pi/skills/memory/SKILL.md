@@ -19,4 +19,4 @@ See [tool workflow](references/tools.md) for discovery, selectors, exact-ref rea
 
 PM automatic capture is enabled by default; it is supplementary, not confirmation that a particular fact was saved. TL capture is disabled by default. Do not manually reconstruct lifecycle capture batches.
 
-Never edit `ME.md` directly or use shell/profile-writing workarounds. The dedicated dream workflow maintains the owner profile using the [canonical template](references/ME.template.md); a confirmed server-memory change does not prove the profile changed. Report only actual confirmed outcomes. Forgetting is not secure erasure.
+Never edit `ME.md` directly or use shell/profile-writing workarounds. The dedicated dream tool validates and renders the whole owner profile; a confirmed server-memory change does not prove the profile changed. Report only actual confirmed outcomes. Forgetting is not secure erasure.
