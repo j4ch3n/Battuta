@@ -13,6 +13,19 @@ run("node", ["--check", "packaging/configure.mjs"]);
 run("node", ["--check", "packaging/shared-resources.mjs"]);
 run("node", ["--check", "packaging/install-services.mjs"]);
 run("uv", ["run", "--locked", "python", "-m", "unittest", "discover", "-s", "scripts/tests", "-v"]);
+run("uv", [
+  "run",
+  "--project",
+  "memory-service",
+  "--locked",
+  "python",
+  "-m",
+  "unittest",
+  "discover",
+  "-s",
+  "memory-service/tests",
+  "-v",
+]);
 
 const sharedSkills = resolve(root, "shared-skills");
 for (const cli of readdirSync(sharedSkills, { withFileTypes: true })
