@@ -43,3 +43,12 @@ Rollback is an operator-controlled previous-release restore, not compatibility i
 ## Verification
 
 `pnpm check:support` includes offline Python unit/adapter-contract tests; `pnpm test:node` and `pnpm test:coverage` include the thin client. Focus on memory correctness and durable replay rather than extensive setup mocks. GitHub Actions validates packaging on ARM64, not Raspberry Pi hardware. Installation must fail with clear remediation for unsupported OS/Python/native wheels or model errors. A local real-model MCP smoke is opt-in; no paid extraction model or model download belongs in default unit discovery. Hardware readiness/performance must be checked on the actual target when deploying.
+
+With the model already provisioned for the current HOME, run explicit HTTP integration checks:
+
+```sh
+BATTUTA_MEMORY_INTEGRATION=1 uv run --project memory-service --locked python -m unittest discover -s memory-service/tests -p test_mcp_integration.py -v
+BATTUTA_MEMORY_INTEGRATION=1 pnpm --dir memory-client test:integration
+```
+
+These use temporary data/ports, actual CPU embeddings and official Python/JS MCP clients; extraction is stubbed, so no provider charges occur. The Python check covers concurrent clients, scoped recall, membership/vector reuse, correction/history and restart persistence. The JS check exercises durable capture after a lost acknowledgement/server restart without repeated extraction. They do not provision models, contact Telegram or modify live bot state.
