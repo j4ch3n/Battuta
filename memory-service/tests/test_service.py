@@ -101,3 +101,10 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
         for start, end in [(12, 12), (13, 12), (-1, 12), (0, float("inf")), (float("nan"), 12)]:
             with self.subTest(start=start, end=end), self.assertRaises(ValueError):
                 InventoryRequest(window_start=start, window_end=end)
+
+    async def test_record_revision_changes_with_scope_and_state_not_distance(self):
+        record = await self.service.get(GetRequest(ref="a" * 64))
+        self.assertEqual(len(record["revision"]), 64)
+        self.conn.execute("UPDATE memories SET tags='proj:atlas,proj:beacon' WHERE content_hash=?", ("a" * 64,))
+        changed = await self.service.get(GetRequest(ref="a" * 64))
+        self.assertNotEqual(record["revision"], changed["revision"])

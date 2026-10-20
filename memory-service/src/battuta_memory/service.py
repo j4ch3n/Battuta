@@ -113,6 +113,8 @@ class MemoryService:
     async def update(self, request):
         async def plan():
             current = await self._active(request.ref)
+            if request.expected_revision is not None and current["revision"] != request.expected_revision:
+                raise ValueError("Memory changed since inventory")
             await asyncio.to_thread(self.adapter.embed, request.content)
             ref = self.adapter.content_ref(request.content)
             if await self.adapter.get(ref, include_deleted=True):
@@ -143,6 +145,8 @@ class MemoryService:
             record = await self._active(request.ref)
             return {"ref": request.ref, "dry_run": True, "scope": record["scope"], "retention": "Tombstone retains content; not secure erasure"}
         async def plan():
-            await self._active(request.ref)
+            current = await self._active(request.ref)
+            if request.expected_revision is not None and current["revision"] != request.expected_revision:
+                raise ValueError("Memory changed since inventory")
             return {"operation": "delete", "ref": request.ref, "result": {"ref": request.ref, "forgotten": True, "retention": "Tombstone retains content; not secure erasure"}}
         return await self._mutation("forget:" + request.ref, request, plan)

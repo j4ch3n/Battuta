@@ -44,6 +44,18 @@ class StorageFixture(unittest.IsolatedAsyncioTestCase):
 
 
 class MutationTests(StorageFixture):
+    async def test_dream_preconditions_reject_changed_membership_without_mutation(self):
+        first = await self.service.remember(self.note())
+        revision = (await self.adapter.get(first["ref"]))["revision"]
+        await self.service.link_projects(LinkRequest(ref=first["ref"], add=["beacon"]))
+        for request, operation in [
+            (UpdateRequest(ref=first["ref"], content="Rewritten", reason="dream", expected_revision=revision), self.service.update),
+            (ForgetRequest(ref=first["ref"], expected_revision=revision), self.service.forget),
+        ]:
+            with self.subTest(operation=operation.__name__), self.assertRaisesRegex(ValueError, "changed"):
+                await operation(request)
+        self.assertTrue((await self.adapter.get(first["ref"]))["active"])
+
     async def test_compensated_version_failure_does_not_poison_recovery(self):
         import sqlite3
         first = await self.service.remember(self.note())

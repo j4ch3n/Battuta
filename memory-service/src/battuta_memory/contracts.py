@@ -104,6 +104,7 @@ class GetRequest(Contract):
 
 
 class UpdateRequest(GetRequest):
+    expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     content: str = Field(min_length=1, max_length=16000)
     reason: str = Field(min_length=1, max_length=1000)
     kind: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_-]{0,39}$")
@@ -133,6 +134,7 @@ class LinkRequest(GetRequest):
 
 
 class ForgetRequest(GetRequest):
+    expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     dry_run: bool = False
 
 

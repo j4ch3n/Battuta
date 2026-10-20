@@ -2,6 +2,7 @@
 
 import asyncio
 import fcntl
+import hashlib
 import json
 import math
 from importlib.metadata import version
@@ -105,7 +106,7 @@ class UpstreamAdapter:
     def record(row):
         tags = row["tags"].split(",") if row["tags"] else []
         metadata = json.loads(row["metadata"] or "{}")
-        return {
+        record = {
             "ref": row["content_hash"], "content": row["content"],
             "scope": {"global": "scope:global" in tags, "projects": sorted(t[5:] for t in tags if t.startswith("proj:"))},
             "tags": sorted(t for t in tags if not t.startswith(("scope:", "proj:", "kind:"))),
@@ -115,6 +116,8 @@ class UpstreamAdapter:
             "active": not row.get("superseded_by") and row.get("deleted_at") is None,
             **({"distance": row["distance"]} if "distance" in row else {}),
         }
+        record["revision"] = hashlib.sha256(json.dumps({k: v for k, v in record.items() if k != "distance"}, sort_keys=True).encode()).hexdigest()
+        return record
 
     @staticmethod
     def _filters(request, resolved):
