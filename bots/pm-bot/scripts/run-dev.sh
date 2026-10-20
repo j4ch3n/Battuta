@@ -70,6 +70,8 @@ if [[ "$mode" == dev ]]; then
   tmux split-window -v -p 30 -t "$pi_pane" -c "$repo_dir" 'exec make functions-serve'
 fi
 tmux split-window -h -t "$pi_pane" -c "$tl_dir" "$tl_command"
+printf -v memory_command 'set -a; source %q; set +a; exec %q serve' "$env_file" "$repo_dir/memory-service/.venv/bin/battuta-memory"
+tmux new-window -t "=$session" -n memory -c "$repo_dir" "$memory_command"
 tmux select-pane -t "$pi_pane"
 
 if [[ -n "${TMUX:-}" ]]; then

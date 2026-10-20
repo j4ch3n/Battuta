@@ -5,6 +5,14 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PATH="$root/bin:$PATH"
 
 case "${1:-}" in
+  setup-memory)
+    shift
+    exec uv run --no-project --managed-python --python 3.12 python "$root/scripts/setup-memory.py" "$@"
+    ;;
+  memory)
+    [[ -x "$root/memory-service/.venv/bin/battuta-memory" ]] || { printf 'Run bin/battuta setup-memory first\n' >&2; exit 1; }
+    exec "$root/memory-service/.venv/bin/battuta-memory" serve
+    ;;
   configure)
     [[ -f "$root/.env.prod" ]] || { printf 'Copy %s/.env.example to %s/.env.prod and fill it in first\n' "$root" "$root" >&2; exit 1; }
     set -a
@@ -42,7 +50,7 @@ case "${1:-}" in
     exec "$root/bin/node" "$root/bin/install-services.mjs"
     ;;
   *)
-    printf 'Usage: %s configure|start-prod-screen|pm|tl|install-services\n' "$0" >&2
+    printf 'Usage: %s configure|setup-memory|memory|start-prod-screen|pm|tl|install-services\n' "$0" >&2
     exit 2
     ;;
 esac

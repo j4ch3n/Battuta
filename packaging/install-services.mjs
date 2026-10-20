@@ -7,7 +7,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const configHome = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
 const unitDir = join(configHome, "systemd/user");
 // systemd unit values do not support shell quoting; refuse paths requiring escaping.
-if (/[^a-zA-Z0-9_./-]/.test(root))
+if ([root, homedir()].some((path) => /[^a-zA-Z0-9_./-]/.test(path)))
   throw new Error("Install path must not contain spaces or systemd special characters");
 
 const units = [
@@ -17,8 +17,8 @@ const units = [
   const path = join(unitDir, `battuta-${role}.service`);
   const content = `[Unit]
 Description=Battuta ${description} bot
-After=network-online.target
-Wants=network-online.target
+After=network-online.target battuta-memory.service
+Wants=network-online.target battuta-memory.service
 
 [Service]
 Type=simple
@@ -33,8 +33,29 @@ WantedBy=default.target
 `;
   return { path, content };
 });
+units.push({
+  path: join(unitDir, "battuta-memory.service"),
+  content: `[Unit]
+Description=Battuta shared memory MCP
+After=network-online.target
+Wants=network-online.target
 
-// Check both units before changing either one.
+[Service]
+Type=simple
+WorkingDirectory=${root}
+Environment=HOME=${homedir()}
+Environment=MCP_MEMORY_ONNX_ALLOW_DOWNLOAD=false
+UMask=0077
+ExecStart=${root}/bin/battuta memory
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+`,
+});
+
+// Check all owned units before changing any one.
 for (const { path, content } of units) {
   try {
     const current = readFileSync(path, "utf8");
