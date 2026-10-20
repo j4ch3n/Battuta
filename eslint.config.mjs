@@ -24,6 +24,7 @@ export default defineConfig(
       "agent-mail/**/*.ts",
       "project-spec/**/*.ts",
       "memory-stone/**/*.ts",
+      "memory-client/**/*.ts",
       "bots/**/.pi/extensions/**/*.ts",
     ],
     extends: [js.configs.recommended, tseslint.configs.recommendedTypeChecked],
