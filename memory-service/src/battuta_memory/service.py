@@ -56,6 +56,9 @@ class MemoryService:
             value.pop("evidence", None)
         if isinstance(request, UpdateRequest) and not value.get("sources"):
             value.pop("sources", None)
+        for field in ("expected_revision", "replacement_ref"):
+            if value.get(field) is None:
+                value.pop(field, None)
         return value
 
     async def _apply(self, key, payload):

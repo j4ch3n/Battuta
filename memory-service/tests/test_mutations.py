@@ -56,13 +56,24 @@ class MutationTests(StorageFixture):
         public = update.model_dump(mode="json", by_alias=True)
         public.pop("evidence", None)
         public.pop("sources", None)
+        public.pop("expected_revision", None)
         keyed = update.model_dump()
         keyed.pop("evidence", None)
         keyed.pop("sources", None)
+        keyed.pop("expected_revision", None)
         key = "update:" + self.service.digest(keyed)
         self.state.prepare_intent(key, self.service.digest(public), {"unused": True})
         self.state.complete_intent(key, receipt)
         self.assertEqual(await self.service.update(update), receipt)
+        forget = ForgetRequest(ref="a" * 64)
+        legacy_forget = forget.model_dump(mode="json", by_alias=True)
+        for field in ("evidence", "expected_revision", "replacement_ref"):
+            legacy_forget.pop(field, None)
+        key = "forget:" + forget.ref
+        forgotten = {"ref": forget.ref, "forgotten": True}
+        self.state.prepare_intent(key, self.service.digest(legacy_forget), {"unused": True})
+        self.state.complete_intent(key, forgotten)
+        self.assertEqual(await self.service.forget(forget), forgotten)
 
     async def test_frozen_evidence_rejects_membership_change_and_earlier_plan_update(self):
         source = await self.service.remember(self.note("Evidence"))
