@@ -45,7 +45,16 @@ class Tagged(Contract):
         return tags
 
 
-class RememberRequest(Tagged):
+class EvidenceRef(Contract):
+    ref: str = Field(pattern=r"^[0-9a-f]{64}$")
+    revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class EvidenceGuard(Contract):
+    evidence: list[EvidenceRef] = Field(default_factory=list, max_length=100)
+
+
+class RememberRequest(Tagged, EvidenceGuard):
     content: str = Field(min_length=1, max_length=16000)
     scope: Scope
     kind: str = Field(default="observation", pattern=r"^[a-z][a-z0-9_-]{0,39}$")
@@ -103,7 +112,8 @@ class GetRequest(Contract):
     include_history: bool = False
 
 
-class UpdateRequest(GetRequest):
+class UpdateRequest(GetRequest, EvidenceGuard):
+    sources: list[SourceRef] = Field(default_factory=list, max_length=200)
     expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     content: str = Field(min_length=1, max_length=16000)
     reason: str = Field(min_length=1, max_length=1000)
@@ -133,7 +143,7 @@ class LinkRequest(GetRequest):
         return self
 
 
-class ForgetRequest(GetRequest):
+class ForgetRequest(GetRequest, EvidenceGuard):
     expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     replacement_ref: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     dry_run: bool = False

@@ -44,6 +44,52 @@ class StorageFixture(unittest.IsolatedAsyncioTestCase):
 
 
 class MutationTests(StorageFixture):
+    async def test_evidence_guards_reject_forgotten_and_changed_sources_but_receipts_win(self):
+        source = await self.service.remember(self.note("Evidence"))
+        record = await self.adapter.get(source["ref"])
+        guard = [{"ref": record["ref"], "revision": record["revision"]}]
+        request = self.note("Derived", key="derived").model_dump(by_alias=True)
+        request["evidence"] = guard
+        derived = RememberRequest(**request)
+        receipt = await self.service.remember(derived)
+        await self.service.forget(ForgetRequest(ref=source["ref"]))
+        self.assertEqual(await self.service.remember(derived), receipt)
+        target = await self.service.remember(self.note("Target"))
+        for operation, request in [
+            (self.service.remember, RememberRequest(**{**request, "content": "Other derived", "idempotency_key": "other"})),
+            (self.service.update, UpdateRequest(ref=target["ref"], content="Revised", reason="dream", evidence=guard)),
+            (self.service.forget, ForgetRequest(ref=target["ref"], evidence=guard)),
+        ]:
+            with self.subTest(operation=operation.__name__), self.assertRaisesRegex(ValueError, "evidence"):
+                await operation(request)
+        self.assertTrue((await self.adapter.get(target["ref"]))["active"])
+
+    async def test_update_unions_sources_and_forget_lineage_survives_restart(self):
+        from battuta_memory.contracts import InventoryRequest
+        a = {"agent_id": "pm", "session_id": "a", "entry_id": "1"}
+        b = {"agent_id": "pm", "session_id": "b", "entry_id": "2"}
+        first = await self.service.remember(RememberRequest(**{**self.note().model_dump(by_alias=True), "sources": [a]}))
+        second = await self.service.remember(RememberRequest(**{**self.note("Second").model_dump(by_alias=True), "sources": [b]}))
+        updated = await self.service.update(UpdateRequest(ref=first["ref"], content="Combined", reason="merge", sources=[b]))
+        self.assertEqual((await self.adapter.get(updated["ref"]))["sources"], [a, b])
+        await self.service.forget(ForgetRequest(ref=second["ref"], replacement_ref=updated["ref"]))
+        restarted = MemoryService(UpstreamAdapter(self.adapter.storage), self.service.config, self.state)
+        await restarted.recover()
+        inventory = await restarted.inventory(InventoryRequest(window_start=0, window_end=9999999999))
+        self.assertIn({"ref": second["ref"], "superseded_by": updated["ref"]}, inventory["inactive"])
+        self.assertIsNone(await restarted.adapter.get(second["ref"]))
+
+    async def test_remember_receipt_reports_actual_reused_content_and_historical_state(self):
+        first = await self.service.remember(self.note("Original CASE"))
+        request = self.note("original case", key="reuse")
+        receipt = await self.service.remember(request)
+        self.assertEqual(receipt["outcome"], "reused")
+        self.assertEqual(receipt["before"], "Original CASE")
+        self.assertEqual(receipt["after"], "Original CASE")
+        self.assertEqual(receipt["revision"], (await self.adapter.get(first["ref"]))["revision"])
+        await self.service.forget(ForgetRequest(ref=first["ref"]))
+        self.assertEqual(await self.service.remember(request), receipt)
+
     async def test_merge_forget_requires_an_active_distinct_same_scope_replacement(self):
         first = await self.service.remember(self.note())
         replacement = await self.service.remember(self.note("Merged fact"))

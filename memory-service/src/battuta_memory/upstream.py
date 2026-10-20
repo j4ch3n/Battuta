@@ -112,7 +112,7 @@ class UpstreamAdapter:
             "tags": sorted(t for t in tags if not t.startswith(("scope:", "proj:", "kind:"))),
             "kind": next((t[5:] for t in tags if t.startswith("kind:")), row["memory_type"] or "observation"), "sources": metadata.get("sources", []),
             "created_at": row["created_at"], "updated_at": row["updated_at"],
-            "parent_ref": row.get("parent_id"), "superseded_by": row.get("superseded_by"),
+            "parent_ref": row.get("parent_id"), "superseded_by": row.get("superseded_by") or (metadata.get("replacement_ref") if row.get("deleted_at") is not None else None),
             "active": not row.get("superseded_by") and row.get("deleted_at") is None,
             **({"distance": row["distance"]} if "distance" in row else {}),
         }
@@ -237,6 +237,7 @@ class UpstreamAdapter:
         current = await self.get(payload["old_ref"], include_deleted=True)
         target = await self.get(payload["ref"], include_deleted=True)
         if current and current["superseded_by"] == payload["ref"] and target and target["parent_ref"] == payload["old_ref"]:
+            await self._evolve_sources(payload)
             return
         if not current or not current["active"]:
             raise TerminalMutationError("Memory correction failed: version state conflicts; use the current ref and revised content")
@@ -262,10 +263,21 @@ class UpstreamAdapter:
                 new_tags=payload["tags"], new_memory_type=self.storage_kind(payload["kind"]), reason=payload["reason"])
             if not ok or ref != payload["ref"]:
                 raise RuntimeError("Upstream version update failed")
+        await self._evolve_sources(payload)
+
+    async def _evolve_sources(self, payload):
+        if "sources" in payload:
+            ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"metadata": {"sources": payload["sources"]}})
+            if not ok:
+                raise RuntimeError("Upstream source update failed")
 
     async def delete(self, payload):
         if await self.get(payload["ref"]) is None:
             return
+        if payload.get("replacement_ref"):
+            ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"metadata": {"replacement_ref": payload["replacement_ref"]}})
+            if not ok:
+                raise RuntimeError("Upstream replacement lineage update failed")
         ok, _ = await self.storage.delete(payload["ref"])
         if not ok:
             raise RuntimeError("Upstream deletion failed")
