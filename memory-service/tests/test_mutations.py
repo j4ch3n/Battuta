@@ -1,0 +1,138 @@
+import hashlib
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+from battuta_memory.config import MemoryConfig
+from battuta_memory.contracts import RememberRequest, UpdateRequest, LinkRequest, ForgetRequest
+from battuta_memory.service import MemoryService
+from battuta_memory.state import StateStore
+from battuta_memory.upstream import UpstreamAdapter
+
+
+class MutationTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        config = MemoryConfig(data_dir=self.root, registry_root=self.root)
+        config.configure_upstream()
+        from mcp_memory_service.storage.sqlite_vec import SqliteVecMemoryStorage
+        async def fake_model(storage):
+            storage.embedding_dimension = 384
+            storage.embedding_model = object()
+        self.patches = [patch.object(SqliteVecMemoryStorage, "_initialize_embedding_model", fake_model),
+            patch.object(SqliteVecMemoryStorage, "_generate_embedding", return_value=[1.0] + [0.0] * 383)]
+        for p in self.patches:
+            p.start()
+            self.addCleanup(p.stop)
+        storage = SqliteVecMemoryStorage(str(self.root / "memory.db"))
+        await storage.initialize()
+        self.addAsyncCleanup(storage.close)
+        self.adapter = UpstreamAdapter(storage)
+        self.adapter.embed = lambda _: b"valid"
+        self.state = StateStore.open(self.root / "state.db")
+        self.addCleanup(self.state.close)
+        self.service = MemoryService(self.adapter, config, self.state)
+        for name in ("atlas", "beacon"):
+            folder = self.root / name
+            (folder / "code").mkdir(parents=True)
+            (folder / "project.yaml").write_text(f"version: 1\nproject:\n  name: {name}\n  path: {folder}/code\n")
+
+    def note(self, content="Original fact", project="atlas", key=None):
+        return RememberRequest(content=content, scope={"global": project is None, "projects": [project] if project else []}, idempotency_key=key)
+
+    async def test_exact_duplicates_link_projects_not_global(self):
+        first = await self.service.remember(self.note())
+        second = await self.service.remember(self.note(project="beacon"))
+        self.assertEqual(first["ref"], second["ref"])
+        record = await self.adapter.get(first["ref"])
+        self.assertEqual(record["scope"]["projects"], ["atlas", "beacon"])
+        with self.assertRaisesRegex(ValueError, "scope"):
+            await self.service.remember(self.note(project=None))
+        other = await self.service.remember(self.note(content="Original fact, with a detail"))
+        self.assertNotEqual(first["ref"], other["ref"])
+
+    async def test_versioned_edit_and_membership_preserve_vectors(self):
+        first = await self.service.remember(self.note())
+        before = self.adapter.storage.conn.execute("SELECT content_embedding FROM memory_embeddings").fetchone()[0]
+        await self.service.link_projects(LinkRequest(ref=first["ref"], add=["beacon"]))
+        after = self.adapter.storage.conn.execute("SELECT content_embedding FROM memory_embeddings").fetchone()[0]
+        self.assertEqual(before, after)
+        changed = await self.service.update(UpdateRequest(ref=first["ref"], content="Corrected fact", reason="owner correction"))
+        self.assertNotEqual(changed["ref"], first["ref"])
+        self.assertEqual((await self.adapter.get(changed["ref"]))["scope"]["projects"], ["atlas", "beacon"])
+        with self.assertRaisesRegex(ValueError, "inactive"):
+            await self.service.update(UpdateRequest(ref=first["ref"], content="Stale correction", reason="late"))
+
+    async def test_final_membership_and_global_link_rejected(self):
+        first = await self.service.remember(self.note())
+        with self.assertRaises(ValueError):
+            await self.service.link_projects(LinkRequest(ref=first["ref"], remove=["atlas"]))
+        global_ = await self.service.remember(self.note("Global", None))
+        with self.assertRaises(ValueError):
+            await self.service.link_projects(LinkRequest(ref=global_["ref"], add=["atlas"]))
+
+    async def test_forget_preview_and_completed_retry_do_not_resurrect(self):
+        first = await self.service.remember(self.note(key="stable"))
+        await self.service.forget(ForgetRequest(ref=first["ref"], dry_run=True))
+        self.assertIsNotNone(await self.adapter.get(first["ref"]))
+        await self.service.forget(ForgetRequest(ref=first["ref"]))
+        self.assertEqual(await self.service.remember(self.note(key="stable")), first)
+        self.assertIsNone(await self.adapter.get(first["ref"]))
+        with self.assertRaises(ValueError):
+            await self.service.remember(self.note())
+        with self.assertRaisesRegex(ValueError, "conflict"):
+            await self.service.remember(self.note("different", key="stable"))
+        row = self.adapter.storage.conn.execute("SELECT content,deleted_at FROM memories").fetchone()
+        self.assertEqual(row[0], "Original fact")
+        self.assertIsNotNone(row[1])
+
+    async def test_crash_after_store_before_receipt_recovers(self):
+        original = self.state.complete_intent
+        with patch.object(self.state, "complete_intent", side_effect=RuntimeError("simulated crash")):
+            with self.assertRaisesRegex(RuntimeError, "simulated crash"):
+                await self.service.remember(self.note(key="retry"))
+        await self.service.recover()
+        result = await self.service.remember(self.note(key="retry"))
+        self.assertEqual(self.adapter.storage.conn.execute("SELECT count(*) FROM memories").fetchone()[0], 1)
+        self.assertEqual(result["ref"], hashlib.sha256(b"original fact").hexdigest())
+
+    async def test_crash_after_version_commit_recovers(self):
+        first = await self.service.remember(self.note())
+        request = UpdateRequest(ref=first["ref"], content="Corrected fact", reason="owner")
+        with patch.object(self.state, "complete_intent", side_effect=RuntimeError("simulated crash")):
+            with self.assertRaises(RuntimeError):
+                await self.service.update(request)
+        await self.service.recover()
+        result = await self.service.update(request)
+        history = await self.adapter.history(result["ref"])
+        self.assertEqual(len(history), 2)
+
+    async def test_crash_inside_upstream_version_store_repairs_orphan(self):
+        from mcp_memory_service.models.memory import Memory
+        first = await self.service.remember(self.note())
+        async def crash_after_store(old_ref, content, **kwargs):
+            ref = self.adapter.content_ref(content)
+            ok, _ = await self.adapter.storage.store(Memory(content, ref, tags=kwargs["new_tags"], memory_type=kwargs["new_memory_type"]), skip_semantic_dedup=True)
+            self.assertTrue(ok)
+            raise RuntimeError("crash before lineage")
+        with patch.object(self.adapter.storage, "update_memory_versioned", side_effect=crash_after_store):
+            with self.assertRaisesRegex(RuntimeError, "crash before lineage"):
+                await self.service.update(UpdateRequest(ref=first["ref"], content="Corrected fact", reason="owner"))
+        await self.service.recover()
+        ref = self.adapter.content_ref("Corrected fact")
+        self.assertEqual([r["ref"] for r in await self.adapter.history(ref)], [first["ref"], ref])
+
+    async def test_crash_before_journal_commit_has_no_upstream_write(self):
+        with patch.object(self.state, "prepare_intent", side_effect=RuntimeError("disk full")):
+            with self.assertRaisesRegex(RuntimeError, "disk full"):
+                await self.service.remember(self.note())
+        self.assertEqual(self.adapter.storage.conn.execute("SELECT count(*) FROM memories").fetchone()[0], 0)
+
+    async def test_membership_mutations_are_serialized(self):
+        import asyncio
+        first = await self.service.remember(self.note())
+        await asyncio.gather(self.service.link_projects(LinkRequest(ref=first["ref"], add=["beacon"])),
+            self.service.link_projects(LinkRequest(ref=first["ref"], remove=["atlas"], add=["beacon"])))
+        self.assertEqual((await self.adapter.get(first["ref"]))["scope"]["projects"], ["beacon"])

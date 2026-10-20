@@ -179,6 +179,66 @@ class UpstreamAdapter:
             seen.add(record["ref"])
         return history
 
+    @staticmethod
+    def content_ref(content):
+        from mcp_memory_service.utils.hashing import generate_content_hash
+        return generate_content_hash(content)
+
+    async def store(self, payload):
+        from mcp_memory_service.models.memory import Memory
+        current = await self.get(payload["ref"], include_deleted=True)
+        if current:
+            if not current["active"]:
+                raise ValueError("Cannot resurrect inactive memory")
+            # Only recovery of our journaled write may reach this branch.
+            return
+        ok, message = await self.storage.store(Memory(content=payload["content"], content_hash=payload["ref"],
+            tags=payload["tags"], memory_type=payload["kind"], metadata={"sources": payload["sources"]}), skip_semantic_dedup=True)
+        if not ok:
+            raise RuntimeError("Upstream memory store failed")
+
+    async def metadata(self, payload):
+        current = await self.get(payload["ref"], include_deleted=True)
+        if not current or not current["active"]:
+            raise ValueError("Memory is inactive")
+        ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"tags": payload["tags"], "metadata": {"sources": payload["sources"]}})
+        if not ok:
+            raise RuntimeError("Upstream metadata update failed")
+
+    async def evolve(self, payload):
+        current = await self.get(payload["old_ref"], include_deleted=True)
+        target = await self.get(payload["ref"], include_deleted=True)
+        if current and current["superseded_by"] == payload["ref"] and target and target["parent_ref"] == payload["old_ref"]:
+            return
+        if not current or not current["active"]:
+            raise ValueError("Memory is inactive")
+        if target:
+            # A process can die inside upstream update_memory_versioned after store()
+            # commits but before lineage linking. Repair only this exact journal target.
+            if not target["active"] or target["parent_ref"]:
+                raise ValueError("Version target conflict")
+            def link():
+                conn = self.storage.conn
+                with conn:
+                    version = conn.execute("SELECT COALESCE(version,1)+1 FROM memories WHERE content_hash=?", (payload["old_ref"],)).fetchone()[0]
+                    conn.execute("UPDATE memories SET parent_id=?,version=? WHERE content_hash=?", (payload["old_ref"], version, payload["ref"]))
+                    cursor = conn.execute("UPDATE memories SET superseded_by=? WHERE content_hash=? AND superseded_by IS NULL AND deleted_at IS NULL", (payload["ref"], payload["old_ref"]))
+                    if cursor.rowcount != 1:
+                        raise RuntimeError("Version recovery conflict")
+            await self.storage._execute_with_retry(link)
+        else:
+            ok, _, ref = await self.storage.update_memory_versioned(payload["old_ref"], payload["content"],
+                new_tags=payload["tags"], new_memory_type=payload["kind"], reason=payload["reason"])
+            if not ok or ref != payload["ref"]:
+                raise RuntimeError("Upstream version update failed")
+
+    async def delete(self, payload):
+        if await self.get(payload["ref"]) is None:
+            return
+        ok, _ = await self.storage.delete(payload["ref"])
+        if not ok:
+            raise RuntimeError("Upstream deletion failed")
+
     async def close(self):
         try:
             await self.storage.close()
