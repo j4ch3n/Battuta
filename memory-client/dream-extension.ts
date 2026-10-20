@@ -13,16 +13,16 @@ import { recordDreamUsage } from "./dream-usage.ts";
 
 // The pinned scheduler resolves models fuzzily. Refuse model drift before any
 // evidence read, and require the narrowly owned workdir job for startup/tool use.
-async function enabledJob(ctx: ExtensionContext): Promise<boolean> {
+async function enabledJob(): Promise<string | undefined> {
   const text = await optionalText(join(clientConfig().directory, "schedule-prompts.json"));
-  if (!text) return false;
+  if (!text) return;
   const store = JSON.parse(text) as { version?: number; jobs?: Record<string, unknown>[] };
   const jobs = store.jobs?.filter(
     (j) => j.id === DREAM_JOB_ID || j.name === "nightly-memory-dream",
   );
-  if (store.version !== 1 || jobs?.length !== 1) return false;
+  if (store.version !== 1 || jobs?.length !== 1) return;
   const job = jobs[0];
-  return (
+  const enabled =
     job.id === DREAM_JOB_ID &&
     job.name === "nightly-memory-dream" &&
     job.enabled === true &&
@@ -30,22 +30,30 @@ async function enabledJob(ctx: ExtensionContext): Promise<boolean> {
     job.schedule === "0 0 3 * * *" &&
     job.session === undefined &&
     job.notify === false &&
-    job.model === `${ctx.model?.provider}/${ctx.model?.id}` &&
+    typeof job.model === "string" &&
+    job.model.includes("/") &&
     Array.isArray(job.skills) &&
     job.skills.length === 0 &&
     Array.isArray(job.extensions) &&
     job.extensions.length === 1 &&
-    job.extensions[0] === fileURLToPath(import.meta.url)
-  );
+    job.extensions[0] === fileURLToPath(import.meta.url);
+  return enabled ? (job.model as string) : undefined;
 }
 
 export default function dreamExtension(pi: ExtensionAPI) {
   if (process.env.AGENT_ROLE !== "pm") return;
   const shutdown = new AbortController();
   let started = false;
-  async function execute(ctx: ExtensionContext, signal?: AbortSignal) {
+  async function execute(ctx: ExtensionContext, signal?: AbortSignal, startup = false) {
     try {
-      if (!(await enabledJob(ctx))) throw new Error("Dream not configured");
+      const configured = await enabledJob();
+      if (!configured) throw new Error("Dream not configured");
+      const separator = configured.indexOf("/");
+      const model = startup
+        ? ctx.modelRegistry.find(configured.slice(0, separator), configured.slice(separator + 1))
+        : ctx.model;
+      if (!model || configured !== `${model.provider}/${model.id}`)
+        throw new Error("Configured dream model unavailable");
       const config = clientConfig();
       const bounded = AbortSignal.any([
         shutdown.signal,
@@ -59,10 +67,14 @@ export default function dreamExtension(pi: ExtensionAPI) {
         {
           directory: config.dataDirectory,
           now: () => new Date(),
-          complete: dreamCompletion(ctx, async (usage) => {
-            const safe = await recordDreamUsage(config.dataDirectory, usage);
-            pi.appendEntry("memory-dream-usage", { usage: safe });
-          }),
+          complete: dreamCompletion(
+            ctx,
+            async (usage) => {
+              const safe = await recordDreamUsage(config.dataDirectory, usage);
+              pi.appendEntry("memory-dream-usage", { usage: safe });
+            },
+            model,
+          ),
           call: (name, args, abort) => abortable(client.call(name, args, abort), abort),
         },
         bounded,
@@ -95,8 +107,8 @@ export default function dreamExtension(pi: ExtensionAPI) {
     }
     if (started) return;
     started = true;
-    void enabledJob(ctx)
-      .then((enabled) => (enabled ? execute(ctx) : undefined))
+    void enabledJob()
+      .then((enabled) => (enabled ? execute(ctx, undefined, true) : undefined))
       .catch(() => {
         ctx.ui.setStatus("memory-dream", "Memory dream unavailable or cancelled");
       });

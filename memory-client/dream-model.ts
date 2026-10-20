@@ -5,8 +5,8 @@ import type { DreamComplete } from "./dream-result.ts";
 export function dreamCompletion(
   ctx: ExtensionContext,
   onUsage: (usage: unknown) => void | Promise<void> = () => {},
+  model: ExtensionContext["model"] = ctx.model,
 ): DreamComplete {
-  const model = ctx.model;
   return async (systemPrompt, evidence, signal) => {
     signal.throwIfAborted();
     if (!model) throw new Error("No configured dream model");

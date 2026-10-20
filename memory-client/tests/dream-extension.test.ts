@@ -69,6 +69,8 @@ async function harness(role = "pm", persisted = true, job: Record<string, unknow
   const ctx = {
     model: { provider: "fake", id: "model" },
     modelRegistry: {
+      find: (provider: string, id: string) =>
+        provider === "fake" && ["model", "dream-model"].includes(id) ? { provider, id } : undefined,
       complete: () =>
         Promise.resolve({
           stopReason: "stop",
@@ -102,6 +104,25 @@ test("persisted PM catches up once without restricting normal tools", async () =
   await h.hooks.get("session_start")!({}, h.ctx);
   await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1));
   expect(h.setActiveTools).not.toHaveBeenCalled();
+});
+test("startup catch-up uses the exact configured dream model without changing the conversation model", async () => {
+  const h = await harness("pm", true, { model: "fake/dream-model" });
+  const complete = vi.spyOn(h.ctx.modelRegistry, "complete");
+  run.mockImplementationOnce((deps, signal) => deps.complete("prompt", "evidence", signal));
+  await h.hooks.get("session_start")!({}, h.ctx);
+  await vi.waitFor(() => expect(complete).toHaveBeenCalledTimes(1));
+  await vi.waitFor(() =>
+    expect(h.status).toHaveBeenCalledWith("memory-dream", "Memory dream complete"),
+  );
+  expect(complete.mock.calls[0][0]).toMatchObject({ provider: "fake", id: "dream-model" });
+  expect(h.ctx.model?.id).toBe("model");
+});
+test("a scheduled child cannot drift to the conversation model", async () => {
+  const h = await harness("pm", false, { model: "fake/dream-model" });
+  await expect(h.tools[0].execute("id", {}, undefined, undefined, h.ctx)).rejects.toThrow(
+    "Dream unavailable",
+  );
+  expect(run).not.toHaveBeenCalled();
 });
 test("main conversation cannot request a private reflection through the dream tool", async () => {
   const h = await harness();
