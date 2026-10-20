@@ -1,16 +1,77 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { runDream, type DreamDependencies } from "../dream-runtime.ts";
 import { memoryRecordSchema, type MemoryRecord } from "../dream-mutations.ts";
 import { validatePersonalProfile } from "../dream-personal.ts";
 
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const fs = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...fs, rename: vi.fn(fs.rename) };
+});
+
 const dirs: string[] = [];
 afterEach(async () => {
+  vi.mocked(rename).mockReset();
+  vi.mocked(rename).mockImplementation(
+    (await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises")).rename,
+  );
   await Promise.all(dirs.splice(0).map((d) => rm(d, { recursive: true, force: true })));
 });
+
+test.each(["ME.md", "dream-profile.json"])(
+  "a failed %s publication followed by an owner edit cannot erase tracked citations",
+  async (failedFile) => {
+    const f = await fixture();
+    const signal = new AbortController().signal;
+    await runDream(f.dependencies, signal);
+    f.dependencies.now = () => new Date("2026-10-22T04:00:00Z");
+    f.records.delete(pref);
+    f.dependencies.complete = () => Promise.resolve(JSON.stringify(emptyProfile()));
+    const real = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+    let failed = false;
+    vi.mocked(rename).mockImplementation(async (from, to) => {
+      if (!failed && to === join(f.dependencies.directory, failedFile)) {
+        failed = true;
+        throw new Error("profile publish failed");
+      }
+      await real.rename(from, to);
+    });
+    await expect(runDream(f.dependencies, signal)).rejects.toThrow("profile publish failed");
+    const current = await readFile(join(f.dependencies.directory, "ME.md"), "utf8");
+    // An owner can restore old text while making an unrelated edit after failure.
+    const edited = current.includes("Prefers concise replies.")
+      ? current
+      : current + "\nPrefers concise replies.\n";
+    await writeFile(join(f.dependencies.directory, "ME.md"), edited + "\nOwner writes poetry.\n");
+    f.dependencies.complete = (prompt) =>
+      Promise.resolve(
+        prompt.startsWith("Refresh")
+          ? JSON.stringify({
+              sections: {
+                ...emptyProfile().sections,
+                enduringPreferencesAndConstraints: [
+                  { text: "Prefers concise replies.", source_refs: [] },
+                ],
+              },
+            })
+          : "Nothing material changed.",
+      );
+    await expect(runDream(f.dependencies, signal)).rejects.toThrow("Unsupported personal evidence");
+    f.dependencies.complete = (prompt) =>
+      Promise.resolve(
+        prompt.startsWith("Refresh")
+          ? JSON.stringify(emptyProfile())
+          : "I removed the withdrawn preference from the profile.",
+      );
+    await runDream(f.dependencies, signal);
+    expect(await readFile(join(f.dependencies.directory, "ME.md"), "utf8")).not.toContain(
+      "Prefers concise replies.",
+    );
+  },
+);
 const hash = (text: string) => createHash("sha256").update(text).digest("hex");
 const parseEvidence = (text: string) =>
   JSON.parse(text) as {

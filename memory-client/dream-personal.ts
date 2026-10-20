@@ -38,6 +38,7 @@ export function validatePersonalProfile(
   records: MemoryRecord[],
   previousContent: string,
   previous: PersonalProfile | undefined,
+  trackedStatements: string[] = [],
 ): PersonalProfile {
   const { sections } = personalProfileSchema.parse(input);
   const globalRefs = new Set(records.filter((r) => r.scope.global).map((r) => r.ref));
@@ -47,11 +48,10 @@ export function validatePersonalProfile(
   const blocks = previousContent.split(/\n\s*\n/).map(normalized);
   for (const statement of Object.values(sections).flat()) {
     const text = normalized(statement.text);
-    const overlapsTracked = prior.some(
-      (s) =>
-        s.source_refs.length > 0 &&
-        (normalized(s.text).includes(text) || text.includes(normalized(s.text))),
-    );
+    const overlapsTracked = [
+      ...prior.filter((s) => s.source_refs.length > 0).map((s) => s.text),
+      ...trackedStatements,
+    ].some((s) => normalized(s).includes(text) || text.includes(normalized(s)));
     const inherited = !overlapsTracked && blocks.includes(text);
     if (
       statement.source_refs.length
