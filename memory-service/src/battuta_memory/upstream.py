@@ -83,6 +83,102 @@ class UpstreamAdapter:
         await self.assert_real_embeddings()
         return {"ready": True, "model": self.manifest, "upstream_version": version("mcp-memory-service")}
 
+    def embed(self, text):
+        from sqlite_vec import serialize_float32
+        tokenizer = self.storage.embedding_model._tokenizer
+        # Inspect untruncated token count, not the model's truncated encode result.
+        from tokenizers import Tokenizer
+        counter = Tokenizer.from_str(tokenizer.to_str())
+        counter.no_truncation()
+        if len(counter.encode(text).ids) > 256:
+            raise ValueError("Memory exceeds embedding token limit; split or rephrase")
+        return serialize_float32(self.storage._generate_embedding(text))
+
+    async def _rows(self, sql, params=()):
+        # Read-only SQL avoids upstream helpers that swallow database exceptions.
+        # All access stays inside its serialized connection boundary.
+        def read():
+            cursor = self.storage.conn.execute(sql, params)
+            names = [d[0] for d in cursor.description]
+            return [dict(zip(names, row)) for row in cursor.fetchall()]
+        return await self.storage._execute_with_retry(read)
+
+    @staticmethod
+    def record(row):
+        tags = row["tags"].split(",") if row["tags"] else []
+        metadata = json.loads(row["metadata"] or "{}")
+        return {
+            "ref": row["content_hash"], "content": row["content"],
+            "scope": {"global": "scope:global" in tags, "projects": sorted(t[5:] for t in tags if t.startswith("proj:"))},
+            "tags": sorted(t for t in tags if not t.startswith(("scope:", "proj:", "kind:"))),
+            "kind": row["memory_type"] or "observation", "sources": metadata.get("sources", []),
+            "created_at": row["created_at"], "updated_at": row["updated_at"],
+            "parent_ref": row.get("parent_id"), "superseded_by": row.get("superseded_by"),
+            "active": not row.get("superseded_by") and row.get("deleted_at") is None,
+            **({"distance": row["distance"]} if "distance" in row else {}),
+        }
+
+    @staticmethod
+    def _filters(request, resolved):
+        clauses = ["m.deleted_at IS NULL", "COALESCE(m.embedding_pending,0)=0"]
+        params = []
+        if not request.include_history:
+            clauses.append("COALESCE(m.superseded_by,'')=''")
+        if resolved.tags is not None:
+            clauses.append("(" + " OR ".join("instr(',' || m.tags || ',', ',' || ? || ',') > 0" for _ in resolved.tags) + ")")
+            params.extend(resolved.tags)
+        if request.kind:
+            clauses.append("m.memory_type=?")
+            params.append(request.kind)
+        if request.tags:
+            conditions = []
+            for tag in request.tags:
+                conditions.append("instr(',' || m.tags || ',', ',' || ? || ',') > 0")
+                params.append(tag)
+            clauses.append("(" + (" AND " if request.tag_match == "all" else " OR ").join(conditions) + ")")
+        return " AND ".join(clauses), params
+
+    async def list(self, request, resolved):
+        where, params = self._filters(request, resolved)
+        rows = await self._rows(f"SELECT m.* FROM memories m WHERE {where} ORDER BY m.updated_at DESC, m.content_hash ASC", params)
+        return [self.record(row) for row in rows]
+
+    async def search(self, request, resolved):
+        vector = await asyncio.to_thread(self.embed, request.query)
+        where, params = self._filters(request, resolved)
+        # Exact filtered distance search has no global-neighbour candidate cap.
+        # sqlite-vec still computes distance; upstream owns all stored embeddings.
+        rows = await self._rows(f"""SELECT m.*, vec_distance_l2(e.content_embedding, ?) AS distance
+            FROM memories m JOIN memory_embeddings e ON m.id=e.rowid
+            WHERE {where} ORDER BY distance, m.content_hash LIMIT ?""", [vector, *params, request.limit])
+        return [self.record(row) for row in rows]
+
+    async def get(self, ref, include_deleted=False):
+        rows = await self._rows("SELECT * FROM memories WHERE content_hash=?" + ("" if include_deleted else " AND deleted_at IS NULL"), (ref,))
+        return self.record(rows[0]) if rows else None
+
+    async def history(self, ref):
+        # Parent links are hashes; walk both directions without recursive cycles.
+        record = await self.get(ref)
+        if not record:
+            return []
+        seen = {ref}
+        while record["parent_ref"] and record["parent_ref"] not in seen:
+            parent = await self.get(record["parent_ref"])
+            if not parent:
+                break
+            record = parent
+            seen.add(record["ref"])
+        history = [record]
+        seen = {record["ref"]}
+        while record["superseded_by"] and record["superseded_by"] not in seen:
+            record = await self.get(record["superseded_by"])
+            if not record:
+                break
+            history.append(record)
+            seen.add(record["ref"])
+        return history
+
     async def close(self):
         try:
             await self.storage.close()
