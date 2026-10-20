@@ -1,0 +1,108 @@
+import { expect, test } from "vitest";
+import { validateDreamPlan, mutationRequest, memoryRecordSchema } from "../dream-mutations.ts";
+
+const a = "a".repeat(64);
+const b = "b".repeat(64);
+const record = (ref = a, projects = ["atlas"]) => ({
+  ref,
+  revision: "c".repeat(64),
+  content: "Existing fact",
+  scope: { global: projects.length === 0, projects },
+  kind: "decision",
+  tags: [],
+  sources: [{ agent_id: "pm", session_id: "s", entry_id: "e" }],
+  active: true,
+});
+const update = {
+  id: "correct",
+  type: "update",
+  ref: a,
+  content: "Corrected fact",
+  reason: "New evidence",
+  source_refs: [a],
+};
+
+test("builds versioned updates with snapshot preconditions and stable insert identities", () => {
+  const records = [memoryRecordSchema.parse(record())];
+  const plan = validateDreamPlan({ operations: [update] }, records, [a]);
+  expect(mutationRequest(plan.operations[0], records, "run")).toEqual({
+    name: "memory_update",
+    arguments: {
+      ref: a,
+      expected_revision: "c".repeat(64),
+      content: "Corrected fact",
+      reason: "New evidence",
+    },
+  });
+  const insert = {
+    id: "merge",
+    type: "insert",
+    content: "Combined fact",
+    kind: "decision",
+    source_refs: [a],
+  };
+  const accepted = validateDreamPlan({ operations: [insert] }, records, [a]);
+  expect(mutationRequest(accepted.operations[0], records, "run")).toEqual({
+    name: "memory_remember",
+    arguments: {
+      content: "Combined fact",
+      kind: "decision",
+      scope: { global: false, projects: ["atlas"] },
+      sources: record().sources,
+      idempotency_key: "dream:run:merge",
+    },
+  });
+});
+
+test("requires a saved same-scope replacement before forgetting merged sources", () => {
+  const records = [memoryRecordSchema.parse(record())];
+  const insert = {
+    id: "merge",
+    type: "insert",
+    content: "Combined fact",
+    kind: "decision",
+    source_refs: [a],
+  };
+  const forget = {
+    id: "retire",
+    type: "forget",
+    ref: a,
+    reason: "Redundant after merge",
+    source_refs: [a],
+    replacement_id: "merge",
+  };
+  const plan = validateDreamPlan({ operations: [insert, forget] }, records, [a]);
+  expect(mutationRequest(plan.operations[1], records, "run")).toEqual({
+    name: "memory_forget",
+    arguments: { ref: a, expected_revision: "c".repeat(64) },
+  });
+  expect(() => validateDreamPlan({ operations: [forget, insert] }, records, [a])).toThrow(
+    "replacement",
+  );
+});
+
+test.each([
+  ["unknown citation", [{ ...update, source_refs: [b] }]],
+  ["unknown target", [{ ...update, ref: b }]],
+  ["repeated target", [update, { ...update, id: "again" }]],
+  ["duplicate id", [update, update]],
+  ["credential", [{ ...update, content: "token ghp_123456789012345678901234567890123456" }]],
+  ["invented scope", [{ ...update, scope: { global: true, projects: [] } }]],
+])("rejects %s before applying any operation", (_name, operations) => {
+  expect(() =>
+    validateDreamPlan({ operations }, [memoryRecordSchema.parse(record())], [a]),
+  ).toThrow();
+});
+
+test("does not cross scope boundaries or change an untouched scope", () => {
+  expect(() =>
+    validateDreamPlan({ operations: [update] }, [memoryRecordSchema.parse(record())], []),
+  ).toThrow("recent");
+  expect(() =>
+    validateDreamPlan(
+      { operations: [{ ...update, source_refs: [a, b] }] },
+      [memoryRecordSchema.parse(record()), memoryRecordSchema.parse(record(b, []))],
+      [a],
+    ),
+  ).toThrow("scope");
+});
