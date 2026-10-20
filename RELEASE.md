@@ -168,7 +168,7 @@ In the PM pane, confirm `/schedule-prompt` opens the scheduler menu and ask the 
 
 The release includes `pi-schedule-prompt@0.4.1` for the PM bot. Its jobs and settings live in the PM working directory's `.pi/schedule-prompts.json` and `.pi/schedule-prompts-settings.json`. Schedules fire only while a Pi session is running in that directory; missed runs are not queued. Jobs are session-bound by default, so resume the creating session for its jobs to run. Inspect existing jobs and their scope before relying on them after a restart or update. See the [upstream scheduler guide](https://github.com/tintinweb/pi-schedule-prompt) for recurring jobs, reminders, and session/workdir scope.
 
-The optional nightly memory dream uses an explicitly configured **workdir-scoped** job and adds one startup catch-up for its latest missed run. General reminders retain the upstream behavior above. Configure dream only through its setup entry in the index; it can automatically rewrite and retire memories and publish the shared owner profile.
+Installing the scheduler or running `bin/battuta configure` does **not** create the optional nightly memory dream job. An absent `.pi/schedule-prompts.json` is normal before any jobs are created. After owner approval, follow [nightly PM dream setup](docs/memory-service-setup.md#nightly-pm-dream-setup) to explicitly create the job and register its dedicated extension with PM stopped. The dream uses a **workdir-scoped** job and adds one startup catch-up for its latest missed run; it can automatically rewrite and retire memories and publish the shared owner profile. General reminders retain the upstream behavior above.
 
 ## 6. Optional: run as user services
 

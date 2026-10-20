@@ -57,6 +57,8 @@ On the physical Pi, record model/RAM/OS/Python/ONNX versions, cold readiness tim
 
 Dream automatically changes server memories and replaces the shared personal profile. Configure it only after the owner has approved unattended consolidation. Ordinary bot configuration does not imply this approval.
 
+**Installing the scheduler does not create the dream schedule.** Neither normal bot configuration nor memory-service setup runs the command below. It is normal for `bots/pm-bot/.pi/schedule-prompts.json` to be absent before any jobs are created; the dream job is not active until explicitly provisioned.
+
 1. Stop PM before editing scheduler files. Confirm the memory service is ready, PM's scheduler is `pi-schedule-prompt@0.4.1`, and PM has authenticated model access. In PM `.pi/settings.json`, select explicit `defaultProvider` and `defaultModel` values for the intended dream model. These are provider/model IDs, not credentials.
 2. Confirm which timezone should define **03:00**. The scheduler and catch-up use process-local time; configure PM's launch environment `TZ` consistently when a specific zone is required. There is no separately configured dream timezone or OS wake-up timer.
 3. Back up the shared memory data and any existing profile. The new profile path is `<BATTUTA_MEMORY_DATA_DIR>/ME.md`, defaulting to `~/.battuta/memory/ME.md`. Old bot `.pi/ME.md` files are not imported. If the owner wants existing private understanding carried forward, arrange an explicit reviewed copy before activation; setup never overwrites it with a template.
@@ -66,7 +68,9 @@ Dream automatically changes server memories and replaces the shared personal pro
    node memory-client/configure-dream.mjs bots/pm-bot
    ```
 
-   In a release archive use `bin/node` in place of `node`. This command is operator-invoked, not a live scheduler edit. It preserves unrelated settings/jobs, an existing dream model and its disabled state, and uses the PM defaults for a new job. A new job is enabled; the next PM startup may immediately catch up the latest missed run.
+   In a release archive use `bin/node` in place of `node`. This operator-invoked command creates `bots/pm-bot/.pi/schedule-prompts.json` if missing, writes the dream job there, and registers `memory-client/dream-extension.ts` in PM's `.pi/settings.json`. For a custom PM workspace, replace `bots/pm-bot` with its directory. It edits configuration only; Pi's scheduler runs the daily job while PM is running. Do not run it against a live PM process.
+
+   The command preserves unrelated settings/jobs, an existing dream model and its disabled state, and uses the PM defaults for a new job. A new job is enabled; the next PM startup may immediately catch up the latest missed run.
 
 5. Inspect PM `.pi/schedule-prompts.json`: exactly one owned `battuta-memory-dream` / `nightly-memory-dream` job, `schedule:"0 0 3 * * *"`, explicit `model`, `notify:false`, no `session` binding, and only the absolute dedicated dream extension path in `extensions`. Keep `skills:[]`. Do not broaden the child to all PM integrations.
 6. Start a single PM process. Verify scheduler discovery, job scope, next due time and model. Startup catch-up resolves the owned job's exact provider/model independently of the conversation's selected model. The scheduled child uses persisted agent-directory model/auth configuration, not providers or credentials registered only in the parent session's memory. Verify the dedicated tool first with disposable data and a separate memory-service endpoint; never point a test at production memory accidentally. Check that a completed run publishes canonical `ME.md` and exactly one under-150-word reflection, and restart does not repeat the same run.
