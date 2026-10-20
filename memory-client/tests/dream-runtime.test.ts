@@ -206,6 +206,43 @@ test("applies insert/update/forget, publishes the whole profile, and appends a r
   ).toHaveLength(1);
 });
 
+test("update-based merge cleanup guards its acknowledged replacement instead of its superseded input", async () => {
+  const f = await fixture();
+  const complete = f.dependencies.complete;
+  f.dependencies.complete = (prompt, input, signal) => {
+    if (prompt.startsWith("Consolidate"))
+      return Promise.resolve(
+        JSON.stringify({
+          operations: [
+            {
+              id: "merge",
+              type: "update",
+              ref: old,
+              content: "Current decision",
+              reason: "Combine",
+              source_refs: [old, duplicate],
+            },
+            {
+              id: "cleanup",
+              type: "forget",
+              ref: duplicate,
+              reason: "Merged",
+              replacement_id: "merge",
+              source_refs: [old, duplicate],
+            },
+          ],
+        }),
+      );
+    if (!prompt.startsWith("Refresh")) expect(parseEvidence(input).partial).toBe(false);
+    return complete(prompt, input, signal);
+  };
+  await runDream(f.dependencies, new AbortController().signal);
+  expect(f.applied).toEqual(["memory_update", "memory_forget"]);
+  expect(f.records.has(old)).toBe(false);
+  expect(f.records.has(duplicate)).toBe(false);
+  expect(f.records.get(hash("Current decision"))?.content).toBe("Current decision");
+});
+
 test("resumes a frozen plan after a lost acknowledgement without repeating model synthesis or writes", async () => {
   const f = await fixture();
   f.loseNextAck();

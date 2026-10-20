@@ -283,7 +283,18 @@ export async function runDream(deps: DreamDependencies, signal: AbortSignal): Pr
           if (replacementRef === operation.ref)
             throw new Error("Cannot forget the merge replacement");
           await deps.call("memory_get", { ref: replacementRef }, signal);
-          Object.assign(request.arguments, { replacement_ref: replacementRef });
+          const replacementOperation = state.operations.find(
+            (op) => op.id === operation.replacement_id,
+          );
+          const guards = request.arguments.evidence as { ref: string; revision: string }[];
+          // Only this exact acknowledged update may supersede a frozen citation.
+          // Unrelated stale sources still fail the server's locked evidence check.
+          const evidence = guards.filter(
+            (guard) =>
+              replacementOperation?.type !== "update" || guard.ref !== replacementOperation.ref,
+          );
+          evidence.push({ ref: replacementRef, revision: ref.parse(replacement?.result.revision) });
+          Object.assign(request.arguments, { replacement_ref: replacementRef, evidence });
         }
         const result = z
           .object({ ref })
