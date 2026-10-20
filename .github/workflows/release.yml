@@ -127,7 +127,7 @@ jobs:
           for bot in pm-bot tl-bot; do
             bot_dir="$PWD/dist/stage/battuta/bots/$bot"
             pnpm --dir "$bot_dir" install --frozen-lockfile --prod
-            PI_CODING_AGENT_DIR="$bot_dir/.pi" pnpm --dir "$bot_dir" exec pi install -l --approve npm:@llblab/pi-telegram@0.50.1
+            PI_CODING_AGENT_DIR="$bot_dir/.pi" pnpm --dir "$bot_dir" exec pi install -l --approve npm:@llblab/pi-telegram@0.57.3
             if [ "$bot" = pm-bot ]; then
               PI_CODING_AGENT_DIR="$bot_dir/.pi" pnpm --dir "$bot_dir" exec pi install -l --approve npm:pi-schedule-prompt@0.4.1
               test -f "$bot_dir/.pi/npm/node_modules/pi-schedule-prompt/src/index.ts"

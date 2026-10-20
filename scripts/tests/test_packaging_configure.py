@@ -42,7 +42,7 @@ class PackagingConfigureTests(unittest.TestCase):
                         (bot / ".pi/ME.md").write_text("Private profile")
                     (bot / "AGENTS_dedicated.md").write_text(role)
                     packages = [
-                        "npm:@llblab/pi-telegram@0.50.1", "npm:pi-mcp-adapter@2.37.0",
+                        "npm:@llblab/pi-telegram@0.57.3", "npm:pi-mcp-adapter@2.37.0",
                         {"source": "npm:pi-mcp-adapter", "extensions": ["index.ts"]},
                         "npm:pi-web-access@0.35.0",
                         {"source": "npm:custom-tools@1.0.0", "extensions": ["read.ts"]},
@@ -104,7 +104,7 @@ class PackagingConfigureTests(unittest.TestCase):
                             continue
                         settings = json.loads(settings_path.read_text())
                         expected_packages = [
-                            "npm:@llblab/pi-telegram@0.50.1", "npm:pi-web-access@0.35.0",
+                            "npm:@llblab/pi-telegram@0.57.3", "npm:pi-web-access@0.35.0",
                             {"source": "npm:custom-tools@1.0.0", "extensions": ["read.ts"]},
                             "npm:pi-mcp-adapter-extra@1.0.0",
                         ]
