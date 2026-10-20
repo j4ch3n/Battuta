@@ -5,6 +5,15 @@ from battuta_memory.state import StateStore
 
 
 class StateTests(unittest.TestCase):
+    def test_model_fingerprint_cannot_change_at_same_dimension(self):
+        with tempfile.TemporaryDirectory() as folder:
+            state = StateStore.open(Path(folder) / "state.db")
+            self.addCleanup(state.close)
+            state.bind_model({"fingerprint": "model-a", "dimension": 384})
+            state.bind_model({"fingerprint": "model-a", "dimension": 384})
+            with self.assertRaisesRegex(RuntimeError, "migration"):
+                state.bind_model({"fingerprint": "model-b", "dimension": 384})
+
     def test_receipt_replay_and_payload_erasure(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "state.db"

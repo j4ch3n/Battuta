@@ -28,6 +28,14 @@ class StateStore:
             raise ValueError("Idempotency key conflict")
         return json.loads(row[1]) if row and row[1] is not None else None
 
+    def bind_model(self, manifest):
+        value = json.dumps(manifest, sort_keys=True)
+        current = self.conn.execute("SELECT value FROM settings WHERE key='model'").fetchone()
+        if current and current[0] != value:
+            raise RuntimeError("Embedding model changed; explicit re-embedding migration required")
+        with self.conn:
+            self.conn.execute("INSERT OR IGNORE INTO settings VALUES('model',?)", (value,))
+
     def prepare_intent(self, key, digest, payload):
         result = self.receipt(key, digest)
         with self.conn:

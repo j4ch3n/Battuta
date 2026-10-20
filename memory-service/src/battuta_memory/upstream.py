@@ -2,7 +2,6 @@
 
 import asyncio
 import fcntl
-import hashlib
 import json
 import math
 from importlib.metadata import version
@@ -19,19 +18,8 @@ class UpstreamAdapter:
 
     @staticmethod
     def verify_cache(home: Path):
-        folder = home / ".cache/mcp_memory/onnx_models" / MODEL / "onnx"
-        try:
-            manifest = json.loads((folder / "battuta-manifest.json").read_text())
-            if manifest["model"] != MODEL or manifest["dimension"] != DIMENSION:
-                raise ValueError("Wrong model identity")
-            for name in ("model.onnx", "tokenizer.json"):
-                with (folder / name).open("rb") as stream:
-                    digest = hashlib.file_digest(stream, "sha256").hexdigest()
-                if digest != manifest["files"][name]:
-                    raise ValueError("Model checksum mismatch")
-            return manifest
-        except (OSError, ValueError, KeyError) as error:
-            raise RuntimeError("Verified ONNX model unavailable; run battuta-memory model install") from error
+        from .model_setup import verify_model
+        return verify_model(home)
 
     @staticmethod
     def create_storage(config):
@@ -51,6 +39,12 @@ class UpstreamAdapter:
             raise RuntimeError("Another memory server owns this data directory") from error
         adapter = None
         try:
+            from .state import StateStore
+            state = StateStore.open(config.data_dir / "state.db")
+            try:
+                state.bind_model(manifest)
+            finally:
+                state.close()
             storage = cls.create_storage(config)
             adapter = cls(storage, lock, manifest)
             await storage.initialize()
