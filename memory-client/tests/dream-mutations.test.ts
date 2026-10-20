@@ -32,6 +32,8 @@ test("builds versioned updates with snapshot preconditions and stable insert ide
       expected_revision: "c".repeat(64),
       content: "Corrected fact",
       reason: "New evidence",
+      evidence: [{ ref: a, revision: "c".repeat(64) }],
+      sources: record().sources,
     },
   });
   const insert = {
@@ -50,6 +52,7 @@ test("builds versioned updates with snapshot preconditions and stable insert ide
       scope: { global: false, projects: ["atlas"] },
       sources: record().sources,
       idempotency_key: "dream:run:merge",
+      evidence: [{ ref: a, revision: "c".repeat(64) }],
     },
   });
 });
@@ -74,10 +77,39 @@ test("requires a saved same-scope replacement before forgetting merged sources",
   const plan = validateDreamPlan({ operations: [insert, forget] }, records, [a]);
   expect(mutationRequest(plan.operations[1], records, "run")).toEqual({
     name: "memory_forget",
-    arguments: { ref: a, expected_revision: "c".repeat(64) },
+    arguments: {
+      ref: a,
+      expected_revision: "c".repeat(64),
+      evidence: [{ ref: a, revision: "c".repeat(64) }],
+    },
   });
   expect(() => validateDreamPlan({ operations: [forget, insert] }, records, [a])).toThrow(
     "replacement",
+  );
+});
+
+test("updates include unioned cited sources and reject source overflow before dispatch", () => {
+  const first = memoryRecordSchema.parse(record());
+  const second = memoryRecordSchema.parse({
+    ...record(b),
+    sources: [{ agent_id: "tl", session_id: "other", entry_id: "b" }],
+  });
+  const plan = validateDreamPlan(
+    { operations: [{ ...update, source_refs: [a, b] }] },
+    [first, second],
+    [a],
+  );
+  expect(mutationRequest(plan.operations[0], [first, second], "run").arguments).toMatchObject({
+    sources: [...first.sources, ...second.sources],
+    evidence: [first, second].map(({ ref, revision }) => ({ ref, revision })),
+  });
+  second.sources = Array.from({ length: 201 }, (_, i) => ({
+    agent_id: "pm",
+    session_id: "many",
+    entry_id: String(i),
+  }));
+  expect(() => mutationRequest(plan.operations[0], [first, second], "run")).toThrow(
+    "Too many source",
   );
 });
 

@@ -106,11 +106,12 @@ export function validateDreamPlan(input: unknown, records: MemoryRecord[], recen
 
 export function mutationRequest(operation: DreamOperation, records: MemoryRecord[], runId: string) {
   const evidence = records.filter((r) => operation.source_refs.includes(r.ref));
+  const guards = evidence.map(({ ref, revision }) => ({ ref, revision }));
+  const sources = [
+    ...new Map(evidence.flatMap((r) => r.sources).map((s) => [JSON.stringify(s), s])).values(),
+  ];
+  if (sources.length > 200) throw new Error("Too many source citations");
   if (operation.type === "insert") {
-    const sources = [
-      ...new Map(evidence.flatMap((r) => r.sources).map((s) => [JSON.stringify(s), s])).values(),
-    ];
-    if (sources.length > 200) throw new Error("Too many source citations");
     return {
       name: "memory_remember",
       arguments: {
@@ -118,17 +119,18 @@ export function mutationRequest(operation: DreamOperation, records: MemoryRecord
         kind: operation.kind,
         scope: evidence[0].scope,
         sources,
+        evidence: guards,
         idempotency_key: `dream:${runId}:${operation.id}`,
       },
     };
   }
   const target = records.find((r) => r.ref === operation.ref);
   if (!target) throw new Error("Unknown mutation target");
-  const args = { ref: target.ref, expected_revision: target.revision };
+  const args = { ref: target.ref, expected_revision: target.revision, evidence: guards };
   return operation.type === "update"
     ? {
         name: "memory_update",
-        arguments: { ...args, content: operation.content, reason: operation.reason },
+        arguments: { ...args, content: operation.content, reason: operation.reason, sources },
       }
     : { name: "memory_forget", arguments: args };
 }

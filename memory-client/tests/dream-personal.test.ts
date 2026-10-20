@@ -73,3 +73,52 @@ test("retains preexisting private understanding but cannot launder invalidated c
   ).toThrow("personal evidence");
   expect(() => validatePersonalProfile(input, [], "", undefined)).toThrow("personal evidence");
 });
+
+test.each(["\n", "\n\nUser-authored unrelated addition."])(
+  "keeps tracked evidence after unrelated edit %j",
+  (edit) => {
+    const previous = validatePersonalProfile({ sections }, [global], "", undefined);
+    for (const text of ["Prefers concise replies.", "concise replies"]) {
+      expect(() =>
+        validatePersonalProfile(
+          {
+            sections: {
+              ...sections,
+              enduringPreferencesAndConstraints: [{ text, source_refs: [] }],
+            },
+          },
+          [],
+          previous.content + edit,
+          previous,
+        ),
+      ).toThrow("personal evidence");
+    }
+  },
+);
+
+test("inherits whole user-authored additions without allowing arbitrary substrings", () => {
+  const previous = validatePersonalProfile({ sections }, [global], "", undefined);
+  const current = previous.content + "\nUser writes poetry.\n";
+  const input = {
+    sections: {
+      ...sections,
+      enduringPreferencesAndConstraints: [{ text: "User writes poetry.", source_refs: [] }],
+    },
+  };
+  expect(validatePersonalProfile(input, [], current, previous).content).toContain(
+    "User writes poetry.",
+  );
+  expect(() =>
+    validatePersonalProfile(
+      {
+        sections: {
+          ...sections,
+          enduringPreferencesAndConstraints: [{ text: "writes poetry", source_refs: [] }],
+        },
+      },
+      [],
+      current,
+      previous,
+    ),
+  ).toThrow("personal evidence");
+});

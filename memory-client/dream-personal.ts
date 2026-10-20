@@ -41,13 +41,18 @@ export function validatePersonalProfile(
 ): PersonalProfile {
   const { sections } = personalProfileSchema.parse(input);
   const globalRefs = new Set(records.filter((r) => r.scope.global).map((r) => r.ref));
-  const tracked = previous?.content === previousContent;
-  const prior = tracked ? Object.values(previous.sections).flat() : [];
+  // Editing unrelated bytes must never detach previously tracked understanding.
+  const prior = previous ? Object.values(previous.sections).flat() : [];
+  const normalized = (text: string) => text.replace(/\s+/g, " ").trim();
+  const blocks = previousContent.split(/\n\s*\n/).map(normalized);
   for (const statement of Object.values(sections).flat()) {
-    const old = prior.find((s) => s.text === statement.text);
-    const inherited = tracked
-      ? old?.source_refs.length === 0
-      : previousContent.includes(statement.text);
+    const text = normalized(statement.text);
+    const overlapsTracked = prior.some(
+      (s) =>
+        s.source_refs.length > 0 &&
+        (normalized(s.text).includes(text) || text.includes(normalized(s.text))),
+    );
+    const inherited = !overlapsTracked && blocks.includes(text);
     if (
       statement.source_refs.length
         ? statement.source_refs.some((r) => !globalRefs.has(r))
