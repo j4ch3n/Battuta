@@ -41,7 +41,7 @@ Run doctor before starting the server; it takes the same single-owner data lock.
 
 `bin/battuta install-services` writes three user units without enabling/restarting them. It refuses conflicting existing units before writing anything; move customized old units aside explicitly. Then enable `battuta-memory.service` with `systemctl --user`. PM/TL want the memory unit but do not require it: memory failure must not kill Telegram conversations. Use `journalctl --user -u battuta-memory` for diagnostics. Only one server owns the shared data directory; occupied ports are errors, not permission to connect to an unknown backend.
 
-Default endpoint: `http://127.0.0.1:8901/mcp`. Default data: `~/.battuta/memory-service/`. Bots must use the same `BATTUTA_MEMORY_URL`. Remote binding/authentication is deliberately unsupported. Source tmux launching adds one memory window; do not run it alongside a systemd server on the same data/port.
+Default endpoint: `http://127.0.0.1:8901/mcp`. Default data: `~/.battuta/memory/`. Bots must use the same `BATTUTA_MEMORY_URL`. Remote binding/authentication is deliberately unsupported. Source tmux launching adds one memory window; do not run it alongside a systemd server on the same data/port.
 
 ## Hardware acceptance
 

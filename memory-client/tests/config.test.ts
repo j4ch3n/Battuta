@@ -1,8 +1,22 @@
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, test } from "vitest";
-import { captureSettings } from "../config.ts";
+import { afterEach, expect, test, vi } from "vitest";
+import { captureSettings, clientConfig } from "../config.ts";
+
+afterEach(() => vi.unstubAllEnvs());
+
+test.each(["pm", "tl"])("%s capture queue defaults to shared memory directory", (role) => {
+  vi.stubEnv("AGENT_ROLE", role);
+  vi.stubEnv("BATTUTA_MEMORY_DATA_DIR", undefined);
+  expect(clientConfig().queue).toBe(join(homedir(), ".battuta/memory/capture-queue", role));
+});
+
+test("capture queue respects an explicit data directory", () => {
+  vi.stubEnv("AGENT_ROLE", "pm");
+  vi.stubEnv("BATTUTA_MEMORY_DATA_DIR", "/custom/memory");
+  expect(clientConfig().queue).toBe("/custom/memory/capture-queue/pm");
+});
 test("capture configuration validates new defaults and explicit disable", async () => {
   const dir = await mkdtemp(join(tmpdir(), "memory-config-test-"));
   try {

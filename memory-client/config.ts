@@ -29,7 +29,7 @@ export function clientConfig() {
     directory: process.env.PI_CODING_AGENT_DIR ?? join(process.cwd(), ".pi"),
     registry: process.env.BATTUTA_PROJECTS_ROOT ?? join(homedir(), ".battuta/projects"),
     queue: join(
-      process.env.BATTUTA_MEMORY_DATA_DIR ?? join(homedir(), ".battuta/memory-service"),
+      process.env.BATTUTA_MEMORY_DATA_DIR ?? join(homedir(), ".battuta/memory"),
       "capture-queue",
       role,
     ),

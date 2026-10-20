@@ -8,7 +8,7 @@ DIMENSION = 384
 
 @dataclass(frozen=True)
 class MemoryConfig:
-    data_dir: Path = field(default_factory=lambda: Path.home() / ".battuta/memory-service")
+    data_dir: Path = field(default_factory=lambda: Path.home() / ".battuta/memory")
     registry_root: Path = field(default_factory=lambda: Path.home() / ".battuta/projects")
     host: str = "127.0.0.1"
     port: int = 8901
@@ -28,7 +28,7 @@ class MemoryConfig:
     @classmethod
     def from_env(cls):
         return cls(
-            data_dir=Path(os.environ.get("BATTUTA_MEMORY_DATA_DIR", "~/.battuta/memory-service")).expanduser(),
+            data_dir=Path(os.environ.get("BATTUTA_MEMORY_DATA_DIR", "~/.battuta/memory")).expanduser(),
             registry_root=Path(os.environ.get("BATTUTA_PROJECTS_ROOT", "~/.battuta/projects")).expanduser(),
             host=os.environ.get("BATTUTA_MEMORY_HOST", "127.0.0.1"),
             port=int(os.environ.get("BATTUTA_MEMORY_PORT", "8901")),
