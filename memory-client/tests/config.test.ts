@@ -16,6 +16,7 @@ test("capture queue respects an explicit data directory", () => {
   vi.stubEnv("AGENT_ROLE", "pm");
   vi.stubEnv("BATTUTA_MEMORY_DATA_DIR", "/custom/memory");
   expect(clientConfig().queue).toBe("/custom/memory/capture-queue/pm");
+  expect(clientConfig().dataDirectory).toBe("/custom/memory");
 });
 test("capture configuration validates new defaults and explicit disable", async () => {
   const dir = await mkdtemp(join(tmpdir(), "memory-config-test-"));

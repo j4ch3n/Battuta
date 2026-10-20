@@ -8,11 +8,15 @@ const piModule = hostPiEntry
   ? pathToFileURL(await realpath(hostPiEntry)).href
   : import.meta.resolve("@earendil-works/pi-coding-agent");
 const { discoverAndLoadExtensions } = await import(piModule);
+const memory = join(directory, "shared-memory");
+await mkdir(memory, { recursive: true });
+process.env.BATTUTA_MEMORY_DATA_DIR = memory;
 for (const role of ["pm", "tl"]) {
   const agent = join(directory, role);
   await mkdir(agent, { recursive: true });
   const profile = "# Owner\nPrefers concise answers.\n";
-  await writeFile(join(agent, "ME.md"), profile);
+  await writeFile(join(memory, "ME.md"), profile);
+  await writeFile(join(agent, "ME.md"), "Legacy private profile must not be loaded or changed.\n");
   await writeFile(
     join(agent, "settings.json"),
     JSON.stringify({ battutaMemoryCapture: { enabled: false } }),
@@ -43,6 +47,10 @@ for (const role of ["pm", "tl"]) {
   }
   if (role === "pm") assert.ok(prompt?.includes(profile));
   else assert.equal(prompt, undefined);
-  assert.equal(await readFile(join(agent, "ME.md"), "utf8"), profile);
+  assert.equal(await readFile(join(memory, "ME.md"), "utf8"), profile);
+  assert.equal(
+    await readFile(join(agent, "ME.md"), "utf8"),
+    "Legacy private profile must not be loaded or changed.\n",
+  );
 }
 console.log("Pi loader read-only profile smoke passed");

@@ -71,7 +71,7 @@ export default function memoryClient(pi: ExtensionAPI) {
     });
     try {
       const config = clientConfig();
-      const profile = await profilePrompt(config.role, config.directory);
+      const profile = await profilePrompt(config.role, config.dataDirectory);
       if (profile) return { systemPrompt: `${event.systemPrompt}\n\n${profile}` };
     } catch {
       ctx.ui.notify("Owner profile unavailable; continuing without it", "warning");
