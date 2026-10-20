@@ -110,3 +110,35 @@ test.each([
 ])("rejects ambiguous ownership or invalid configuration %#", (store, settings) => {
   expect(() => reconcileDreamSchedule(store, settings, "/dream-extension.ts", now)).toThrow();
 });
+
+test.each(["model-only", "/model", "provider/", "provider/model with spaces"])(
+  "rejects an existing fuzzy or invalid model selector %s rather than replacing it",
+  (model) => {
+    expect(() =>
+      reconcileDreamSchedule(
+        { version: 1, jobs: [{ id: "battuta-memory-dream", model }] },
+        { defaultProvider: "p", defaultModel: "m" },
+        "/dream-extension.ts",
+        now,
+      ),
+    ).toThrow("explicit provider/model");
+  },
+);
+
+test("fresh setup without explicit defaults leaves all files untouched", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "dream-unconfigured-"));
+  try {
+    await mkdir(join(dir, ".pi"));
+    const settings = JSON.stringify({ customSetting: true });
+    await writeFile(join(dir, ".pi/settings.json"), settings);
+    await expect(
+      promisify(execFile)(process.execPath, ["configure-dream.mjs", dir]),
+    ).rejects.toThrow("defaultProvider/defaultModel");
+    expect(await readFile(join(dir, ".pi/settings.json"), "utf8")).toBe(settings);
+    await expect(readFile(join(dir, ".pi/schedule-prompts.json"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

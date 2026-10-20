@@ -32,6 +32,10 @@ export function reconcileDreamSchedule(
         ? `${settings.defaultProvider}/${settings.defaultModel}`
         : undefined;
   if (!model) throw new Error("Configure PM defaultProvider/defaultModel before dream setup");
+  if (!/^[^/\s]+\/[^\s]+$/.test(model))
+    throw new Error(
+      "Dream requires an explicit provider/model; fix the owned job while PM is stopped",
+    );
   const job: Record<string, unknown> = {
     createdAt: timestamp,
     runCount: 0,

@@ -24,11 +24,9 @@ test("uses the configured Pi model and records usage without a conversation turn
     },
   } as unknown as ExtensionContext;
   expect(
-    await dreamCompletion(ctx, (value) => usage.push(value))(
-      "Dream prompt",
-      "evidence",
-      new AbortController().signal,
-    ),
+    await dreamCompletion(ctx, (value) => {
+      usage.push(value);
+    })("Dream prompt", "evidence", new AbortController().signal),
   ).toBe("Reflection");
   expect(usage).toEqual([{ totalTokens: 10 }]);
 });

@@ -4,7 +4,7 @@ import type { DreamComplete } from "./dream-result.ts";
 
 export function dreamCompletion(
   ctx: ExtensionContext,
-  onUsage: (usage: unknown) => void = () => {},
+  onUsage: (usage: unknown) => void | Promise<void> = () => {},
 ): DreamComplete {
   const model = ctx.model;
   return async (systemPrompt, evidence, signal) => {
@@ -22,7 +22,7 @@ export function dreamCompletion(
       ),
       deadline,
     );
-    onUsage(response.usage);
+    await onUsage(response.usage);
     deadline.throwIfAborted();
     if (response.stopReason !== "stop") throw new Error("Dream model did not finish");
     return response.content.map((part) => (part.type === "text" ? part.text : "")).join("");
