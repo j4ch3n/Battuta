@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { expect, test } from "vitest";
 
-test("published scheduler persists and delivers global prompts across workspace/session changes", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "scheduler-contract-"));
+test("provisioned dream prompt survives process and release-directory changes", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "scheduler-wiring-"));
   try {
     const options = {
       timeout: 20000,
@@ -14,15 +14,15 @@ test("published scheduler persists and delivers global prompts across workspace/
     };
     await promisify(execFile)(
       process.execPath,
-      ["tests/scheduler-contract-worker.mjs", directory, "seed"],
+      ["tests/scheduler-wiring-worker.mjs", directory, "seed"],
       options,
     );
     const result = await promisify(execFile)(
       process.execPath,
-      ["tests/scheduler-contract-worker.mjs", directory, "resume"],
+      ["tests/scheduler-wiring-worker.mjs", directory, "resume"],
       options,
     );
-    expect(result.stdout).toContain("Upstream scheduler contract passed");
+    expect(result.stdout).toContain("Stable dream scheduler wiring passed");
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

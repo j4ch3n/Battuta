@@ -97,23 +97,27 @@ test("explicit offline setup writes stable model/job config idempotently and ref
     code: "ENOENT",
   });
 });
-test("invalid defaults leave scheduler and settings unchanged", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "dream-unconfigured-"));
-  dirs.push(dir);
-  const store = join(dir, "stable/jobs.json");
-  await initializeSchedulerStore(store);
-  await mkdir(join(dir, ".pi"));
-  await writeFile(join(dir, ".pi/settings.json"), "{}");
-  const before = await readFile(store, "utf8");
-  await expect(
-    promisify(execFile)(process.execPath, ["configure-dream.mjs", dir], {
-      env: {
-        ...process.env,
-        PI_SCHEDULER_STATE_FILE: store,
-        BATTUTA_MEMORY_DATA_DIR: join(dir, "memory"),
-      },
-    }),
-  ).rejects.toThrow();
-  expect(await readFile(store, "utf8")).toBe(before);
-  expect(await readFile(join(dir, ".pi/settings.json"), "utf8")).toBe("{}");
-});
+test.each([{}, { defaultProvider: "p", defaultModel: "model with spaces" }])(
+  "invalid defaults %j leave scheduler and settings unchanged",
+  async (settings) => {
+    const dir = await mkdtemp(join(tmpdir(), "dream-unconfigured-"));
+    dirs.push(dir);
+    const store = join(dir, "stable/jobs.json");
+    await initializeSchedulerStore(store);
+    await mkdir(join(dir, ".pi"));
+    const settingsText = JSON.stringify(settings);
+    await writeFile(join(dir, ".pi/settings.json"), settingsText);
+    const before = await readFile(store, "utf8");
+    await expect(
+      promisify(execFile)(process.execPath, ["configure-dream.mjs", dir], {
+        env: {
+          ...process.env,
+          PI_SCHEDULER_STATE_FILE: store,
+          BATTUTA_MEMORY_DATA_DIR: join(dir, "memory"),
+        },
+      }),
+    ).rejects.toThrow();
+    expect(await readFile(store, "utf8")).toBe(before);
+    expect(await readFile(join(dir, ".pi/settings.json"), "utf8")).toBe(settingsText);
+  },
+);

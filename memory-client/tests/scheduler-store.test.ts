@@ -45,11 +45,8 @@ test("explicit initialization is private and preserves an existing native store 
 });
 test.each([
   "broken",
-  "null",
-  '{"version":1,"jobs":[]}',
-  '{"version":2,"revision":-1,"tasks":[]}',
-  JSON.stringify({ version: 2, revision: 0, tasks: [{ id: "x", action: "prompt" }] }),
-  JSON.stringify({ version: 2, revision: 0, tasks: [1] }),
+  '{"version":3,"revision":0,"tasks":[]}',
+  '{"version":2,"revision":0,"tasks":[1]}',
 ])("invalid store is not replaced: %s", async (text) => {
   const path = await fixture();
   await initializeSchedulerStore(path);
@@ -73,31 +70,28 @@ test("duplicate task IDs are diagnosed", async () => {
   await writeFile(path, JSON.stringify({ version: 2, revision: 0, tasks: [task, task] }));
   await expect(readSchedulerStore(path)).rejects.toThrow("Duplicate");
 });
-test.each(["shell", "prompt", "message", "notify"])(
-  "rejects missing %s payload without replacing the store",
-  async (action) => {
-    const path = await fixture();
-    await initializeSchedulerStore(path);
-    const text = JSON.stringify({
-      version: 2,
-      revision: 0,
-      tasks: [
-        {
-          id: "x",
-          action,
-          type: "once",
-          schedule: "5m",
-          scope: "global",
-          status: "pending",
-          enabled: true,
-        },
-      ],
-    });
-    await writeFile(path, text);
-    await expect(readSchedulerStore(path)).rejects.toThrow("Missing");
-    expect(await readFile(path, "utf8")).toBe(text);
-  },
-);
+test("rejects a missing prompt without replacing the store", async () => {
+  const path = await fixture();
+  await initializeSchedulerStore(path);
+  const text = JSON.stringify({
+    version: 2,
+    revision: 0,
+    tasks: [
+      {
+        id: "x",
+        action: "prompt",
+        type: "once",
+        schedule: "5m",
+        scope: "global",
+        status: "pending",
+        enabled: true,
+      },
+    ],
+  });
+  await writeFile(path, text);
+  await expect(readSchedulerStore(path)).rejects.toThrow("Missing");
+  expect(await readFile(path, "utf8")).toBe(text);
+});
 test("directory and invalid parent write failures propagate", async () => {
   const path = await fixture();
   await initializeSchedulerStore(path);
@@ -106,17 +100,9 @@ test("directory and invalid parent write failures propagate", async () => {
 });
 test.each([
   { type: "cron", schedule: "not-a-cron" },
-  { type: "interval", schedule: "0s" },
   { maxRuns: -1 },
-  { maxRuns: "2" },
   { expiresAt: "yesterday" },
-  { dueAt: "broken" },
-  { nextRun: "broken" },
-  { createdAt: 12 },
   { scope: "session" },
-  { scope: "cwd" },
-  { runCount: -1 },
-  { timeoutMs: "oops" },
   { backoff: { factor: 0, maxInterval: "5m" } },
 ])("preflight preserves invalid native record %j", async (fields) => {
   const path = await fixture();

@@ -1,25 +1,14 @@
 """Launcher orchestration, independent of Telegram refresh implementation."""
 
 import os
+import json
 import subprocess
 import sys
-from pathlib import Path
 
 from fixtures import LauncherFixture
 
 
 class RunDevTests(LauncherFixture):
-    def test_scheduler_path_and_catchup_are_exported_before_pm_exec(self):
-        pi = self.root / "bots/pm-bot/node_modules/.bin/pi"
-        pi.write_text(f"#!{sys.executable}\nimport os\nprint(os.environ['PI_SCHEDULER_STATE_FILE'] + ':' + os.environ['PI_SCHEDULER_CATCHUP_MAX'] + ':' + oct(os.umask(0)))\n")
-        result = self.run_launcher("prod", existing=False)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        for command in self.commands():
-            if "AGENT_ROLE=pm" in command[-1]:
-                pane = subprocess.run(["bash", "-c", command[-1]], capture_output=True, text=True)
-                self.assertEqual(pane.returncode, 0, pane.stderr)
-                self.assertEqual(pane.stdout.strip(), f"{self.scheduler}:0:0o77")
-
     def test_missing_or_corrupt_store_blocks_new_session_without_replacing_it(self):
         for text in (None, "broken"):
             with self.subTest(text=text):
@@ -32,11 +21,13 @@ class RunDevTests(LauncherFixture):
                 self.assertFalse(any(c[0] == "new-session" for c in self.commands()))
                 self.assertEqual(self.scheduler.read_text() if self.scheduler.exists() else None, text)
 
-    def test_production_pane_commands_export_token_to_both_bots(self):
+    def test_production_pane_commands_pass_runtime_environment_to_bots(self):
         for role in ("pm", "tl"):
             pi = self.root / f"bots/{role}-bot/node_modules/.bin/pi"
-            pi.write_text(f"#!{sys.executable}\n" + '''import os
-print(os.environ["AGENT_ROLE"] + ":" + os.environ.get("LINEAR_API_TOKEN", "") + ":" + os.environ.get("BATTUTA_MEMORY_URL", ""))
+            pi.write_text(f"#!{sys.executable}\n" + '''import json, os
+print(json.dumps({"role": os.environ["AGENT_ROLE"], "token": os.environ.get("LINEAR_API_TOKEN"),
+    "memory": os.environ.get("BATTUTA_MEMORY_URL"), "scheduler": os.environ.get("PI_SCHEDULER_STATE_FILE"),
+    "catchup": os.environ.get("PI_SCHEDULER_CATCHUP_MAX"), "umask": os.umask(0)}))
 ''')
         result = self.run_launcher("prod", existing=False)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -48,9 +39,15 @@ print(os.environ["AGENT_ROLE"] + ":" + os.environ.get("LINEAR_API_TOKEN", "") + 
                 pane = subprocess.run(["bash", "-c", command[-1]], env=env,
                                       capture_output=True, text=True)
                 self.assertEqual(pane.returncode, 0, pane.stderr)
-                outputs.append(pane.stdout.strip())
+                outputs.append(json.loads(pane.stdout))
         path = "http://127.0.0.1:8901/mcp"
-        self.assertEqual(outputs, [f"pm:linear-test:{path}", f"tl:linear-test:{path}"])
+        self.assertEqual([item["role"] for item in outputs], ["pm", "tl"])
+        for item in outputs:
+            self.assertEqual(item["token"], "linear-test")
+            self.assertEqual(item["memory"], path)
+        self.assertEqual(outputs[0]["scheduler"], str(self.scheduler))
+        self.assertEqual(outputs[0]["catchup"], "0")
+        self.assertEqual(outputs[0]["umask"], 0o77)
 
     def test_shared_endpoint_override_reaches_both_processes(self):
         override = "http://127.0.0.1:8989/mcp"

@@ -108,6 +108,8 @@ jobs:
         with:
           version: "0.11.19"
           enable-cache: true
+      - name: Install scheduler setup/launcher runtime dependencies
+        run: pnpm --dir memory-client install --frozen-lockfile --prod
       - run: pnpm check:support
 
   quality:

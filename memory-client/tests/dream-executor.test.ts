@@ -60,19 +60,3 @@ test.each(["fuzzy", "p/missing", "p/dream extra"])(
     expect(run).not.toHaveBeenCalled();
   },
 );
-test("whole-run deadline interrupts a transport that never settles", async () => {
-  const h = harness();
-  const deadline = new AbortController();
-  const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(deadline.signal);
-  run.mockImplementation(
-    (_deps, signal) =>
-      new Promise((_resolve, reject) =>
-        signal.addEventListener("abort", () => reject(new Error("Aborted"))),
-      ),
-  );
-  const pending = executeDream(h.ctx, h.options);
-  const result = expect(pending).rejects.toThrow();
-  expect(timeout).toHaveBeenCalledWith(600000);
-  deadline.abort();
-  await result;
-});

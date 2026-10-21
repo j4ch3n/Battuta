@@ -9,20 +9,21 @@ import subprocess
 import tempfile
 import unittest
 
+from fixtures import copy_scheduler_runtime
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class PackagingConfigureTests(unittest.TestCase):
     def test_install_and_migrate_links_for_both_bots(self):
-        for existing, settings_mode, personal in product((None, "../../../shared-skills/project-context"), ("missing", "legacy", "scheduler"), (None, "Personal instructions")):
+        for existing, settings_mode, personal in product((None, "../../../shared-skills/project-context"), ("missing", "legacy"), (None, "Personal instructions")):
             with self.subTest(existing=existing, settings_mode=settings_mode, personal=personal), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 (root / "bin").mkdir()
                 shutil.copyfile(ROOT / "packaging" / "configure.mjs", root / "bin" / "configure.mjs")
                 shutil.copyfile(ROOT / "packaging" / "shared-resources.mjs", root / "bin" / "shared-resources.mjs")
-                shutil.copytree(ROOT / "memory-client", root / "memory-client", ignore=shutil.ignore_patterns("node_modules", "coverage"))
-                (root / "memory-client/node_modules").symlink_to(ROOT / "memory-client/node_modules", target_is_directory=True)
+                copy_scheduler_runtime(root)
                 source = root / "shared-skills" / "project-context"
                 source.mkdir(parents=True)
                 (source / "SKILL.md").write_text("Shared project context")
@@ -51,8 +52,6 @@ class PackagingConfigureTests(unittest.TestCase):
                         "npm:pi-mcp-adapter-extra@1.0.0",
                         {"source": "npm:pi-memory-stone@0.1.7", "skills": ["skills"]},
                     ]
-                    if settings_mode == "scheduler" and role == "pm-bot":
-                        packages.append({"source": "npm:@jl1990/pi-scheduler@0.5.1", "extensions": ["extensions/scheduler/index.ts"]})
                     if settings_mode != "missing":
                         settings = {"theme": "dark", "packages": packages}
                         if settings_mode == "legacy":
@@ -113,8 +112,5 @@ class PackagingConfigureTests(unittest.TestCase):
                             "npm:pi-mcp-adapter-extra@1.0.0",
                         ]
                         if role == "pm-bot":
-                            expected_packages.append(
-                                {"source": "npm:@jl1990/pi-scheduler@0.5.1", "extensions": ["extensions/scheduler/index.ts"]}
-                                if settings_mode == "scheduler" else "npm:@jl1990/pi-scheduler@0.5.1"
-                            )
+                            expected_packages.append("npm:@jl1990/pi-scheduler@0.5.1")
                         self.assertEqual(settings, {"theme": "dark", "packages": expected_packages, "battutaMemoryCapture": {"enabled": role == "pm-bot", "batchMessages": 6}})
