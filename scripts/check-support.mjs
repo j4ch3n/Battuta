@@ -29,6 +29,19 @@ run("uv", [
 ]);
 
 const sharedSkills = resolve(root, "shared-skills");
+run("uv", [
+  "run",
+  "--project",
+  "artifact-service",
+  "--locked",
+  "python",
+  "-m",
+  "unittest",
+  "discover",
+  "-s",
+  "artifact-service/tests",
+  "-v",
+]);
 for (const cli of readdirSync(sharedSkills, { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && entry.name.endsWith("-cli"))
   .sort((left, right) => left.name.localeCompare(right.name))) {

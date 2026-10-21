@@ -1,0 +1,28 @@
+[project]
+name = "battuta-artifacts"
+version = "0.1.0"
+description = "Allowlisted local artifact catalog and HTTP service"
+requires-python = ">=3.12"
+dependencies = [
+    "aiosqlite>=0.21,<1",
+    "alembic>=1.16,<2",
+    "click>=8.1,<9",
+    "fastapi>=0.115,<1",
+    "Jinja2>=3.1,<4",
+    "markdown-it-py>=4,<5",
+    "sse-starlette>=3,<4",
+    "uvicorn>=0.35,<1",
+]
+
+[dependency-groups]
+dev = ["httpx>=0.28,<1"]
+
+[project.scripts]
+battuta-artifact = "battuta_artifacts.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/battuta_artifacts"]
