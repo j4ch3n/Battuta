@@ -50,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots shared-skills agent-mail project-spec memory-client memory-service scripts/setup-memory.sh .env.example RELEASE.md docs/gogcli-setup.md docs/memory-service.md docs/memory-service-setup.md | tar -x -C dist/stage/battuta
+          git archive HEAD bots shared-skills agent-mail project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/gogcli-setup.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md | tar -x -C dist/stage/battuta
           test -s dist/stage/battuta/RELEASE.md
           test -s dist/stage/battuta/docs/gogcli-setup.md
           test -s dist/stage/battuta/bots/pm-bot/.pi/skills/memory/references/tools.md
@@ -65,6 +65,11 @@ jobs:
           uv build "$memory_dir" --wheel --out-dir "$memory_dir/wheels"
           python3 -m pip download --require-hashes --no-deps --only-binary=:all: --dest "$memory_dir/wheels" -r "$memory_dir/requirements.txt"
           (cd "$memory_dir/wheels" && sha256sum *.whl > SHA256SUMS)
+          artifact_dir="$PWD/dist/stage/battuta/artifact-service"
+          uv export --project "$artifact_dir" --locked --no-dev --no-emit-project --format requirements-txt --output-file "$artifact_dir/requirements.txt"
+          uv build "$artifact_dir" --wheel --out-dir "$artifact_dir/wheels"
+          python3 -m pip download --require-hashes --no-deps --only-binary=:all: --dest "$artifact_dir/wheels" -r "$artifact_dir/requirements.txt"
+          (cd "$artifact_dir/wheels" && sha256sum *.whl > SHA256SUMS)
           cp "$(command -v node)" dist/stage/battuta/bin/node
           cp packaging/battuta dist/stage/battuta/bin/battuta
           cp packaging/configure.mjs dist/stage/battuta/bin/configure.mjs
@@ -143,6 +148,12 @@ jobs:
           uv venv --python 3.12 "$RUNNER_TEMP/memory-smoke"
           uv pip install --python "$RUNNER_TEMP/memory-smoke/bin/python" --offline --no-index --find-links "$memory_dir/wheels" battuta-memory
           "$RUNNER_TEMP/memory-smoke/bin/battuta-memory" --help
+          uv venv --python 3.12 "$RUNNER_TEMP/artifact-smoke"
+          uv pip install --python "$RUNNER_TEMP/artifact-smoke/bin/python" --offline --no-index --find-links "$artifact_dir/wheels" battuta-artifacts
+          "$RUNNER_TEMP/artifact-smoke/bin/battuta-artifact" --help
+          BATTUTA_ARTIFACT_DB="$RUNNER_TEMP/artifact-smoke/registry.sqlite3" "$RUNNER_TEMP/artifact-smoke/bin/battuta-artifact" setup
+          BATTUTA_ARTIFACT_DB="$RUNNER_TEMP/artifact-smoke/registry.sqlite3" "$RUNNER_TEMP/artifact-smoke/bin/battuta-artifact" list --json
+          "$RUNNER_TEMP/artifact-smoke/bin/python" -c 'from importlib.resources import files; p = files("battuta_artifacts"); assert (p / "assets/catalog.js").is_file(); assert (p / "templates/index.html").is_file()'
           rm -rf "$memory_smoke_home"
           test -x dist/stage/battuta/bots/pm-bot/node_modules/.bin/pi
           test -x dist/stage/battuta/bots/tl-bot/node_modules/.bin/pi
@@ -154,7 +165,7 @@ jobs:
           test ! -e dist/stage/battuta/bots/tl-bot/.pi/auth.json
           test ! -e dist/stage/battuta/bots/pm-bot/.pi/telegram.json
           test ! -e dist/stage/battuta/bots/tl-bot/.pi/telegram.json
-          tar -C dist/stage --exclude='battuta/memory-service/.venv' -czf "dist/battuta-$TAG-linux-arm64.tar.gz" battuta
+          tar -C dist/stage --exclude='battuta/memory-service/.venv' --exclude='battuta/artifact-service/.venv' -czf "dist/battuta-$TAG-linux-arm64.tar.gz" battuta
           (cd dist && sha256sum "battuta-$TAG-linux-arm64.tar.gz" > "battuta-$TAG-linux-arm64.tar.gz.sha256")
 
       - name: Publish GitHub Release

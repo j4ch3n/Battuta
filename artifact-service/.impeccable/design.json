@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "title": "Design System: Artifact index",
+  "extensions": {
+    "motion": [
+      {
+        "name": "title-underline",
+        "value": "text-decoration-color 160ms ease-out",
+        "purpose": "Rust title feedback; disabled with reduced motion."
+      }
+    ],
+    "breakpoints": [{ "name": "narrow-max", "value": "45rem" }]
+  },
+  "components": [],
+  "narrative": {
+    "northStar": "Sienna working library",
+    "overview": "Small hero, warm paper, Newsreader content, Inter metadata and a continuous date timeline. Local to the artifact index.",
+    "keyCharacteristics": [
+      "Compact hero without navigation, images or avatars.",
+      "Desktop date rail becomes dates above content on mobile.",
+      "Quiet © 2026 Fiscum Technology footer."
+    ],
+    "rules": [],
+    "dos": ["Preserve live updates, native links and meaningful keyboard focus."],
+    "donts": ["No cards, format grouping, external font requests or project-wide branding changes."]
+  }
+}

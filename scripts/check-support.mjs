@@ -9,7 +9,7 @@ function run(command, args) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 run("bash", ["-n", "packaging/battuta", "bots/pm-bot/scripts/run-dev.sh"]);
-run("bash", ["-n", "scripts/setup-memory.sh"]);
+run("bash", ["-n", "scripts/setup-memory.sh", "scripts/setup-artifacts.sh"]);
 run("node", ["--check", "packaging/configure.mjs"]);
 run("node", ["--check", "packaging/shared-resources.mjs"]);
 run("node", ["--check", "packaging/install-services.mjs"]);
@@ -29,6 +29,19 @@ run("uv", [
 ]);
 
 const sharedSkills = resolve(root, "shared-skills");
+run("uv", [
+  "run",
+  "--project",
+  "artifact-service",
+  "--locked",
+  "python",
+  "-m",
+  "unittest",
+  "discover",
+  "-s",
+  "artifact-service/tests",
+  "-v",
+]);
 for (const cli of readdirSync(sharedSkills, { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && entry.name.endsWith("-cli"))
   .sort((left, right) => left.name.localeCompare(right.name))) {
