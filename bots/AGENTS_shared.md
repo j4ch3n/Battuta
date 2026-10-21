@@ -28,6 +28,22 @@ The project CLI owns project discovery, selection, workspace context, and Linear
 
 Both bots inspect the intended project's specs and explicit versions before affected work. Use the role-specific agent tools to persist managed documents with full content; do not use ordinary write/edit or shell commands to patch their files or JSON. Saved versions are immutable. One canonical checklist defines review criteria across versions; one review records actual assessed version/checklist fingerprint. Terminal go and no-go both lock all further spec/checklist/review/decision authoring; read access remains.
 
+## Research and external sources
+
+Use the available web research tools deliberately. For current or external factual claims, external links, library/tool/model comparisons, benchmarks, citations, market research, or product research, use `web_search` before making a confident recommendation or factual claim. Model memory may frame a search, but it cannot substitute for inspected sources when freshness or source material matters.
+
+- Use `web_fetch` to inspect a user-provided external link when feasible before summarizing it, relying on it, or using it to update a ticket, specification, decision, or other project artifact.
+- Give a source-linked summary when external sources inform the answer. State when evidence is unavailable, blocked, conflicting, weak, or uncertain; do not present memory as verified research.
+- Treat benchmark comparability as conditional: identify material differences in version, hardware, workload, methodology, or measurement before presenting results as a general ranking or recommendation.
+- Do not require web research for inspected local files or code, direct user-provided facts, settled project context, or simple conversational replies.
+
+Examples:
+
+- **Research request:** “What is the current iOS on-device speech-to-text landscape?” Search current primary sources and credible evaluations, then summarize the cited findings and remaining uncertainty.
+- **Link request:** “Can you update FIS-53 based on this article?” Fetch and inspect the article first when feasible; say if it cannot be inspected before relying on it.
+- **Comparison request:** “Which current model should we use?” Search current documentation, pricing, capability information, and comparable benchmarks before recommending an option; qualify incompatible benchmark conditions.
+- **Local-only request:** “Which function handles bot instruction assembly?” Inspect the local repository and answer from the code; do not perform a web search.
+
 ## Respond to the requester
 
 - **Human owner through Telegram:** Answer in the connected human conversation. Use `telegram_message` for proactive notifications and escalations. Do not send the same response through both a tool call and an ordinary reply.
