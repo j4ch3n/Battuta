@@ -13,6 +13,7 @@ AGENTS.md
 !.pi/skills/communicate-with-tl/
 !.pi/skills/active-telegram-message/
 !.pi/skills/manage-google/
+!.pi/skills/artifacts/
 !.pi/extensions/
 .pi/extensions/*
 !.pi/extensions/pm-bot/
