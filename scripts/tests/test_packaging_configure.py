@@ -21,6 +21,8 @@ class PackagingConfigureTests(unittest.TestCase):
                 (root / "bin").mkdir()
                 shutil.copyfile(ROOT / "packaging" / "configure.mjs", root / "bin" / "configure.mjs")
                 shutil.copyfile(ROOT / "packaging" / "shared-resources.mjs", root / "bin" / "shared-resources.mjs")
+                shutil.copytree(ROOT / "memory-client", root / "memory-client", ignore=shutil.ignore_patterns("node_modules", "coverage"))
+                (root / "memory-client/node_modules").symlink_to(ROOT / "memory-client/node_modules", target_is_directory=True)
                 source = root / "shared-skills" / "project-context"
                 source.mkdir(parents=True)
                 (source / "SKILL.md").write_text("Shared project context")
@@ -50,7 +52,7 @@ class PackagingConfigureTests(unittest.TestCase):
                         {"source": "npm:pi-memory-stone@0.1.7", "skills": ["skills"]},
                     ]
                     if settings_mode == "scheduler" and role == "pm-bot":
-                        packages.append({"source": "npm:pi-schedule-prompt@0.4.1", "extensions": ["src/index.ts"]})
+                        packages.append({"source": "npm:@jl1990/pi-scheduler@0.5.1", "extensions": ["extensions/scheduler/index.ts"]})
                     if settings_mode != "missing":
                         settings = {"theme": "dark", "packages": packages}
                         if settings_mode == "legacy":
@@ -60,6 +62,7 @@ class PackagingConfigureTests(unittest.TestCase):
                         (skills / "project-context").symlink_to(existing, target_is_directory=True)
                 env = {
                     **os.environ,
+                    "PI_SCHEDULER_STATE_FILE": str(root / "stable/schedule-prompts.json"),
                     "TELEGRAM_ALLOWED_USER_ID": "123",
                     "LINEAR_API_TOKEN": "test-linear",
                     "SUPABASE_URL": "https://example.com",
@@ -73,6 +76,7 @@ class PackagingConfigureTests(unittest.TestCase):
                         env=env, capture_output=True, text=True,
                     )
                     self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(json.loads((root / "stable/schedule-prompts.json").read_text()), {"version": 2, "revision": 0, "tasks": []})
                     for role in ("pm-bot", "tl-bot"):
                         link = root / "bots" / role / ".pi" / "skills" / "project-context"
                         self.assertEqual((link / "SKILL.md").read_text(), "Shared project context")
@@ -98,7 +102,7 @@ class PackagingConfigureTests(unittest.TestCase):
                         if settings_mode == "missing":
                             expected = {"battutaMemoryCapture": {"enabled": role == "pm-bot", "batchMessages": 6}}
                             if role == "pm-bot":
-                                expected["packages"] = ["npm:pi-schedule-prompt@0.4.1"]
+                                expected["packages"] = ["npm:@jl1990/pi-scheduler@0.5.1"]
                             self.assertEqual(json.loads(settings_path.read_text()), expected)
                             self.assertEqual(settings_path.stat().st_mode & 0o777, 0o600)
                             continue
@@ -110,7 +114,7 @@ class PackagingConfigureTests(unittest.TestCase):
                         ]
                         if role == "pm-bot":
                             expected_packages.append(
-                                {"source": "npm:pi-schedule-prompt@0.4.1", "extensions": ["src/index.ts"]}
-                                if settings_mode == "scheduler" else "npm:pi-schedule-prompt@0.4.1"
+                                {"source": "npm:@jl1990/pi-scheduler@0.5.1", "extensions": ["extensions/scheduler/index.ts"]}
+                                if settings_mode == "scheduler" else "npm:@jl1990/pi-scheduler@0.5.1"
                             )
                         self.assertEqual(settings, {"theme": "dark", "packages": expected_packages, "battutaMemoryCapture": {"enabled": role == "pm-bot", "batchMessages": 6}})

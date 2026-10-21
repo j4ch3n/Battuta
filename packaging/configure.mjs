@@ -2,12 +2,14 @@ import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { configureSharedResources } from "./shared-resources.mjs";
+import { schedulerStorePath, schedulerCatchUpMax } from "../memory-client/scheduler-config.ts";
+import { initializeSchedulerStore } from "../memory-client/scheduler-store.ts";
 
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 // In source this is the repository root; in a release it is the archive root.
 const PACKAGE_ROOT = resolve(SCRIPT_DIRECTORY, "..");
 const BOTS_DIRECTORY = join(PACKAGE_ROOT, "bots");
-const SCHEDULE_PACKAGE = "npm:pi-schedule-prompt@0.4.1";
+const SCHEDULE_PACKAGE = "npm:@jl1990/pi-scheduler@0.5.1";
 const BOT_CONFIGURATIONS = [
   {
     name: "PM",
@@ -49,6 +51,9 @@ if (
 )
   throw new Error("BATTUTA_MEMORY_URL must use loopback HTTP");
 
+// Explicit configuration may create a missing store; launch only validates it.
+schedulerCatchUpMax();
+await initializeSchedulerStore(schedulerStorePath());
 for (const bot of BOT_CONFIGURATIONS) {
   await configureSharedResources(PACKAGE_ROOT, bot.directory);
 
@@ -100,7 +105,7 @@ for (const bot of BOT_CONFIGURATIONS) {
   if (!Array.isArray(packages)) throw new Error(`Expected packages array in ${bot.settingsPath}`);
   const packageName = (entry) => {
     const source = typeof entry === "string" ? entry : entry?.source;
-    return typeof source === "string" ? source.split("@", 1)[0] : undefined;
+    return typeof source === "string" ? source.replace(/@[^@/]+$/, "") : undefined;
   };
   const retained = packages.filter(
     (entry) => !["npm:pi-mcp-adapter", "npm:pi-memory-stone"].includes(packageName(entry)),

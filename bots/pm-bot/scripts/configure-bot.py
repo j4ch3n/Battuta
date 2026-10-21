@@ -3,6 +3,8 @@
 import sys
 from pathlib import Path
 import re
+import os
+import subprocess
 
 import click
 
@@ -37,6 +39,10 @@ def main(bot_dir: Path, env_file: Path, env_prefix: str, telegram_package: str) 
     configure_telegram(bot_dir, env_file, env_prefix, values)
     configure_mcp(bot_dir, env_file, values)
     configure_memory_settings(bot_dir, role="pm")
+    subprocess.run(
+        ["node", str(ROOT / "memory-client/configure-scheduler.mjs"), "--initialize"],
+        check=True, env={**os.environ, **values},
+    )
     install_packages(bot_dir, telegram_package, extra_packages=(SCHEDULE_PACKAGE,))
     warn_running_session(bot_dir)
 

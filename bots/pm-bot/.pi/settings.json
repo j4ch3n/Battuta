@@ -2,7 +2,7 @@
   "packages": [
     "npm:@llblab/pi-telegram@0.57.3",
     "npm:pi-web-access@0.43.0",
-    "npm:pi-schedule-prompt@0.4.1"
+    "npm:@jl1990/pi-scheduler@0.5.1"
   ],
   "lastChangelogVersion": "1.0.0",
   "theme": "dark",
