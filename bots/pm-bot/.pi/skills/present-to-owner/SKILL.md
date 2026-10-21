@@ -9,20 +9,18 @@ metadata:
 
 # Present to owner
 
-Choose one primary format after identifying the reader's takeaway, the evidence that supports it, and why a format improves understanding. PM's standing communication guidance applies to all visible wording and takes precedence over conflicting prose defaults below.
+Identify the reader's takeaway and what would make it easier to understand. PM's standing communication guidance applies to all visible wording and takes precedence over conflicting prose defaults below.
 
-- Use plain text for a direct answer, compact update, or question.
-- Read [Visual Explainer](references/visual-explainer/SKILL.md) for a substantial reading-first HTML explanation, report, comparison, or interactive figure.
-- Read [live-panel](references/live-panel/SKILL.md) for a complete animated workflow or system whose continuous flow improves understanding. Do not use it merely as decoration.
-- Read [Frontend Slides](references/frontend-slides/SKILL.md) for an explicitly requested or clearly speaker-led slide presentation.
+| Reader need                                                                                        | Primary format                 | Load                                                     |
+| -------------------------------------------------------------------------------------------------- | ------------------------------ | -------------------------------------------------------- |
+| A direct answer, compact status, or question                                                       | Plain text                     | No presentation reference                                |
+| A reader will work through evidence, a report, comparison, or interactive figure at their own pace | Reading-first HTML explanation | [Visual Explainer](references/visual-explainer/SKILL.md) |
+| Understanding depends on seeing a complete workflow or system's ongoing state and flow             | Animated system/workflow panel | [live-panel](references/live-panel/SKILL.md)             |
+| A presenter will guide the audience through a sequence, or the owner explicitly asks for slides    | Speaker-led deck               | [Frontend Slides](references/frontend-slides/SKILL.md)   |
 
-Honor an explicit requested format unless it is materially unavailable or unsuitable; explain the reason rather than silently substituting. Load only the selected format. Keep conclusions, warnings, and evidence limits understandable without animation. Label simulated activity or figures; animation is not telemetry.
+Choose one primary format and load only its reference. Honor an explicit viable format request; otherwise prefer the least complex format that makes the point clear. Do not use a visual format or animation as decoration. Keep conclusions, warnings, evidence limits, and simulated figures understandable without animation.
 
 Each selected package retains its upstream relative layout under `references/`; use its local files rather than an upstream checkout. These packages are presentation support, not independently activated skills.
-
-## Delivery
-
-When the selected output is HTML intended for the owner, use the `artifacts` skill to register its entry and explicit required assets, then return the resulting URL. Preserve the essential conclusion and decision in Telegram; the page holds supporting detail. Do not serve a draft-only artifact or unclear sharing scope without confirmation. Registration alone does not prove browser availability.
 
 ## Telegram
 
