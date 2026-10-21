@@ -9,6 +9,29 @@ from fixtures import LauncherFixture
 
 
 class RunDevTests(LauncherFixture):
+    def test_scheduler_path_and_catchup_are_exported_before_pm_exec(self):
+        pi = self.root / "bots/pm-bot/node_modules/.bin/pi"
+        pi.write_text(f"#!{sys.executable}\nimport os\nprint(os.environ['PI_SCHEDULER_STATE_FILE'] + ':' + os.environ['PI_SCHEDULER_CATCHUP_MAX'])\n")
+        result = self.run_launcher("prod", existing=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for command in self.commands():
+            if "AGENT_ROLE=pm" in command[-1]:
+                pane = subprocess.run(["bash", "-c", command[-1]], capture_output=True, text=True)
+                self.assertEqual(pane.returncode, 0, pane.stderr)
+                self.assertEqual(pane.stdout.strip(), f"{self.scheduler}:0")
+
+    def test_missing_or_corrupt_store_blocks_new_session_without_replacing_it(self):
+        for text in (None, "broken"):
+            with self.subTest(text=text):
+                if text is None:
+                    self.scheduler.unlink()
+                else:
+                    self.scheduler.write_text(text)
+                result = self.run_launcher("prod", existing=False)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(any(c[0] == "new-session" for c in self.commands()))
+                self.assertEqual(self.scheduler.read_text() if self.scheduler.exists() else None, text)
+
     def test_production_pane_commands_export_token_to_both_bots(self):
         for role in ("pm", "tl"):
             pi = self.root / f"bots/{role}-bot/node_modules/.bin/pi"

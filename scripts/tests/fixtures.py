@@ -79,7 +79,14 @@ class LauncherFixture(ConfigFixture):
             (bot / ".pi/mcp.json").write_text("{}")
         (self.root / "agent-mail/node_modules").mkdir(parents=True)
         (self.root / "project-spec/node_modules").mkdir(parents=True)
-        (self.root / "memory-client/node_modules").mkdir(parents=True)
+        shutil.copytree(ROOT / "memory-client", self.root / "memory-client", ignore=shutil.ignore_patterns("node_modules", "coverage"))
+        (self.root / "memory-client/node_modules").symlink_to(ROOT / "memory-client/node_modules", target_is_directory=True)
+        self.scheduler = self.root / "stable schedules/schedule-prompts.json"
+        self.scheduler.parent.mkdir()
+        self.scheduler.write_text('{"version":2,"revision":0,"tasks":[]}')
+        for name in (".env", ".env.prod"):
+            with (self.root / name).open("a") as output:
+                output.write(f'PI_SCHEDULER_STATE_FILE="{self.scheduler}"\n')
         (self.root / "supabase").mkdir()
         (self.root / "supabase/.env").touch()
         self.executable("tmux", '''import json, os, sys

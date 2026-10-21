@@ -65,6 +65,13 @@ case "${1:-}" in
     done
     export AGENT_ROLE="$role" PI_CODING_AGENT_DIR="$bot_dir/.pi"
     export BATTUTA_MEMORY_URL="${BATTUTA_MEMORY_URL:-http://127.0.0.1:8901/mcp}"
+    if [[ "$role" == pm ]]; then
+      export PI_SCHEDULER_STATE_FILE
+      PI_SCHEDULER_STATE_FILE="$("$root/bin/node" "$root/memory-client/configure-scheduler.mjs" --print-path)"
+      export PI_SCHEDULER_CATCHUP_MAX
+      PI_SCHEDULER_CATCHUP_MAX="$("$root/bin/node" "$root/memory-client/configure-scheduler.mjs" --print-catchup)"
+      "$root/bin/node" "$root/memory-client/configure-scheduler.mjs" --check
+    fi
     cd "$bot_dir"
     exec "$bot_dir/node_modules/.bin/pi" --approve --continue --session-dir "$bot_dir/.pi/mail-sessions" --extension "$root/agent-mail/index.ts" --extension "$root/project-spec/index.ts" --extension "$root/memory-client/index.ts"
     ;;

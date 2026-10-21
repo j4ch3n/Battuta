@@ -64,6 +64,8 @@ name, version = source.rsplit("@", 1)
 package = pathlib.Path.cwd() / ".pi/npm/node_modules" / name
 (package / "src").mkdir(parents=True, exist_ok=True)
 (package / "src/index.ts").write_text("Extension boundary stub")
+(package / "extensions/scheduler").mkdir(parents=True, exist_ok=True)
+(package / "extensions/scheduler/index.ts").write_text("Extension boundary stub")
 ''')
         for role in ("pm-bot", "tl-bot"):
             shutil.copy2(self.bin / "pi", stage / role / "node_modules/.bin/pi")
@@ -76,6 +78,6 @@ package = pathlib.Path.cwd() / ".pi/npm/node_modules" / name
         for role in ("pm-bot", "tl-bot"):
             packages = stage / role / ".pi/npm/node_modules"
             self.assertTrue((packages / "@llblab/pi-telegram/src/index.ts").is_file())
-            self.assertEqual((packages / "pi-schedule-prompt/src/index.ts").is_file(), role == "pm-bot")
+            self.assertEqual((packages / "@jl1990/pi-scheduler/extensions/scheduler/index.ts").is_file(), role == "pm-bot")
             self.assertFalse((packages / "pi-memory-stone/src/index.ts").exists())
         self.assertFalse((self.root / ".pi/npm").exists())
