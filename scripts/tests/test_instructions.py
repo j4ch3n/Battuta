@@ -2,6 +2,7 @@
 
 from itertools import product
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import unittest
@@ -11,6 +12,34 @@ from bot_setup.instructions import configure_instructions  # noqa: E402
 
 
 class InstructionTests(unittest.TestCase):
+    def test_shared_research_policy_is_assembled_for_both_bots(self):
+        root = Path(__file__).resolve().parents[2]
+        required_guidance = (
+            "web_search",
+            "web_fetch",
+            "current or external factual claims",
+            "user-provided external link",
+            "source-linked summary",
+            "benchmark comparability",
+            "inspected local files or code",
+            "Research request:",
+            "Link request:",
+            "Comparison request:",
+            "Local-only request:",
+        )
+
+        for role in ("pm", "tl"):
+            with self.subTest(role=role), tempfile.TemporaryDirectory() as directory:
+                bot = Path(directory) / f"{role}-bot"
+                bot.mkdir()
+                shutil.copyfile(root / "bots" / f"{role}-bot" / "AGENTS_dedicated.md", bot / "AGENTS_dedicated.md")
+
+                configure_instructions(bot, role=role, root=root)
+
+                instructions = (bot / "AGENTS.md").read_text()
+                for guidance in required_guidance:
+                    self.assertIn(guidance, instructions)
+
     def test_explicit_role_installs_into_custom_bot_directory(self):
         for role in ("pm", "tl"):
             with self.subTest(role=role), tempfile.TemporaryDirectory() as directory:

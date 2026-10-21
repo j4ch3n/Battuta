@@ -30,7 +30,6 @@ coverage/
 .reports/
 
 # Local Superpowers artifacts
-/docs/superpowers/
 /.superpowers/
 
 # Local memory-service exploration (upstream source, data, and tooling)
