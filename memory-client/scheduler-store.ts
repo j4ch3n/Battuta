@@ -1,6 +1,16 @@
 import { lstat, mkdir, open, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { createRequire } from "node:module";
 import { z } from "zod";
+
+// Reuse the pinned upstream parser instead of maintaining another scheduling grammar.
+const native = createRequire(import.meta.url)(
+  "@jl1990/pi-scheduler/extensions/scheduler/scheduler-core.cjs",
+) as {
+  validateTaskSchedule: (type: string, schedule: string, now: Date) => { intervalMs?: number };
+  normalizeBackoff: (value: unknown, intervalMs: number | undefined, now: Date) => unknown;
+};
+const timestamp = z.string().datetime({ offset: true });
 
 const taskSchema = z
   .object({
@@ -11,6 +21,26 @@ const taskSchema = z
     scope: z.enum(["session", "cwd", "global"]),
     status: z.enum(["pending", "running", "fired", "cancelled", "failed", "expired"]),
     enabled: z.boolean(),
+    cwd: z.string().min(1).optional(),
+    sessionFile: z.string().min(1).optional(),
+    createdAt: timestamp.optional(),
+    dueAt: timestamp.optional(),
+    nextRun: timestamp.optional(),
+    expiresAt: timestamp.optional(),
+    startedAt: timestamp.optional(),
+    lastRun: timestamp.optional(),
+    completedAt: timestamp.optional(),
+    cancelledAt: timestamp.optional(),
+    disabledAt: timestamp.optional(),
+    expiredAt: timestamp.optional(),
+    maxRuns: z.number().int().positive().optional(),
+    runCount: z.number().int().nonnegative().optional(),
+    intervalMs: z.number().int().positive().optional(),
+    timeoutMs: z.number().int().positive().optional(),
+    wakeOn: z.enum(["always", "failure", "success", "never", "change"]).optional(),
+    stopOn: z.enum(["success", "failure", "never"]).optional(),
+    lastStatus: z.enum(["success", "error", "running"]).optional(),
+    triggerTurn: z.boolean().optional(),
   })
   .passthrough()
   .superRefine((task, ctx) => {
@@ -18,6 +48,22 @@ const taskSchema = z
       task.action === "shell" ? "command" : task.action === "prompt" ? "prompt" : "message";
     if (typeof task[key] !== "string" || !task[key].trim())
       ctx.addIssue({ code: "custom", message: `Missing ${key}` });
+    if ((task.scope === "session" && !task.sessionFile) || (task.scope === "cwd" && !task.cwd))
+      ctx.addIssue({ code: "custom", message: "Missing scheduler scope binding" });
+    try {
+      // Completed/overdue absolute one-shots remain valid on later startups.
+      const absolute = task.type === "once" ? Date.parse(task.schedule) : Number.NaN;
+      const now = Number.isFinite(absolute)
+        ? new Date(absolute - 1)
+        : task.type === "once" && task.createdAt
+          ? new Date(task.createdAt)
+          : new Date();
+      const schedule = native.validateTaskSchedule(task.type, task.schedule, now);
+      if (task.backoff !== undefined)
+        native.normalizeBackoff(task.backoff, schedule.intervalMs, now);
+    } catch {
+      ctx.addIssue({ code: "custom", message: "Invalid native scheduler schedule or backoff" });
+    }
   });
 const storeSchema = z
   .object({

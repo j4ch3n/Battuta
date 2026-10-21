@@ -42,7 +42,10 @@ export async function configureDream(botDirectory) {
   // Validate first, then make model/extension available before publishing the job.
   await atomicPrivateWrite(modelPath, JSON.stringify(model, null, 2) + "\n");
   await atomicPrivateWrite(settingsPath, JSON.stringify(settings, null, 2) + "\n");
-  if (result !== store) await atomicPrivateWrite(storePath, JSON.stringify(result, null, 2) + "\n");
+  if (result !== store)
+    await atomicPrivateWrite(storePath, JSON.stringify(result, null, 2) + "\n", {
+      preserveParentMode: true,
+    });
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

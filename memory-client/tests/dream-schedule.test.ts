@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile, chmod, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
@@ -72,6 +72,7 @@ test("explicit offline setup writes stable model/job config idempotently and ref
   const store = join(dir, "stable/jobs.json");
   const data = join(dir, "memory");
   await initializeSchedulerStore(store);
+  await chmod(join(dir, "stable"), 0o750);
   await mkdir(join(dir, ".pi"));
   await writeFile(
     join(dir, ".pi/settings.json"),
@@ -81,6 +82,7 @@ test("explicit offline setup writes stable model/job config idempotently and ref
   const configure = () =>
     promisify(execFile)(process.execPath, ["configure-dream.mjs", dir], { env });
   await configure();
+  expect((await stat(join(dir, "stable"))).mode & 0o777).toBe(0o750);
   const first = await readFile(store, "utf8");
   await configure();
   expect(await readFile(store, "utf8")).toBe(first);

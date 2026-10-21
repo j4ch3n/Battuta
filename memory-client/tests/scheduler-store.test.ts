@@ -1,10 +1,11 @@
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { initializeSchedulerStore, readSchedulerStore } from "../scheduler-store.ts";
 
 const dirs: string[] = [];
+afterEach(() => vi.useRealTimers());
 afterEach(async () =>
   Promise.all(dirs.splice(0).map((d) => rm(d, { recursive: true, force: true }))),
 );
@@ -103,3 +104,61 @@ test("directory and invalid parent write failures propagate", async () => {
   await expect(readSchedulerStore(join(path, ".."))).rejects.toThrow();
   await expect(initializeSchedulerStore(join(path, "child"))).rejects.toThrow();
 });
+test.each([
+  { type: "cron", schedule: "not-a-cron" },
+  { type: "interval", schedule: "0s" },
+  { maxRuns: -1 },
+  { maxRuns: "2" },
+  { expiresAt: "yesterday" },
+  { dueAt: "broken" },
+  { nextRun: "broken" },
+  { createdAt: 12 },
+  { scope: "session" },
+  { scope: "cwd" },
+  { runCount: -1 },
+  { timeoutMs: "oops" },
+  { backoff: { factor: 0, maxInterval: "5m" } },
+])("preflight preserves invalid native record %j", async (fields) => {
+  const path = await fixture();
+  await initializeSchedulerStore(path);
+  const task = {
+    id: "x",
+    action: "prompt",
+    type: "interval",
+    schedule: "5m",
+    scope: "global",
+    status: "pending",
+    enabled: true,
+    prompt: "Keep me",
+    ...fields,
+  };
+  const text = JSON.stringify({ version: 2, revision: 0, tasks: [task] });
+  await writeFile(path, text);
+  await expect(initializeSchedulerStore(path)).rejects.toThrow();
+  expect(await readFile(path, "utf8")).toBe(text);
+});
+test.each(["2026-01-01T15:00:00Z", "today at 11pm"])(
+  "keeps completed one-shot schedule %s valid on later startups",
+  async (schedule) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 0, 3, 23, 59));
+    const path = await fixture();
+    await initializeSchedulerStore(path);
+    const task = {
+      id: "past",
+      action: "prompt",
+      type: "once",
+      schedule,
+      scope: "global",
+      status: "fired",
+      enabled: false,
+      prompt: "Done",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      dueAt: "2026-01-01T15:00:00.000Z",
+    };
+    const text = JSON.stringify({ version: 2, revision: 1, tasks: [task] });
+    await writeFile(path, text);
+    await initializeSchedulerStore(path);
+    expect(await readFile(path, "utf8")).toBe(text);
+  },
+);

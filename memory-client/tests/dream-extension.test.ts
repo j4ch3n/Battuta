@@ -158,6 +158,32 @@ test("queued tool calls recheck disablement even while startup work is active", 
   await first;
   expect(run).toHaveBeenCalledTimes(1);
 });
+test("a cancelled caller does not wait for already-active startup work", async () => {
+  const h = await harness();
+  let finish!: (value: string) => void;
+  run.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  await h.hooks.get("session_start")!({}, h.ctx);
+  await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1));
+  const abort = new AbortController();
+  abort.abort();
+  const pending = h.tools[0].execute("cancelled", {}, abort.signal, undefined, h.ctx);
+  try {
+    await expect(
+      Promise.race([
+        pending,
+        new Promise((resolve) => setTimeout(() => resolve("still waiting"), 50)),
+      ]),
+    ).rejects.toThrow("Dream unavailable");
+  } finally {
+    finish("Private reflection");
+    await pending.catch(() => {});
+  }
+});
 test.each([
   null,
   { enabled: false },

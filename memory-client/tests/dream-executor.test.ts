@@ -14,13 +14,11 @@ afterEach(() => {
 });
 function harness() {
   vi.stubEnv("AGENT_ROLE", "pm");
-  const complete = vi
-    .fn()
-    .mockResolvedValue({
-      stopReason: "stop",
-      content: [{ type: "text", text: "private reflection" }],
-      usage: { totalTokens: 7 },
-    });
+  const complete = vi.fn().mockResolvedValue({
+    stopReason: "stop",
+    content: [{ type: "text", text: "private reflection" }],
+    usage: { totalTokens: 7 },
+  });
   const ctx = {
     model: { provider: "other", id: "conversation" },
     modelRegistry: {

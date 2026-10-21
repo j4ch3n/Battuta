@@ -5,6 +5,7 @@ import { schedulerStorePath } from "./scheduler-config.ts";
 import { enabledDreamModel } from "./dream-config.ts";
 import { executeDream } from "./dream-executor.ts";
 import { recordDreamUsage } from "./dream-usage.ts";
+import { abortable } from "./abortable.ts";
 
 export default function dreamExtension(pi: ExtensionAPI) {
   if (process.env.AGENT_ROLE !== "pm") return;
@@ -31,7 +32,7 @@ export default function dreamExtension(pi: ExtensionAPI) {
           active = undefined;
         });
       }
-      await active;
+      await abortable(active, signal ?? shutdown.signal);
       ctx.ui.setStatus("memory-dream", "Memory dream complete");
     } catch {
       ctx.ui.setStatus("memory-dream", "Memory dream unavailable or cancelled");
