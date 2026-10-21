@@ -72,6 +72,31 @@ test("duplicate task IDs are diagnosed", async () => {
   await writeFile(path, JSON.stringify({ version: 2, revision: 0, tasks: [task, task] }));
   await expect(readSchedulerStore(path)).rejects.toThrow("Duplicate");
 });
+test.each(["shell", "prompt", "message", "notify"])(
+  "rejects missing %s payload without replacing the store",
+  async (action) => {
+    const path = await fixture();
+    await initializeSchedulerStore(path);
+    const text = JSON.stringify({
+      version: 2,
+      revision: 0,
+      tasks: [
+        {
+          id: "x",
+          action,
+          type: "once",
+          schedule: "5m",
+          scope: "global",
+          status: "pending",
+          enabled: true,
+        },
+      ],
+    });
+    await writeFile(path, text);
+    await expect(readSchedulerStore(path)).rejects.toThrow("Missing");
+    expect(await readFile(path, "utf8")).toBe(text);
+  },
+);
 test("directory and invalid parent write failures propagate", async () => {
   const path = await fixture();
   await initializeSchedulerStore(path);

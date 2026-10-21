@@ -33,7 +33,6 @@ setup-pm-bot:
 	uv run --locked python bots/pm-bot/scripts/configure-bot.py
 	pnpm --dir agent-mail install
 	pnpm --dir project-spec install --frozen-lockfile
-	pnpm --dir memory-client install --frozen-lockfile
 
 setup-tl-bot:
 	uv run --locked python bots/tl-bot/scripts/configure-bot.py

@@ -11,6 +11,7 @@ import type { DreamDependencies } from "../dream-runtime.ts";
 import { MemoryMcpClient } from "../mcp-client.ts";
 import { afterEach, expect, test, vi } from "vitest";
 import extension from "../dream-extension.ts";
+import { readSchedulerStore } from "../scheduler-store.ts";
 
 const run = vi.hoisted(() =>
   vi.fn<(deps: DreamDependencies, signal: AbortSignal) => Promise<string>>(() =>
@@ -134,6 +135,28 @@ test("main conversation can trigger dream but cannot receive its private reflect
   const h = await harness();
   const result = await h.tools[0].execute("id", {}, undefined, undefined, h.ctx);
   expect(JSON.stringify(result)).not.toContain("Private reflection");
+});
+test("queued tool calls recheck disablement even while startup work is active", async () => {
+  const h = await harness();
+  let finish!: (value: string) => void;
+  run.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const first = h.tools[0].execute("first", {}, undefined, undefined, h.ctx);
+  await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1));
+  const path = join(h.dir, "jobs.json");
+  const store = await readSchedulerStore(path);
+  store.tasks[0].enabled = false;
+  await writeFile(path, JSON.stringify(store));
+  await expect(h.tools[0].execute("queued", {}, undefined, undefined, h.ctx)).rejects.toThrow(
+    "Dream unavailable",
+  );
+  finish("Private reflection");
+  await first;
+  expect(run).toHaveBeenCalledTimes(1);
 });
 test.each([
   null,

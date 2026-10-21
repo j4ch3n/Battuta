@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { expect, test } from "vitest";
 
-test("pinned scheduler runs the isolated dream tool with local auth and fake provider", async () => {
+test("native scheduler delivery and startup catch-up share a private deduplicated dream", async () => {
   const directory = await mkdtemp(join(tmpdir(), "dream-scheduler-"));
   try {
     const result = await promisify(execFile)(

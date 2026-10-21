@@ -3,7 +3,7 @@ import { access, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const [directory, hostPiEntry] = process.argv.slice(2);
+const [directory, hostPiEntry, schedulerEntry] = process.argv.slice(2);
 const piModule = hostPiEntry
   ? pathToFileURL(await realpath(hostPiEntry)).href
   : import.meta.resolve("@earendil-works/pi-coding-agent");
@@ -11,6 +11,12 @@ const { discoverAndLoadExtensions } = await import(piModule);
 const memory = join(directory, "shared-memory");
 await mkdir(memory, { recursive: true });
 process.env.BATTUTA_MEMORY_DATA_DIR = memory;
+process.env.PI_SCHEDULER_STATE_FILE = join(memory, "scheduler.json");
+process.env.PI_SCHEDULER_CATCHUP_MAX = "0";
+await writeFile(
+  process.env.PI_SCHEDULER_STATE_FILE,
+  JSON.stringify({ version: 2, revision: 0, tasks: [] }),
+);
 for (const role of ["pm", "tl"]) {
   const agent = join(directory, role);
   await mkdir(agent, { recursive: true });
@@ -24,7 +30,10 @@ for (const role of ["pm", "tl"]) {
   process.env.AGENT_ROLE = role;
   process.env.PI_CODING_AGENT_DIR = agent;
   const loaded = await discoverAndLoadExtensions(
-    [new URL("../index.ts", import.meta.url).pathname],
+    [
+      new URL("../index.ts", import.meta.url).pathname,
+      ...(role === "pm" && schedulerEntry ? [schedulerEntry] : []),
+    ],
     agent,
     agent,
   );
@@ -33,6 +42,9 @@ for (const role of ["pm", "tl"]) {
   assert.equal(extension.tools.size, 0);
   let prompt;
   const ctx = {
+    cwd: agent,
+    hasUI: false,
+    isIdle: () => true,
     sessionManager: { getSessionId: () => "smoke", getBranch: () => [] },
     ui: { notify: () => {}, setStatus: () => {} },
     modelRegistry: {
@@ -55,7 +67,8 @@ for (const role of ["pm", "tl"]) {
     "session_before_compact",
     "session_shutdown",
   ]) {
-    for (const handler of extension.handlers.get(event) ?? []) await handler({}, ctx);
+    for (const loadedExtension of loaded.extensions)
+      for (const handler of loadedExtension.handlers.get(event) ?? []) await handler({}, ctx);
   }
   await assert.rejects(access(join(memory, "capture-queue", role)), { code: "ENOENT" });
   assert.equal(await readFile(join(memory, "ME.md"), "utf8"), profile);

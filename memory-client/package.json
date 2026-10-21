@@ -31,7 +31,6 @@
     "@jl1990/pi-scheduler": "0.5.1",
     "@types/node": "24.19.1",
     "@vitest/coverage-v8": "4.1.11",
-    "pi-schedule-prompt": "0.4.1",
     "typescript": "~5.9.3",
     "vitest": "4.1.11"
   }

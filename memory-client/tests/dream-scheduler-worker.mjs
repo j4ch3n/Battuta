@@ -3,10 +3,12 @@ import { createServer } from "node:http";
 import { once } from "node:events";
 import { mkdir, readFile, writeFile, access } from "node:fs/promises";
 import { join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { discoverAndLoadExtensions } from "@earendil-works/pi-coding-agent";
 import { configureDream } from "../configure-dream.mjs";
 import { initializeSchedulerStore } from "../scheduler-store.ts";
 import { dreamRunId } from "../dream-runtime.ts";
+import { DREAM_PROMPT } from "../dream-schedule.ts";
 
 const [directory] = process.argv.slice(2);
 const agent = join(directory, ".pi");
@@ -20,6 +22,12 @@ await writeFile(
   JSON.stringify({ defaultProvider: "offline", defaultModel: "dream" }),
 );
 await configureDream(directory);
+process.umask(0o077);
+process.env.PI_SCHEDULER_CATCHUP_MAX = "1";
+const persisted = JSON.parse(await readFile(process.env.PI_SCHEDULER_STATE_FILE, "utf8"));
+persisted.tasks[0].nextRun = dreamRunId(new Date());
+persisted.tasks[0].dueAt = persisted.tasks[0].nextRun;
+await writeFile(process.env.PI_SCHEDULER_STATE_FILE, JSON.stringify(persisted));
 for (const [now, due] of [
   ["2026-10-21T06:59:59Z", "2026-10-20T07:00:00.000Z"],
   ["2026-10-21T07:00:00Z", "2026-10-21T07:00:00.000Z"],
@@ -29,6 +37,10 @@ for (const [now, due] of [
 let inventoryCalls = 0;
 let holdService = false;
 let reachedService;
+let releaseEvidence;
+const evidenceGate = new Promise((resolve) => {
+  releaseEvidence = resolve;
+});
 const server = createServer(async (req, res) => {
   try {
     let body = "";
@@ -57,6 +69,7 @@ const server = createServer(async (req, res) => {
         reachedService?.();
         return;
       }
+      await evidenceGate;
       let value;
       if (name === "memory_inventory") {
         inventoryCalls++;
@@ -97,7 +110,11 @@ await once(server, "listening");
 process.env.BATTUTA_MEMORY_URL = `http://127.0.0.1:${server.address().port}/mcp`;
 const publicEvents = [];
 const loaded = await discoverAndLoadExtensions(
-  [new URL("../dream-extension.ts", import.meta.url).pathname],
+  [
+    new URL("../dream-extension.ts", import.meta.url).pathname,
+    new URL("../node_modules/@jl1990/pi-scheduler/extensions/scheduler/index.ts", import.meta.url)
+      .pathname,
+  ],
   directory,
   agent,
 );
@@ -105,9 +122,20 @@ assert.deepEqual(loaded.errors, []);
 loaded.runtime.appendEntry = (...args) => publicEvents.push(args);
 const extension = loaded.extensions[0];
 const tool = extension.tools.get("memory_dream").definition;
+const scheduler = loaded.extensions[1];
+let scheduled;
+// Deterministic PM boundary: accept the delivered instruction and call its tool.
+// Delivery alone cannot force a real PM model to choose this call.
+loaded.runtime.sendUserMessage = (prompt) => {
+  assert.ok(prompt.endsWith(DREAM_PROMPT));
+  scheduled = tool.execute("scheduled", {}, undefined, undefined, ctx);
+};
 let modelCalls = 0;
 const reflection = "PRIVATE dream reflection";
 const ctx = {
+  cwd: directory,
+  hasUI: false,
+  isIdle: () => true,
   model: { provider: "other", id: "conversation" },
   modelRegistry: {
     find: (provider, id) => ({ provider, id }),
@@ -140,7 +168,21 @@ const ctx = {
   ui: { setStatus: (...args) => publicEvents.push(args) },
 };
 try {
-  const result = await tool.execute("run", {}, undefined, undefined, ctx);
+  for (const handler of extension.handlers.get("session_start") ?? []) await handler({}, ctx);
+  for (const handler of scheduler.handlers.get("session_start") ?? []) await handler({}, ctx);
+  const deadline = Date.now() + 7000;
+  let history;
+  do {
+    history = JSON.parse(await readFile(process.env.PI_SCHEDULER_STATE_FILE, "utf8")).tasks[0]
+      .history;
+    if (scheduled && history?.length) break;
+    await delay(25);
+  } while (Date.now() < deadline);
+  assert.ok(scheduled, "Scheduler catch-up delivered the native dream prompt");
+  assert.equal(history[0].outcome.status, "success");
+  await assert.rejects(access(join(data, "dream.log")), "Delivery is not dream completion");
+  releaseEvidence();
+  const result = await scheduled;
   assert.deepEqual(result.details, { status: "complete" });
   assert.ok(!JSON.stringify(result).includes(reflection));
   assert.ok(inventoryCalls > 0);
@@ -173,6 +215,8 @@ try {
   await assert.rejects(access(join(cancelled, "dream.log")));
   console.log("Pinned scheduler dream isolation passed");
 } finally {
+  releaseEvidence();
+  for (const handler of scheduler.handlers.get("session_shutdown") ?? []) await handler({}, ctx);
   for (const handler of extension.handlers.get("session_shutdown") ?? []) await handler({}, ctx);
   server.closeAllConnections();
   server.close();

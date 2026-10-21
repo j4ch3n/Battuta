@@ -11,14 +11,14 @@ from fixtures import LauncherFixture
 class RunDevTests(LauncherFixture):
     def test_scheduler_path_and_catchup_are_exported_before_pm_exec(self):
         pi = self.root / "bots/pm-bot/node_modules/.bin/pi"
-        pi.write_text(f"#!{sys.executable}\nimport os\nprint(os.environ['PI_SCHEDULER_STATE_FILE'] + ':' + os.environ['PI_SCHEDULER_CATCHUP_MAX'])\n")
+        pi.write_text(f"#!{sys.executable}\nimport os\nprint(os.environ['PI_SCHEDULER_STATE_FILE'] + ':' + os.environ['PI_SCHEDULER_CATCHUP_MAX'] + ':' + oct(os.umask(0)))\n")
         result = self.run_launcher("prod", existing=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         for command in self.commands():
             if "AGENT_ROLE=pm" in command[-1]:
                 pane = subprocess.run(["bash", "-c", command[-1]], capture_output=True, text=True)
                 self.assertEqual(pane.returncode, 0, pane.stderr)
-                self.assertEqual(pane.stdout.strip(), f"{self.scheduler}:0")
+                self.assertEqual(pane.stdout.strip(), f"{self.scheduler}:0:0o77")
 
     def test_missing_or_corrupt_store_blocks_new_session_without_replacing_it(self):
         for text in (None, "broken"):
