@@ -1,0 +1,256 @@
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/artifacts/fonts/public-sans-latin.woff2") format("woff2");
+}
+
+:root {
+  color-scheme: light;
+  --color-canvas: #f3f6ff;
+  --color-ink: #14234b;
+  --color-muted: #53617e;
+  --color-accent: #2346e8;
+  --color-on-accent: #ffffff;
+  --color-rule: #c8d1e7;
+  --color-active: #e8eeff;
+  --color-notice: #7a3c14;
+  --color-marker: #d8ee79;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --page-gutter: clamp(1.25rem, 5vw, 5rem);
+  --date-width: 8.5rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: "Public Sans", system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-marker);
+  color: var(--color-ink);
+}
+
+.page-width {
+  width: min(100% - var(--page-gutter) * 2, 76rem);
+  margin-inline: auto;
+}
+
+.masthead {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.masthead-content {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-8);
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2.75rem, 6vw, 5rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.heading-stop {
+  color: var(--color-marker);
+}
+
+.artifact-count {
+  margin: 0;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.library {
+  padding-block: var(--space-8);
+}
+
+.library-caption {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--date-width) 1.5rem;
+  column-gap: var(--space-8);
+  padding-block-end: var(--space-3);
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.artifact-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  border-block-start: 1px solid var(--color-ink);
+}
+
+.artifact {
+  border-block-end: 1px solid var(--color-rule);
+}
+
+.artifact-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--date-width) 1.5rem;
+  align-items: start;
+  gap: var(--space-8);
+  padding-block: var(--space-8);
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: var(--color-active);
+}
+
+.artifact-copy {
+  min-width: 0;
+}
+
+.artifact-title {
+  display: inline;
+  margin: 0;
+  font-size: clamp(1.25rem, 2.2vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color 160ms ease-out;
+}
+
+.artifact-description {
+  max-width: 68ch;
+  margin: var(--space-2) 0 0;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+
+.artifact-updated {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-block-start: var(--space-1);
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.artifact-updated > span {
+  display: none;
+}
+
+.artifact-arrow {
+  margin-block-start: var(--space-1);
+  color: var(--color-accent);
+}
+
+.artifact-link:focus-visible,
+.artifact-list:focus-visible,
+.empty-state:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: var(--space-1);
+}
+
+.artifact-link:focus-visible .artifact-title {
+  color: var(--color-accent);
+  text-decoration-color: currentColor;
+}
+
+@media (hover: hover) {
+  .artifact-link:hover .artifact-title {
+    color: var(--color-accent);
+    text-decoration-color: currentColor;
+  }
+}
+
+.artifact-link:active {
+  background: var(--color-active);
+}
+
+.empty-state {
+  max-width: 45ch;
+  margin-block: var(--space-8);
+  color: var(--color-muted);
+}
+
+.connection-status {
+  margin: var(--space-4) 0 0;
+  color: var(--color-notice);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 40rem) {
+  h1 {
+    font-size: clamp(2rem, 11vw, 2.75rem);
+  }
+
+  .masthead-content {
+    flex-wrap: wrap;
+    padding-block: var(--space-6);
+  }
+
+  .library {
+    padding-block: var(--space-6);
+  }
+
+  .library-caption {
+    display: none;
+  }
+
+  .artifact-link {
+    grid-template-columns: minmax(0, 1fr) 1.5rem;
+    gap: var(--space-4);
+    padding-block: var(--space-6);
+  }
+
+  .artifact-updated {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding: 0;
+  }
+
+  .artifact-updated > span {
+    display: inline;
+  }
+
+  .artifact-arrow {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .artifact-title {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .artifact-title {
+    text-decoration-color: LinkText;
+  }
+}

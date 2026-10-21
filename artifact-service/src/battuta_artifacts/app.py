@@ -1,6 +1,7 @@
 """Read-only HTTP surface. Startup checks the schema but never migrates it."""
 
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
@@ -18,9 +19,19 @@ from .markdown import render_markdown
 from .registry import ArtifactError, Registry
 
 
+def catalog_date(value: str) -> str:
+    """Use a stable UTC calendar date, including before JavaScript is available."""
+    if not value:
+        return ""
+    date = datetime.fromisoformat(value).astimezone(timezone.utc)
+    months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    return f"{date.day} {months[date.month - 1]} {date.year}"
+
+
 def create_app(path: Path | None = None) -> FastAPI:
     registry = Registry(path if path is not None else database_path())
     templates = Environment(loader=PackageLoader("battuta_artifacts", "templates"), autoescape=select_autoescape())
+    templates.filters["catalog_date"] = catalog_date
     events = CatalogEvents(registry.path)
 
     @asynccontextmanager
@@ -50,6 +61,16 @@ def create_app(path: Path | None = None) -> FastAPI:
     @app.get("/artifacts/catalog.js")
     def catalog_script():
         return FileResponse(Path(__file__).parent / "assets/catalog.js", media_type="text/javascript",
+                             headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+
+    @app.get("/artifacts/catalog.css")
+    def catalog_styles():
+        return FileResponse(Path(__file__).parent / "assets/catalog.css", media_type="text/css",
+                            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+
+    @app.get("/artifacts/fonts/public-sans-latin.woff2")
+    def catalog_font():
+        return FileResponse(Path(__file__).parent / "assets/fonts/public-sans-latin.woff2", media_type="font/woff2",
                             headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
     @app.get("/artifacts/events")

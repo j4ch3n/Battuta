@@ -7,3 +7,5 @@ A read-only web catalog for explicitly registered HTML bundles and rendered Mark
 - Explicit Alembic setup migrations
 
 See [runtime behavior](../docs/artifact-service.md) and the [component setup index](../RELEASE.md#extension-and-skill-setup-index).
+
+The index's visual conventions are recorded in [index design](DESIGN.md).
