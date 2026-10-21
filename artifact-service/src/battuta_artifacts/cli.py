@@ -17,6 +17,8 @@ class ArtifactGroup(click.Group):
     def main(self, args=None, **kwargs):
         args = list(sys.argv[1:] if args is None else args)
         try:
+            # Own the outer error boundary, including parsing before invoke().
+            kwargs["standalone_mode"] = False
             return super().main(args, **kwargs)
         except (ArtifactError, ValidationError, OSError, sqlite3.Error, click.ClickException) as exc:
             if isinstance(exc, ArtifactError):
@@ -25,18 +27,12 @@ class ArtifactGroup(click.Group):
                 code, status = "STORAGE_ERROR", 5
             else:
                 code, status = "INVALID_INPUT", 2
+            message = exc.format_message() if isinstance(exc, click.ClickException) else str(exc)
             if "--json" in args:
-                click.echo(json.dumps({"ok": False, "error": {"code": code, "message": str(exc)}}))
+                click.echo(json.dumps({"ok": False, "error": {"code": code, "message": message}}))
             else:
-                click.echo(f"Error: {exc}", err=True)
+                click.echo(f"Error: {message}", err=True)
             raise SystemExit(status) from exc
-
-    def invoke(self, ctx):
-        # Let main produce a consistent JSON envelope even for parser errors.
-        try:
-            return super().invoke(ctx)
-        except click.ClickException as exc:
-            raise ArtifactError(exc.format_message()) from exc
 
 
 @click.group(cls=ArtifactGroup)

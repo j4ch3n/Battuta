@@ -93,6 +93,9 @@ class Registry:
 
     def get(self, slug: str) -> dict:
         with self.connect() as db:
+            # SELECT does not start a transaction in sqlite3's legacy mode.
+            # Pin metadata and allowlist to one revision, even under WAL writers.
+            db.execute("BEGIN")
             item = self._find(db, slug)
             item["files"] = dict(db.execute("SELECT public_path, media_type FROM artifact_files WHERE artifact_id=? ORDER BY public_path", (item["id"],)))
             return item

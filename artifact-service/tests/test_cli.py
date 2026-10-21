@@ -89,3 +89,14 @@ class CliTests(unittest.TestCase):
         result = self.run_cli("register", "--json")
         self.assertEqual(result.exit_code, 2)
         self.assertEqual(json.loads(result.output)["error"]["code"], "INVALID_INPUT")
+
+    def test_top_level_errors_use_json_and_help_still_succeeds(self):
+        for args in [("--json", "--bogus", "list"), ("--json", "missing-command"), ("--json", "--bogus")]:
+            with self.subTest(args=args):
+                result = self.run_cli(*args)
+                self.assertEqual(result.exit_code, 2)
+                self.assertEqual(json.loads(result.stdout)["error"]["code"], "INVALID_INPUT")
+        for args in [("--help",), ("register", "--help"), ()]:
+            result = self.run_cli(*args)
+            self.assertEqual(result.exit_code, 0 if args else 2)
+            self.assertIn("Usage:", result.output)

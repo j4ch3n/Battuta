@@ -1,7 +1,9 @@
 import os
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -33,6 +35,33 @@ class HttpFixture(unittest.TestCase):
 
 
 class HttpTests(HttpFixture):
+    def test_concurrent_replacement_never_combines_root_and_allowlist_revisions(self):
+        # WAL lets the writer commit while the reader retains an older snapshot.
+        with sqlite3.connect(self.db) as db:
+            db.execute("PRAGMA journal_mode=WAL")
+        (self.source / "private.js").write_text("never registered from this root")
+        new_root = self.root / "new-source"
+        new_root.mkdir()
+        (new_root / "index.html").write_text("New entry")
+        (new_root / "private.js").write_text("explicitly published from new root")
+        find = Registry._find
+        replace_once = [True]
+
+        def replace_after_metadata(db, slug):
+            item = find(db, slug)
+            if replace_once[0]:
+                replace_once[0] = False
+                self.registry.replace_files("demo", source_root=str(new_root), entry_path="index.html", format="html",
+                                            files={"index.html": "text/html", "private.js": "text/javascript"})
+            return item
+
+        client = self.client()
+        # Interleave real registry replacement exactly between metadata and files.
+        with patch.object(Registry, "_find", side_effect=replace_after_metadata):
+            response = client.get("/artifacts/a/demo/private.js")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(client.get("/artifacts/a/demo/private.js").text, "explicitly published from new root")
+
     def test_entry_bundle_live_changes_and_deregistration(self):
         client = self.client()
         response = client.get("/artifacts/a/demo", follow_redirects=False)
