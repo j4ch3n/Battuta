@@ -8,6 +8,7 @@ export default defineConfig(
   globalIgnores([
     "**/node_modules/**",
     "**/vendor/**",
+    "bots/**/.pi/skills/**/{references,tools}/**",
     "**/.venv/**",
     ".memory-spike/**",
     "supabase/**",

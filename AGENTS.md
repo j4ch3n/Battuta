@@ -14,6 +14,7 @@ TypeScript on Node.js and Deno, the Pi coding-agent runtime, Telegram, Linear, a
 - Follow surrounding code and runtime-specific formatting, linting, and typing rules.
 - Scan related code before adding logic; reuse existing helpers and refactor duplication within the affected scope. Avoid unrelated rewrites.
 - Cover changed behavior, edge cases, and regressions with meaningful tests. Use parameterized tests for equivalent cases.
+- Do not add tests that assert prompt or instruction wording. Test executable behavior and integration contracts instead.
 - Keep unit tests small and focused. Stub external services, clocks, and runtime boundaries; exercise real internal logic. Use integration tests for cross-system behavior.
 - For `scripts/`, organize tests in `scripts/tests/test_<script_or_module>.py` by the script or helper they exercise. Keep configuration/parsing tests separate from launcher orchestration; avoid a single catch-all launch test suite. Run discovery through `pnpm check:support`.
 - For shared skills, keep instructions and references under `shared-skills/<skill>/` and tool code, package metadata, dependencies, and tests under `shared-skills/<skill>-cli/`. `pnpm check:support` discovers each CLI's `tests/` directory in its own locked Python environment.
@@ -22,6 +23,7 @@ TypeScript on Node.js and Deno, the Pi coding-agent runtime, Telegram, Linear, a
 - Keep runtime `SKILL.md` files focused on workflows and link to owning command references instead of duplicating command contracts. Installation guides are linked only from [release setup](RELEASE.md), which indexes setup for every extension and skill; runtime skills and command references do not carry installation navigation.
 - Keep skill declarations, discovery triggers, and usage guidance in the owning `SKILL.md`; do not repeat them in bot instruction sources. Bot instructions define enduring responsibilities and authority rather than duplicate the skill catalog.
 - In skill instructions and prompts, link only to prompts, templates, and references owned by that skill. Refer to other skills by skill name (for example, use the `memory` skill), not by file paths or links to their `SKILL.md` or supporting files.
+- Avoid repeating attribution in runtime instructions. When reusing MIT or other suitably licensed material, retain the notices required by that source's license in an accompanying license or notices file.
 - Review coverage for changed modules and address meaningful gaps; do not optimize for a percentage alone. Run relevant verification before claiming completion.
 - Keep every `README.md` concise: project/component description, high-level features, and links to getting started and further guidance. Put commands, setup, stack details, and technical explanations in focused references.
 - Keep this file high-level and link to a single maintained source rather than duplicating technical guidance.
