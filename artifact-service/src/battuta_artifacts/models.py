@@ -2,7 +2,6 @@
 
 import mimetypes
 import re
-import stat
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -55,17 +54,12 @@ def assemble_files(root: Path | None, entry: str, files: tuple[str, ...]) -> dic
     paths = [entry, *files]
     if len(set(paths)) != len(paths):
         raise ArtifactError("Duplicate file paths; the entry is already included automatically.")
+    from .files import open_source
+
     for path in paths:
         relative_path(path)
-        source = root
-        for part in path.split("/"):
-            source = source / part
-            if source.is_symlink():
-                raise ArtifactError(f"Symlinks are not allowed: {path}")
         try:
-            if not stat.S_ISREG(source.stat().st_mode):
-                raise ArtifactError(f"Not a regular file: {path}")
-            with source.open("rb"):
+            with open_source(str(root), path):
                 pass
         except OSError as exc:
             raise ArtifactError(f"File is unavailable: {path}") from exc

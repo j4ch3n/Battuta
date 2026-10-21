@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["httpx>=0.28,<1"]
+dev = ["httpx2"]
 
 [project.scripts]
 battuta-artifact = "battuta_artifacts.cli:main"
