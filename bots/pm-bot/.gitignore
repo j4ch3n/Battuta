@@ -14,7 +14,7 @@ AGENTS.md
 !.pi/skills/active-telegram-message/
 !.pi/skills/manage-google/
 !.pi/skills/artifacts/
-!.pi/skills/present-findings-to-owner/
+!.pi/skills/present-to-owner/
 !.pi/extensions/
 .pi/extensions/*
 !.pi/extensions/pm-bot/
