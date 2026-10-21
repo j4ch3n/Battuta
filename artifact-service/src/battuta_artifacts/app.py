@@ -8,9 +8,12 @@ from fastapi import FastAPI, HTTPException
 from jinja2 import Environment, PackageLoader, select_autoescape
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
+from starlette.responses import FileResponse
+from sse_starlette import EventSourceResponse
 
 from .config import database_path
 from .files import SourceResponse, open_source
+from .events import CatalogEvents
 from .markdown import render_markdown
 from .registry import ArtifactError, Registry
 
@@ -18,11 +21,16 @@ from .registry import ArtifactError, Registry
 def create_app(path: Path | None = None) -> FastAPI:
     registry = Registry(path if path is not None else database_path())
     templates = Environment(loader=PackageLoader("battuta_artifacts", "templates"), autoescape=select_autoescape())
+    events = CatalogEvents(registry.path)
 
     @asynccontextmanager
     async def lifespan(app):
         await run_in_threadpool(registry.check_schema)
-        yield
+        await events.start()
+        try:
+            yield
+        finally:
+            await events.stop()
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -38,6 +46,15 @@ def create_app(path: Path | None = None) -> FastAPI:
     @app.get("/artifacts/catalog")
     def catalog_json():
         return JSONResponse({"artifacts": catalog()}, headers={"Cache-Control": "no-store"})
+
+    @app.get("/artifacts/catalog.js")
+    def catalog_script():
+        return FileResponse(Path(__file__).parent / "assets/catalog.js", media_type="text/javascript",
+                            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+
+    @app.get("/artifacts/events")
+    async def catalog_events():
+        return EventSourceResponse(events.stream(), ping=15, send_timeout=30, headers={"Cache-Control": "no-store"})
 
     @app.get("/artifacts/a/{slug}/")
     @app.get("/artifacts/a/{slug}/{path:path}")

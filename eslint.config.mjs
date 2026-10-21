@@ -21,6 +21,10 @@ export default defineConfig(
     languageOptions: { globals: globals.node },
   },
   {
+    files: ["artifact-service/src/battuta_artifacts/assets/*.js"],
+    languageOptions: { globals: globals.browser },
+  },
+  {
     files: [
       "agent-mail/**/*.ts",
       "project-spec/**/*.ts",
