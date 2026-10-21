@@ -68,9 +68,11 @@ def create_app(path: Path | None = None) -> FastAPI:
         return FileResponse(Path(__file__).parent / "assets/catalog.css", media_type="text/css",
                             headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
-    @app.get("/artifacts/fonts/public-sans-latin.woff2")
-    def catalog_font():
-        return FileResponse(Path(__file__).parent / "assets/fonts/public-sans-latin.woff2", media_type="font/woff2",
+    @app.get("/artifacts/fonts/{font_name}")
+    def catalog_font(font_name: str):
+        if font_name not in {"newsreader-latin.woff2", "inter-latin.woff2"}:
+            raise HTTPException(404, "Font not found")
+        return FileResponse(Path(__file__).parent / "assets/fonts" / font_name, media_type="font/woff2",
                             headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
     @app.get("/artifacts/events")

@@ -1,29 +1,16 @@
 {% macro artifact_row(artifact={}) -%}
 <li class="artifact" data-slug="{{ artifact.slug | default('') }}">
   <a class="artifact-link" href="{{ artifact.url | default('') }}">
-    <div class="artifact-copy">
-      <h2 class="artifact-title">{{ artifact.title | default('') }}</h2>
-      <p class="artifact-description">{{ artifact.description | default('') }}</p>
-    </div>
     <span class="artifact-updated">
       <span>Updated</span>
       <time datetime="{{ artifact.updated_at | default('') }}"
         >{{ artifact.updated_at | default('') | catalog_date }}</time
       >
     </span>
-    <svg
-      class="artifact-arrow"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.5"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M5 19 19 5M5 5h14v14" />
-    </svg>
+    <div class="artifact-copy">
+      <h2 class="artifact-title">{{ artifact.title | default('') }}</h2>
+      <p class="artifact-description">{{ artifact.description | default('') }}</p>
+    </div>
   </a>
 </li>
 {%- endmacro %}
@@ -32,11 +19,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#2346e8" />
+    <meta name="theme-color" content="#f6f0e5" />
     <title>Artifacts</title>
     <link
       rel="preload"
-      href="/artifacts/fonts/public-sans-latin.woff2"
+      href="/artifacts/fonts/newsreader-latin.woff2"
       as="font"
       type="font/woff2"
       crossorigin
@@ -45,19 +32,16 @@
     <script src="/artifacts/catalog.js" defer></script>
   </head>
   <body>
-    <header class="masthead">
-      <div class="page-width masthead-content">
-        <h1>Artifacts<span class="heading-stop" aria-hidden="true">.</span></h1>
+    <header class="page-width hero">
+      <div class="hero-heading">
+        <h1>Artifacts</h1>
         <p id="artifact-count" class="artifact-count" aria-live="polite">
           {{ artifacts | length }} {{ 'work' if artifacts | length == 1 else 'works' }}
         </p>
       </div>
+      <p class="hero-description">Documents, demos, and work in progress.</p>
     </header>
     <main class="page-width library" aria-label="Artifact library">
-      <div class="library-caption" aria-hidden="true">
-        <span>Work / Description</span>
-        <span>Last updated</span>
-      </div>
       <ul id="artifacts" class="artifact-list" role="list" aria-label="Artifacts" tabindex="-1">
         {% for artifact in artifacts %}{{ artifact_row(artifact) }}{% endfor %}
       </ul>
@@ -66,6 +50,9 @@
       </p>
       <p id="status" class="connection-status" role="status"></p>
     </main>
+    <footer class="page-width site-footer">
+      <p>© 2026 Fiscum Technology</p>
+    </footer>
     <template id="artifact-template">{{ artifact_row() }}</template>
   </body>
 </html>

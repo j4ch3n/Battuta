@@ -33,7 +33,8 @@ class CatalogTests(HttpFixture):
 
     def test_packaged_stylesheet_and_font_are_served_without_arbitrary_asset_access(self):
         client = self.client()
-        for path, media in [("catalog.css", "text/css"), ("fonts/public-sans-latin.woff2", "font/woff2")]:
+        for path, media in [("catalog.css", "text/css"), ("fonts/newsreader-latin.woff2", "font/woff2"),
+                            ("fonts/inter-latin.woff2", "font/woff2")]:
             with self.subTest(path=path):
                 response = client.get(f"/artifacts/{path}")
                 self.assertEqual(response.status_code, 200)
