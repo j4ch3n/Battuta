@@ -1,64 +1,51 @@
-import { z } from "zod";
+import type { SchedulerStore } from "./scheduler-store.ts";
 
 export const DREAM_JOB_ID = "battuta-memory-dream";
-const JOB_NAME = "nightly-memory-dream";
-const storeSchema = z
-  .object({ version: z.literal(1), jobs: z.array(z.record(z.string(), z.unknown())) })
-  .passthrough();
-const settingsSchema = z
-  .object({
-    defaultProvider: z.string().min(1).optional(),
-    defaultModel: z.string().min(1).optional(),
-    extensions: z.array(z.string()).optional(),
-  })
-  .passthrough();
+export const DREAM_JOB_NAME = "nightly-memory-dream";
+export const DREAM_PROMPT =
+  "Call memory_dream exactly once. Report only its completion status. Do not request or repeat private dream reflections.";
 
-export function reconcileDreamSchedule(
-  input: unknown,
-  inputSettings: unknown,
-  extensionPath: string,
-  timestamp: string,
-) {
-  const store = storeSchema.parse(input);
-  const settings = settingsSchema.parse(inputSettings);
-  const matching = store.jobs.filter((job) => job.id === DREAM_JOB_ID || job.name === JOB_NAME);
-  if (matching.length > 1 || matching.some((job) => job.id !== DREAM_JOB_ID))
-    throw new Error("Dream job ownership conflict");
-  const previous = matching[0];
-  const model =
-    typeof previous?.model === "string" && previous.model.trim()
-      ? previous.model
-      : settings.defaultProvider && settings.defaultModel
-        ? `${settings.defaultProvider}/${settings.defaultModel}`
-        : undefined;
-  if (!model) throw new Error("Configure PM defaultProvider/defaultModel before dream setup");
-  if (!/^[^/\s]+\/[^\s]+$/.test(model))
-    throw new Error(
-      "Dream requires an explicit provider/model; fix the owned job while PM is stopped",
-    );
-  const job: Record<string, unknown> = {
-    createdAt: timestamp,
-    runCount: 0,
-    ...previous,
-    id: DREAM_JOB_ID,
-    name: JOB_NAME,
-    type: "cron",
-    schedule: "0 0 3 * * *",
-    prompt:
-      "Call memory_dream exactly once, then repeat its returned reflection unchanged. Do not mutate memories or files yourself. If the tool fails, report failure concisely without claiming completion.",
-    enabled: previous?.enabled !== false,
-    model,
-    notify: false,
-    extensions: [extensionPath],
-    skills: [],
-  };
-  delete job.session;
-  const jobs = previous
-    ? store.jobs.map((existing) => (existing.id === DREAM_JOB_ID ? job : existing))
-    : [...store.jobs, job];
-  const extensions = (settings.extensions ?? []).filter(
-    (path) => !path.replaceAll("\\", "/").endsWith("/memory-client/dream-extension.ts"),
+export function ownedDreamTask(task: SchedulerStore["tasks"][number]): boolean {
+  return (
+    task.id === DREAM_JOB_ID &&
+    task.name === DREAM_JOB_NAME &&
+    task.action === "prompt" &&
+    task.type === "cron" &&
+    task.schedule === "0 0 3 * * *" &&
+    task.scope === "global" &&
+    task.prompt === DREAM_PROMPT &&
+    task.cwd === undefined &&
+    task.sessionFile === undefined &&
+    task.expiresAt === undefined &&
+    task.maxRuns === undefined
   );
-  if (!extensions.includes(extensionPath)) extensions.push(extensionPath);
-  return { store: { ...store, jobs }, settings: { ...settings, extensions } };
+}
+
+export function reconcileDreamSchedule(store: SchedulerStore, now: string): SchedulerStore {
+  const matching = store.tasks.filter(
+    (task) => task.id === DREAM_JOB_ID || task.name === DREAM_JOB_NAME,
+  );
+  if (matching.length > 1 || matching.some((task) => !ownedDreamTask(task)))
+    throw new Error("Dream job ownership conflict");
+  if (matching.length) return store;
+  return {
+    ...store,
+    revision: store.revision + 1,
+    tasks: [
+      ...store.tasks,
+      {
+        id: DREAM_JOB_ID,
+        name: DREAM_JOB_NAME,
+        action: "prompt",
+        type: "cron",
+        schedule: "0 0 3 * * *",
+        scope: "global",
+        status: "pending",
+        enabled: true,
+        prompt: DREAM_PROMPT,
+        createdAt: now,
+        runCount: 0,
+      },
+    ],
+  };
 }

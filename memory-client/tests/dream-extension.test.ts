@@ -32,23 +32,31 @@ async function harness(role = "pm", persisted = true, job: Record<string, unknow
   vi.stubEnv("AGENT_ROLE", role);
   vi.stubEnv("PI_CODING_AGENT_DIR", join(dir, ".pi"));
   vi.stubEnv("BATTUTA_MEMORY_DATA_DIR", join(dir, "memory"));
+  vi.stubEnv("PI_SCHEDULER_STATE_FILE", join(dir, "jobs.json"));
+  await mkdir(join(dir, "memory"));
+  await writeFile(
+    join(dir, "memory/dream-config.json"),
+    JSON.stringify({ version: 1, model: job?.model ?? "fake/model" }),
+  );
   await mkdir(join(dir, ".pi"));
   if (job)
     await writeFile(
-      join(dir, ".pi/schedule-prompts.json"),
+      join(dir, "jobs.json"),
       JSON.stringify({
-        version: 1,
-        jobs: [
+        version: 2,
+        revision: 0,
+        tasks: [
           {
             id: "battuta-memory-dream",
             name: "nightly-memory-dream",
+            action: "prompt",
+            scope: "global",
+            status: "pending",
             type: "cron",
             schedule: "0 0 3 * * *",
             enabled: true,
-            model: "fake/model",
-            notify: false,
-            skills: [],
-            extensions: [new URL("../dream-extension.ts", import.meta.url).pathname],
+            prompt:
+              "Call memory_dream exactly once. Report only its completion status. Do not request or repeat private dream reflections.",
             ...job,
           },
         ],
@@ -88,14 +96,12 @@ test("TL never registers the dream tool or lifecycle", async () => {
   expect(h.tools).toEqual([]);
   expect(h.hooks.size).toBe(0);
 });
-test("child enables only memory_dream, without startup catch-up or capture hooks", async () => {
+test("PM tool returns status only and never changes normal active tools", async () => {
   const h = await harness("pm", false);
-  await h.hooks.get("session_start")!({}, h.ctx);
-  expect(h.setActiveTools).toHaveBeenCalledExactlyOnceWith(["memory_dream"]);
-  expect(run).not.toHaveBeenCalled();
+  expect(h.setActiveTools).not.toHaveBeenCalled();
   expect([...h.hooks.keys()]).not.toContain("agent_settled");
   const result = await h.tools[0].execute("id", {}, undefined, undefined, h.ctx);
-  expect(result.content[0]).toEqual({ type: "text", text: "Private reflection" });
+  expect(result.content[0]).toEqual({ type: "text", text: '{"status":"complete"}' });
   expect(h.status).not.toHaveBeenCalledWith(expect.anything(), expect.stringContaining("Private"));
 });
 test("persisted PM catches up once without restricting normal tools", async () => {
@@ -117,27 +123,25 @@ test("startup catch-up uses the exact configured dream model without changing th
   expect(complete.mock.calls[0][0]).toMatchObject({ provider: "fake", id: "dream-model" });
   expect(h.ctx.model?.id).toBe("model");
 });
-test("a scheduled child cannot drift to the conversation model", async () => {
+test("tool uses configured model, not the conversation model", async () => {
   const h = await harness("pm", false, { model: "fake/dream-model" });
-  await expect(h.tools[0].execute("id", {}, undefined, undefined, h.ctx)).rejects.toThrow(
-    "Dream unavailable",
-  );
-  expect(run).not.toHaveBeenCalled();
+  const complete = vi.spyOn(h.ctx.modelRegistry, "complete");
+  run.mockImplementationOnce((deps, signal) => deps.complete("prompt", "evidence", signal));
+  await h.tools[0].execute("id", {}, undefined, undefined, h.ctx);
+  expect(complete.mock.calls[0][0]).toMatchObject({ provider: "fake", id: "dream-model" });
 });
-test("main conversation cannot request a private reflection through the dream tool", async () => {
+test("main conversation can trigger dream but cannot receive its private reflection", async () => {
   const h = await harness();
-  await expect(h.tools[0].execute("id", {}, undefined, undefined, h.ctx)).rejects.toThrow(
-    "isolated scheduled session",
-  );
-  expect(run).not.toHaveBeenCalled();
+  const result = await h.tools[0].execute("id", {}, undefined, undefined, h.ctx);
+  expect(JSON.stringify(result)).not.toContain("Private reflection");
 });
 test.each([
   null,
   { enabled: false },
   { model: "fake/other" },
-  { model: undefined },
-  { session: "old" },
-  { extensions: true },
+  { scope: "session" },
+  { status: "cancelled" },
+  { prompt: "Changed prompt" },
 ])("no catch-up for absent, disabled, mismatched or unsafe job %j", async (job) => {
   const h = await harness("pm", true, job);
   await h.hooks.get("session_start")!({}, h.ctx);

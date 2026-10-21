@@ -1,144 +1,117 @@
-import { expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { reconcileDreamSchedule } from "../dream-schedule.ts";
+import { initializeSchedulerStore } from "../scheduler-store.ts";
 
 const now = "2026-10-21T12:00:00.000Z";
-test("the operator setup command provisions persisted files idempotently", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "dream-configure-"));
-  try {
-    await mkdir(join(dir, ".pi"));
-    await writeFile(
-      join(dir, ".pi/settings.json"),
-      JSON.stringify({ defaultProvider: "p", defaultModel: "m" }),
-    );
-    const configure = () => promisify(execFile)(process.execPath, ["configure-dream.mjs", dir]);
-    await configure();
-    const first = await readFile(join(dir, ".pi/schedule-prompts.json"), "utf8");
-    await configure();
-    expect(await readFile(join(dir, ".pi/schedule-prompts.json"), "utf8")).toBe(first);
-    const settings: unknown = JSON.parse(await readFile(join(dir, ".pi/settings.json"), "utf8"));
-    expect(settings).toMatchObject({
-      defaultProvider: "p",
-      defaultModel: "m",
-      extensions: [expect.stringContaining("/memory-client/dream-extension.ts")],
-    });
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
+const dirs: string[] = [];
+afterEach(async () => {
+  vi.unstubAllEnvs();
+  await Promise.all(dirs.splice(0).map((d) => rm(d, { recursive: true, force: true })));
 });
-test("provisions one isolated workdir job without changing unrelated jobs or settings", () => {
-  const input = {
-    version: 1,
-    jobs: [{ id: "other", name: "reminder", session: "s", prompt: "Unrelated" }],
+test("provisions one native global dream prompt without release paths or unrelated mutations", () => {
+  const other = {
+    id: "other",
+    action: "notify" as const,
+    type: "once" as const,
+    schedule: "+5m",
+    message: "Hello",
+    scope: "session" as const,
+    status: "pending" as const,
+    enabled: true,
+    sessionFile: "/session",
   };
-  const settings = {
-    defaultProvider: "openai-codex",
-    defaultModel: "gpt-6.1-sol",
-    extensions: ["custom.ts"],
-  };
-  const output = reconcileDreamSchedule(
-    input,
-    settings,
-    "/bundle/memory-client/dream-extension.ts",
-    now,
-  );
-  expect(output.store.jobs[0]).toEqual(input.jobs[0]);
-  expect(output.store.jobs[1]).toMatchObject({
+  const store = { version: 2 as const, revision: 4, tasks: [other] };
+  const output = reconcileDreamSchedule(store, now);
+  expect(output.tasks[0]).toEqual(other);
+  expect(output.tasks[1]).toMatchObject({
     id: "battuta-memory-dream",
-    name: "nightly-memory-dream",
+    action: "prompt",
     type: "cron",
     schedule: "0 0 3 * * *",
-    model: "openai-codex/gpt-6.1-sol",
-    notify: false,
-    extensions: ["/bundle/memory-client/dream-extension.ts"],
-    skills: [],
+    scope: "global",
     enabled: true,
   });
-  expect(output.store.jobs[1]).not.toHaveProperty("session");
-  expect(output.settings.extensions).toEqual([
-    "custom.ts",
-    "/bundle/memory-client/dream-extension.ts",
-  ]);
-  expect(
+  expect(output.tasks[1]).not.toHaveProperty("extensions");
+  expect(output.tasks[1]).not.toHaveProperty("cwd");
+  expect(reconcileDreamSchedule(output, now)).toEqual(output);
+  output.tasks[1].enabled = false;
+  expect(reconcileDreamSchedule(output, now).tasks[1].enabled).toBe(false);
+});
+test("rejects conflicting dream ownership", () => {
+  expect(() =>
     reconcileDreamSchedule(
-      output.store,
-      output.settings,
-      "/bundle/memory-client/dream-extension.ts",
+      {
+        version: 2,
+        revision: 0,
+        tasks: [
+          {
+            id: "other",
+            name: "nightly-memory-dream",
+            action: "prompt",
+            type: "cron",
+            schedule: "0 0 3 * * *",
+            scope: "global",
+            enabled: true,
+            status: "pending",
+            prompt: "Other",
+          },
+        ],
+      },
       now,
     ),
-  ).toEqual(output);
+  ).toThrow("ownership");
 });
-
-test("retains an existing model, disabled state and execution statistics", () => {
-  const owned = {
-    id: "battuta-memory-dream",
-    name: "nightly-memory-dream",
-    enabled: false,
-    model: "provider/selected",
-    runCount: 5,
-    createdAt: now,
-    session: "old",
-  };
-  const output = reconcileDreamSchedule(
-    { version: 1, jobs: [owned] },
-    {},
-    "/dream-extension.ts",
-    now,
+test("explicit offline setup writes stable model/job config idempotently and refreshes registration", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "dream-setup-"));
+  dirs.push(dir);
+  const store = join(dir, "stable/jobs.json");
+  const data = join(dir, "memory");
+  await initializeSchedulerStore(store);
+  await mkdir(join(dir, ".pi"));
+  await writeFile(
+    join(dir, ".pi/settings.json"),
+    JSON.stringify({ defaultProvider: "p", defaultModel: "m", extensions: ["custom.ts"] }),
   );
-  expect(output.store.jobs[0]).toMatchObject({
-    enabled: false,
-    model: "provider/selected",
-    runCount: 5,
+  const env = { ...process.env, PI_SCHEDULER_STATE_FILE: store, BATTUTA_MEMORY_DATA_DIR: data };
+  const configure = () =>
+    promisify(execFile)(process.execPath, ["configure-dream.mjs", dir], { env });
+  await configure();
+  const first = await readFile(store, "utf8");
+  await configure();
+  expect(await readFile(store, "utf8")).toBe(first);
+  expect(JSON.parse(await readFile(join(data, "dream-config.json"), "utf8"))).toEqual({
+    version: 1,
+    model: "p/m",
   });
-  expect(output.store.jobs[0]).not.toHaveProperty("session");
+  expect(JSON.parse(await readFile(join(dir, ".pi/settings.json"), "utf8"))).toMatchObject({
+    extensions: ["custom.ts", expect.stringContaining("dream-extension.ts")],
+  });
+  await expect(readFile(join(dir, ".pi/schedule-prompts.json"))).rejects.toMatchObject({
+    code: "ENOENT",
+  });
 });
-
-test.each([
-  [{ version: 1, jobs: [] }, {}],
-  [
-    { version: 2, jobs: [] },
-    { defaultProvider: "p", defaultModel: "m" },
-  ],
-  [
-    { version: 1, jobs: [{ name: "nightly-memory-dream", id: "someone-else" }] },
-    { defaultProvider: "p", defaultModel: "m" },
-  ],
-])("rejects ambiguous ownership or invalid configuration %#", (store, settings) => {
-  expect(() => reconcileDreamSchedule(store, settings, "/dream-extension.ts", now)).toThrow();
-});
-
-test.each(["model-only", "/model", "provider/", "provider/model with spaces"])(
-  "rejects an existing fuzzy or invalid model selector %s rather than replacing it",
-  (model) => {
-    expect(() =>
-      reconcileDreamSchedule(
-        { version: 1, jobs: [{ id: "battuta-memory-dream", model }] },
-        { defaultProvider: "p", defaultModel: "m" },
-        "/dream-extension.ts",
-        now,
-      ),
-    ).toThrow("explicit provider/model");
-  },
-);
-
-test("fresh setup without explicit defaults leaves all files untouched", async () => {
+test("invalid defaults leave scheduler and settings unchanged", async () => {
   const dir = await mkdtemp(join(tmpdir(), "dream-unconfigured-"));
-  try {
-    await mkdir(join(dir, ".pi"));
-    const settings = JSON.stringify({ customSetting: true });
-    await writeFile(join(dir, ".pi/settings.json"), settings);
-    await expect(
-      promisify(execFile)(process.execPath, ["configure-dream.mjs", dir]),
-    ).rejects.toThrow("defaultProvider/defaultModel");
-    expect(await readFile(join(dir, ".pi/settings.json"), "utf8")).toBe(settings);
-    await expect(readFile(join(dir, ".pi/schedule-prompts.json"))).rejects.toMatchObject({
-      code: "ENOENT",
-    });
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
+  dirs.push(dir);
+  const store = join(dir, "stable/jobs.json");
+  await initializeSchedulerStore(store);
+  await mkdir(join(dir, ".pi"));
+  await writeFile(join(dir, ".pi/settings.json"), "{}");
+  const before = await readFile(store, "utf8");
+  await expect(
+    promisify(execFile)(process.execPath, ["configure-dream.mjs", dir], {
+      env: {
+        ...process.env,
+        PI_SCHEDULER_STATE_FILE: store,
+        BATTUTA_MEMORY_DATA_DIR: join(dir, "memory"),
+      },
+    }),
+  ).rejects.toThrow();
+  expect(await readFile(store, "utf8")).toBe(before);
+  expect(await readFile(join(dir, ".pi/settings.json"), "utf8")).toBe("{}");
 });
