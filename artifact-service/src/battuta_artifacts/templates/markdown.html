@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title }}</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        line-height: 1.6;
+        max-width: 60rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        overflow-wrap: anywhere;
+      }
+      img {
+        max-width: 100%;
+      }
+      pre {
+        overflow-x: auto;
+        background: #f4f4f4;
+        padding: 1rem;
+      }
+      table {
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <nav><a href="/artifacts/">All artifacts</a></nav>
+    <main>{{ content | safe }}</main>
+  </body>
+</html>

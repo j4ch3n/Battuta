@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from battuta_artifacts.registry import Registry, SchemaError, migrate
 
 
-class HttpTests(unittest.TestCase):
+class HttpFixture(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -31,6 +31,8 @@ class HttpTests(unittest.TestCase):
         self.addCleanup(client.close)
         return client
 
+
+class HttpTests(HttpFixture):
     def test_entry_bundle_live_changes_and_deregistration(self):
         client = self.client()
         response = client.get("/artifacts/a/demo", follow_redirects=False)

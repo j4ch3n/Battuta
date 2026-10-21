@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Artifacts</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 70rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        padding: 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+        overflow-wrap: anywhere;
+      }
+      #status {
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Artifacts</h1>
+    <p id="status" role="status"></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Artifact</th>
+          <th>Description</th>
+          <th>Format</th>
+          <th>Updated</th>
+        </tr>
+      </thead>
+      <tbody id="artifacts">
+        {% for artifact in artifacts %}
+        <tr>
+          <td><a href="{{ artifact.url }}">{{ artifact.title }}</a></td>
+          <td>{{ artifact.description }}</td>
+          <td>{{ artifact.format }}</td>
+          <td>{{ artifact.updated_at }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4">No artifacts registered.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>
