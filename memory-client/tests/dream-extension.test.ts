@@ -11,6 +11,7 @@ import type { DreamDependencies } from "../dream-runtime.ts";
 import { MemoryMcpClient } from "../mcp-client.ts";
 import { afterEach, expect, test, vi } from "vitest";
 import extension from "../dream-extension.ts";
+import { readSchedulerStore } from "../scheduler-store.ts";
 
 const run = vi.hoisted(() =>
   vi.fn<(deps: DreamDependencies, signal: AbortSignal) => Promise<string>>(() =>
@@ -26,29 +27,35 @@ afterEach(async () => {
   run.mockReset().mockResolvedValue("Private reflection");
   await Promise.all(directories.splice(0).map((d) => rm(d, { recursive: true, force: true })));
 });
-async function harness(role = "pm", persisted = true, job: Record<string, unknown> | null = {}) {
+async function harness(role = "pm", job: Record<string, unknown> | null = {}) {
   const dir = await mkdtemp(join(tmpdir(), "dream-extension-"));
   directories.push(dir);
   vi.stubEnv("AGENT_ROLE", role);
-  vi.stubEnv("PI_CODING_AGENT_DIR", join(dir, ".pi"));
   vi.stubEnv("BATTUTA_MEMORY_DATA_DIR", join(dir, "memory"));
-  await mkdir(join(dir, ".pi"));
+  vi.stubEnv("PI_SCHEDULER_STATE_FILE", join(dir, "jobs.json"));
+  await mkdir(join(dir, "memory"));
+  await writeFile(
+    join(dir, "memory/dream-config.json"),
+    JSON.stringify({ version: 1, model: job?.model ?? "fake/model" }),
+  );
   if (job)
     await writeFile(
-      join(dir, ".pi/schedule-prompts.json"),
+      join(dir, "jobs.json"),
       JSON.stringify({
-        version: 1,
-        jobs: [
+        version: 2,
+        revision: 0,
+        tasks: [
           {
             id: "battuta-memory-dream",
             name: "nightly-memory-dream",
+            action: "prompt",
+            scope: "global",
+            status: "pending",
             type: "cron",
             schedule: "0 0 3 * * *",
             enabled: true,
-            model: "fake/model",
-            notify: false,
-            skills: [],
-            extensions: [new URL("../dream-extension.ts", import.meta.url).pathname],
+            prompt:
+              "Call memory_dream exactly once. Report only its completion status. Do not request or repeat private dream reflections.",
             ...job,
           },
         ],
@@ -78,7 +85,6 @@ async function harness(role = "pm", persisted = true, job: Record<string, unknow
           usage: { totalTokens: 7 },
         }),
     },
-    sessionManager: { getSessionFile: () => (persisted ? "session.jsonl" : undefined) },
     ui: { setStatus: status },
   } as unknown as ExtensionToolContext;
   return { hooks, tools, ctx, setActiveTools, appendEntry, status, dir };
@@ -88,60 +94,98 @@ test("TL never registers the dream tool or lifecycle", async () => {
   expect(h.tools).toEqual([]);
   expect(h.hooks.size).toBe(0);
 });
-test("child enables only memory_dream, without startup catch-up or capture hooks", async () => {
-  const h = await harness("pm", false);
-  await h.hooks.get("session_start")!({}, h.ctx);
-  expect(h.setActiveTools).toHaveBeenCalledExactlyOnceWith(["memory_dream"]);
-  expect(run).not.toHaveBeenCalled();
+test("PM tool returns status only and never changes normal active tools", async () => {
+  const h = await harness();
   expect([...h.hooks.keys()]).not.toContain("agent_settled");
   const result = await h.tools[0].execute("id", {}, undefined, undefined, h.ctx);
-  expect(result.content[0]).toEqual({ type: "text", text: "Private reflection" });
+  expect(result.content[0]).toEqual({ type: "text", text: '{"status":"complete"}' });
+  expect(JSON.stringify(result)).not.toContain("Private reflection");
+  expect(h.setActiveTools).not.toHaveBeenCalled();
   expect(h.status).not.toHaveBeenCalledWith(expect.anything(), expect.stringContaining("Private"));
 });
-test("persisted PM catches up once without restricting normal tools", async () => {
+test("PM catches up once without restricting normal tools", async () => {
   const h = await harness();
   await h.hooks.get("session_start")!({}, h.ctx);
   await h.hooks.get("session_start")!({}, h.ctx);
   await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1));
   expect(h.setActiveTools).not.toHaveBeenCalled();
 });
-test("startup catch-up uses the exact configured dream model without changing the conversation model", async () => {
-  const h = await harness("pm", true, { model: "fake/dream-model" });
-  const complete = vi.spyOn(h.ctx.modelRegistry, "complete");
-  run.mockImplementationOnce((deps, signal) => deps.complete("prompt", "evidence", signal));
-  await h.hooks.get("session_start")!({}, h.ctx);
-  await vi.waitFor(() => expect(complete).toHaveBeenCalledTimes(1));
-  await vi.waitFor(() =>
-    expect(h.status).toHaveBeenCalledWith("memory-dream", "Memory dream complete"),
+test.each(["startup", "tool"])(
+  "%s uses the exact dream model without changing the conversation model",
+  async (trigger) => {
+    const h = await harness("pm", { model: "fake/dream-model" });
+    const complete = vi.spyOn(h.ctx.modelRegistry, "complete");
+    run.mockImplementationOnce((deps, signal) => deps.complete("prompt", "evidence", signal));
+    if (trigger === "startup") await h.hooks.get("session_start")!({}, h.ctx);
+    else await h.tools[0].execute("id", {}, undefined, undefined, h.ctx);
+    await vi.waitFor(() => expect(complete).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() =>
+      expect(h.status).toHaveBeenCalledWith("memory-dream", "Memory dream complete"),
+    );
+    expect(complete.mock.calls[0][0]).toMatchObject({ provider: "fake", id: "dream-model" });
+    expect(h.ctx.model?.id).toBe("model");
+  },
+);
+test("queued tool calls recheck disablement even while startup work is active", async () => {
+  const h = await harness();
+  let finish!: (value: string) => void;
+  run.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
   );
-  expect(complete.mock.calls[0][0]).toMatchObject({ provider: "fake", id: "dream-model" });
-  expect(h.ctx.model?.id).toBe("model");
-});
-test("a scheduled child cannot drift to the conversation model", async () => {
-  const h = await harness("pm", false, { model: "fake/dream-model" });
-  await expect(h.tools[0].execute("id", {}, undefined, undefined, h.ctx)).rejects.toThrow(
+  const first = h.tools[0].execute("first", {}, undefined, undefined, h.ctx);
+  await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1));
+  const path = join(h.dir, "jobs.json");
+  const store = await readSchedulerStore(path);
+  store.tasks[0].enabled = false;
+  await writeFile(path, JSON.stringify(store));
+  await expect(h.tools[0].execute("queued", {}, undefined, undefined, h.ctx)).rejects.toThrow(
     "Dream unavailable",
   );
-  expect(run).not.toHaveBeenCalled();
+  finish("Private reflection");
+  await first;
+  expect(run).toHaveBeenCalledTimes(1);
 });
-test("main conversation cannot request a private reflection through the dream tool", async () => {
+test("a cancelled caller does not wait for already-active startup work", async () => {
   const h = await harness();
-  await expect(h.tools[0].execute("id", {}, undefined, undefined, h.ctx)).rejects.toThrow(
-    "isolated scheduled session",
+  let finish!: (value: string) => void;
+  run.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
   );
-  expect(run).not.toHaveBeenCalled();
+  await h.hooks.get("session_start")!({}, h.ctx);
+  await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1));
+  const abort = new AbortController();
+  abort.abort();
+  const pending = h.tools[0].execute("cancelled", {}, abort.signal, undefined, h.ctx);
+  try {
+    await expect(
+      Promise.race([
+        pending,
+        new Promise((resolve) => setTimeout(() => resolve("still waiting"), 50)),
+      ]),
+    ).rejects.toThrow("Dream unavailable");
+  } finally {
+    finish("Private reflection");
+    await pending.catch(() => {});
+  }
 });
 test.each([
   null,
   { enabled: false },
   { model: "fake/other" },
-  { model: undefined },
-  { session: "old" },
-  { extensions: true },
-])("no catch-up for absent, disabled, mismatched or unsafe job %j", async (job) => {
-  const h = await harness("pm", true, job);
-  await h.hooks.get("session_start")!({}, h.ctx);
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  { scope: "session" },
+  { status: "cancelled" },
+  { prompt: "Changed prompt" },
+])("rejects absent, disabled, mismatched or unsafe dream configuration %j", async (job) => {
+  const h = await harness("pm", job);
+  await expect(h.tools[0].execute("id", {}, undefined, undefined, h.ctx)).rejects.toThrow(
+    "Dream unavailable",
+  );
   expect(run).not.toHaveBeenCalled();
 });
 test("shutdown aborts active work and outages expose no private error", async () => {
@@ -151,7 +195,7 @@ test("shutdown aborts active work and outages expose no private error", async ()
         signal.addEventListener("abort", () => reject(new Error("SECRET provider error"))),
       ),
   );
-  const h = await harness("pm", false);
+  const h = await harness();
   const result = h.tools[0].execute("id", {}, undefined, undefined, h.ctx);
   await vi.waitFor(() => expect(run).toHaveBeenCalled());
   await h.hooks.get("session_shutdown")!({}, h.ctx);
@@ -161,7 +205,7 @@ test("shutdown aborts active work and outages expose no private error", async ()
 
 test("records numeric model usage as a custom entry without reflection content", async () => {
   run.mockImplementationOnce((deps, signal) => deps.complete("prompt", "private evidence", signal));
-  const h = await harness("pm", false);
+  const h = await harness();
   await h.tools[0].execute("id", {}, undefined, undefined, h.ctx);
   expect(h.appendEntry).toHaveBeenCalledExactlyOnceWith("memory-dream-usage", {
     usage: { totalTokens: 7 },
@@ -174,7 +218,7 @@ test("records numeric model usage as a custom entry without reflection content",
 });
 
 test("whole-run deadline settles even when a memory transport ignores cancellation", async () => {
-  const h = await harness("pm", false);
+  const h = await harness();
   vi.spyOn(MemoryMcpClient.prototype, "call").mockImplementation(() => new Promise(() => {}));
   run.mockImplementationOnce(async (deps, signal) => {
     await deps.call("memory_inventory", {}, signal);

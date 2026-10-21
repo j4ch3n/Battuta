@@ -61,8 +61,13 @@ done
 [[ -d "$repo_dir/project-spec/node_modules" ]] || { printf 'Install project-spec dependencies with pnpm --dir project-spec install --frozen-lockfile\n' >&2; exit 1; }
 [[ -d "$repo_dir/memory-client/node_modules" ]] || { printf 'Install memory client dependencies with pnpm --dir memory-client install --frozen-lockfile\n' >&2; exit 1; }
 memory_url="${BATTUTA_MEMORY_URL:-http://127.0.0.1:8901/mcp}"
+export PI_SCHEDULER_STATE_FILE
+PI_SCHEDULER_STATE_FILE="$(node "$repo_dir/memory-client/configure-scheduler.mjs" --print-path)"
+export PI_SCHEDULER_CATCHUP_MAX
+PI_SCHEDULER_CATCHUP_MAX="$(node "$repo_dir/memory-client/configure-scheduler.mjs" --print-catchup)"
+node "$repo_dir/memory-client/configure-scheduler.mjs" --check
 
-printf -v pi_command 'set -a; source %q; set +a; export PATH=%q; AGENT_ROLE=pm PI_CODING_AGENT_DIR=%q BATTUTA_MEMORY_URL=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q --extension %q' "$env_file" "$repo_dir/artifact-service/.venv/bin:$PATH" "$bot_dir/.pi" "$memory_url" "$bot_dir/node_modules/.bin/pi" "$bot_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts" "$repo_dir/memory-client/index.ts"
+printf -v pi_command 'set -e; set -a; source %q; set +a; umask 077; export PATH=%q; export PI_SCHEDULER_STATE_FILE; PI_SCHEDULER_STATE_FILE="$(node %q --print-path)"; export PI_SCHEDULER_CATCHUP_MAX; PI_SCHEDULER_CATCHUP_MAX="$(node %q --print-catchup)"; node %q --check; AGENT_ROLE=pm PI_CODING_AGENT_DIR=%q BATTUTA_MEMORY_URL=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q --extension %q' "$env_file" "$repo_dir/artifact-service/.venv/bin:$PATH" "$repo_dir/memory-client/configure-scheduler.mjs" "$repo_dir/memory-client/configure-scheduler.mjs" "$repo_dir/memory-client/configure-scheduler.mjs" "$bot_dir/.pi" "$memory_url" "$bot_dir/node_modules/.bin/pi" "$bot_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts" "$repo_dir/memory-client/index.ts"
 printf -v tl_command 'set -a; source %q; set +a; AGENT_ROLE=tl PI_CODING_AGENT_DIR=%q BATTUTA_MEMORY_URL=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q --extension %q' "$env_file" "$tl_dir/.pi" "$memory_url" "$tl_dir/node_modules/.bin/pi" "$tl_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts" "$repo_dir/memory-client/index.ts"
 pi_pane="$(tmux new-session -d -P -F '#{pane_id}' -s "$session" -n "$mode" -c "$bot_dir" "$pi_command")"
 if [[ "$mode" == dev ]]; then

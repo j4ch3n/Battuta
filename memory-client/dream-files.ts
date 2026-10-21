@@ -12,10 +12,14 @@ export async function optionalText(path: string): Promise<string | undefined> {
   }
 }
 
-export async function atomicPrivateWrite(path: string, content: string) {
+export async function atomicPrivateWrite(
+  path: string,
+  content: string,
+  options: { preserveParentMode?: boolean } = {},
+) {
   const directory = dirname(path);
   await mkdir(directory, { recursive: true, mode: 0o700 });
-  await chmod(directory, 0o700);
+  if (!options.preserveParentMode) await chmod(directory, 0o700);
   const temporary = join(directory, `.dream-${randomUUID()}`);
   try {
     const file = await open(temporary, "wx", 0o600);

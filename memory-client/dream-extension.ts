@@ -1,86 +1,39 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { fileURLToPath } from "node:url";
-import { join } from "node:path";
 import { clientConfig } from "./config.ts";
-import { optionalText } from "./dream-files.ts";
-import { DREAM_JOB_ID } from "./dream-schedule.ts";
-import { dreamCompletion } from "./dream-model.ts";
-import { runDream } from "./dream-runtime.ts";
-import { MemoryMcpClient } from "./mcp-client.ts";
-import { abortable } from "./abortable.ts";
+import { schedulerStorePath } from "./scheduler-config.ts";
+import { enabledDreamModel } from "./dream-config.ts";
+import { executeDream } from "./dream-executor.ts";
 import { recordDreamUsage } from "./dream-usage.ts";
-
-// The pinned scheduler resolves models fuzzily. Refuse model drift before any
-// evidence read, and require the narrowly owned workdir job for startup/tool use.
-async function enabledJob(): Promise<string | undefined> {
-  const text = await optionalText(join(clientConfig().directory, "schedule-prompts.json"));
-  if (!text) return;
-  const store = JSON.parse(text) as { version?: number; jobs?: Record<string, unknown>[] };
-  const jobs = store.jobs?.filter(
-    (j) => j.id === DREAM_JOB_ID || j.name === "nightly-memory-dream",
-  );
-  if (store.version !== 1 || jobs?.length !== 1) return;
-  const job = jobs[0];
-  const enabled =
-    job.id === DREAM_JOB_ID &&
-    job.name === "nightly-memory-dream" &&
-    job.enabled === true &&
-    job.type === "cron" &&
-    job.schedule === "0 0 3 * * *" &&
-    job.session === undefined &&
-    job.notify === false &&
-    typeof job.model === "string" &&
-    job.model.includes("/") &&
-    Array.isArray(job.skills) &&
-    job.skills.length === 0 &&
-    Array.isArray(job.extensions) &&
-    job.extensions.length === 1 &&
-    job.extensions[0] === fileURLToPath(import.meta.url);
-  return enabled ? (job.model as string) : undefined;
-}
+import { abortable } from "./abortable.ts";
 
 export default function dreamExtension(pi: ExtensionAPI) {
   if (process.env.AGENT_ROLE !== "pm") return;
   const shutdown = new AbortController();
   let started = false;
-  async function execute(ctx: ExtensionContext, signal?: AbortSignal, startup = false) {
+  let active: Promise<void> | undefined;
+  async function execute(ctx: ExtensionContext, signal?: AbortSignal) {
     try {
-      const configured = await enabledJob();
-      if (!configured) throw new Error("Dream not configured");
-      const separator = configured.indexOf("/");
-      const model = startup
-        ? ctx.modelRegistry.find(configured.slice(0, separator), configured.slice(separator + 1))
-        : ctx.model;
-      if (!model || configured !== `${model.provider}/${model.id}`)
-        throw new Error("Configured dream model unavailable");
       const config = clientConfig();
-      const bounded = AbortSignal.any([
-        shutdown.signal,
-        ...(signal ? [signal] : []),
-        AbortSignal.timeout(600000),
-      ]);
-      bounded.throwIfAborted();
-      ctx.ui.setStatus("memory-dream", "Memory dream running");
-      const client = new MemoryMcpClient(config.url);
-      const reflection = await runDream(
-        {
-          directory: config.dataDirectory,
-          now: () => new Date(),
-          complete: dreamCompletion(
-            ctx,
-            async (usage) => {
-              const safe = await recordDreamUsage(config.dataDirectory, usage);
-              pi.appendEntry("memory-dream-usage", { usage: safe });
-            },
-            model,
-          ),
-          call: (name, args, abort) => abortable(client.call(name, args, abort), abort),
-        },
-        bounded,
-      );
+      // Recheck even when joining active work: queued prompts cannot bypass disablement.
+      const model = await enabledDreamModel(schedulerStorePath(), config.dataDirectory);
+      if (!model) throw new Error("Dream not configured");
+      if (!active) {
+        ctx.ui.setStatus("memory-dream", "Memory dream running");
+        active = executeDream(ctx, {
+          model,
+          shutdown: shutdown.signal,
+          signal,
+          onUsage: async (usage) => {
+            const safe = await recordDreamUsage(config.dataDirectory, usage);
+            pi.appendEntry("memory-dream-usage", { usage: safe });
+          },
+        }).finally(() => {
+          active = undefined;
+        });
+      }
+      await abortable(active, signal ?? shutdown.signal);
       ctx.ui.setStatus("memory-dream", "Memory dream complete");
-      return reflection;
     } catch {
       ctx.ui.setStatus("memory-dream", "Memory dream unavailable or cancelled");
       throw new Error("Dream unavailable or cancelled");
@@ -90,30 +43,20 @@ export default function dreamExtension(pi: ExtensionAPI) {
     name: "memory_dream",
     label: "Memory dream",
     description:
-      "Only in the isolated scheduled session: run private memory consolidation once and return its reflection unchanged.",
+      "Run the explicitly configured private memory dream. Returns completion status only, never private reflections. Does not accept custom prompts or models.",
     parameters: Type.Object({}, { additionalProperties: false }),
     async execute(_id, _params, signal, _update, ctx) {
-      if (ctx.sessionManager.getSessionFile())
-        throw new Error("Dream tool is available only in the isolated scheduled session");
-      return { content: [{ type: "text", text: await execute(ctx, signal) }], details: {} };
+      await execute(ctx, signal);
+      return {
+        content: [{ type: "text", text: JSON.stringify({ status: "complete" }) }],
+        details: { status: "complete" },
+      };
     },
   });
   pi.on("session_start", (_event, ctx) => {
-    if (!ctx.sessionManager.getSessionFile()) {
-      // In-memory scheduler children otherwise inherit Pi's default shell/file
-      // tools. Never call request_tools or allow model-controlled tool changes.
-      pi.setActiveTools(["memory_dream"]);
-      return;
-    }
     if (started) return;
     started = true;
-    void enabledJob()
-      .then((enabled) => (enabled ? execute(ctx, undefined, true) : undefined))
-      .catch(() => {
-        ctx.ui.setStatus("memory-dream", "Memory dream unavailable or cancelled");
-      });
+    void execute(ctx).catch(() => {});
   });
-  pi.on("session_shutdown", () => {
-    shutdown.abort();
-  });
+  pi.on("session_shutdown", () => shutdown.abort());
 }

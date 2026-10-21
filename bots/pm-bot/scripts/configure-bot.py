@@ -3,6 +3,7 @@
 import sys
 from pathlib import Path
 import re
+import os
 
 import click
 
@@ -11,6 +12,7 @@ from bot_setup import (  # noqa: E402
     SCHEDULE_PACKAGE, TELEGRAM_PACKAGE, configure_mcp, configure_memory_settings, configure_telegram,
     configure_instructions, install_packages, read_env, required, warn_running_session,
 )
+from bot_setup.install import run  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -37,6 +39,11 @@ def main(bot_dir: Path, env_file: Path, env_prefix: str, telegram_package: str) 
     configure_telegram(bot_dir, env_file, env_prefix, values)
     configure_mcp(bot_dir, env_file, values)
     configure_memory_settings(bot_dir, role="pm")
+    run("pnpm", "--dir", str(ROOT / "memory-client"), "install", "--frozen-lockfile")
+    run(
+        "node", str(ROOT / "memory-client/configure-scheduler.mjs"), "--initialize",
+        env={**os.environ, **values},
+    )
     install_packages(bot_dir, telegram_package, extra_packages=(SCHEDULE_PACKAGE,))
     warn_running_session(bot_dir)
 

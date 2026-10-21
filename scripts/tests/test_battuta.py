@@ -31,12 +31,13 @@ class BattutaLauncherTests(LauncherFixture):
     def setUp(self):
         super().setUp()
         shutil.copy2(ROOT / "packaging" / "battuta", self.bin / "battuta")
+        (self.bin / "node").symlink_to(shutil.which("node"))
         for role in ("pm", "tl"):
             pi = self.root / f"bots/{role}-bot/node_modules/.bin/pi"
             pi.write_text(f"#!{sys.executable}\n" + '''import json, os, sys
 print(json.dumps({"role": os.environ["AGENT_ROLE"],
                    "token": os.environ.get("LINEAR_API_TOKEN"),
-                   "memory": os.environ.get("BATTUTA_MEMORY_URL"), "args": sys.argv[1:]}))
+                    "memory": os.environ.get("BATTUTA_MEMORY_URL"), "scheduler": os.environ.get("PI_SCHEDULER_STATE_FILE"), "catchup": os.environ.get("PI_SCHEDULER_CATCHUP_MAX"), "args": sys.argv[1:]}))
 ''')
             pi.chmod(0o700)
 
@@ -55,6 +56,9 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"],
                 self.assertEqual(response["role"], role)
                 self.assertEqual(response["token"], "linear-test")
                 self.assertEqual(response["memory"], "http://127.0.0.1:8901/mcp")
+                if role == "pm":
+                    self.assertEqual(response["scheduler"], str(self.scheduler))
+                    self.assertEqual(response["catchup"], "0")
                 self.assertIn(str(self.root / "project-spec/index.ts"), response["args"])
                 self.assertIn(str(self.root / "memory-client/index.ts"), response["args"])
 

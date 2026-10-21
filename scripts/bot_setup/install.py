@@ -9,7 +9,7 @@ import click
 
 
 TELEGRAM_PACKAGE = "npm:@llblab/pi-telegram@0.57.3"
-SCHEDULE_PACKAGE = "npm:pi-schedule-prompt@0.4.1"
+SCHEDULE_PACKAGE = "npm:@jl1990/pi-scheduler@0.5.1"
 
 
 def run(*args: str, **kwargs: object) -> None:

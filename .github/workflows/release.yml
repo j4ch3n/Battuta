@@ -134,8 +134,8 @@ jobs:
             pnpm --dir "$bot_dir" install --frozen-lockfile --prod
             PI_CODING_AGENT_DIR="$bot_dir/.pi" pnpm --dir "$bot_dir" exec pi install -l --approve npm:@llblab/pi-telegram@0.57.3
             if [ "$bot" = pm-bot ]; then
-              PI_CODING_AGENT_DIR="$bot_dir/.pi" pnpm --dir "$bot_dir" exec pi install -l --approve npm:pi-schedule-prompt@0.4.1
-              test -f "$bot_dir/.pi/npm/node_modules/pi-schedule-prompt/src/index.ts"
+              PI_CODING_AGENT_DIR="$bot_dir/.pi" pnpm --dir "$bot_dir" exec pi install -l --approve npm:@jl1990/pi-scheduler@0.5.1
+              test -f "$bot_dir/.pi/npm/node_modules/@jl1990/pi-scheduler/extensions/scheduler/index.ts"
               test -f "$bot_dir/.pi/skills/manage-google/SKILL.md"
             fi
           done
@@ -144,7 +144,7 @@ jobs:
           pnpm --dir dist/stage/battuta/memory-client install --frozen-lockfile --prod
           memory_smoke_home="$(mktemp -d)"
           mkdir -p "$memory_smoke_home/agent"
-          HOME="$memory_smoke_home" node dist/stage/battuta/memory-client/tests/loader-worker.mjs "$memory_smoke_home/agent" "$PWD/dist/stage/battuta/bots/pm-bot/node_modules/@earendil-works/pi-coding-agent/dist/index.js"
+          HOME="$memory_smoke_home" node dist/stage/battuta/memory-client/tests/loader-worker.mjs "$memory_smoke_home/agent" "$PWD/dist/stage/battuta/bots/pm-bot/node_modules/@earendil-works/pi-coding-agent/dist/index.js" "$PWD/dist/stage/battuta/bots/pm-bot/.pi/npm/node_modules/@jl1990/pi-scheduler/extensions/scheduler/index.ts"
           uv venv --python 3.12 "$RUNNER_TEMP/memory-smoke"
           uv pip install --python "$RUNNER_TEMP/memory-smoke/bin/python" --offline --no-index --find-links "$memory_dir/wheels" battuta-memory
           "$RUNNER_TEMP/memory-smoke/bin/battuta-memory" --help

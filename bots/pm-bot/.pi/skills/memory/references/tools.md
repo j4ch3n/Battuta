@@ -41,3 +41,7 @@ Preview with `memory_forget({"ref":"<ref>","dry_run":true})`, then omit dry_run 
 `memory_capture` is normally called by the lifecycle adapter, not manually reconstructed by the agent. It uploads validated extracted facts with frozen scope, source entry refs, batch/item IDs and payload digest. Replays resume partial batches without recreating forgotten records. An empty extraction is valid. The model runs in the bot; the memory server embeds locally and never needs model-provider credentials.
 
 Conversation tools do not directly edit the owner profile. When a request includes both “remember this” and “update ME.md”, perform the supported server-memory operation and report its confirmed result separately from profile maintenance. Never edit ME.md directly or claim its contents changed without confirmation from the dedicated dream workflow.
+
+## Approved private dream
+
+When an enabled, explicitly configured nightly dream requests it, call the PM-only `memory_dream({})` tool once. It accepts no custom prompt or model and returns completion status only. Report that status; never request or repeat private reflections. Disabled or unconfigured dreams fail closed. A scheduler delivery marker does not prove the dream ran or the profile changed.

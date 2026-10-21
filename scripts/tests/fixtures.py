@@ -12,6 +12,18 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def copy_scheduler_runtime(root):
+    """Copy only the launch/setup boundary, using explicitly installed runtime deps."""
+    dependencies = ROOT / "memory-client/node_modules"
+    if not dependencies.is_dir():
+        raise RuntimeError("Run pnpm --dir memory-client install --frozen-lockfile --prod before support checks")
+    client = root / "memory-client"
+    client.mkdir()
+    for name in ("package.json", "configure-scheduler.mjs", "scheduler-config.ts", "scheduler-store.ts"):
+        shutil.copy2(ROOT / "memory-client" / name, client / name)
+    (client / "node_modules").symlink_to(dependencies, target_is_directory=True)
+
+
 class ConfigFixture(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="battuta scripts ")
@@ -79,7 +91,13 @@ class LauncherFixture(ConfigFixture):
             (bot / ".pi/mcp.json").write_text("{}")
         (self.root / "agent-mail/node_modules").mkdir(parents=True)
         (self.root / "project-spec/node_modules").mkdir(parents=True)
-        (self.root / "memory-client/node_modules").mkdir(parents=True)
+        copy_scheduler_runtime(self.root)
+        self.scheduler = self.root / "stable schedules/schedule-prompts.json"
+        self.scheduler.parent.mkdir()
+        self.scheduler.write_text('{"version":2,"revision":0,"tasks":[]}')
+        for name in (".env", ".env.prod"):
+            with (self.root / name).open("a") as output:
+                output.write(f'PI_SCHEDULER_STATE_FILE="{self.scheduler}"\n')
         (self.root / "supabase").mkdir()
         (self.root / "supabase/.env").touch()
         self.executable("tmux", '''import json, os, sys
