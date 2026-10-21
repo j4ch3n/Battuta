@@ -6,6 +6,7 @@ const nodeFiles = [];
 const functions = new Map();
 for (const file of process.argv.slice(2)) {
   const path = relative(root, file).split(sep).join("/");
+  if (/^bots\/[^/]+\/\.pi\/skills\/[^/]+\/(?:references|tools)\//.test(path)) continue;
   const match = /^supabase\/functions\/([^/]+)\//.exec(path);
   if (match) {
     const files = functions.get(match[1]) ?? [];

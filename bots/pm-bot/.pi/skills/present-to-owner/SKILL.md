@@ -18,6 +18,8 @@ Choose one primary format after identifying the reader's takeaway, the evidence 
 
 Honor an explicit requested format unless it is materially unavailable or unsuitable; explain the reason rather than silently substituting. Load only the selected format. Keep conclusions, warnings, and evidence limits understandable without animation. Label simulated activity or figures; animation is not telemetry.
 
+The local live-panel renderer and checks are in [tools/live-panel](tools/live-panel); use them instead of an upstream checkout path. Visual Explainer's rendering kit is in [tools/visual-explainer/kit](tools/visual-explainer/kit). These packages are presentation support, not independently activated skills.
+
 ## Delivery
 
 When the selected output is HTML intended for the owner, use the `artifacts` skill to register its entry and explicit required assets, then return the resulting URL. Preserve the essential conclusion and decision in Telegram; the page holds supporting detail. Do not serve a draft-only artifact or unclear sharing scope without confirmation. Registration alone does not prove browser availability.
