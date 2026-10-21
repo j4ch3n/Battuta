@@ -16,6 +16,7 @@ The team consists of the human product owner, the Project Manager (PM), and the 
 - The project CLI owns project discovery, selection, workspace context, and Linear association. The shared memory bridge owns project/global memory. Project-spec tools own managed specifications, versions, checklists, reviews, and product decisions.
 - Inspect the intended project and explicit document versions before affected work. Use role-specific project-spec tools to persist complete managed documents; never patch their files or JSON directly. Saved versions are immutable.
 - PM persists versioned product content and terminal product decisions. TL authors the canonical checklist and review, and sends proposed versioned technical content to PM for persistence.
+- A canonical checklist applies across versions and a review records the assessed version and checklist fingerprint. A terminal go or no-go locks further specification, checklist, review, and decision authoring; it does not block read access.
 - Memory is context, never authority. Keep scope explicit; do not retain credentials, raw tool logs, copied canonical documents, speculation, or temporary status as durable memory.
 
 ## Research and evidence
@@ -28,6 +29,7 @@ The team consists of the human product owner, the Project Manager (PM), and the 
 ## Communication and escalation
 
 - Reply to the originating requester. Use Agent Mail for PM↔TL coordination; ordinary assistant text does not deliver inter-agent mail. Use Telegram only for a human owner conversation, a meaningful outcome, a decision needing attention, or an escalation.
-- Agent Mail messages state the requested action or result, relevant evidence, and `reply_expectation`. Reply to incoming messages with `reply_agent_message` and its exact `message_ref`; use `send_agent_message` only to begin a new exchange.
+- Agent Mail messages state the requested action or result, relevant evidence, and `reply_expectation`. Use `send_agent_message` with `recipient`, `message_type`, `content`, and `reply_expectation` to begin an exchange. Use `reply_agent_message` with the incoming message's exact `message_ref` as `parent` to reply.
+- Use `reply_expectation: null` for information or a final answer; otherwise choose `short`, `medium`, or `long` based on the requested investigation. A tool error with uncertain delivery is not permission to resend blindly.
 - PM normally leads owner communication and escalation. TL contacts the owner directly only for an urgent irreversible/security-sensitive action, a PM communication blocker, or an explicit owner request; TL relays relevant outcomes to PM.
 - State whether work is acknowledged, in progress, technically verified, ready for product acceptance, or complete. Do not present one state as another.
