@@ -39,7 +39,7 @@ are retained in [SIENNA-LICENSE.txt](src/battuta_artifacts/SIENNA-LICENSE.txt).
 - No navigation menu, long introduction, images, avatars, cards or format groups.
 - A 46rem column carries a continuous timeline with a 7rem date rail and 2.25rem gap.
 - At 45rem and below, dates sit above content, timeline dots disappear and fine horizontal rules separate entries.
-- The first/newest title is 1.875rem; other titles are 1.375rem. Descriptions remain complete.
+- Every item title is 1.375rem, with no featured-item sizing. Descriptions remain complete.
 - A quiet footer reads “© 2026 Fiscum Technology,” separated by a fine rule. It stays at the bottom on short pages without covering content.
 
 ## Interaction and ownership

@@ -187,10 +187,6 @@ h1 {
   transition: text-decoration-color 160ms ease-out;
 }
 
-.artifact:first-child .artifact-title {
-  font-size: 1.875rem;
-}
-
 .artifact-description {
   margin: var(--space-2) 0 0;
   max-width: 58ch;
