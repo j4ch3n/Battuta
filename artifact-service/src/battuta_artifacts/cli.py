@@ -166,3 +166,14 @@ def deregister(ctx, slug, expected_revision, json_output):
     """Remove registration only; never delete source files."""
     registry().deregister(slug, expected_revision=expected_revision)
     output(ctx, json_output, message=f"Deregistered {slug}; source files unchanged.")
+
+
+@main.command()
+@click.option("--port", default=8000, type=click.IntRange(min=0, max=65535), show_default=True)
+def serve(port):
+    """Run the read-only service on 127.0.0.1 (never migrate schema)."""
+    import uvicorn
+    from .app import create_app
+
+    registry()
+    uvicorn.run(create_app(), host="127.0.0.1", port=port)

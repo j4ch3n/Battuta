@@ -25,6 +25,13 @@ class MemoryUnitTests(unittest.TestCase):
             pm = (units / "battuta-pm.service").read_text()
             self.assertIn("Wants=network-online.target battuta-memory.service", pm)
             self.assertNotIn("Requires=", pm)
+            artifacts = (units / "battuta-artifacts.service").read_text()
+            self.assertIn(f"ExecStart={root.resolve()}/bin/battuta artifacts", artifacts)
+            self.assertNotIn("ExecStartPre=", artifacts)
+            self.assertIn("Restart=on-failure", artifacts)
+            self.assertIn("NoNewPrivileges=true", artifacts)
+            self.assertIn("ProtectSystem=strict", artifacts)
+            self.assertNotIn("setup", artifacts)
 
     def test_conflicting_unit_prevents_all_writes(self):
         with tempfile.TemporaryDirectory() as directory:

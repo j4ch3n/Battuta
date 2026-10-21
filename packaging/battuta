@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export PATH="$root/bin:$PATH"
+export PATH="$root/bin:$root/artifact-service/.venv/bin:$PATH"
 
 load_memory_environment() {
   if [[ -f "$root/.env.prod" ]]; then
@@ -13,6 +13,19 @@ load_memory_environment() {
 }
 
 case "${1:-}" in
+  setup-artifacts)
+    shift
+    exec bash "$root/scripts/setup-artifacts.sh" "$@"
+    ;;
+  artifacts|artifact)
+    command="$1"
+    shift
+    [[ -x "$root/artifact-service/.venv/bin/battuta-artifact" ]] || { printf 'Run bin/battuta setup-artifacts first\n' >&2; exit 1; }
+    if [[ "$command" == artifacts ]]; then
+      exec "$root/artifact-service/.venv/bin/battuta-artifact" serve "$@"
+    fi
+    exec "$root/artifact-service/.venv/bin/battuta-artifact" "$@"
+    ;;
   setup-memory)
     shift
     load_memory_environment
@@ -59,7 +72,7 @@ case "${1:-}" in
     exec "$root/bin/node" "$root/bin/install-services.mjs"
     ;;
   *)
-    printf 'Usage: %s configure|setup-memory|memory|start-prod-screen|pm|tl|install-services\n' "$0" >&2
+    printf 'Usage: %s configure|setup-memory|memory|setup-artifacts|artifacts|artifact|start-prod-screen|pm|tl|install-services\n' "$0" >&2
     exit 2
     ;;
 esac

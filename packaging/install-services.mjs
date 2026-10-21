@@ -55,6 +55,31 @@ WantedBy=default.target
 `,
 });
 
+units.push({
+  path: join(unitDir, "battuta-artifacts.service"),
+  content: `[Unit]
+Description=Battuta artifact catalog
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=${root}
+Environment=HOME=${homedir()}
+Environment=PYTHONDONTWRITEBYTECODE=1
+UMask=0077
+ExecStart=${root}/bin/battuta artifacts
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=default.target
+`,
+});
+
 // Check all owned units before changing any one.
 for (const { path, content } of units) {
   try {

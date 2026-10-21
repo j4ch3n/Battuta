@@ -12,6 +12,7 @@ dependencies = [
     "markdown-it-py>=4,<5",
     "pydantic>=2,<3",
     "sse-starlette>=3,<4",
+    "SQLAlchemy>=2,<3",
     "uvicorn>=0.35,<1",
 ]
 
