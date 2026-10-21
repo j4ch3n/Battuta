@@ -18,7 +18,14 @@ Choose one primary format after identifying the reader's takeaway, the evidence 
 
 Honor an explicit requested format unless it is materially unavailable or unsuitable; explain the reason rather than silently substituting. Load only the selected format. Keep conclusions, warnings, and evidence limits understandable without animation. Label simulated activity or figures; animation is not telemetry.
 
-The local live-panel renderer and checks are in [tools/live-panel](tools/live-panel); use them instead of an upstream checkout path. Visual Explainer's rendering kit is in [tools/visual-explainer/kit](tools/visual-explainer/kit). These packages are presentation support, not independently activated skills.
+Each selected package retains its upstream relative layout under `references/`; use its local files rather than an upstream checkout. These packages are presentation support, not independently activated skills.
+
+## Battuta constraints
+
+These constraints take precedence over conflicting imported guidance:
+
+- Three.js and other 3D presentation work are out of scope. Use SVG, CSS, diagrams, or another selected 2D format instead.
+- Serve owner-facing HTML only through the `artifacts` skill. Do not use an imported deployment workflow such as Vercel.
 
 ## Delivery
 
