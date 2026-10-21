@@ -20,13 +20,6 @@ Honor an explicit requested format unless it is materially unavailable or unsuit
 
 Each selected package retains its upstream relative layout under `references/`; use its local files rather than an upstream checkout. These packages are presentation support, not independently activated skills.
 
-## Battuta constraints
-
-These constraints take precedence over conflicting imported guidance:
-
-- Three.js and other 3D presentation work are out of scope. Use SVG, CSS, diagrams, or another selected 2D format instead.
-- Serve owner-facing HTML only through the `artifacts` skill. Do not use an imported deployment workflow such as Vercel.
-
 ## Delivery
 
 When the selected output is HTML intended for the owner, use the `artifacts` skill to register its entry and explicit required assets, then return the resulting URL. Preserve the essential conclusion and decision in Telegram; the page holds supporting detail. Do not serve a draft-only artifact or unclear sharing scope without confirmation. Registration alone does not prove browser availability.
