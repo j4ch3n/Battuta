@@ -29,6 +29,12 @@ test("renders cited high-level personal understanding with external evidence", (
   expect(result.sections.enduringPreferencesAndConstraints[0].source_refs).toEqual([ref]);
 });
 
+test("normalizes an exact unwrapped model response before strict validation", () => {
+  const result = validatePersonalProfile(sections, [global], "", undefined);
+
+  expect(result.sections).toEqual(sections);
+});
+
 test("rejects project facts and forgotten personal sources", () => {
   expect(() =>
     validatePersonalProfile(
