@@ -5,6 +5,7 @@ from enum import StrEnum
 
 class TodoErrorCode(StrEnum):
     INVALID_INPUT = "INVALID_INPUT"
+    CONFLICTING_FILTERS = "CONFLICTING_FILTERS"
     INVALID_ROLE = "INVALID_ROLE"
     PROJECT_UNAVAILABLE = "PROJECT_UNAVAILABLE"
     NO_TODO_LIST = "NO_TODO_LIST"
@@ -16,6 +17,10 @@ class TodoErrorCode(StrEnum):
 
 
 TODO_ERROR_MESSAGES: dict[TodoErrorCode, str] = {
+    TodoErrorCode.CONFLICTING_FILTERS: (
+        "Choose either --next to show the next step or --remain to show all remaining steps, "
+        "not both. Omit both flags to see the full list with rational explanations."
+    ),
     TodoErrorCode.INVALID_INPUT: (
         "Choose --scope project or --scope general and supply nonblank --item descriptions in execution order. "
         "Use done or cancel to advance, supplying --rational with a detailed nonblank explanation of "

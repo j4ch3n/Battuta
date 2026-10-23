@@ -6,11 +6,11 @@ from collections.abc import Callable
 import click
 
 from .presentation import display_path
-from .todo_errors import TodoError
+from .todo_errors import TodoError, TodoErrorCode
 from .todos import TodoList, TodoStore
 
 
-def render_todos(result: TodoList, operation: str) -> str:
+def render_todos(result: TodoList, operation: str, *, remain: bool = False, next_only: bool = False) -> str:
     scope = f"project / {result.project}" if result.scope == "project" else "general"
     counts = {status: sum(item.status == status for item in result.items) for status in ("done", "cancelled", "todo")}
     next_item = next((item for item in result.items if item.status == "todo"), None)
@@ -20,7 +20,12 @@ def render_todos(result: TodoList, operation: str) -> str:
         f"File: {display_path(result.path)}",
         "",
     ]
-    for item in result.items:
+    items = result.items
+    if next_only:
+        items = [next_item] if next_item else []
+    elif remain:
+        items = [item for item in items if item.status == "todo"]
+    for item in items:
         lines.append(f"{item.id}. [{item.status}] {item.description}")
         if item.rational:
             lines.append(f"   Rational: {item.rational}")
@@ -32,7 +37,7 @@ def render_todos(result: TodoList, operation: str) -> str:
     return "\n".join(lines)
 
 
-def _show(operation: str, action: Callable[[], TodoList | None]) -> None:
+def _show(operation: str, action: Callable[[], TodoList | None], *, remain: bool = False, next_only: bool = False) -> None:
     try:
         result = action()
     except TodoError as error:
@@ -40,7 +45,7 @@ def _show(operation: str, action: Callable[[], TodoList | None]) -> None:
     if result is None:
         click.echo("No active TODO list in this scope for this role. Use create --item to start one in execution order.")
     else:
-        click.echo(render_todos(result, operation))
+        click.echo(render_todos(result, operation, remain=remain, next_only=next_only))
 
 
 @click.group()
@@ -64,10 +69,15 @@ def create(store: TodoStore, item: tuple[str, ...], force: bool):
 
 
 @todo.command("list")
+@click.option("--remain", is_flag=True, help="Show only remaining TODO items; keep overall progress counts and original IDs.")
+@click.option("--next", "next_only", is_flag=True, help="Show only the next TODO item in execution order; keep overall progress counts and its original ID.")
 @click.pass_obj
-def list_todos(store: TodoStore):
-    """Show every item, progress, and the next step in the latest list."""
-    _show("Current TODO list", store.read)
+def list_todos(store: TodoStore, remain: bool, next_only: bool):
+    """Show the latest list, optionally restricted to remaining or next work."""
+    if remain and next_only:
+        raise click.ClickException(str(TodoError(TodoErrorCode.CONFLICTING_FILTERS)))
+    operation = "Next TODO item" if next_only else "Remaining TODO items" if remain else "Current TODO list"
+    _show(operation, store.read, remain=remain, next_only=next_only)
 
 
 @todo.command()

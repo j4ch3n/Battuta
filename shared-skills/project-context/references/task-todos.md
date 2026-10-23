@@ -5,12 +5,7 @@ multi-step tasks. Both PM and TL invoke `battuta-project todo` through the shell
 owners can ask for progress in ordinary Telegram conversation. Return a readable
 summary, not a terminal screenshot or a JSONL dump.
 
-## Choose scope and inspect
-
-```sh
-battuta-project todo --scope project list
-battuta-project todo --scope general list
-```
+## Choose scope
 
 Choose project scope when the task belongs to the selected project, based on the
 request and project overview. Confirm selection with `battuta-project current`;
@@ -23,7 +18,61 @@ timestamped file. Project selection is resolved at invocation time; general scop
 does not change project selection. Check existing work before creating another list.
 An absent list is a successful discovery result and does not create storage.
 
-## Create steps in execution order
+## Basic usage
+
+Work in top-down execution order: inspect the next TODO, perform that step, and
+mark it done or cancelled with a detailed rational before moving to the next.
+
+### Show the next item
+
+```sh
+battuta-project todo --scope general list --next
+```
+
+Show only the first remaining `todo` item without loading the full history.
+
+### Show remaining items
+
+```sh
+battuta-project todo --scope general list --remain
+```
+
+Show all remaining `todo` items in execution order. Both list filters preserve
+original IDs, overall progress counts, and the next-item indicator. Neither
+changes storage. Use one filter at a time; combining them is rejected.
+
+### Complete or cancel the next item
+
+```sh
+battuta-project todo --scope general done \
+  --rational "Compared the supported formats against the supplied requirements; CSV meets the confirmed import needs."
+battuta-project todo --scope general cancel \
+  --rational "The confirmed scope excludes legacy XML, so that comparison is no longer needed."
+```
+
+- `done` completes only the first `todo` item. Its required `--rational` records a
+  detailed explanation of the actual outcome and relevant verification.
+- `cancel` cancels only the first `todo` item without claiming success. Its required
+  `--rational` explains why that step is cancelled.
+- Missing or blank explanations are rejected without changing the list. The CLI
+  records the explanation but does not independently verify its truth; never invent it.
+
+These commands work in either scope. There is no target-ID option or out-of-order
+completion. Finished lists explicitly report that no TODO items remain. Status
+updates never implicitly create a list.
+
+## Advanced usage
+
+### Inspect the full list
+
+```sh
+battuta-project todo --scope general list
+```
+
+Without a filter, `list` shows all items, including completed/cancelled work and
+their rational explanations.
+
+### Create steps in execution order
 
 ```sh
 battuta-project todo --scope general create \
@@ -51,28 +100,18 @@ the old file unchanged, including unfinished items. It does not bypass validatio
 storage failures, or timestamp collisions. The bot must obtain approval; the CLI
 cannot independently verify conversational consent.
 
-## Advance or revise
+### Revise the remaining steps
 
 ```sh
-battuta-project todo --scope general done \
-  --rational "Compared the supported formats against the supplied requirements; CSV meets the confirmed import needs."
-battuta-project todo --scope general cancel \
-  --rational "The confirmed scope excludes legacy XML, so that comparison is no longer needed."
 battuta-project todo --scope general update-todo \
   --item "Compare the two supported options" \
   --item "Present the trade-offs"
 ```
 
-- `done` completes only the first `todo` item. Its required `--rational` records a
-  detailed explanation of the actual outcome and relevant verification.
-- `cancel` cancels only the first `todo` item without claiming success. Its required
-  `--rational` explains why that step is cancelled.
-- Missing or blank explanations are rejected without changing the list. The CLI
-  records the explanation but does not independently verify its truth; never invent it.
-- `update-todo` requires at least one replacement description and replaces all
-  remaining `todo` items in execution order. Completed/cancelled items remain
-  unchanged, including their rational explanations; replacement IDs continue
-  immediately after that prefix and their rational fields start empty.
+`update-todo` requires at least one replacement description and replaces all
+remaining `todo` items in execution order. Completed/cancelled items remain
+unchanged, including their rational explanations; replacement IDs continue
+immediately after that prefix and their rational fields start empty.
 
 There is no target-ID option, individual deletion/edit, or out-of-order completion.
 IDs describe positions in the current plan, not stable identities across a rewrite
@@ -82,7 +121,7 @@ Neither advancement nor `update-todo` implicitly creates a list.
 ## Output and failure handling
 
 Successful list reads and mutations report the operation, scope/project, role,
-file location, every item with ID/status/description and any rational explanation, and done/cancelled/remaining
+file location, the visible items with ID/status/description and any rational explanation, and done/cancelled/remaining
 counts. `Next:` identifies the first remaining item; finished lists explicitly say
 `No remaining TODO items.` Consult this output when reorienting and before advancing.
 

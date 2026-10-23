@@ -66,29 +66,25 @@ New project initialization creates a rendered summary skeleton. The shared memor
 
 ### Execution TODOs
 
-For long-running, multi-step work, use `battuta-project todo` to keep a small
-ordered execution list and stay oriented as context grows. Skip lists for simple
-replies or single-step work. Choose project scope only when the request and project
-overview establish ownership; current selection alone is not ownership. Use general
-scope for unrelated work or uncertain ownership, without blocking on project selection.
+Use `battuta-project todo` for long-running, multi-step work to keep concrete steps
+in execution order and stay oriented as context grows. Skip lists for simple replies.
+Choose project scope for clearly project-owned work; use general scope otherwise.
 
-Read the latest list in that scope before creating one. Write concrete steps in
-execution order, consult the list when reorienting and before advancing, and use
-`done` or `cancel` for only the next item, supplying `--rational` with a detailed
-explanation. For done, record the actual outcome and relevant verification; for
-cancel, explain why the step is no longer needed. Cancellation is not completion.
-New items have an empty rational. When the approach changes,
-use `update-todo` to replace all remaining steps while retaining the terminal history.
+Work through TODO items strictly in top-down execution order: read the next item,
+perform the work, then mark it done or cancelled with a detailed rational before
+moving to the next item.
 
-If creation reports unfinished work, ask the human owner whether to resume/revise
-it or abandon it, and pause the new work until they decide. Use `create --force`
-only after explicit owner approval to abandon the previous list; a new request alone
-is not that approval. Present progress in ordinary chat when asked. TODOs do not
-grant permission, complete Linear issues, or replace a durable plan. Use memory
-for enduring context rather than transient execution progress.
+| Mode                                                                                          | When and why to use it                                                                                       |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| [Create a list](references/task-todos.md#create-steps-in-execution-order)                     | Turn a long-running request into concrete steps in intended execution order.                                 |
+| [Next item](references/task-todos.md#show-the-next-item)                                      | Refocus on the immediate action without loading the full history.                                            |
+| [Remaining items](references/task-todos.md#show-remaining-items)                              | Understand what still needs doing and in what order.                                                         |
+| [Full list (default)](references/task-todos.md#inspect-the-full-list)                         | Understand past work through all items, including completed/cancelled items and their rational explanations. |
+| [Complete or cancel the next item](references/task-todos.md#complete-or-cancel-the-next-item) | Record the outcome and relevant verification, or the reason for cancellation, before moving on.              |
 
-Read the [TODO command reference](references/task-todos.md) for invocation,
-scope selection, outputs, and error handling. No session-specific tool is needed.
+Present progress in ordinary chat when asked. Read the
+[TODO command reference](references/task-todos.md) before invocation; it owns
+command syntax, options, and advanced list management.
 
 ### Project documents
 

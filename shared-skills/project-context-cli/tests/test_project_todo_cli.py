@@ -79,6 +79,67 @@ class TodoCliTests(ProjectTestCase):
         self.success("done", "--rational", "Different work verified")
         self.success("create", "--item", "Next task", second=2)
 
+    def test_list_remain_preserves_ids_counts_and_stored_history(self):
+        for scope in ("project", "general"):
+            with self.subTest(scope=scope):
+                self.success("list", "--remain", scope=scope)
+                self.success("create", "--item", "Completed step", "--item", "Cancelled step", "--item", "Remaining step", scope=scope)
+                self.success("done", "--rational", "Completion explanation", scope=scope)
+                self.success("cancel", "--rational", "Cancellation explanation", scope=scope)
+                directory = self.project.root / "todos" if scope == "project" else self.home / ".battuta/todos"
+                path = directory / "todo-pm-20261023T120000Z.jsonl"
+                before = path.read_bytes()
+
+                output = self.success("list", "--remain", scope=scope)
+                self.assertIn("3. [todo] Remaining step", output)
+                self.assertIn("Next: #3 Remaining step", output)
+                self.assertIn("1 done, 1 cancelled, 1 remaining", output)
+                for hidden in ("Completed step", "Cancelled step", "Completion explanation", "Cancellation explanation"):
+                    self.assertNotIn(hidden, output)
+                self.assertEqual(path.read_bytes(), before)
+
+                full = self.success("list", scope=scope)
+                for visible in ("Completed step", "Cancelled step", "Remaining step", "Completion explanation", "Cancellation explanation"):
+                    self.assertIn(visible, full)
+
+                self.success("done", "--rational", "Remaining step verified", scope=scope)
+                output = self.success("list", "--remain", scope=scope)
+                self.assertIn("No remaining TODO items.", output)
+                self.assertIn("2 done, 1 cancelled, 0 remaining", output)
+                self.assertNotIn("Remaining step", output)
+
+    def test_list_next_item_follows_execution_order_without_mutating(self):
+        for scope in ("project", "general"):
+            with self.subTest(scope=scope):
+                self.success("list", "--next", scope=scope)
+                self.success("create", "--item", "Completed step", "--item", "Cancelled step", "--item", "Next step", "--item", "Later step", scope=scope)
+                self.success("done", "--rational", "Completion explanation", scope=scope)
+                self.success("cancel", "--rational", "Cancellation explanation", scope=scope)
+                directory = self.project.root / "todos" if scope == "project" else self.home / ".battuta/todos"
+                path = directory / "todo-pm-20261023T120000Z.jsonl"
+                before = path.read_bytes()
+
+                output = self.success("list", "--next", scope=scope)
+                self.assertIn("3. [todo] Next step", output)
+                self.assertIn("1 done, 1 cancelled, 2 remaining", output)
+                for hidden in ("Completed step", "Cancelled step", "Completion explanation", "Cancellation explanation", "Later step"):
+                    self.assertNotIn(hidden, output)
+                self.assertEqual(path.read_bytes(), before)
+
+                conflict = self.call("list", "--next", "--remain", scope=scope)
+                self.assert_explained_failure(conflict)
+                self.assertEqual(path.read_bytes(), before)
+
+                self.success("done", "--rational", "Next step verified", scope=scope)
+                output = self.success("list", "--next", scope=scope)
+                self.assertIn("4. [todo] Later step", output)
+                self.assertNotIn("Next step", output)
+                self.success("cancel", "--rational", "Later step no longer needed", scope=scope)
+                output = self.success("list", "--next", scope=scope)
+                self.assertIn("No remaining TODO items.", output)
+                self.assertIn("2 done, 2 cancelled, 0 remaining", output)
+                self.assertNotIn("Later step", output)
+
     def test_scopes_roles_and_projects_are_isolated(self):
         self.success("create", "--item", "PM project")
         self.assertNotIn("PM project", self.success("list", role="tl"))
