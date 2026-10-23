@@ -4,6 +4,14 @@ Run `battuta-project` from any directory. The CLI owns project discovery and wor
 
 A bare `battuta-project` invocation displays command help.
 
+## Execution TODOs
+
+Use `battuta-project todo --scope project` for work owned by the selected project,
+or `battuta-project todo --scope general` for unrelated work or uncertain ownership.
+The command group offers `create`, `list`, `done`, `cancel`, and `update-todo`.
+Read the [TODO command reference](task-todos.md) before invocation; it owns ordered
+execution, owner-approved `create --force`, outputs, and failure handling.
+
 ## Initialize a project
 
 ```sh

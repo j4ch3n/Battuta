@@ -1,6 +1,6 @@
 ---
 name: project-context
-description: Use when working on, researching, coding, summarizing, specifying, planning, or building artifacts for a project.
+description: Use when working on, researching, coding, summarizing, specifying, planning, or building artifacts for a project, or managing long-running multi-step work with or without project ownership.
 ---
 
 # Project context
@@ -63,6 +63,34 @@ An empty constitution scaffold is not adopted policy. Apply confirmed project gu
 New project initialization creates a rendered summary skeleton. The shared memory bridge handles memory without project-local memory files. Spec tools establish document storage only when authoring is requested. Older projects may lack artifacts: `explain` stays read-only, while requested authoring creates only what is needed. Complete the summary using its shared Markdown reference rather than guessing product context.
 
 ## Tools and command navigation
+
+### Execution TODOs
+
+For long-running, multi-step work, use `battuta-project todo` to keep a small
+ordered execution list and stay oriented as context grows. Skip lists for simple
+replies or single-step work. Choose project scope only when the request and project
+overview establish ownership; current selection alone is not ownership. Use general
+scope for unrelated work or uncertain ownership, without blocking on project selection.
+
+Read the latest list in that scope before creating one. Write concrete steps in
+execution order, consult the list when reorienting and before advancing, and use
+`done` or `cancel` for only the next item, supplying `--rational` with a detailed
+explanation. For done, record the actual outcome and relevant verification; for
+cancel, explain why the step is no longer needed. Cancellation is not completion.
+New items have an empty rational. When the approach changes,
+use `update-todo` to replace all remaining steps while retaining the terminal history.
+
+If creation reports unfinished work, ask the human owner whether to resume/revise
+it or abandon it, and pause the new work until they decide. Use `create --force`
+only after explicit owner approval to abandon the previous list; a new request alone
+is not that approval. Present progress in ordinary chat when asked. TODOs do not
+grant permission, complete Linear issues, or replace a durable plan. Use memory
+for enduring context rather than transient execution progress.
+
+Read the [TODO command reference](references/task-todos.md) for invocation,
+scope selection, outputs, and error handling. No session-specific tool is needed.
+
+### Project documents
 
 Use [project-spec tools](references/spec-tools.md) for named specs, canonical checklist/review, and terminal decisions. Both roles inspect spec inventories and documents. All writes receive complete content; there is no spec/decision CLI or publish stage.
 
