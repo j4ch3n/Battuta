@@ -16,7 +16,12 @@ import {
   validatePersonalProfile,
   type PersonalProfile,
 } from "./dream-personal.ts";
-import { createDreamReflection, publishDreamLog, type DreamComplete } from "./dream-result.ts";
+import {
+  createDreamReflection,
+  publishDreamLog,
+  type DreamComplete,
+  type DreamOutcome,
+} from "./dream-result.ts";
 import { readOwnerProfile } from "./profile-loader.ts";
 import { redact } from "./privacy.ts";
 import {
@@ -47,7 +52,20 @@ const checkpointSchema = z.object({
   window_end: z.number(),
   records: z.array(memoryRecordSchema),
   recent_refs: z.array(ref),
-  operations: dreamPlanSchema.shape.operations,
+  // Normalize only persisted legacy plans. Never accept the old reason field
+  // from new model output or turn it into a public report for a legacy run.
+  operations: z.preprocess(
+    (value) =>
+      Array.isArray(value)
+        ? value.map((operation: unknown) => {
+            if (!operation || typeof operation !== "object" || "summary" in operation)
+              return operation;
+            const { reason, ...rest } = operation as Record<string, unknown>;
+            return { ...rest, summary: reason ?? "Legacy memory insert." };
+          })
+        : value,
+    dreamPlanSchema.shape.operations,
+  ),
   results: z.array(
     z.object({
       id: z.string(),
@@ -64,6 +82,7 @@ const checkpointSchema = z.object({
   base_profile: z.string().optional(),
   profile_published: z.boolean(),
   reflection: z.string().optional(),
+  summary: z.string().min(1).optional(),
   conflict: z.boolean().optional(),
   completed: z.boolean(),
   handled: z.record(z.string(), z.string()),
@@ -141,6 +160,11 @@ async function prepare(
     records: inventory.records,
     recent_refs: recent,
     operations: plan.operations,
+    summary: plan.operations.length
+      ? plan.operations
+          .map((operation) => redact(operation.summary).trim().replace(/\s+/g, " "))
+          .join(" ")
+      : "No memory changes were needed.",
     results: [],
     profile_published: false,
     completed: false,
@@ -292,7 +316,17 @@ async function observeAcknowledgement(
   await save();
 }
 
-export async function runDream(deps: DreamDependencies, signal: AbortSignal): Promise<string> {
+function publicOutcome(state: Checkpoint): DreamOutcome {
+  if (state.conflict) return { status: "partial" };
+  return state.summary
+    ? { status: "complete", summary: state.summary }
+    : { status: "already_completed" };
+}
+
+export async function runDream(
+  deps: DreamDependencies,
+  signal: AbortSignal,
+): Promise<DreamOutcome> {
   signal.throwIfAborted();
   const release = await acquireDreamLock(deps.directory);
   try {
@@ -300,7 +334,7 @@ export async function runDream(deps: DreamDependencies, signal: AbortSignal): Pr
     const text = await optionalText(path);
     const previous = text ? checkpointSchema.parse(JSON.parse(text)) : undefined;
     if (previous?.completed && previous.run_id === dreamRunId(deps.now()))
-      return previous.reflection!;
+      return publicOutcome(previous);
     const state =
       previous && !previous.completed ? previous : await prepare(deps, previous, signal);
     state.version = 2;
@@ -369,21 +403,17 @@ export async function runDream(deps: DreamDependencies, signal: AbortSignal): Pr
       // later operations, without replaying their acknowledged mutations.
       for (const result of state.results)
         await observeAcknowledgement(deps, state, result, save, signal);
-      state.reflection = await createDreamReflection(
-        deps.complete,
-        state.run_id,
-        {
-          confirmed_changes: state.results,
-          partial: state.conflict ?? false,
-          unapplied_operation_ids: state.operations
-            .filter((op) => !state.results.some((r) => r.id === op.id))
-            .map((op) => op.id),
-          profile_before: state.base_profile,
-          profile_after: state.profile?.content,
-          profile_published: state.profile_published,
-        },
-        signal,
-      );
+      const outcome = {
+        confirmed_changes: state.results,
+        partial: state.conflict ?? false,
+        unapplied_operation_ids: state.operations
+          .filter((op) => !state.results.some((r) => r.id === op.id))
+          .map((op) => op.id),
+        profile_before: state.base_profile,
+        profile_after: state.profile?.content,
+        profile_published: state.profile_published,
+      };
+      state.reflection = await createDreamReflection(deps.complete, state.run_id, outcome, signal);
       await save();
     }
     signal.throwIfAborted();
@@ -405,7 +435,7 @@ export async function runDream(deps: DreamDependencies, signal: AbortSignal): Pr
     };
     state.completed = true;
     await save();
-    return state.reflection;
+    return publicOutcome(state);
   } finally {
     release();
   }

@@ -6,12 +6,13 @@ import { enabledDreamModel } from "./dream-config.ts";
 import { DreamExecutionError, type DreamFailure, executeDream } from "./dream-executor.ts";
 import { recordDreamUsage } from "./dream-usage.ts";
 import { abortable } from "./abortable.ts";
+import type { DreamOutcome } from "./dream-result.ts";
 
 export default function dreamExtension(pi: ExtensionAPI) {
   if (process.env.AGENT_ROLE !== "pm") return;
   const shutdown = new AbortController();
   let started = false;
-  let active: Promise<void> | undefined;
+  let active: Promise<DreamOutcome> | undefined;
   async function execute(ctx: ExtensionContext, signal?: AbortSignal) {
     let configured = false;
     try {
@@ -34,8 +35,9 @@ export default function dreamExtension(pi: ExtensionAPI) {
           active = undefined;
         });
       }
-      await abortable(active, signal ?? shutdown.signal);
-      ctx.ui.setStatus("memory-dream", "Memory dream complete");
+      const result = await abortable(active, signal ?? shutdown.signal);
+      ctx.ui.setStatus("memory-dream", `Memory dream ${result.status.replaceAll("_", " ")}`);
+      return result;
     } catch (error) {
       const failure: DreamFailure = !configured
         ? "unavailable"
@@ -59,13 +61,13 @@ export default function dreamExtension(pi: ExtensionAPI) {
     name: "memory_dream",
     label: "Memory dream",
     description:
-      "Run the explicitly configured private memory dream. Returns completion status only, never private reflections. Does not accept custom prompts or models.",
+      "Run the explicitly configured memory dream. On success, report successful completion and the returned public summary. For partial, already completed without a summary, or failed runs, report the actual status honestly. Never request or repeat private reflections. Does not accept custom prompts or models.",
     parameters: Type.Object({}, { additionalProperties: false }),
     async execute(_id, _params, signal, _update, ctx) {
-      await execute(ctx, signal);
+      const result = await execute(ctx, signal);
       return {
-        content: [{ type: "text", text: JSON.stringify({ status: "complete" }) }],
-        details: { status: "complete" },
+        content: [{ type: "text", text: JSON.stringify(result) }],
+        details: result,
       };
     },
   });
