@@ -5,6 +5,14 @@ import { runDream } from "./dream-runtime.ts";
 import { MemoryMcpClient } from "./mcp-client.ts";
 import { abortable } from "./abortable.ts";
 
+export type DreamFailure = "unavailable" | "cancelled" | "timed_out" | "failed";
+
+export class DreamExecutionError extends Error {
+  constructor(readonly failure: DreamFailure) {
+    super(failure);
+  }
+}
+
 export async function executeDream(
   ctx: ExtensionContext,
   options: {
@@ -14,34 +22,43 @@ export async function executeDream(
     onUsage: (usage: unknown) => Promise<void>;
   },
 ): Promise<void> {
-  if (!/^[^/\s]+\/[^\s]+$/.test(options.model)) throw new Error("Invalid dream model");
+  if (!/^[^/\s]+\/[^\s]+$/.test(options.model)) throw new DreamExecutionError("unavailable");
   const separator = options.model.indexOf("/");
   const model = ctx.modelRegistry.find(
     options.model.slice(0, separator),
     options.model.slice(separator + 1),
   );
   if (!model || `${model.provider}/${model.id}` !== options.model)
-    throw new Error("Configured dream model unavailable");
-  const config = clientConfig();
+    throw new DreamExecutionError("unavailable");
+  const timeout = AbortSignal.timeout(600000);
   const signal = AbortSignal.any([
     options.shutdown,
     ...(options.signal ? [options.signal] : []),
-    AbortSignal.timeout(600000),
+    timeout,
   ]);
-  signal.throwIfAborted();
-  const client = new MemoryMcpClient(config.url);
-  // Fixed model completions receive evidence, not PM history or tool access.
-  // The private reflection is persisted by the engine, never returned to PM.
-  await abortable(
-    runDream(
-      {
-        directory: config.dataDirectory,
-        now: () => new Date(),
-        complete: dreamCompletion(ctx, options.onUsage, model),
-        call: (name, args, abort) => abortable(client.call(name, args, abort), abort),
-      },
+  try {
+    signal.throwIfAborted();
+    const config = clientConfig();
+    const client = new MemoryMcpClient(config.url);
+    // Fixed model completions receive evidence, not PM history or tool access.
+    // The private reflection is persisted by the engine, never returned to PM.
+    await abortable(
+      runDream(
+        {
+          directory: config.dataDirectory,
+          now: () => new Date(),
+          complete: dreamCompletion(ctx, options.onUsage, model),
+          call: (name, args, abort) => abortable(client.call(name, args, abort), abort),
+        },
+        signal,
+      ),
       signal,
-    ),
-    signal,
-  );
+    );
+  } catch (error) {
+    if (error instanceof DreamExecutionError) throw error;
+    if (options.shutdown.aborted || options.signal?.aborted)
+      throw new DreamExecutionError("cancelled");
+    if (timeout.aborted) throw new DreamExecutionError("timed_out");
+    throw new DreamExecutionError("failed");
+  }
 }

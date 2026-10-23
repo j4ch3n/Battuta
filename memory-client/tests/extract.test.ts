@@ -59,12 +59,9 @@ test.each([
     ],
   }),
   JSON.stringify({
-    items: [{ content: "password is hunter2", scope: { global: true }, source_entry_ids: ["e"] }],
-  }),
-  JSON.stringify({
     items: [{ content: "x".repeat(1001), scope: { global: true }, source_entry_ids: ["e"] }],
   }),
-])("rejects invalid, cross-project, uncited or unsafe output", async (content) => {
+])("rejects invalid, cross-project, uncited or oversized output", async (content) => {
   await expect(
     extractMemories(job, context(content), new AbortController().signal),
   ).rejects.toThrow();
@@ -107,14 +104,14 @@ test.each([
   "SUPABASE_SECRET_KEY=sb_secret_" + "s".repeat(32),
   "PM_TELEGRAM_TOKEN=123456789:" + "A".repeat(35),
   "TL_TELEGRAM_TOKEN=987654321:" + "B".repeat(35),
-])("rejects supported credential assignments in extracted output", async (content) => {
-  await expect(
-    extractMemories(
-      job,
-      context(
-        JSON.stringify({ items: [{ content, scope: { global: true }, source_entry_ids: ["e"] }] }),
-      ),
-      new AbortController().signal,
+])("accepts credential-like model output for local memory", async (content) => {
+  const result = await extractMemories(
+    job,
+    context(
+      JSON.stringify({ items: [{ content, scope: { global: true }, source_entry_ids: ["e"] }] }),
     ),
-  ).rejects.toThrow();
+    new AbortController().signal,
+  );
+
+  expect(result.batch.items[0].content).toBe(content);
 });

@@ -1,18 +1,12 @@
 import { z } from "zod";
 import { renderOwnerProfile } from "./dream-profile.ts";
 import { type MemoryRecord } from "./dream-mutations.ts";
-import { redact } from "./privacy.ts";
 
 const statements = z
   .array(
     z
       .object({
-        text: z
-          .string()
-          .trim()
-          .min(1)
-          .max(4000)
-          .refine((v) => redact(v) === v),
+        text: z.string().trim().min(1).max(4000),
         source_refs: z.array(z.string().regex(/^[0-9a-f]{64}$/)).max(100),
       })
       .strict(),
@@ -33,6 +27,15 @@ export const personalProfileSchema = z
   .strict();
 export type PersonalProfile = z.infer<typeof personalProfileSchema> & { content: string };
 
+function normalizePersonalProfile(input: unknown) {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) return input;
+  const expected = Object.keys(personalProfileSchema.shape.sections.shape);
+  const keys = Object.keys(input);
+  return keys.length === expected.length && expected.every((key) => keys.includes(key))
+    ? { sections: input }
+    : input;
+}
+
 export function validatePersonalProfile(
   input: unknown,
   records: MemoryRecord[],
@@ -40,7 +43,7 @@ export function validatePersonalProfile(
   previous: PersonalProfile | undefined,
   trackedStatements: string[] = [],
 ): PersonalProfile {
-  const { sections } = personalProfileSchema.parse(input);
+  const { sections } = personalProfileSchema.parse(normalizePersonalProfile(input));
   const globalRefs = new Set(records.filter((r) => r.scope.global).map((r) => r.ref));
   // Editing unrelated bytes must never detach previously tracked understanding.
   const prior = previous ? Object.values(previous.sections).flat() : [];

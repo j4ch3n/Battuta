@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises";
 import { z } from "zod";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { digest, type CaptureJob } from "./capture-queue.ts";
-import { redact } from "./privacy.ts";
 import { abortable } from "./abortable.ts";
 
 const itemSchema = z
@@ -59,11 +58,8 @@ export async function extractMemories(
   );
   const sourceIds = new Set(job.segment.messages.map((m) => m.entry_id));
   const items = parsed.items.map((item, i) => {
-    if (
-      redact(item.content) !== item.content ||
-      item.tags.some((t) => redact(t) !== t || t.includes(",") || /^(scope|proj|kind):/.test(t))
-    )
-      throw new Error("Unsafe extracted memory");
+    if (item.tags.some((t) => t.includes(",") || /^(scope|proj|kind):/.test(t)))
+      throw new Error("Invalid extracted memory tag");
     const projects = [...new Set(item.scope.projects)].sort();
     if (
       item.scope.global
