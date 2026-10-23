@@ -51,9 +51,15 @@ This states a conclusion but omits the cost, uncertainty, and condition that cou
 
 **Good — direct evidence, trade-off, and only a necessary decision:**
 
-> **Recommendation: Stripe Billing.** Its metered-billing support is the fastest route to launch; reporting fit still needs validation. Building in-house guarantees reporting control, but delays launch and adds operational ownership. Decide whether reporting control is non-negotiable.
+> **Recommendation: use a usage-based billing provider.** [Stripe's usage-based billing documentation](https://docs.stripe.com/billing/usage-based) confirms support for real-time metering, pricing, billing, and reporting. If the integration estimate meets the launch date, it is faster than building in-house; validate the reporting requirements before deciding. Building in-house gives implementation control, but transfers delivery and operating responsibility to the team. Decide whether that control is non-negotiable.
 
-This keeps the decision-changing evidence and uncertainty visible, explains the trade-off, and asks only for the owner decision.
+This distinguishes sourced evidence from the condition that needs an internal estimate, keeps the decision-changing uncertainty visible, explains the trade-off, and asks only for the owner decision.
+
+**Short research — source-backed finding without a comparison:**
+
+> **Stripe documents usage-based billing.** Its documentation describes real-time metering, pricing, billing, and reporting. This removes the capability question; validate fit with the required reporting workflow next. Source: [Stripe usage-based billing](https://docs.stripe.com/billing/usage-based).
+
+This answers the narrow research question with a source and material uncertainty without inventing options to compare.
 
 ## Owner-facing communication
 
