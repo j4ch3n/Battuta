@@ -603,6 +603,23 @@ const emptyProfile = () => ({
   },
 });
 
+test("repairs malformed unwrapped personal profile JSON before strict validation", async () => {
+  const f = await fixture();
+  const complete = f.dependencies.complete;
+  f.dependencies.complete = (prompt, input, signal) =>
+    prompt.startsWith("Refresh")
+      ? Promise.resolve(
+          "{backgroundAndRole: [], goalsAndPriorities: [], valuesAndDecisionMaking: [], lifeContextAndInterests: [], enduringPreferencesAndConstraints: [],}",
+        )
+      : complete(prompt, input, signal);
+
+  await runDream(f.dependencies, new AbortController().signal);
+
+  expect(
+    JSON.parse(await readFile(join(f.dependencies.directory, "dream-profile.json"), "utf8")),
+  ).toMatchObject(emptyProfile());
+});
+
 test("next day revisits concurrent captures and membership revisions, not the final snapshot", async () => {
   const f = await fixture();
   const external = hash("concurrent capture");
