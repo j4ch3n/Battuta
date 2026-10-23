@@ -37,9 +37,23 @@ Use the least-complex route that lets the owner understand, decide, or act. Hono
 
 Examples:
 
-> **Stripe supports usage-based billing.** Its Billing API supports metered prices and tiered models, which fits the pricing experiment. The remaining question is whether its reporting covers the required revenue breakdown. Sources: Stripe Billing and usage-record documentation.
+**Bad — narrates work and delegates an unprepared decision:**
 
-> **Recommendation: Stripe Billing.** Metered billing is already supported, so it is the fastest route to launch; reporting fit still needs validation. Building in-house guarantees reporting control, but delays launch and adds operational ownership. Choose Stripe unless reporting control is confirmed as non-negotiable.
+> I researched the billing options and found some useful information. There are pros and cons to both, and I think Stripe may be best. Please review the sources and let me know what you want to do.
+
+This makes the owner reconstruct the trade-off and assigns routine PM work.
+
+**Neutral — concise but not decision-ready:**
+
+> Stripe is the recommended billing option. It supports usage-based billing, while building in-house gives us more control.
+
+This states a conclusion but omits the cost, uncertainty, and condition that could change it.
+
+**Good — direct evidence, trade-off, and only a necessary decision:**
+
+> **Recommendation: Stripe Billing.** Its metered-billing support is the fastest route to launch; reporting fit still needs validation. Building in-house guarantees reporting control, but delays launch and adds operational ownership. Decide whether reporting control is non-negotiable.
+
+This keeps the decision-changing evidence and uncertainty visible, explains the trade-off, and asks only for the owner decision.
 
 ## Owner-facing communication
 
