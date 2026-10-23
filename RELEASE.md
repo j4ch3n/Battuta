@@ -4,6 +4,9 @@ This guide is for installing the prebuilt **64-bit Linux ARM** Battuta release o
 
 ## Extension and skill setup index
 
+TL-only bounded Pi children are opt-in; see [bounded child setup](docs/subagents-setup.md)
+for the private operator grant, dedicated provider key and deployment acceptance.
+
 Installation navigation lives here, separate from runtime skill workflows and command contracts. Use the component's setup guide below; bundled resources do not need separate installation. When adding an extension or skill, update this index with its installation guide or explicitly state how the release configures it.
 
 | Component                                                  | Installation and configuration                                                                                                                                                                                                            |

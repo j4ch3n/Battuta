@@ -13,6 +13,7 @@ from bot_setup import (  # noqa: E402
 )
 
 ROOT = Path(__file__).resolve().parents[3]
+from bot_setup.subagents import configure_subagents
 
 
 @click.command()
@@ -37,6 +38,7 @@ def main(bot_dir: Path, env_file: Path, env_prefix: str, telegram_package: str) 
     configure_telegram(bot_dir, env_file, env_prefix, values)
     configure_mcp(bot_dir, env_file, values)
     configure_memory_settings(bot_dir, role="tl")
+    configure_subagents(bot_dir, root=ROOT)
     install_packages(bot_dir, telegram_package)
     warn_running_session(bot_dir)
 

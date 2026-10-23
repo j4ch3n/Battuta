@@ -50,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots shared-skills agent-mail project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/gogcli-setup.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md | tar -x -C dist/stage/battuta
+          git archive HEAD bots shared-skills agent-mail project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/gogcli-setup.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md | tar -x -C dist/stage/battuta
           test -s dist/stage/battuta/RELEASE.md
           test -s dist/stage/battuta/docs/gogcli-setup.md
           test -s dist/stage/battuta/bots/pm-bot/.pi/skills/memory/references/tools.md
@@ -165,6 +165,12 @@ jobs:
           rm -rf "$memory_smoke_home"
           test -x dist/stage/battuta/bots/pm-bot/node_modules/.bin/pi
           test -x dist/stage/battuta/bots/tl-bot/node_modules/.bin/pi
+          test -f dist/stage/battuta/bots/tl-bot/.pi/extensions/bounded-subagents/index.ts
+          test -f dist/stage/battuta/bots/tl-bot/.pi/skills/use-subagent/references/tools.md
+          test -f dist/stage/battuta/bots/tl-bot/node_modules/pi-subagents/LICENSE
+          test ! -e dist/stage/battuta/bots/pm-bot/node_modules/pi-subagents
+          test ! -e dist/stage/battuta/bots/tl-bot/.pi/subagents.json
+          pnpm --dir dist/stage/battuta/bots/tl-bot exec node --input-type=module -e 'import upstream from "pi-subagents"; import { SUBAGENT_DELEGATION_REQUEST_EVENT } from "pi-subagents/delegation"; if (typeof upstream !== "function" || !SUBAGENT_DELEGATION_REQUEST_EVENT) process.exit(1)'
           test -d dist/stage/battuta/agent-mail/node_modules
           test -d dist/stage/battuta/project-spec/node_modules
           test -d dist/stage/battuta/memory-client/node_modules
