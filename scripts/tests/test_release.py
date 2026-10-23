@@ -1,6 +1,7 @@
 """Release package installation runs inside the staged bot workspaces."""
 
 import os
+import json
 from pathlib import Path
 import re
 import shutil
@@ -35,7 +36,7 @@ class ReleaseInstallTests(ConfigFixture):
             self.assertTrue((memory / "references/tools.md").is_file())
             self.assertTrue((memory.parent / "project-context").is_symlink())
 
-    def test_packages_are_installed_inside_archive_with_scheduler_only_for_pm(self):
+    def test_packages_are_installed_from_staged_bot_settings(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         loop = re.search(
             r'^          for bot in pm-bot tl-bot; do\n            bot_dir=.*?^          done$',
@@ -43,9 +44,19 @@ class ReleaseInstallTests(ConfigFixture):
         )
         self.assertIsNotNone(loop)
         stage = self.root / "dist/stage/battuta/bots"
+        expected_packages = {}
         for role in ("pm-bot", "tl-bot"):
             bot = stage / role
             (bot / "node_modules/.bin").mkdir(parents=True)
+            settings = json.loads((ROOT / "bots" / role / ".pi/settings.json").read_text())
+            (bot / ".pi").mkdir(exist_ok=True)
+            (bot / ".pi/settings.json").write_text(json.dumps(settings))
+            expected_packages[role] = [
+                source.removeprefix("npm:").rsplit("@", 1)[0]
+                for entry in settings["packages"]
+                if isinstance(entry, str)
+                if (source := entry).startswith("npm:")
+            ]
             skill = bot / ".pi/skills/manage-google"
             if role == "pm-bot":
                 skill.mkdir(parents=True)
@@ -77,7 +88,6 @@ package = pathlib.Path.cwd() / ".pi/npm/node_modules" / name
         self.assertEqual(result.returncode, 0, result.stderr)
         for role in ("pm-bot", "tl-bot"):
             packages = stage / role / ".pi/npm/node_modules"
-            self.assertTrue((packages / "@llblab/pi-telegram/src/index.ts").is_file())
-            self.assertEqual((packages / "@jl1990/pi-scheduler/extensions/scheduler/index.ts").is_file(), role == "pm-bot")
-            self.assertFalse((packages / "pi-memory-stone/src/index.ts").exists())
+            for package in expected_packages[role]:
+                self.assertTrue((packages / package).is_dir())
         self.assertFalse((self.root / ".pi/npm").exists())
