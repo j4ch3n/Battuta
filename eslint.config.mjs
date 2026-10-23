@@ -31,6 +31,8 @@ export default defineConfig(
       "project-spec/**/*.ts",
       "memory-client/**/*.ts",
       "bots/**/.pi/extensions/**/*.ts",
+      "bots/tl-bot/tests/**/*.ts",
+      "bots/tl-bot/vitest.config.ts",
     ],
     extends: [js.configs.recommended, tseslint.configs.recommendedTypeChecked],
     languageOptions: {
