@@ -229,6 +229,7 @@ async function fixture() {
                 id: "insert",
                 type: "insert",
                 content: "Combined implementation detail",
+                summary: "Combined overlapping implementation details.",
                 kind: "observation",
                 source_refs: [old, duplicate],
               },
@@ -237,14 +238,14 @@ async function fixture() {
                 type: "update",
                 ref: old,
                 content: "Current decision",
-                reason: "Latest evidence",
+                summary: "Corrected an outdated decision.",
                 source_refs: [old],
               },
               {
                 id: "remove",
                 type: "forget",
                 ref: duplicate,
-                reason: "Merged",
+                summary: "Removed the redundant detail.",
                 source_refs: [duplicate],
                 replacement_id: "insert",
               },
@@ -298,12 +299,123 @@ const graphReceipt = (fingerprint: string) => ({
   status: "published" as const,
 });
 
+test("public summary comes from the plan without an extra completion and is reused on replay", async () => {
+  const f = await fixture();
+  const complete = f.dependencies.complete;
+  let completions = 0;
+  f.dependencies.complete = (prompt, evidence, signal) => {
+    completions++;
+    if (prompt.startsWith("Write a private"))
+      return Promise.resolve("PRIVATE reflection narrative.");
+    if (completions > 3) throw new Error("Unexpected extra completion");
+    return complete(prompt, evidence, signal);
+  };
+  const signal = new AbortController().signal;
+  const result = await runDream(f.dependencies, signal);
+  expect(result).toEqual({
+    status: "complete",
+    summary:
+      "Combined overlapping implementation details. Corrected an outdated decision. Removed the redundant detail.",
+  });
+  expect(await runDream(f.dependencies, signal)).toEqual(result);
+  expect(completions).toBe(3);
+  expect(await readFile(join(f.dependencies.directory, "dream.log"), "utf8")).toContain(
+    "PRIVATE reflection narrative",
+  );
+});
+
+test("public operation summaries normalize whitespace and redact credentials without changing mutation arguments", async () => {
+  const f = await fixture();
+  const complete = f.dependencies.complete;
+  const secret = "ghp_123456789012345678901234567890";
+  f.dependencies.complete = async (prompt, evidence, signal) => {
+    const result = await complete(prompt, evidence, signal);
+    if (!prompt.startsWith("Consolidate")) return result;
+    const plan = JSON.parse(result) as { operations: Record<string, unknown>[] };
+    plan.operations[1].summary = `Corrected\nthe decision. ${secret}`;
+    return JSON.stringify(plan);
+  };
+  const call = f.dependencies.call;
+  f.dependencies.call = (name, args, signal) => {
+    if (name === "memory_update") expect(args.reason).toBe(`Corrected\nthe decision. ${secret}`);
+    return call(name, args, signal);
+  };
+  expect(await runDream(f.dependencies, new AbortController().signal)).toEqual({
+    status: "complete",
+    summary:
+      "Combined overlapping implementation details. Corrected the decision. [REDACTED:token] Removed the redundant detail.",
+  });
+});
+
+test("a failed reflection retains the plan summary without repeating planning or mutations", async () => {
+  const f = await fixture();
+  const complete = f.dependencies.complete;
+  let unavailable = true;
+  f.dependencies.complete = (prompt, evidence, signal) => {
+    if (prompt.startsWith("Write a private") && unavailable)
+      return Promise.reject(new Error("reflection provider unavailable"));
+    return complete(prompt, evidence, signal);
+  };
+  const signal = new AbortController().signal;
+  await expect(runDream(f.dependencies, signal)).rejects.toThrow("reflection provider unavailable");
+  const saved = JSON.parse(
+    await readFile(join(f.dependencies.directory, "dream-state.json"), "utf8"),
+  ) as Record<string, unknown>;
+  expect(saved.summary).toBe(
+    "Combined overlapping implementation details. Corrected an outdated decision. Removed the redundant detail.",
+  );
+  expect(saved.completed).toBe(false);
+  unavailable = false;
+  expect(await runDream(f.dependencies, signal)).toEqual({
+    status: "complete",
+    summary: saved.summary,
+  });
+  expect(f.applied).toHaveLength(3);
+  expect(f.plans()).toBe(1);
+});
+
+test("completed legacy checkpoints without a summary report status without exposing reflection or replaying work", async () => {
+  const f = await fixture();
+  const signal = new AbortController().signal;
+  await runDream(f.dependencies, signal);
+  const path = join(f.dependencies.directory, "dream-state.json");
+  const state = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+  delete state.summary;
+  await writeFile(path, JSON.stringify(state));
+  f.dependencies.complete = () => Promise.reject(new Error("must not synthesize"));
+  expect(await runDream(f.dependencies, signal)).toEqual({ status: "already_completed" });
+  expect(f.applied).toHaveLength(3);
+});
+
+test("a no-change run reports successful completion with an honest no-change summary", async () => {
+  const f = await fixture();
+  const profile = validatePersonalProfile(emptyProfile(), [...f.records.values()], "", undefined);
+  await writeFile(join(f.dependencies.directory, "ME.md"), profile.content);
+  f.dependencies.complete = (prompt, evidence) => {
+    if (prompt.startsWith("Consolidate")) return Promise.resolve('{"operations":[]}');
+    if (prompt.startsWith("Refresh")) return Promise.resolve(JSON.stringify(emptyProfile()));
+    const outcome = JSON.parse(evidence) as Record<string, unknown>;
+    expect(outcome.confirmed_changes).toEqual([]);
+    expect(outcome.profile_before).toBe(outcome.profile_after);
+    return Promise.resolve("Nothing material changed.");
+  };
+  expect(await runDream(f.dependencies, new AbortController().signal)).toEqual({
+    status: "complete",
+    summary: "No memory changes were needed.",
+  });
+  expect(f.applied).toEqual([]);
+});
+
 test("applies insert/update/forget, publishes the whole profile, and appends a reflection once", async () => {
   const f = await fixture();
   await writeFile(join(f.dependencies.directory, "SUMMARY.md"), "Do not change");
   const signal = new AbortController().signal;
   const result = await runDream(f.dependencies, signal);
-  expect(result).toContain("corrected the project decision");
+  expect(result).toEqual({
+    status: "complete",
+    summary:
+      "Combined overlapping implementation details. Corrected an outdated decision. Removed the redundant detail.",
+  });
   expect(f.applied).toEqual(["memory_remember", "memory_update", "memory_forget"]);
   expect(f.stages).toEqual([
     "memory_remember",
@@ -318,7 +430,7 @@ test("applies insert/update/forget, publishes the whole profile, and appends a r
   expect(await readFile(join(f.dependencies.directory, "SUMMARY.md"), "utf8")).toBe(
     "Do not change",
   );
-  expect(await runDream(f.dependencies, signal)).toBe(result);
+  expect(await runDream(f.dependencies, signal)).toEqual(result);
   expect(f.plans()).toBe(1);
   expect(f.graphBuilds).toHaveLength(1);
   expect(
@@ -339,14 +451,14 @@ test("update-based merge cleanup guards its acknowledged replacement instead of 
               type: "update",
               ref: old,
               content: "Current decision",
-              reason: "Combine",
+              summary: "Combined the details.",
               source_refs: [old, duplicate],
             },
             {
               id: "cleanup",
               type: "forget",
               ref: duplicate,
-              reason: "Merged",
+              summary: "Removed the merged detail.",
               replacement_id: "merge",
               source_refs: [old, duplicate],
             },
@@ -381,14 +493,14 @@ test.each([false, true])(
                 type: "update",
                 ref: old,
                 content: "Current decision",
-                reason: "Combine",
+                summary: "Combined the details.",
                 source_refs: refs,
               },
               ...[duplicate, extra].map((ref, index) => ({
                 id: `cleanup${index}`,
                 type: "forget",
                 ref,
-                reason: "Merged",
+                summary: "Removed the merged detail.",
                 replacement_id: "merge",
                 source_refs: refs,
               })),
@@ -494,18 +606,25 @@ test.each(["unpublished", "profile", "reflection", "completed"])(
   async (stage) => {
     const f = await fixture();
     const signal = new AbortController().signal;
-    const result = await runDream(f.dependencies, signal);
+    await runDream(f.dependencies, signal);
     const path = join(f.dependencies.directory, "dream-state.json");
     const state = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
     state.version = 1;
     delete state.consolidation;
+    delete state.summary;
+    state.operations = (state.operations as Record<string, unknown>[]).map(
+      ({ summary, ...operation }) => ({
+        ...operation,
+        ...(operation.type === "insert" ? {} : { reason: summary }),
+      }),
+    );
     state.completed = stage === "completed";
     if (stage === "unpublished") state.profile_published = false;
     if (stage === "unpublished" || stage === "profile") delete state.reflection;
     await writeFile(path, JSON.stringify(state));
     const profilePath = join(f.dependencies.directory, "ME.md");
     if (stage !== "unpublished") await writeFile(profilePath, "Owner's current private text");
-    expect(await runDream(f.dependencies, signal)).toBe(result);
+    expect(await runDream(f.dependencies, signal)).toEqual({ status: "already_completed" });
     expect(f.applied).toHaveLength(3);
     expect(f.plans()).toBe(1);
     const saved = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
@@ -588,7 +707,10 @@ test("a terminal conflict logs only confirmed changes and leaves dependent clean
     return complete(prompt, input, signal);
   };
   const result = await runDream(f.dependencies, new AbortController().signal);
-  expect(result).toContain("partially applied");
+  expect(result).toEqual({ status: "partial" });
+  expect(await runDream(f.dependencies, new AbortController().signal)).toEqual({
+    status: "partial",
+  });
   expect(f.applied).toEqual(["memory_remember"]);
   expect(f.records.has(duplicate)).toBe(true);
 });
@@ -667,6 +789,7 @@ test("lost-ack historical receipt after external forgetting is not reflected as 
               id: "insert",
               type: "insert",
               content: "Combined implementation detail",
+              summary: "Combined overlapping implementation details.",
               kind: "observation",
               source_refs: [old, duplicate],
             },
@@ -870,13 +993,14 @@ test("earlier plan mutations invalidating later cited sources finish as a termin
               type: "update",
               ref: old,
               content: "Current decision",
-              reason: "correction",
+              summary: "Corrected the outdated fact.",
               source_refs: [old],
             },
             {
               id: "derived",
               type: "insert",
               content: "Must not derive stale evidence",
+              summary: "Recorded a derived implementation detail.",
               kind: "observation",
               source_refs: [old],
             },
@@ -1015,6 +1139,7 @@ test("preserves established global profile understanding by re-citing an evidenc
               id: "merge",
               type: "insert",
               content: "Concise answers are preferred",
+              summary: "Combined the concise-answer preferences.",
               kind: "preference",
               source_refs: [pref, second],
             },
@@ -1022,7 +1147,7 @@ test("preserves established global profile understanding by re-citing an evidenc
               id: "retire_a",
               type: "forget",
               ref: pref,
-              reason: "Merged duplicate",
+              summary: "Removed the merged duplicate.",
               source_refs: [pref],
               replacement_id: "merge",
             },
@@ -1030,7 +1155,7 @@ test("preserves established global profile understanding by re-citing an evidenc
               id: "retire_b",
               type: "forget",
               ref: second,
-              reason: "Merged duplicate",
+              summary: "Removed the merged duplicate.",
               source_refs: [second],
               replacement_id: "merge",
             },

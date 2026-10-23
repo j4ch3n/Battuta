@@ -124,6 +124,7 @@ loaded.runtime.sendUserMessage = (prompt) => {
 };
 let modelCalls = 0;
 const reflection = "PRIVATE dream reflection";
+const summary = "No memory changes were needed.";
 const ctx = {
   cwd: directory,
   hasUI: false,
@@ -136,6 +137,7 @@ const ctx = {
       assert.equal(input.tools, undefined);
       assert.equal(input.messages.length, 1);
       assert.ok(!JSON.stringify(input).includes("PRIVATE PM transcript"));
+      assert.ok(!JSON.stringify(input).includes(reflection));
       modelCalls++;
       const text = input.systemPrompt.includes("Refresh the whole high-level personal profile")
         ? JSON.stringify({
@@ -167,7 +169,9 @@ try {
   await assert.rejects(access(join(data, "dream.log")), "Delivery is not dream completion");
   releaseEvidence();
   const result = await scheduled;
-  assert.deepEqual(result.details, { status: "complete" });
+  assert.equal(modelCalls, 2, "Empty inventory needs only profile and private reflection calls");
+  assert.deepEqual(result.details, { status: "complete", summary });
+  assert.deepEqual(JSON.parse(result.content[0].text), { status: "complete", summary });
   assert.ok(!JSON.stringify(result).includes(reflection));
   assert.ok(inventoryCalls > 0);
   assert.equal(JSON.parse(await readFile(join(data, "dream-state.json"), "utf8")).completed, true);
@@ -176,7 +180,10 @@ try {
   assert.ok(!JSON.stringify(publicEvents).includes(reflection));
   assert.ok(!(await readFile(join(data, "dream-usage.jsonl"), "utf8")).includes(reflection));
   const calls = modelCalls;
-  await tool.execute("repeat", {}, undefined, undefined, ctx);
+  assert.deepEqual((await tool.execute("repeat", {}, undefined, undefined, ctx)).details, {
+    status: "complete",
+    summary,
+  });
   assert.equal(modelCalls, calls);
   assert.equal(await readFile(join(data, "dream.log"), "utf8"), log);
   console.log("Pinned scheduler dream isolation passed");

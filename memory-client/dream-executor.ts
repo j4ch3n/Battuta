@@ -4,6 +4,7 @@ import { dreamCompletion } from "./dream-model.ts";
 import { runDream } from "./dream-runtime.ts";
 import { MemoryMcpClient } from "./mcp-client.ts";
 import { abortable } from "./abortable.ts";
+import type { DreamOutcome } from "./dream-result.ts";
 
 export type DreamFailure = "unavailable" | "cancelled" | "timed_out" | "failed";
 
@@ -21,7 +22,7 @@ export async function executeDream(
     signal?: AbortSignal;
     onUsage: (usage: unknown) => Promise<void>;
   },
-): Promise<void> {
+): Promise<DreamOutcome> {
   if (!/^[^/\s]+\/[^\s]+$/.test(options.model)) throw new DreamExecutionError("unavailable");
   const separator = options.model.indexOf("/");
   const model = ctx.modelRegistry.find(
@@ -41,8 +42,8 @@ export async function executeDream(
     const config = clientConfig();
     const client = new MemoryMcpClient(config.url);
     // Fixed model completions receive evidence, not PM history or tool access.
-    // The private reflection is persisted by the engine, never returned to PM.
-    await abortable(
+    // The engine returns a separate public summary, never the private reflection.
+    return await abortable(
       runDream(
         {
           directory: config.dataDirectory,

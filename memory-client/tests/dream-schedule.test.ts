@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile, chmod, stat } from "node:fs/pr
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
-import { reconcileDreamSchedule } from "../dream-schedule.ts";
+import { DREAM_PROMPT, ownedDreamTask, reconcileDreamSchedule } from "../dream-schedule.ts";
 import { initializeSchedulerStore } from "../scheduler-store.ts";
 
 const now = "2026-10-21T12:00:00.000Z";
@@ -65,6 +65,24 @@ test("rejects conflicting dream ownership", () => {
       now,
     ),
   ).toThrow("ownership");
+});
+test("offline reconciliation upgrades the owned legacy prompt without enabling or resetting the task", () => {
+  const store = reconcileDreamSchedule({ version: 2, revision: 0, tasks: [] }, now);
+  const legacy = {
+    ...store.tasks[0],
+    enabled: false,
+    runCount: 7,
+    lastRun: now,
+    prompt:
+      "Call memory_dream exactly once. Report only its completion status. Do not request or repeat private dream reflections.",
+  };
+  const input = { ...store, tasks: [legacy] };
+  expect(ownedDreamTask(legacy)).toBe(true);
+  const upgraded = reconcileDreamSchedule(input, now);
+  expect(upgraded.tasks).toEqual([{ ...legacy, prompt: DREAM_PROMPT }]);
+  expect(upgraded.revision).toBe(input.revision + 1);
+  expect(upgraded.tasks[0].prompt).not.toBe(legacy.prompt);
+  expect(reconcileDreamSchedule(upgraded, now)).toEqual(upgraded);
 });
 test("explicit offline setup writes stable model/job config idempotently and refreshes registration", async () => {
   const dir = await mkdtemp(join(tmpdir(), "dream-setup-"));

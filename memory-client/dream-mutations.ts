@@ -33,6 +33,7 @@ export type MemoryRecord = z.infer<typeof memoryRecordSchema>;
 const common = {
   id: z.string().regex(/^[a-z0-9_-]{1,40}$/),
   source_refs: z.array(ref).min(1).max(100),
+  summary: modelText.max(1000),
 };
 const operationSchema = z.discriminatedUnion("type", [
   z
@@ -49,7 +50,6 @@ const operationSchema = z.discriminatedUnion("type", [
       type: z.literal("update"),
       ref,
       content: modelText,
-      reason: modelText.max(1000),
     })
     .strict(),
   z
@@ -57,7 +57,6 @@ const operationSchema = z.discriminatedUnion("type", [
       ...common,
       type: z.literal("forget"),
       ref,
-      reason: modelText.max(1000),
       replacement_id: z.string().optional(),
     })
     .strict(),
@@ -150,7 +149,7 @@ export function mutationRequest(operation: DreamOperation, records: MemoryRecord
   return operation.type === "update"
     ? {
         name: "memory_update",
-        arguments: { ...args, content: operation.content, reason: operation.reason, sources },
+        arguments: { ...args, content: operation.content, reason: operation.summary, sources },
       }
     : { name: "memory_forget", arguments: args };
 }

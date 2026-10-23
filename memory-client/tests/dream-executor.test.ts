@@ -2,9 +2,10 @@ import { afterEach, expect, test, vi } from "vitest";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { DreamDependencies } from "../dream-runtime.ts";
 import { executeDream } from "../dream-executor.ts";
+import type { DreamOutcome } from "../dream-result.ts";
 
 const run = vi.hoisted(() =>
-  vi.fn<(deps: DreamDependencies, signal: AbortSignal) => Promise<string>>(),
+  vi.fn<(deps: DreamDependencies, signal: AbortSignal) => Promise<DreamOutcome>>(),
 );
 vi.mock("../dream-runtime.ts", () => ({ runDream: run }));
 afterEach(() => {
@@ -37,12 +38,16 @@ function harness() {
     },
   };
 }
-test("executes with the configured model and fresh tool-free messages, discarding reflection", async () => {
+test("executes with the configured model and fresh tool-free messages, returning only the public outcome", async () => {
   const h = harness();
-  run.mockImplementation((deps, signal) =>
-    deps.complete("dream system", "private evidence", signal),
-  );
-  expect(await executeDream(h.ctx, h.options)).toBeUndefined();
+  run.mockImplementation(async (deps, signal) => {
+    await deps.complete("dream system", "private evidence", signal);
+    return { status: "complete", summary: "Learned a concise-reply preference." };
+  });
+  expect(await executeDream(h.ctx, h.options)).toEqual({
+    status: "complete",
+    summary: "Learned a concise-reply preference.",
+  });
   expect(h.complete.mock.calls[0][0]).toEqual({ provider: "p", id: "dream" });
   expect(h.complete.mock.calls[0][1]).toMatchObject({
     systemPrompt: "dream system",

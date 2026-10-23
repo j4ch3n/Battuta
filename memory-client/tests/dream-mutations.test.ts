@@ -18,9 +18,22 @@ const update = {
   type: "update",
   ref: a,
   content: "Corrected fact",
-  reason: "New evidence",
+  summary: "Corrected the fact using new evidence.",
   source_refs: [a],
 };
+
+test.each([undefined, "", "   ", "x".repeat(1001)])(
+  "rejects missing or oversized operation summaries (%s)",
+  (summary) => {
+    expect(() =>
+      validateDreamPlan(
+        { operations: [{ ...update, summary }] },
+        [memoryRecordSchema.parse(record())],
+        [a],
+      ),
+    ).toThrow();
+  },
+);
 
 test("builds versioned updates with snapshot preconditions and stable insert identities", () => {
   const records = [memoryRecordSchema.parse(record())];
@@ -31,7 +44,7 @@ test("builds versioned updates with snapshot preconditions and stable insert ide
       ref: a,
       expected_revision: "c".repeat(64),
       content: "Corrected fact",
-      reason: "New evidence",
+      reason: "Corrected the fact using new evidence.",
       evidence: [{ ref: a, revision: "c".repeat(64) }],
       sources: record().sources,
     },
@@ -40,6 +53,7 @@ test("builds versioned updates with snapshot preconditions and stable insert ide
     id: "merge",
     type: "insert",
     content: "Combined fact",
+    summary: "Combined overlapping details.",
     kind: "decision",
     source_refs: [a],
   };
@@ -63,6 +77,7 @@ test("requires a saved same-scope replacement before forgetting merged sources",
     id: "merge",
     type: "insert",
     content: "Combined fact",
+    summary: "Combined overlapping details.",
     kind: "decision",
     source_refs: [a],
   };
@@ -70,7 +85,7 @@ test("requires a saved same-scope replacement before forgetting merged sources",
     id: "retire",
     type: "forget",
     ref: a,
-    reason: "Redundant after merge",
+    summary: "Removed a redundant detail after merging.",
     source_refs: [a],
     replacement_id: "merge",
   };
@@ -95,6 +110,7 @@ test("preflight reserves a guard for merge replacement before any writes", () =>
     id: "merge",
     type: "insert",
     content: "Combined fact",
+    summary: "Combined overlapping details.",
     kind: "decision",
     source_refs: refs.slice(0, 100),
   };
@@ -102,7 +118,7 @@ test("preflight reserves a guard for merge replacement before any writes", () =>
     id: "cleanup",
     type: "forget",
     ref: refs[0],
-    reason: "Merged",
+    summary: "Removed the merged detail.",
     replacement_id: "merge",
     source_refs: refs.slice(1),
   };

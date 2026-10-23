@@ -8,6 +8,9 @@ export type DreamComplete = (
   signal: AbortSignal,
 ) => Promise<string>;
 
+export type DreamOutcome =
+  { status: "complete"; summary: string } | { status: "partial" | "already_completed" };
+
 export async function createDreamReflection(
   complete: DreamComplete,
   timestamp: string,

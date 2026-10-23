@@ -8,14 +8,16 @@ import type {
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { DreamDependencies } from "../dream-runtime.ts";
+import type { DreamOutcome } from "../dream-result.ts";
+import { DREAM_PROMPT } from "../dream-schedule.ts";
 import { MemoryMcpClient } from "../mcp-client.ts";
 import { afterEach, expect, test, vi } from "vitest";
 import extension from "../dream-extension.ts";
 import { readSchedulerStore } from "../scheduler-store.ts";
 
 const run = vi.hoisted(() =>
-  vi.fn<(deps: DreamDependencies, signal: AbortSignal) => Promise<string>>(() =>
-    Promise.resolve("Private reflection"),
+  vi.fn<(deps: DreamDependencies, signal: AbortSignal) => Promise<DreamOutcome>>(() =>
+    Promise.resolve({ status: "complete", summary: "Learned your concise-reply preference." }),
   ),
 );
 vi.mock("../dream-runtime.ts", () => ({ runDream: run }));
@@ -24,7 +26,9 @@ afterEach(async () => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
-  run.mockReset().mockResolvedValue("Private reflection");
+  run
+    .mockReset()
+    .mockResolvedValue({ status: "complete", summary: "Learned your concise-reply preference." });
   await Promise.all(directories.splice(0).map((d) => rm(d, { recursive: true, force: true })));
 });
 async function harness(role = "pm", job: Record<string, unknown> | null = {}) {
@@ -54,8 +58,7 @@ async function harness(role = "pm", job: Record<string, unknown> | null = {}) {
             type: "cron",
             schedule: "0 0 3 * * *",
             enabled: true,
-            prompt:
-              "Call memory_dream exactly once. Report only its completion status. Do not request or repeat private dream reflections.",
+            prompt: DREAM_PROMPT,
             ...job,
           },
         ],
@@ -94,15 +97,36 @@ test("TL never registers the dream tool or lifecycle", async () => {
   expect(h.tools).toEqual([]);
   expect(h.hooks.size).toBe(0);
 });
-test("PM tool returns status only and never changes normal active tools", async () => {
+test("PM tool returns a public summary, not the private reflection, without changing normal active tools", async () => {
   const h = await harness();
+  run.mockResolvedValueOnce({
+    status: "complete",
+    summary: "Learned your concise-reply preference.",
+  });
   expect([...h.hooks.keys()]).not.toContain("agent_settled");
   const result = await h.tools[0].execute("id", {}, undefined, undefined, h.ctx);
-  expect(result.content[0]).toEqual({ type: "text", text: '{"status":"complete"}' });
+  expect(result.content[0]).toEqual({
+    type: "text",
+    text: '{"status":"complete","summary":"Learned your concise-reply preference."}',
+  });
+  expect(result.details).toEqual({
+    status: "complete",
+    summary: "Learned your concise-reply preference.",
+  });
   expect(JSON.stringify(result)).not.toContain("Private reflection");
   expect(h.setActiveTools).not.toHaveBeenCalled();
   expect(h.status).not.toHaveBeenCalledWith(expect.anything(), expect.stringContaining("Private"));
 });
+test.each(["partial", "already_completed"] as const)(
+  "PM tool honestly reports %s without a summary",
+  async (status) => {
+    const h = await harness();
+    run.mockResolvedValueOnce({ status });
+    const result = await h.tools[0].execute("id", {}, undefined, undefined, h.ctx);
+    expect(result.details).toEqual({ status });
+    expect(result.content[0]).toEqual({ type: "text", text: JSON.stringify({ status }) });
+  },
+);
 test("PM catches up once without restricting normal tools", async () => {
   const h = await harness();
   await h.hooks.get("session_start")!({}, h.ctx);
@@ -115,7 +139,10 @@ test.each(["startup", "tool"])(
   async (trigger) => {
     const h = await harness("pm", { model: "fake/dream-model" });
     const complete = vi.spyOn(h.ctx.modelRegistry, "complete");
-    run.mockImplementationOnce((deps, signal) => deps.complete("prompt", "evidence", signal));
+    run.mockImplementationOnce(async (deps, signal) => {
+      await deps.complete("prompt", "evidence", signal);
+      return { status: "complete", summary: "Nothing material changed." };
+    });
     if (trigger === "startup") await h.hooks.get("session_start")!({}, h.ctx);
     else await h.tools[0].execute("id", {}, undefined, undefined, h.ctx);
     await vi.waitFor(() => expect(complete).toHaveBeenCalledTimes(1));
@@ -128,7 +155,7 @@ test.each(["startup", "tool"])(
 );
 test("queued tool calls recheck disablement even while startup work is active", async () => {
   const h = await harness();
-  let finish!: (value: string) => void;
+  let finish!: (value: DreamOutcome) => void;
   run.mockImplementationOnce(
     () =>
       new Promise((resolve) => {
@@ -144,13 +171,13 @@ test("queued tool calls recheck disablement even while startup work is active", 
   await expect(h.tools[0].execute("queued", {}, undefined, undefined, h.ctx)).rejects.toThrow(
     "Dream unavailable: configure an enabled nightly dream model and retry.",
   );
-  finish("Private reflection");
+  finish({ status: "complete", summary: "Nothing material changed." });
   await first;
   expect(run).toHaveBeenCalledTimes(1);
 });
 test("a cancelled caller does not wait for already-active startup work", async () => {
   const h = await harness();
-  let finish!: (value: string) => void;
+  let finish!: (value: DreamOutcome) => void;
   run.mockImplementationOnce(
     () =>
       new Promise((resolve) => {
@@ -170,7 +197,7 @@ test("a cancelled caller does not wait for already-active startup work", async (
       ]),
     ).rejects.toThrow("Dream cancelled: retry the next eligible scheduled run.");
   } finally {
-    finish("Private reflection");
+    finish({ status: "complete", summary: "Nothing material changed." });
     await pending.catch(() => {});
   }
 });
@@ -214,7 +241,10 @@ test("worker failures return a safe actionable status", async () => {
 });
 
 test("records numeric model usage as a custom entry without reflection content", async () => {
-  run.mockImplementationOnce((deps, signal) => deps.complete("prompt", "private evidence", signal));
+  run.mockImplementationOnce(async (deps, signal) => {
+    await deps.complete("prompt", "private evidence", signal);
+    return { status: "complete", summary: "Nothing material changed." };
+  });
   const h = await harness();
   await h.tools[0].execute("id", {}, undefined, undefined, h.ctx);
   expect(h.appendEntry).toHaveBeenCalledExactlyOnceWith("memory-dream-usage", {
@@ -232,7 +262,7 @@ test("whole-run deadline settles even when a memory transport ignores cancellati
   vi.spyOn(MemoryMcpClient.prototype, "call").mockImplementation(() => new Promise(() => {}));
   run.mockImplementationOnce(async (deps, signal) => {
     await deps.call("memory_inventory", {}, signal);
-    return "must not complete";
+    return { status: "complete", summary: "must not complete" };
   });
   const deadline = new AbortController();
   const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(deadline.signal);
