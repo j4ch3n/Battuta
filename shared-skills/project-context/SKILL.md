@@ -1,6 +1,6 @@
 ---
 name: project-context
-description: Use when working on, researching, coding, summarizing, specifying, planning, or building artifacts for a project.
+description: Use when working on, researching, coding, summarizing, specifying, planning, or building artifacts for a project, or managing long-running multi-step work with or without project ownership.
 ---
 
 # Project context
@@ -63,6 +63,30 @@ An empty constitution scaffold is not adopted policy. Apply confirmed project gu
 New project initialization creates a rendered summary skeleton. The shared memory bridge handles memory without project-local memory files. Spec tools establish document storage only when authoring is requested. Older projects may lack artifacts: `explain` stays read-only, while requested authoring creates only what is needed. Complete the summary using its shared Markdown reference rather than guessing product context.
 
 ## Tools and command navigation
+
+### Execution TODOs
+
+Use `battuta-project todo` for long-running, multi-step work to keep concrete steps
+in execution order and stay oriented as context grows. Skip lists for simple replies.
+Choose project scope for clearly project-owned work; use general scope otherwise.
+
+Work through TODO items strictly in top-down execution order: read the next item,
+perform the work, then mark it done or cancelled with a detailed rational before
+moving to the next item.
+
+| Mode                                                                                          | When and why to use it                                                                                       |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| [Create a list](references/task-todos.md#create-steps-in-execution-order)                     | Turn a long-running request into concrete steps in intended execution order.                                 |
+| [Next item](references/task-todos.md#show-the-next-item)                                      | Refocus on the immediate action without loading the full history.                                            |
+| [Remaining items](references/task-todos.md#show-remaining-items)                              | Understand what still needs doing and in what order.                                                         |
+| [Full list (default)](references/task-todos.md#inspect-the-full-list)                         | Understand past work through all items, including completed/cancelled items and their rational explanations. |
+| [Complete or cancel the next item](references/task-todos.md#complete-or-cancel-the-next-item) | Record the outcome and relevant verification, or the reason for cancellation, before moving on.              |
+
+Present progress in ordinary chat when asked. Read the
+[TODO command reference](references/task-todos.md) before invocation; it owns
+command syntax, options, and advanced list management.
+
+### Project documents
 
 Use [project-spec tools](references/spec-tools.md) for named specs, canonical checklist/review, and terminal decisions. Both roles inspect spec inventories and documents. All writes receive complete content; there is no spec/decision CLI or publish stage.
 

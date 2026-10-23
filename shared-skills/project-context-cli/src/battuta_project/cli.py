@@ -8,6 +8,7 @@ from .linear import LinearClient, require_linear_token
 from .models import LinearConfig, LinearResult, ProjectList
 from .presentation import render
 from .registry import ProjectRegistry
+from .todo_cli import todo
 
 
 class _TokenGroup(click.Group):
@@ -41,9 +42,12 @@ def _linear_pair(ctx, param, value):
 @click.group(cls=_TokenGroup, invoke_without_command=True)
 @click.pass_context
 def main(ctx):
-    """Manage project checkouts, selection, context, and Linear association."""
+    """Manage project checkouts, context, Linear association, and execution TODOs."""
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
+
+
+main.add_command(todo)
 
 
 @main.command()
