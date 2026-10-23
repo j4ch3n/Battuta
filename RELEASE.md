@@ -21,6 +21,11 @@ Installation navigation lives here, separate from runtime skill workflows and co
 | Additional Pi packages (source checkouts)                  | Follow the [Pi-extension installation guide](https://github.com/j4ch3n/Battuta/blob/main/docs/pi-extensions.md). This contributor workflow requires source tooling, not just the release archive.                                         |
 | OpenCode contributor skills/plugins (source checkouts)     | Follow [OpenCode setup](https://github.com/j4ch3n/Battuta/blob/main/docs/opencode.md). These development-agent workflows are not the PM/TL runtime skill environment.                                                                     |
 
+Task todos are bundled in the existing project-spec extension and project-context
+skill for both bots. Source setup and release configuration need no new dependency
+or service; normal bot configuration and launch expose the tool. Existing Pi
+session files hold the lists, so preserve them when upgrading or moving a bot.
+
 ## 1. Confirm the target and prerequisites
 
 ### Already done?

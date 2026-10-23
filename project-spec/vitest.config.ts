@@ -5,7 +5,7 @@ export default defineConfig({
     include: ["tests/**/*.test.ts"],
     coverage: {
       provider: "v8",
-      include: ["index.ts", "guards.ts", "tools/**/*.ts", "store/**/*.ts"],
+      include: ["index.ts", "guards.ts", "task-todos.ts", "tools/**/*.ts", "store/**/*.ts"],
       reporter: ["text", "lcov", "json-summary"],
     },
   },

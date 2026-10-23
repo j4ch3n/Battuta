@@ -7,6 +7,7 @@ import { registerChecklistTools } from "./tools/checklist.ts";
 import { registerReviewTools } from "./tools/review.ts";
 import { registerDecisionTools } from "./tools/decision.ts";
 import { registerConstitutionTools } from "./tools/constitution.ts";
+import { registerTaskTodos } from "./task-todos.ts";
 
 export default function projectSpec(
   pi: ExtensionAPI,
@@ -15,6 +16,7 @@ export default function projectSpec(
   const role = options?.role ?? process.env.AGENT_ROLE;
   if (role !== "pm" && role !== "tl") throw new Error("AGENT_ROLE must be pm or tl");
   const store = new ProjectSpecStore(role, options?.projectsRoot);
+  registerTaskTodos(pi, role, store.root);
   registerReadTools(pi, store);
   registerConstitutionTools(pi, store);
   registerGuards(pi, store.root);

@@ -5,5 +5,7 @@ Shared Pi extension for versioned project specifications, canonical checklists/r
 - Full-content tools, including dedicated constitution reads and versioned authoring, with role-specific registration and persistence checks.
 - Serialized document/metadata writes with recovery and SHA-256 decision snapshots.
 - Terminal decisions and guards against direct Pi write/edit of managed artifacts.
+- Recoverable, branch-local execution todos for both bots, scoped to the selected project and task.
 
 See [tool workflows](../shared-skills/project-context/references/spec-tools.md) and the [metadata contract](../shared-skills/project-context/references/spec-metadata.md).
+For execution bookkeeping, see [task todos](../shared-skills/project-context/references/task-todos.md).

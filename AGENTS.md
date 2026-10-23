@@ -10,6 +10,7 @@ TypeScript on Node.js and Deno, the Pi coding-agent runtime, Telegram, Linear, a
 
 ## Working conventions
 
+- Never commit local Superpowers planning, research, design, specification, or progress artifacts; keep them under the existing ignored `.superpowers/` directory.
 - Name new ticket branches `agent/<ticket>-<short-description>`, using a lowercase ticket identifier and fewer than four hyphen-separated description words (for example, `agent/fis-46-constitution-tool`).
 - Follow surrounding code and runtime-specific formatting, linting, and typing rules.
 - Scan related code before adding logic; reuse existing helpers and refactor duplication within the affected scope. Avoid unrelated rewrites.

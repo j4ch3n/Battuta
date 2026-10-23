@@ -12,7 +12,7 @@ test("Pi loads a staged extension with only production dependencies for both rol
   try {
     const staged = join(f.root, "release/project-spec");
     await mkdir(join(staged, "node_modules"), { recursive: true });
-    for (const item of ["index.ts", "guards.ts", "store", "tools", "package.json"])
+    for (const item of ["index.ts", "guards.ts", "task-todos.ts", "store", "tools", "package.json"])
       await cp(join(packageRoot, item), join(staged, item), { recursive: true });
     const manifest = JSON.parse(await readFile(join(staged, "package.json"), "utf8")) as {
       dependencies: Record<string, string>;
@@ -43,6 +43,7 @@ test("Pi loads a staged extension with only production dependencies for both rol
       assert.ok(extension, "Shared extension must load through Pi's real loader");
       assert.ok(extension.tools.has("describe_spec"));
       assert.ok(extension.tools.has("read_constitution"));
+      assert.ok(extension.tools.has("task_todos"));
       assert.equal(extension.tools.has("init_constitution"), role === "pm");
       assert.equal(extension.tools.has("update_constitution"), role === "pm");
       assert.equal(extension.tools.has("finalize_spec"), role === "pm");

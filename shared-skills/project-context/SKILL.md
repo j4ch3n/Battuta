@@ -64,6 +64,23 @@ New project initialization creates a rendered summary skeleton. The shared memor
 
 ## Tools and command navigation
 
+### Recoverable execution todos
+
+For genuinely multi-step project work, use `task_todos` to keep a small, concrete
+execution list. Do not create ceremonial lists for greetings, routine replies, or
+single-step answers. Before resuming, discover existing task keys with `tasks` and
+read the relevant `list`; do not repeat completed steps without a reason. Reuse
+that task key, update progress as work changes, and retain blocker/next-action
+information. Mark an item completed only after the actual outcome and relevant
+verification or reference are available. If verification fails, keep it open or
+blocked. Report the list in readable ordinary chat when asked, including over
+Telegram; no terminal viewer is needed.
+
+These notes do not grant execution permission, complete Linear issues, approve
+specifications, delegate work, schedule reminders, or replace a durable plan.
+Use memory for enduring context, never transient execution progress. See the
+[task-todos tool reference](references/task-todos.md) for invocation and recovery.
+
 Use [project-spec tools](references/spec-tools.md) for named specs, canonical checklist/review, and terminal decisions. Both roles inspect spec inventories and documents. All writes receive complete content; there is no spec/decision CLI or publish stage.
 
 Read the relevant [command reference](references/commands.md) section before invocation; it owns syntax, outputs, validation, side effects, and failure/recovery behavior.

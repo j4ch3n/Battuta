@@ -9,7 +9,7 @@ test("each runtime exposes shared reads and only its own authoring tools", async
     for (const role of ["pm", "tl"] as const) {
       const fake = fakePi();
       register(fake.pi, { role, projectsRoot: f.projects });
-      const common = ["inspect_specs", "describe_spec", "read_constitution"];
+      const common = ["inspect_specs", "describe_spec", "read_constitution", "task_todos"];
       const own =
         role === "pm"
           ? [
