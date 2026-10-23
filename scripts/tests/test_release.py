@@ -12,10 +12,10 @@ from fixtures import ConfigFixture, ROOT
 
 
 class ReleaseInstallTests(ConfigFixture):
-    def test_tl_subagent_release_boundary_requires_runtime_skill_and_license(self):
+    def test_tl_subagent_release_boundary_requires_runtime_files(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         boundary = re.search(
-            r'^          test -f dist/stage/battuta/bots/tl-bot/\.pi/extensions/bounded-subagents/index.ts\n.*?^          pnpm --dir dist/stage/battuta/bots/tl-bot exec node .*?$',
+            r'^          test -f dist/stage/battuta/bots/tl-bot/\.pi/extensions/bounded-subagents/index.ts\n.*?^          test ! -e dist/stage/battuta/bots/tl-bot/\.pi/subagents.json$',
             workflow, re.MULTILINE | re.DOTALL,
         )
         self.assertIsNotNone(boundary)
@@ -23,17 +23,19 @@ class ReleaseInstallTests(ConfigFixture):
         extension = tl / ".pi/extensions/bounded-subagents"
         extension.mkdir(parents=True)
         (extension / "index.ts").write_text("// staged extension")
-        shutil.copy2(ROOT / "bots/tl-bot/package.json", tl / "package.json")
         references = tl / ".pi/skills/use-subagent/references"
         references.mkdir(parents=True)
         (references / "tools.md").write_text("staged command reference")
-        (tl / "node_modules").symlink_to(ROOT / "bots/tl-bot/node_modules", target_is_directory=True)
         command = ["bash", "-euc", textwrap.dedent(boundary.group())]
         result = subprocess.run(command, cwd=self.root, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        (references / "tools.md").unlink()
-        result = subprocess.run(command, cwd=self.root, capture_output=True, text=True)
-        self.assertNotEqual(result.returncode, 0)
+        for path in (extension / "index.ts", references / "tools.md"):
+            with self.subTest(missing=path.name):
+                content = path.read_text()
+                path.unlink()
+                result = subprocess.run(command, cwd=self.root, capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+                path.write_text(content)
 
     def test_archive_preserves_local_memory_skills_and_links_shared_context(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()

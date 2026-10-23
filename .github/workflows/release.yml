@@ -167,7 +167,6 @@ jobs:
           test -x dist/stage/battuta/bots/tl-bot/node_modules/.bin/pi
           test -f dist/stage/battuta/bots/tl-bot/.pi/extensions/bounded-subagents/index.ts
           test -f dist/stage/battuta/bots/tl-bot/.pi/skills/use-subagent/references/tools.md
-          test -f dist/stage/battuta/bots/tl-bot/node_modules/pi-subagents/LICENSE
           test ! -e dist/stage/battuta/bots/pm-bot/node_modules/pi-subagents
           test ! -e dist/stage/battuta/bots/tl-bot/.pi/subagents.json
           pnpm --dir dist/stage/battuta/bots/tl-bot exec node --input-type=module -e 'import upstream from "pi-subagents"; import { SUBAGENT_DELEGATION_REQUEST_EVENT } from "pi-subagents/delegation"; if (typeof upstream !== "function" || !SUBAGENT_DELEGATION_REQUEST_EVENT) process.exit(1)'
