@@ -165,11 +165,16 @@ export class Runtime {
         clearTimeout(killTimer);
         if (terminal) {
           const { usage, ...evidence } = terminal;
-          // Upstream normalizes provider failures to zero counters. Those are not
-          // evidence of zero billing, so leave failed-run usage unavailable.
+          // Upstream also normalizes missing successful-stream usage to zeros.
+          // Without an availability flag, all-zero counters are unverifiable.
           job.result = {
             ...evidence,
-            ...(usage && terminal.status === "completed"
+            ...(usage &&
+            terminal.status === "completed" &&
+            [usage.input, usage.output, usage.cacheRead, usage.cacheWrite].every(
+              (n) => Number.isFinite(n) && n >= 0,
+            ) &&
+            [usage.input, usage.output, usage.cacheRead, usage.cacheWrite].some((n) => n > 0)
               ? { usage: { ...usage, cost: null } }
               : {}),
           };

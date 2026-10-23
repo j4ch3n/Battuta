@@ -41,3 +41,5 @@ of zero usage. Timeout, provider rejection and missing terminal evidence are not
 successful work. Keep required patches/evidence before session shutdown.
 Failed-run usage is omitted because upstream may normalize unavailable provider
 usage to zero counters; do not treat it as zero billing.
+All-zero token counters are also omitted on successful runs: the upstream API
+does not distinguish a provider's missing usage from reported zeros.

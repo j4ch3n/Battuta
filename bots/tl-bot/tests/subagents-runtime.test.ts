@@ -17,7 +17,7 @@ let server: Server;
 let root: string;
 let runtime: Runtime;
 let requests: Record<string, unknown>[];
-let mode: "success" | "failure" | "hang" | "write" | "oversized";
+let mode: "success" | "failure" | "hang" | "write" | "oversized" | "no-usage";
 let baseUrl: string;
 beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), "bounded-runtime-"));
@@ -66,9 +66,10 @@ beforeEach(async () => {
         }),
       );
       res.write(chunk({}, tool ? "tool_calls" : "stop"));
-      res.write(
-        `data: ${JSON.stringify({ id: "fixture", choices: [], usage: { prompt_tokens: 10, completion_tokens: 4, total_tokens: 14 } })}\n\n`,
-      );
+      if (mode !== "no-usage")
+        res.write(
+          `data: ${JSON.stringify({ id: "fixture", choices: [], usage: { prompt_tokens: 10, completion_tokens: 4, total_tokens: 14 } })}\n\n`,
+        );
       res.end("data: [DONE]\n\n");
     })().catch((error: unknown) =>
       res.destroy(error instanceof Error ? error : new Error(String(error))),
@@ -131,6 +132,16 @@ it("worker changes only its private authorized snapshot", async () => {
   expect(result.status, JSON.stringify(result)).toBe("completed");
   expect(readFileSync(join(result.workspace, "input.ts"), "utf8")).toBe("changed");
   expect(readFileSync(join(root, "input.ts"), "utf8")).toBe("original");
+});
+it("leaves successful-run usage unavailable when the real provider stream omits it", async () => {
+  setup();
+  mode = "no-usage";
+  const [job] = runtime.start([task()]);
+  const [result] = await runtime.wait([job.id]);
+  expect(result.status, JSON.stringify(result)).toBe("completed");
+  expect(JSON.stringify(result.result)).toContain("fixture evidence");
+  expect(requests).toHaveLength(1);
+  expect(result.result?.usage).toBeUndefined();
 });
 it("reports actual provider rejection as failure", async () => {
   setup();

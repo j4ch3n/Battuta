@@ -83,13 +83,19 @@ Files: TL setup, release assembly, package/check wiring, focused references.
   notification delivery, inspect, cancellation and session shutdown. Actual active
   provider requests are cancelled/timed out; processes are reaped. Per-task grants,
   batch/lifetime limits, attribution, and oversized-result failures are covered.
-- Task 4 verification: `make check` passed (296 Node tests, 5 Deno tests,
+- Task 4 verification: `make check` passed (297 Node tests, 5 Deno tests,
   support/service/CLI suites). `pnpm test:coverage` passed; adapter measured line
-  coverage 93.65%, branches 85.71%. Broker runs in real subprocesses and is excluded
+  coverage 93.71%, branches 86.04%. Broker runs in real subprocesses and is excluded
   from parent-process coverage instrumentation, not from behavioral tests.
 - Self-review fixed task-specific file narrowing, cancelled-process capacity
   accounting, dangling symlinks, oversized failure classification and unavailable
-  failure usage. Regression cases passed. Independent parent review remains pending.
+  failure usage. Regression cases passed.
+- Independent read-only review of `5dfb8f7..1d61e12` found one Important usage
+  availability bug and no critical security issues. A successful real-runtime SSE
+  stream without usage reproduced normalized zero counters (RED). The adapter now
+  conservatively omits all-zero/unverifiable counters even on completion (GREEN).
+  All 39 TL tests and repository checks passed after the fix. Parent re-review is
+  pending; no additional reviewer was spawned.
 - Ruling: use the existing `use-subagent` runtime skill instead of introducing a
   competing skill; preserve custom skill content. Cost if wrong: operators with
   custom skills must incorporate the new command usage themselves.
