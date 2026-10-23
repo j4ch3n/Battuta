@@ -2,12 +2,13 @@ import { z } from "zod";
 import { redact } from "./privacy.ts";
 
 const ref = z.string().regex(/^[0-9a-f]{64}$/);
-const safeText = z
+const inboundMemoryText = z
   .string()
   .trim()
   .min(1)
   .max(16000)
   .refine((v) => redact(v) === v, "Unsafe memory text");
+const modelText = z.string().trim().min(1).max(16000);
 const source = z.object({
   agent_id: z.enum(["pm", "tl"]),
   session_id: z.string(),
@@ -17,7 +18,7 @@ export const memoryRecordSchema = z
   .object({
     ref,
     revision: ref,
-    content: safeText,
+    content: inboundMemoryText,
     scope: z
       .object({ global: z.boolean(), projects: z.array(z.string()) })
       .strict()
@@ -38,7 +39,7 @@ const operationSchema = z.discriminatedUnion("type", [
     .object({
       ...common,
       type: z.literal("insert"),
-      content: safeText,
+      content: modelText,
       kind: z.string().regex(/^[a-z][a-z0-9_-]{0,39}$/),
     })
     .strict(),
@@ -47,8 +48,8 @@ const operationSchema = z.discriminatedUnion("type", [
       ...common,
       type: z.literal("update"),
       ref,
-      content: safeText,
-      reason: safeText.max(1000),
+      content: modelText,
+      reason: modelText.max(1000),
     })
     .strict(),
   z
@@ -56,7 +57,7 @@ const operationSchema = z.discriminatedUnion("type", [
       ...common,
       type: z.literal("forget"),
       ref,
-      reason: safeText.max(1000),
+      reason: modelText.max(1000),
       replacement_id: z.string().optional(),
     })
     .strict(),

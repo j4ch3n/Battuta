@@ -3,7 +3,7 @@ import { Type } from "typebox";
 import { clientConfig } from "./config.ts";
 import { schedulerStorePath } from "./scheduler-config.ts";
 import { enabledDreamModel } from "./dream-config.ts";
-import { executeDream } from "./dream-executor.ts";
+import { DreamExecutionError, type DreamFailure, executeDream } from "./dream-executor.ts";
 import { recordDreamUsage } from "./dream-usage.ts";
 import { abortable } from "./abortable.ts";
 
@@ -13,11 +13,13 @@ export default function dreamExtension(pi: ExtensionAPI) {
   let started = false;
   let active: Promise<void> | undefined;
   async function execute(ctx: ExtensionContext, signal?: AbortSignal) {
+    let configured = false;
     try {
       const config = clientConfig();
       // Recheck even when joining active work: queued prompts cannot bypass disablement.
       const model = await enabledDreamModel(schedulerStorePath(), config.dataDirectory);
       if (!model) throw new Error("Dream not configured");
+      configured = true;
       if (!active) {
         ctx.ui.setStatus("memory-dream", "Memory dream running");
         active = executeDream(ctx, {
@@ -34,9 +36,23 @@ export default function dreamExtension(pi: ExtensionAPI) {
       }
       await abortable(active, signal ?? shutdown.signal);
       ctx.ui.setStatus("memory-dream", "Memory dream complete");
-    } catch {
-      ctx.ui.setStatus("memory-dream", "Memory dream unavailable or cancelled");
-      throw new Error("Dream unavailable or cancelled");
+    } catch (error) {
+      const failure: DreamFailure = !configured
+        ? "unavailable"
+        : error instanceof DreamExecutionError
+          ? error.failure
+          : signal?.aborted || shutdown.signal.aborted
+            ? "cancelled"
+            : "failed";
+      const messages: Record<DreamFailure, string> = {
+        unavailable: "Dream unavailable: configure an enabled nightly dream model and retry.",
+        cancelled: "Dream cancelled: retry the next eligible scheduled run.",
+        timed_out:
+          "Dream timed out: review availability and retry the next eligible scheduled run.",
+        failed: "Dream failed: review private operational logs and retry.",
+      };
+      ctx.ui.setStatus("memory-dream", `Memory dream ${failure.replace("_", " ")}`);
+      throw new Error(messages[failure], { cause: error });
     }
   }
   pi.registerTool({

@@ -34,7 +34,6 @@ export async function createDreamReflection(
       text &&
       !text.includes("```") &&
       !/\b[0-9a-f]{64}\b/i.test(text) &&
-      redact(text) === text &&
       line.split(/\s+/).length <= 149
     )
       return line;
