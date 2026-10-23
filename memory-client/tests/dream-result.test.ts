@@ -59,7 +59,7 @@ test.each([147, 148])(
   },
 );
 
-test.each(["", "```raw entries```", "token ghp_123456789012345678901234567890", "a".repeat(64)])(
+test.each(["", "```raw entries```", "a".repeat(64)])(
   "rejects unsafe or non-narrative output %s",
   async (text) => {
     await expect(
@@ -67,6 +67,14 @@ test.each(["", "```raw entries```", "token ghp_123456789012345678901234567890", 
     ).rejects.toThrow("reflection");
   },
 );
+
+test("accepts credential-like model output for a local reflection", async () => {
+  const text = "token ghp_123456789012345678901234567890";
+
+  await expect(createDreamReflection(() => Promise.resolve(text), stamp, {}, signal)).resolves.toBe(
+    `${stamp} — ${text}`,
+  );
+});
 
 test.each(["", "```raw entries```", Array(148).fill("word").join(" ")])(
   "retries invalid output once and returns a valid bounded second reflection (%s)",

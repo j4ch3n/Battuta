@@ -1,18 +1,12 @@
 import { z } from "zod";
 import { renderOwnerProfile } from "./dream-profile.ts";
 import { type MemoryRecord } from "./dream-mutations.ts";
-import { redact } from "./privacy.ts";
 
 const statements = z
   .array(
     z
       .object({
-        text: z
-          .string()
-          .trim()
-          .min(1)
-          .max(4000)
-          .refine((v) => redact(v) === v),
+        text: z.string().trim().min(1).max(4000),
         source_refs: z.array(z.string().regex(/^[0-9a-f]{64}$/)).max(100),
       })
       .strict(),

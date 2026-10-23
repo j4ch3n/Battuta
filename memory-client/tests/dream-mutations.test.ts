@@ -171,12 +171,25 @@ test.each([
   ["unknown target", [{ ...update, ref: b }]],
   ["repeated target", [update, { ...update, id: "again" }]],
   ["duplicate id", [update, update]],
-  ["credential", [{ ...update, content: "token ghp_123456789012345678901234567890123456" }]],
   ["invented scope", [{ ...update, scope: { global: true, projects: [] } }]],
 ])("rejects %s before applying any operation", (_name, operations) => {
   expect(() =>
     validateDreamPlan({ operations }, [memoryRecordSchema.parse(record())], [a]),
   ).toThrow();
+});
+
+test("accepts credential-like model output in a locally persisted plan", () => {
+  const plan = validateDreamPlan(
+    {
+      operations: [{ ...update, content: "token ghp_123456789012345678901234567890123456" }],
+    },
+    [memoryRecordSchema.parse(record())],
+    [a],
+  );
+
+  expect(plan.operations[0]).toMatchObject({
+    content: "token ghp_123456789012345678901234567890123456",
+  });
 });
 
 test("does not cross scope boundaries or change an untouched scope", () => {

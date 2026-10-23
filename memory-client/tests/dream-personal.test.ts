@@ -35,6 +35,24 @@ test("normalizes an exact unwrapped model response before strict validation", ()
   expect(result.sections).toEqual(sections);
 });
 
+test("accepts credential-like model output in a locally persisted profile", () => {
+  const result = validatePersonalProfile(
+    {
+      sections: {
+        ...sections,
+        enduringPreferencesAndConstraints: [
+          { text: "Token ghp_123456789012345678901234567890123456", source_refs: [ref] },
+        ],
+      },
+    },
+    [global],
+    "",
+    undefined,
+  );
+
+  expect(result.content).toContain("ghp_");
+});
+
 test("rejects project facts and forgotten personal sources", () => {
   expect(() =>
     validatePersonalProfile(
