@@ -1,17 +1,82 @@
 """Bot-facing ordered queue commands and scope selection."""
 
-from datetime import datetime, timezone
 import json
 import os
+import shlex
 from unittest.mock import patch
 
 from click.testing import CliRunner
 
 from battuta_project.cli import main
+from battuta_project.registry import ProjectRegistry
 from project_fixtures import ProjectTestCase
 
 
 class TodoCliTests(ProjectTestCase):
+    def test_creation_handoff_example_creates_independent_related_work(self):
+        for scope in ("project", "general"):
+            for role, counterpart in (("pm", "tl"), ("tl", "pm")):
+                with self.subTest(scope=scope, role=role), patch("pathlib.Path.home", return_value=self.home / f"{scope}-{role}"):
+                    registry = ProjectRegistry()
+                    project = "atlas-api" if scope == "project" else None
+                    if project:
+                        registry.init(project)
+                    output = self.success("create", "--item", "Initial", scope=scope, role=role)
+                    work_id = registry.current_work_id(project, role)
+                    reference = f"{role}:{work_id}"
+                    self.assertIn(f"Work: {reference}", output)
+                    self.assertIn(f"Scope: {scope}", output)
+                    if project:
+                        self.assertIn(project, output)
+                    examples = [shlex.split(line.strip()) for line in output.splitlines()
+                                if line.strip().startswith("battuta-project ")]
+                    self.assertEqual(len(examples), 1)
+                    example = examples[0]
+                    self.assertEqual(example[:5], ["battuta-project", "todo", "--scope", scope, "create"])
+                    self.assertEqual(example[example.index("--related-to") + 1], reference)
+                    with patch.dict(os.environ, {"AGENT_ROLE": counterpart}):
+                        result = self.runner.invoke(main, example[1:])
+                    self.assertEqual(result.exit_code, 0, result.output)
+                    self.assertIn(f"Related to: {reference}", result.output)
+                    self.assertNotIn("battuta-project ", result.output)
+                    other_id = registry.current_work_id(project, counterpart)
+                    self.assertNotEqual(other_id, work_id)
+                    self.assertEqual(registry.work_record(project, counterpart, other_id).related_to, reference)
+                    for args in (("list",), ("extend", "--item", "Next")):
+                        subsequent = self.success(*args, scope=scope, role=counterpart)
+                        self.assertIn(f"Work: {counterpart}:{other_id}", subsequent)
+                        self.assertNotIn("battuta-project ", subsequent)
+                    self.assertEqual(registry.current_work_id(project, role), work_id)
+
+    def test_extend_and_invalid_relationship_options_preserve_storage(self):
+        self.success("create", "--item", "First")
+        path = self.todo_path()
+        original = path.read_bytes()
+        output = self.success("extend", "--item", "Second")
+        self.assertIn("2. [todo] Second", output)
+        self.assertTrue(path.read_bytes().startswith(original))
+        before = path.read_bytes()
+        config = self.registry.state_path.read_bytes()
+        for args in (("create", "--force", "--item", "New", "--related-to", "pm:abc12"),
+                     ("create", "--force", "--item", "New", "--related-to", "bad"),
+                     ("extend", "--related-to", "pm:abc12", "--item", "New"),
+                     ("extend", "--work-id", "abc12", "--item", "New"),
+                     ("create", "--work-id", "abc12", "--item", "New")):
+            with self.subTest(args=args):
+                result = self.call(*args)
+                self.assertNotEqual(result.exit_code, 0)
+                self.assertNotIn("battuta-project ", result.output)
+                self.assertEqual(path.read_bytes(), before)
+                self.assertEqual(self.registry.state_path.read_bytes(), config)
+
+    def test_creation_initializes_missing_project_work_mappings(self):
+        for entry in ({}, {"projects": {}}, {"projects": {"atlas-api": {}}}):
+            with self.subTest(entry=entry):
+                self.registry.state_path.write_text(json.dumps({"currentProject": "atlas-api", **entry}))
+                self.success("create", "--item", "Fresh")
+                self.assertTrue(self.todo_path().exists())
+                self.assertEqual(self.registry.current_name(), "atlas-api")
+
     def setUp(self):
         super().setUp()
         self.runner = CliRunner()
@@ -21,9 +86,13 @@ class TodoCliTests(ProjectTestCase):
 
     def call(self, *args, scope="project", second=0, role="pm"):
         with patch.dict(os.environ, {"AGENT_ROLE": role}):
-            with patch("battuta_project.todos.datetime", wraps=datetime) as clock:
-                clock.now.return_value = datetime(2026, 10, 23, 12, 0, second, tzinfo=timezone.utc)
-                return self.runner.invoke(main, ["todo", "--scope", scope, *args])
+            return self.runner.invoke(main, ["todo", "--scope", scope, *args])
+
+    def todo_path(self, *, scope="project", role="pm"):
+        project = self.registry.current_name() if scope == "project" else None
+        work_id = self.registry.current_work_id(project, role)
+        directory = self.registry.root / project / "todos" if project else self.home / ".battuta/todos"
+        return directory / f"todo-{role}-{work_id}.jsonl"
 
     def success(self, *args, **kwargs):
         result = self.call(*args, **kwargs)
@@ -44,7 +113,7 @@ class TodoCliTests(ProjectTestCase):
         self.success("cancel", "--rational", "Owner dropped the second step")
         output = self.success("update-todo", "--item", "Revised", "--item", "Extra")
         self.assertIn("Next: #3 Revised", output)
-        path = self.project.root / "todos" / "todo-pm-20261023T120000Z.jsonl"
+        path = self.todo_path()
         self.assertEqual([json.loads(line) for line in path.read_text().splitlines()], [
             {"id": 1, "status": "done", "description": "First", "rational": "Verified first step"},
             {"id": 2, "status": "cancelled", "description": "Second", "rational": "Owner dropped the second step"},
@@ -67,14 +136,14 @@ class TodoCliTests(ProjectTestCase):
 
     def test_creation_blocks_until_owner_approved_force(self):
         self.success("create", "--item", "Existing work")
-        path = self.project.root / "todos" / "todo-pm-20261023T120000Z.jsonl"
+        path = self.todo_path()
         before = path.read_bytes()
         blocked = self.call("create", "--item", "Different work", second=1)
         self.assert_explained_failure(blocked)
         self.assertEqual(path.read_bytes(), before)
         self.assertEqual(len(list(path.parent.glob("*.jsonl"))), 1)
         output = self.success("create", "--force", "--item", "Different work", second=1)
-        self.assertIn("todo-pm-20261023T120001Z.jsonl", output)
+        self.assertIn(self.todo_path().name, output)
         self.assertEqual(path.read_bytes(), before)
         self.success("done", "--rational", "Different work verified")
         self.success("create", "--item", "Next task", second=2)
@@ -87,7 +156,7 @@ class TodoCliTests(ProjectTestCase):
                 self.success("done", "--rational", "Completion explanation", scope=scope)
                 self.success("cancel", "--rational", "Cancellation explanation", scope=scope)
                 directory = self.project.root / "todos" if scope == "project" else self.home / ".battuta/todos"
-                path = directory / "todo-pm-20261023T120000Z.jsonl"
+                path = self.todo_path(scope=scope)
                 before = path.read_bytes()
 
                 output = self.success("list", "--remain", scope=scope)
@@ -116,7 +185,7 @@ class TodoCliTests(ProjectTestCase):
                 self.success("done", "--rational", "Completion explanation", scope=scope)
                 self.success("cancel", "--rational", "Cancellation explanation", scope=scope)
                 directory = self.project.root / "todos" if scope == "project" else self.home / ".battuta/todos"
-                path = directory / "todo-pm-20261023T120000Z.jsonl"
+                path = self.todo_path(scope=scope)
                 before = path.read_bytes()
 
                 output = self.success("list", "--next", scope=scope)
@@ -160,8 +229,8 @@ class TodoCliTests(ProjectTestCase):
             self.assertIn("No active TODO list", self.success("list", scope="general"))
             self.assertFalse((home / ".battuta").exists())
             self.success("create", "--item", "General task", scope="general")
-            self.assertTrue((home / ".battuta/todos/todo-pm-20261023T120000Z.jsonl").is_file())
-            self.assertFalse((home / ".battuta/projects").exists())
+            self.assertEqual(len(list((home / ".battuta/todos").glob("todo-pm-*.jsonl"))), 1)
+            self.assertIsNone(json.loads((home / ".battuta/projects/.config.json").read_text())["currentProject"])
             result = self.call("list")
             self.assert_explained_failure(result)
 
@@ -182,7 +251,7 @@ class TodoCliTests(ProjectTestCase):
 
     def test_done_and_cancel_require_rational(self):
         self.success("create", "--item", "Next step")
-        path = self.project.root / "todos" / "todo-pm-20261023T120000Z.jsonl"
+        path = self.todo_path()
         before = path.read_bytes()
         for command in ("done", "cancel"):
             for options in ((), ("--rational", ""), ("--rational", " \n ")):

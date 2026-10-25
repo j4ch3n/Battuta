@@ -1,7 +1,6 @@
 """Ordered next-item and remaining-queue persistence contracts."""
 
 from concurrent.futures import ProcessPoolExecutor
-from datetime import datetime, timezone
 import json
 from pathlib import Path
 import tempfile
@@ -10,11 +9,24 @@ from unittest.mock import patch
 
 from battuta_project.todo_errors import TodoError, TodoErrorCode
 from battuta_project.todos import TodoStore
+from battuta_project.registry import ProjectRegistry
 
 
 def advance_in_process(home):
     with patch("pathlib.Path.home", return_value=Path(home)):
         TodoStore("general", "pm").advance("done", rational="Verified the step's outcome")
+
+
+def create_in_process(args):
+    home, role = args
+    with patch("pathlib.Path.home", return_value=Path(home)):
+        return TodoStore("general", role).create([role]).work_id
+
+
+def switch_in_process(args):
+    home, project = args
+    with patch("pathlib.Path.home", return_value=Path(home)):
+        ProjectRegistry().switch(project)
 
 
 class TodoTests(unittest.TestCase):
@@ -28,9 +40,138 @@ class TodoTests(unittest.TestCase):
         self.store = TodoStore("general", "pm")
 
     def create(self, *items, second=0, force=False):
-        with patch("battuta_project.todos.datetime", wraps=datetime) as clock:
-            clock.now.return_value = datetime(2026, 10, 23, 12, 0, second, tzinfo=timezone.utc)
-            return self.store.create(list(items), force=force)
+        return self.store.create(list(items), force=force)
+
+    def test_roles_create_independently_and_extend_their_own_work(self):
+        for role in ("pm", "tl"):
+            with self.subTest(role=role):
+                store = TodoStore("general", role)
+                with self.assertRaisesRegex(TodoError, "NO_CURRENT_WORK"):
+                    store.extend(["Not started"])
+                created = store.create(["First"])
+                self.assertRegex(created.work_id, r"^[a-z0-9]{5}$")
+                self.assertEqual(created.path.name, f"todo-{role}-{created.work_id}.jsonl")
+                state = store.registry.state_path.read_bytes()
+                before = created.path.read_bytes()
+                result = store.extend(["Second", "Third"])
+                self.assertEqual(result.path, created.path)
+                self.assertTrue(result.path.read_bytes().startswith(before))
+                self.assertEqual([item.id for item in result.items], [1, 2, 3])
+                self.assertEqual(store.registry.state_path.read_bytes(), state)
+                for invalid in ([], [" "], [42]):
+                    with self.assertRaisesRegex(TodoError, "INVALID_INPUT"):
+                        store.extend(invalid)
+                for _ in range(3):
+                    store.advance("done", "Checked")
+                self.assertEqual(store.extend(["More"]).items[-1].id, 4)
+                store.advance("done", "Checked")
+                self.assertNotEqual(store.create(["New work"]).work_id, created.work_id)
+
+    def test_related_work_retains_historical_target_and_does_not_switch_roles(self):
+        pm = self.store.create(["PM"])
+        tl_store = TodoStore("general", "tl")
+        tl = tl_store.create(["TL"], related_to=f"pm:{pm.work_id}")
+        self.assertNotEqual(pm.work_id, tl.work_id)
+        self.assertEqual(self.store.read().path, pm.path)
+        self.store.create(["Later PM"], force=True)
+        self.assertEqual(tl_store.extend(["More TL"]).related_to, f"pm:{pm.work_id}")
+        tl_store.create(["Later TL"], force=True, related_to=f"pm:{pm.work_id}")
+        self.assertEqual(tl_store.registry.work_record(None, "tl", tl.work_id).related_to, f"pm:{pm.work_id}")
+
+    def test_invalid_related_references_do_not_publish_work(self):
+        for reference in ("pm:../xx", "pm:abc12", "engineer:abc12", "abc12", "pm:ABCDE"):
+            with self.subTest(reference=reference), self.assertRaisesRegex(TodoError, "INVALID_REFERENCE"):
+                self.store.create(["New"], related_to=reference)
+        self.assertIsNone(self.store.read())
+        registry = ProjectRegistry()
+        registry.init("atlas")
+        project_work = TodoStore("project", "tl").create(["Project TL"])
+        with self.assertRaisesRegex(TodoError, "INVALID_REFERENCE"):
+            self.store.create(["General"], related_to=f"tl:{project_work.work_id}")
+
+    def test_collision_checks_both_roles_orphans_and_metadata(self):
+        self.store.directory.mkdir(parents=True)
+        orphan = self.store.directory / "todo-tl-aaaaa.jsonl"
+        orphan.write_text("Preserve orphan")
+        with patch("battuta_project.todos.secrets.choice", side_effect=list("aaaaabbbbb")):
+            created = self.create("New")
+        self.assertEqual(created.work_id, "bbbbb")
+        self.assertEqual(orphan.read_text(), "Preserve orphan")
+        with patch("battuta_project.todos.secrets.choice", return_value="a"):
+            with self.assertRaisesRegex(TodoError, "WORK_ID_COLLISION"):
+                self.create("Collision", force=True)
+        self.assertEqual(self.store.read().work_id, "bbbbb")
+        # Retained metadata still reserves an ID when its historical file is absent.
+        self.store.create(["Later"], force=True)
+        created.path.unlink()
+        with patch("battuta_project.todos.secrets.choice", side_effect=list("bbbbbccccc")):
+            self.assertEqual(self.store.create(["Newest"], force=True).work_id, "ccccc")
+        outside = self.home / "private"
+        outside.write_text("Keep")
+        (self.store.directory / "todo-tl-ddddd.jsonl").symlink_to(outside)
+        with patch("battuta_project.todos.secrets.choice", side_effect=list("dddddeeeee")):
+            self.assertEqual(self.store.create(["Safe"], force=True).work_id, "eeeee")
+        self.assertEqual(outside.read_text(), "Keep")
+
+    def test_legacy_continuation_and_independent_role_migration(self):
+        self.store.directory.mkdir(parents=True)
+        paths = {}
+        for role in ("pm", "tl"):
+            path = self.store.directory / f"todo-{role}-20261023T120000Z.jsonl"
+            path.write_text('{"id":1,"status":"todo","description":"Legacy","rational":""}\n')
+            paths[role] = path
+        self.assertIsNone(self.store.read().work_id)
+        with self.assertRaisesRegex(TodoError, "UNFINISHED_TODO"):
+            self.create("New")
+        with self.assertRaisesRegex(TodoError, "NO_CURRENT_WORK"):
+            self.store.extend(["No legacy extension"])
+        self.store.advance("done", "Checked legacy")
+        legacy_bytes = paths["pm"].read_bytes()
+        current = self.create("New")
+        self.assertEqual(paths["pm"].read_bytes(), legacy_bytes)
+        tl = TodoStore("general", "tl")
+        self.assertIsNone(tl.read().work_id)
+        tl.update_todo(["Revised legacy"])
+        tl.advance("cancelled", "No longer needed")
+        current.path.unlink()
+        for action in (self.store.read, lambda: self.store.extend(["Missing"]), lambda: self.create("Force", force=True)):
+            with self.assertRaisesRegex(TodoError, "INVALID_TODO_FILE"):
+                action()
+
+    def test_invalid_legacy_timestamp_is_rejected(self):
+        self.store.directory.mkdir(parents=True)
+        (self.store.directory / "todo-pm-20261323T120000Z.jsonl").write_text("unused")
+        with self.assertRaisesRegex(TodoError, "INVALID_TODO_FILE"):
+            self.store.read()
+
+    def test_failed_publication_preserves_pointer_history_and_removes_new_file(self):
+        first = self.create("Original")
+        before = first.path.read_bytes()
+        config = self.store.registry.state_path.read_bytes()
+        with patch("battuta_project.registry.atomic_write", side_effect=OSError("disk full")):
+            with self.assertRaisesRegex(TodoError, "TODO_STORAGE_ERROR"):
+                self.create("New", force=True)
+        self.assertEqual(self.store.registry.state_path.read_bytes(), config)
+        self.assertEqual(first.path.read_bytes(), before)
+        self.assertEqual(list(self.store.directory.glob("*.jsonl")), [first.path])
+
+    def test_parallel_role_publication_preserves_both_pointers(self):
+        with ProcessPoolExecutor(max_workers=2) as pool:
+            ids = list(pool.map(create_in_process, [(str(self.home), role) for role in ("pm", "tl")]))
+        for role, work_id in zip(("pm", "tl"), ids):
+            self.assertEqual(TodoStore("general", role).read().work_id, work_id)
+
+    def test_publication_and_project_switch_preserve_state(self):
+        registry = ProjectRegistry()
+        registry.init("atlas")
+        registry.init("harbor")
+        with ProcessPoolExecutor(max_workers=2) as pool:
+            publication = pool.submit(create_in_process, (str(self.home), "tl"))
+            switch = pool.submit(switch_in_process, (str(self.home), "atlas"))
+            work_id = publication.result()
+            switch.result()
+        self.assertEqual(registry.current_name(), "atlas")
+        self.assertEqual(registry.current_work_id(None, "tl"), work_id)
 
     def test_error_explanations_render_without_relying_on_exact_wording(self):
         for code in TodoErrorCode:
@@ -94,12 +235,9 @@ class TodoTests(unittest.TestCase):
         second = self.create("New", second=1, force=True)
         self.assertEqual(first.path.read_bytes(), before)
         self.assertEqual(self.store.read().path, second.path)
-        # File timestamps, not mtime, determine which list is active.
+        # The persisted pointer, not mtime, determines the active list.
         first.path.touch()
         self.assertEqual(self.store.read().path, second.path)
-        with self.assertRaisesRegex(TodoError, "TIMESTAMP_COLLISION"):
-            self.create("Collision", second=1, force=True)
-        self.assertEqual(self.store.read().items[0].description, "New")
 
     def test_invalid_data_never_changes_or_falls_back(self):
         first = self.create("Original")

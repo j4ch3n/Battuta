@@ -16,6 +16,80 @@ from battuta_project.models import LinearConfig
 
 
 class RegistryTests(unittest.TestCase):
+    def test_work_defaults_and_publication_preserve_existing_state(self):
+        variants = [None, {}, {"custom": 7}, {"projects": {}}, {"projects": {"other": {}}}]
+        variants += [{"projects": {"atlas": entry}} for entry in
+                     ({}, {"roles": {}}, {"roles": {"tl": {}}}, {"roles": {"pm": {}}},
+                      {"roles": {"pm": {"works": {}}}})]
+        for index, value in enumerate(variants):
+            with self.subTest(value=value):
+                registry = ProjectRegistry(self.root / str(index))
+                if value is not None:
+                    registry.root.mkdir(parents=True)
+                    registry.state_path.write_text(json.dumps(value))
+                before = sorted(registry.root.iterdir()) if registry.root.exists() else []
+                self.assertIsNone(registry.current_work_id("atlas", "pm"))
+                self.assertIsNone(registry.current_work_id(None, "tl"))
+                self.assertEqual(sorted(registry.root.iterdir()) if registry.root.exists() else [], before)
+                with registry.locked(create=True):
+                    registry.set_work_id("atlas", "pm", "abc12")
+                self.assertEqual(registry.current_work_id("atlas", "pm"), "abc12")
+                self.assertIsNone(registry.current_work_id("atlas", "tl"))
+                state = json.loads(registry.state_path.read_text())
+                for key, item in (value or {}).items():
+                    if key != "projects":
+                        self.assertEqual(state[key], item)
+
+    def test_work_history_survives_role_rotation_and_project_switching(self):
+        self.registry.init("atlas")
+        self.registry.init("harbor")
+        data = json.loads(self.registry.state_path.read_text())
+        data["projects"] = {"atlas": {"custom": 7, "roles": {"pm": {"custom": 9}}}}
+        self.registry.state_path.write_text(json.dumps(data))
+        with self.registry.locked():
+            self.registry.set_work_id("atlas", "pm", "abc12")
+            self.registry.set_work_id("atlas", "tl", "def34", related_to="pm:abc12")
+            self.registry.set_work_id("atlas", "pm", "ghi56")
+            self.registry.set_work_id(None, "tl", "jkl78")
+        self.registry.switch("atlas")
+        self.assertEqual(self.registry.current_work_id("atlas", "pm"), "ghi56")
+        self.assertEqual(self.registry.current_work_id("atlas", "tl"), "def34")
+        self.assertEqual(self.registry.work_record("atlas", "tl", "def34").related_to, "pm:abc12")
+        self.assertIsNotNone(self.registry.work_record("atlas", "pm", "abc12"))
+        self.assertIsNone(self.registry.work_record("harbor", "pm", "abc12"))
+        self.assertEqual(self.registry.current_work_id(None, "tl"), "jkl78")
+        state = json.loads(self.registry.state_path.read_text())["projects"]["atlas"]
+        self.assertEqual(state["custom"], 7)
+        self.assertEqual(state["roles"]["pm"]["custom"], 9)
+
+    def test_malformed_work_state_cannot_be_overwritten(self):
+        self.root.mkdir()
+        variants = [{"projects": []}, {"projects": {"atlas": []}}, {"general": []}]
+        variants += [{"projects": {"atlas": {"roles": roles}}} for roles in
+                     ([], {"engineer": {}}, {"pm": []}, {"pm": {"works": []}},
+                      {"pm": {"currentWorkId": "../xx"}}, {"pm": {"currentWorkId": "abc12"}},
+                      {"pm": {"works": {"bad": {}}}},
+                      {"pm": {"works": {"abc12": {"relatedTo": "tl:../xx"}}}})]
+        for value in variants:
+            with self.subTest(value=value):
+                original = json.dumps(value)
+                self.registry.state_path.write_text(original)
+                with self.assertRaises(click.ClickException):
+                    with self.registry.locked():
+                        self.registry.set_work_id("atlas", "pm", "abc12")
+                self.assertEqual(self.registry.state_path.read_text(), original)
+
+    def test_config_lock_symlink_cannot_redirect_publication(self):
+        self.root.mkdir()
+        outside = self.root.parent / "outside"
+        outside.write_text("keep")
+        (self.root / ".config.lock").symlink_to(outside)
+        with self.assertRaises(click.ClickException):
+            with self.registry.locked(create=True):
+                self.registry.set_work_id(None, "tl", "abc12")
+        self.assertEqual(outside.read_text(), "keep")
+        self.assertFalse(self.registry.state_path.exists())
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
