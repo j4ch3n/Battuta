@@ -24,6 +24,7 @@ class PackagingConfigureTests(unittest.TestCase):
                 shutil.copyfile(ROOT / "packaging" / "configure.mjs", root / "bin" / "configure.mjs")
                 shutil.copyfile(ROOT / "packaging" / "shared-resources.mjs", root / "bin" / "shared-resources.mjs")
                 shutil.copyfile(ROOT / "packaging" / "configure-subagents.mjs", root / "bin" / "configure-subagents.mjs")
+                shutil.copytree(ROOT / "bot-setup", root / "bot-setup")
                 copy_scheduler_runtime(root)
                 source = root / "shared-skills" / "project-context"
                 source.mkdir(parents=True)
@@ -41,6 +42,10 @@ class PackagingConfigureTests(unittest.TestCase):
                     bot = root / "bots" / role
                     skills = bot / ".pi" / "skills"
                     skills.mkdir(parents=True)
+                    (bot / ".pi/mcp.json").write_text(json.dumps({"mcpServers": {"other": {"command": "other-server"}}}))
+                    auth = bot / ".pi/mcp-auth.json"
+                    auth.write_bytes(b'{"sentinel":"private-oauth-token"}\n')
+                    auth.chmod(0o600)
                     shutil.copytree(ROOT / "bots" / role / ".pi/skills/memory", skills / "memory")
                     if personal is not None:
                         (bot / ".pi/ME.md").write_text("Private profile")
@@ -93,11 +98,16 @@ class PackagingConfigureTests(unittest.TestCase):
                             self.assertEqual((root / "bots/AGENTS_personal.md").read_text(), personal)
                         self.assertEqual((root / "bots" / role / "AGENTS.md").read_text(), f"Shared instructions\n{role}")
                         mcp = json.loads((link.parent.parent / "mcp.json").read_text())
-                        self.assertEqual(
-                            mcp["mcpServers"]["linear"]["headers"], {"Authorization": "Bearer ${LINEAR_API_TOKEN}"},
-                        )
-                        self.assertEqual(mcp["mcpServers"]["linear"]["exposure"], "codemode")
                         self.assertNotIn("test-linear", json.dumps(mcp))
+                        self.assertNotIn("private-oauth-token", json.dumps(mcp) + result.stdout + result.stderr)
+                        self.assertEqual(mcp["mcpServers"]["other"], {"command": "other-server"})
+                        auth = link.parent.parent / "mcp-auth.json"
+                        self.assertEqual(auth.read_bytes(), b'{"sentinel":"private-oauth-token"}\n')
+                        self.assertEqual(auth.stat().st_mode & 0o777, 0o600)
+                        telegram = json.loads((link.parent.parent / "telegram.json").read_text())
+                        self.assertEqual(telegram["profiles"]["default"]["botToken"], env[f"{role[:2].upper()}_TELEGRAM_TOKEN"])
+                        self.assertEqual(telegram["profiles"]["default"]["allowedUserId"], 123)
+                        self.assertEqual("luma" in mcp["mcpServers"], role == "pm-bot")
                         settings_path = link.parent.parent / "settings.json"
                         settings = json.loads(settings_path.read_text())
                         if role == "tl-bot":
@@ -125,3 +135,99 @@ class PackagingConfigureTests(unittest.TestCase):
                         else:
                             expected_packages.append("npm:pi-subagents@0.82.1")
                         self.assertEqual(settings, {"theme": "dark", "packages": expected_packages, "battutaMemoryCapture": {"enabled": role == "pm-bot", "batchMessages": 6}})
+
+
+class PackagingMigrationTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name) / "new"
+        self.old = Path(self.temporary.name) / "old bots"
+        (self.root / "bin").mkdir(parents=True)
+        for name in ("configure.mjs", "shared-resources.mjs", "configure-subagents.mjs", "battuta"):
+            shutil.copyfile(ROOT / "packaging" / name, self.root / "bin" / name)
+        (self.root / "bin/node").symlink_to(shutil.which("node"))
+        shutil.copytree(ROOT / "bot-setup", self.root / "bot-setup")
+        copy_scheduler_runtime(self.root)
+        (self.root / "shared-skills/project-context").mkdir(parents=True)
+        (self.root / "bots").mkdir()
+        (self.root / "bots/AGENTS_shared.md").write_text("Shared")
+        for role in ("pm-bot", "tl-bot"):
+            bot = self.root / "bots" / role
+            (bot / ".pi").mkdir(parents=True)
+            (bot / "AGENTS_dedicated.md").write_text(role)
+            old_pi = self.old / role / ".pi"
+            old_pi.mkdir(parents=True)
+            (old_pi / "telegram.json").write_text(json.dumps({
+                "profiles": {"default": {"botToken": f"private-{role}", "custom": True}, "extra": {"enabled": False}},
+                "custom": role,
+            }) + "\n")
+            (old_pi / "mcp-auth.json").write_text(json.dumps({"private-oauth": role}) + "\n")
+        (self.root / ".env.prod").write_text(
+            "LINEAR_API_TOKEN=test-linear\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=test-supabase\n"
+        )
+        self.env = {key: value for key, value in os.environ.items() if "TELEGRAM" not in key}
+        self.env["PI_SCHEDULER_STATE_FILE"] = str(self.root / "schedule.json")
+        self.env.update(TELEGRAM_ALLOWED_USER_ID="123", PM_TELEGRAM_TOKEN="456:test-pm", TL_TELEGRAM_TOKEN="789:test-tl")
+
+    def configure(self, *args):
+        return subprocess.run(
+            ["bash", str(self.root / "bin/battuta"), "configure", *args],
+            env=self.env, capture_output=True, text=True,
+        )
+
+    def test_migrates_by_bot_name_preserving_bytes_and_private_permissions(self):
+        for key in ("TELEGRAM_ALLOWED_USER_ID", "PM_TELEGRAM_TOKEN", "TL_TELEGRAM_TOKEN"):
+            self.env.pop(key)
+        for with_auth in (True, False):
+            with self.subTest(with_auth=with_auth):
+                if not with_auth:
+                    for role in ("pm-bot", "tl-bot"):
+                        (self.old / role / ".pi/mcp-auth.json").unlink()
+                        (self.root / "bots" / role / ".pi/mcp-auth.json").unlink(missing_ok=True)
+                for _ in range(2):
+                    result = self.configure("--migrate-from", str(self.old))
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    for role in ("pm-bot", "tl-bot"):
+                        for name in ("telegram.json", "mcp-auth.json"):
+                            source = self.old / role / ".pi" / name
+                            target = self.root / "bots" / role / ".pi" / name
+                            if source.exists():
+                                self.assertEqual(target.read_bytes(), source.read_bytes())
+                                self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+                                self.assertEqual(source.stat().st_mode & 0o777, 0o644)
+                            else:
+                                self.assertFalse(target.exists())
+                    self.assertNotIn("private-", result.stdout + result.stderr)
+
+    def test_preflights_both_bots_before_copying_on_invalid_or_conflicting_state(self):
+        for name, failure in product(("telegram.json", "mcp-auth.json"), ("invalid", "array", "conflict")):
+            with self.subTest(name=name, failure=failure):
+                source = self.old / "tl-bot/.pi" / name
+                original = source.read_bytes()
+                target = self.root / "bots/tl-bot/.pi" / name
+                if failure == "conflict":
+                    target.write_bytes(b'{"existing":"private-destination"}')
+                else:
+                    source.write_bytes(b'{"private-broken' if failure == "invalid" else b'[]')
+                result = self.configure("--migrate-from", str(self.old))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn("private-", result.stdout + result.stderr)
+                self.assertFalse((self.root / "bots/pm-bot/.pi/telegram.json").exists())
+                if failure == "conflict":
+                    self.assertEqual(target.read_bytes(), b'{"existing":"private-destination"}')
+                    target.unlink()
+                source.write_bytes(original)
+
+    def test_missing_telegram_fails_without_env_fallback(self):
+        (self.old / "tl-bot/.pi/telegram.json").unlink()
+        result = self.configure("--migrate-from", str(self.old))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.root / "bots/pm-bot/.pi/telegram.json").exists())
+
+    def test_rejects_unknown_or_missing_arguments(self):
+        for args in (("--migrate-from",), ("--unknown",), ("unexpected",)):
+            with self.subTest(args=args):
+                result = self.configure(*args)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse((self.root / "schedule.json").exists())

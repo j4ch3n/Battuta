@@ -1,8 +1,10 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import { configureSharedResources } from "./shared-resources.mjs";
 import { configureSubagents } from "./configure-subagents.mjs";
+import { configureMcp, validateMemoryUrl } from "../bot-setup/mcp.mjs";
 import { schedulerStorePath, schedulerCatchUpMax } from "../memory-client/scheduler-config.ts";
 import { initializeSchedulerStore } from "../memory-client/scheduler-store.ts";
 
@@ -26,7 +28,6 @@ const BOT_CONFIGURATIONS = [
     ...bot,
     piDirectory,
     telegramConfigPath: join(piDirectory, "telegram.json"),
-    mcpConfigPath: join(piDirectory, "mcp.json"),
     settingsPath: join(piDirectory, "settings.json"),
   };
 });
@@ -37,20 +38,68 @@ function required(name) {
   return value;
 }
 
-const owner = Number(required("TELEGRAM_ALLOWED_USER_ID"));
-if (!Number.isSafeInteger(owner) || owner <= 0) throw new Error("Invalid TELEGRAM_ALLOWED_USER_ID");
+async function checkMigrationTarget(path, content) {
+  try {
+    const stat = await lstat(path);
+    if (!stat.isFile() || !(await readFile(path)).equals(content))
+      throw new Error(`Refusing to overwrite existing configuration: ${path}`);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+}
+
+const { values } = parseArgs({ options: { "migrate-from": { type: "string" } } });
+const oldBotsDirectory = values["migrate-from"];
+if (oldBotsDirectory === "") throw new Error("--migrate-from requires a bots directory");
+const migrating = oldBotsDirectory !== undefined;
+let owner;
+if (!migrating) {
+  owner = Number(required("TELEGRAM_ALLOWED_USER_ID"));
+  if (!Number.isSafeInteger(owner) || owner <= 0)
+    throw new Error("Invalid TELEGRAM_ALLOWED_USER_ID");
+}
 required("LINEAR_API_TOKEN");
 required("SUPABASE_URL");
 required("SUPABASE_SECRET_KEY");
-const memoryUrl = process.env.BATTUTA_MEMORY_URL || "http://127.0.0.1:8901/mcp";
-const endpoint = new URL(memoryUrl);
-if (
-  endpoint.protocol !== "http:" ||
-  !["127.0.0.1", "localhost", "[::1]"].includes(endpoint.hostname) ||
-  endpoint.username ||
-  endpoint.password
-)
-  throw new Error("BATTUTA_MEMORY_URL must use loopback HTTP");
+const memoryUrl = validateMemoryUrl(process.env.BATTUTA_MEMORY_URL);
+
+// Preflight both roles before changing private state; never log JSON parser errors.
+const migration = [];
+if (migrating) {
+  for (const bot of BOT_CONFIGURATIONS) {
+    for (const name of ["telegram.json", "mcp-auth.json"]) {
+      const source = join(resolve(oldBotsDirectory), `${bot.name.toLowerCase()}-bot`, ".pi", name);
+      let content;
+      try {
+        content = await readFile(source);
+      } catch (error) {
+        if (error.code === "ENOENT" && name === "mcp-auth.json") continue;
+        throw error;
+      }
+      let data;
+      try {
+        data = JSON.parse(content.toString("utf8"));
+      } catch {
+        throw new Error(`Invalid JSON in ${source}`);
+      }
+      if (!data || typeof data !== "object" || Array.isArray(data))
+        throw new Error(`Expected a JSON object in ${source}`);
+      const path = join(bot.piDirectory, name);
+      await checkMigrationTarget(path, content);
+      migration.push({ path, content });
+    }
+  }
+}
+for (const { path, content } of migration) {
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  try {
+    await writeFile(path, content, { flag: "wx", mode: 0o600 });
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    await checkMigrationTarget(path, content);
+  }
+  await chmod(path, 0o600);
+}
 
 // Explicit configuration may create a missing store; launch only validates it.
 schedulerCatchUpMax();
@@ -58,42 +107,23 @@ await initializeSchedulerStore(schedulerStorePath());
 for (const bot of BOT_CONFIGURATIONS) {
   await configureSharedResources(PACKAGE_ROOT, bot.directory);
 
-  const token = required(`${bot.name}_TELEGRAM_TOKEN`);
-  const [id, secret] = token.split(":");
-  const botId = Number(id);
-  if (!secret || !Number.isSafeInteger(botId) || botId <= 0)
-    throw new Error(`Invalid ${bot.name}_TELEGRAM_TOKEN`);
-  const username = (process.env[`${bot.name}_TELEGRAM_BOT_USERNAME`] || "").replace(/^@/, "");
-  if (username && !/^[a-zA-Z0-9_]+$/.test(username))
-    throw new Error(`Invalid ${bot.name}_TELEGRAM_BOT_USERNAME`);
+  let telegram;
+  if (!migrating) {
+    const token = required(`${bot.name}_TELEGRAM_TOKEN`);
+    const [id, secret] = token.split(":");
+    const botId = Number(id);
+    if (!secret || !Number.isSafeInteger(botId) || botId <= 0)
+      throw new Error(`Invalid ${bot.name}_TELEGRAM_TOKEN`);
+    const username = (process.env[`${bot.name}_TELEGRAM_BOT_USERNAME`] || "").replace(/^@/, "");
+    if (username && !/^[a-zA-Z0-9_]+$/.test(username))
+      throw new Error(`Invalid ${bot.name}_TELEGRAM_BOT_USERNAME`);
 
-  const telegram = { profiles: { default: { botToken: token, allowedUserId: owner, botId } } };
-  if (username) telegram.profiles.default.botUsername = username;
-  let mcpConfig = {};
-  try {
-    mcpConfig = JSON.parse(await readFile(bot.mcpConfigPath, "utf8"));
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
+    telegram = { profiles: { default: { botToken: token, allowedUserId: owner, botId } } };
+    if (username) telegram.profiles.default.botUsername = username;
   }
-  if (!mcpConfig || typeof mcpConfig !== "object" || Array.isArray(mcpConfig))
-    throw new Error("Invalid MCP config");
-  mcpConfig.mcpServers ??= {};
-  if (typeof mcpConfig.mcpServers !== "object" || Array.isArray(mcpConfig.mcpServers))
-    throw new Error("Invalid MCP servers");
-  mcpConfig.mcpServers.linear = {
-    url: "https://mcp.linear.app/mcp",
-    headers: { Authorization: "Bearer ${LINEAR_API_TOKEN}" },
-    exposure: "codemode",
-    description: "Manage Linear issues, projects, and cycles",
-  };
-  mcpConfig.mcpServers.memory = {
-    url: memoryUrl,
-    exposure: "codemode",
-    description: "Shared scoped memory; context, not execution authority",
-  };
-  const mcpConfigJson = JSON.stringify(mcpConfig, null, 2);
+  await configureMcp(bot.directory, { role: bot.name.toLowerCase(), memoryUrl });
 
-  // Retained state can load the old MCP adapter or omit newly bundled PM packages.
+  // Retained state can omit newly bundled packages or load the old memory adapter.
   let settings = {};
   try {
     settings = JSON.parse(await readFile(bot.settingsPath, "utf8"));
@@ -108,9 +138,7 @@ for (const bot of BOT_CONFIGURATIONS) {
     const source = typeof entry === "string" ? entry : entry?.source;
     return typeof source === "string" ? source.replace(/@[^@/]+$/, "") : undefined;
   };
-  const retained = packages.filter(
-    (entry) => !["npm:pi-mcp-adapter", "npm:pi-memory-stone"].includes(packageName(entry)),
-  );
+  const retained = packages.filter((entry) => packageName(entry) !== "npm:pi-memory-stone");
   if (bot.name === "PM") {
     for (const source of [SCHEDULE_PACKAGE]) {
       if (!retained.some((entry) => packageName(entry) === packageName(source)))
@@ -143,8 +171,7 @@ for (const bot of BOT_CONFIGURATIONS) {
     configureSubagents(settings, bot.directory);
   }
   await writeFile(bot.settingsPath, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 });
-
-  await writeFile(bot.telegramConfigPath, JSON.stringify(telegram, null, 2), { mode: 0o600 });
-  await writeFile(bot.mcpConfigPath, mcpConfigJson, { mode: 0o600 });
+  if (!migrating)
+    await writeFile(bot.telegramConfigPath, JSON.stringify(telegram, null, 2), { mode: 0o600 });
 }
 console.log("Configured both bots. Run bin/battuta start-prod.");

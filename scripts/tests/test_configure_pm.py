@@ -30,6 +30,8 @@ class ConfigurePmTests(unittest.TestCase):
                 mocks["read_env"].return_value = values
                 result = CliRunner().invoke(configure_pm.main, ["--bot-dir", str(bot), "--env-file", str(env_file)])
                 self.assertEqual(result.exit_code, 0, result.output)
+                self.assertEqual(mocks["configure_mcp"].call_args.args, (bot.resolve(), env_file.resolve(), values))
+                self.assertEqual(mocks["configure_mcp"].call_args.kwargs, {"role": "pm"})
                 calls = mocks["run"].call_args_list
                 self.assertEqual(calls[0].args, ("pnpm", "--dir", str(ROOT / "memory-client"), "install", "--frozen-lockfile"))
                 self.assertEqual(calls[1].args, ("node", str(ROOT / "memory-client/configure-scheduler.mjs"), "--initialize"))
