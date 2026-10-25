@@ -63,34 +63,3 @@ the relevant role allowlists too, or upstream will correctly report missing tool
 Children are trusted workers, not a sandbox. Workers edit the real workspace and
 can run commands with the same user's file/environment access. TL still reviews
 changes and verification evidence; child output is not product acceptance.
-
-## Verification and remaining acceptance
-
-One-time offline verification on 2026-10-25 loaded the actual
-`pi-subagents@0.82.1` package through Pi 1.3.0's normal package registration.
-Both foreground and detached background scouts passed: every local-provider
-request used the saved fixture Pi credential, and the selected fixture web
-extension's `web_search` tool ran and returned its result. Tool lists excluded
-the ambient sentinel and Linear/memory/todo/MCP tools; load markers showed the
-selected extension loaded in the child and the ambient extension loaded only
-in the parent.
-
-After this successful proof, the upstream-feature integration test was
-deliberately removed, along with unused TL test/typecheck/coverage tooling.
-There is no ongoing Battuta integration suite for upstream plugin features.
-Battuta's Python setup/release contract tests remain and cover repeat runs,
-native configuration, private-file preservation, and release configuration.
-Background execution needs the supported installed Pi host, not just an SDK
-imported from an unrelated path.
-
-The one-time proof establishes fixture auth-store reuse and extension selection,
-not live Codex OAuth/subscription access, OAuth refresh, live web search, or
-Telegram acceptance. No live credentials were used.
-For deployment acceptance, use a disposable workspace and TL's existing login:
-
-1. Launch a scout through TL and verify its provider/model and attributable result.
-2. Ask it to search; verify web-access tools work and other integrations are absent.
-3. Repeat in background and inspect the native run's terminal result.
-4. Record deployment version, child IDs, tested conditions, and limitations without
-   credentials or raw authentication logs. Lifecycle behavior is upstream-owned;
-   do not assume the removed wrapper's process or snapshot guarantees still apply.

@@ -216,24 +216,23 @@ installed version's command help rather than guessing.
 To authorize another account, ask for its email and repeat steps 2 and 5–7.
 The OAuth client and keyring setup can be reused.
 
-## 8. Verify the PM bot's runtime and service
+## 8. Verify the command environment
 
-In the running PM Pi session, ask the bot to use `manage-google` for a read-only
-agenda lookup with the selected account and run
-`gog auth list --check --json --no-input`. This checks skill discovery and
-Google access without sending email or invitations.
+In a new terminal for the bot user, with the selected account and keyring
+environment available, run:
 
-For a user service, make `gog` available on the PM service's PATH using the
-[release service setup](../RELEASE.md#6-optional-run-as-user-services).
-Shell PATH changes alone do not apply to systemd units. For a file keyring,
-the owner must privately provide the matching `GOG_KEYRING_BACKEND=file`,
-`GOG_KEYRING_PASSWORD`, and `HOME` in the service's runtime environment. Never
-print the password. Battuta's release launcher loads `.env.prod`; shell
-startup files alone do not establish the service's environment.
+```bash
+command -v gog
+gog auth list --check --json --no-input >/dev/null
+```
 
-Repeat the checks through the running PM bot after restarting it to load any
-environment changes. A successful login-shell check is insufficient. Resolve
-runtime/keyring errors before treating unattended Google operations as ready.
+Both commands must exit zero. The first must print the expected executable
+path; the second must produce no error. Stop here if either check fails.
+
+For a PM user service, make `gog` and the file-keyring variables available in
+that service's environment before enabling it. Shell startup files do not
+configure systemd user services. Keep `GOG_KEYRING_PASSWORD` private; do not
+inspect or print service environment values as a setup check.
 
 ## Troubleshooting
 

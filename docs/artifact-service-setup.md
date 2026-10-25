@@ -48,9 +48,11 @@ Production bot launch adds the artifact virtual environment to PATH; the source 
 ## Verify
 
 ```sh
-battuta-artifact list --json
-curl -f http://127.0.0.1:8000/artifacts/
-curl -N http://127.0.0.1:8000/artifacts/events
+battuta-artifact list --json >/dev/null
+curl -fsS http://127.0.0.1:8000/artifacts/ >/dev/null
 ```
 
-Confirm schema setup occurred before starting the server. Through the existing tunnel, check the index, an HTML bundle with relative JS/CSS, a Markdown image, and registration/deregistration while the index is open. The tunnel must preserve `/artifacts/...`; check browser network traffic for successful events or five-second catalog refreshes. Ensure Cloudflare caching rules honor `no-store`, and apply Access if pages are private. No remote tunnel verification is implied by passing local tests.
+Run the first command after setup; run the second only with the local server
+running. Both must exit zero. Stop if either fails; do not create registrations,
+open a tunnel, or use a browser to recover setup validation. Tunnel, caching,
+and access policy are deployment concerns outside this setup guide.
