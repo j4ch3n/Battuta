@@ -1,9 +1,11 @@
 """Atomic text persistence and readable filesystem failures."""
 
 from contextlib import contextmanager
+import fcntl
 import os
 from pathlib import Path
 import tempfile
+import stat
 
 import click
 
@@ -47,3 +49,23 @@ def atomic_write(path: Path, text: str) -> None:
         finally:
             if os.path.exists(temporary):
                 os.unlink(temporary)
+
+
+@contextmanager
+def file_lock(path: Path, *, create: bool = False):
+    with file_errors():
+        check_registry_root(path.parent)
+        if create:
+            path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.parent.exists():
+            yield
+            return
+        regular_file(path)
+        fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise click.ClickException(f"Expected a regular lock file: {path}")
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            yield
+        finally:
+            os.close(fd)

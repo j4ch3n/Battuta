@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
 
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -26,9 +26,36 @@ class LinearProject(Model):
     url: Text
 
 
+WorkId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]{5}$")]
+WorkReference = Annotated[str, StringConstraints(pattern=r"^(pm|tl):[a-z0-9]{5}$")]
+
+
+class WorkRecord(Model):
+    related_to: WorkReference | None = Field(default=None, alias="relatedTo")
+
+
+class RoleWorkConfig(Model):
+    model_config = ConfigDict(extra="allow")
+    current_work_id: WorkId | None = Field(default=None, alias="currentWorkId")
+    works: dict[WorkId, WorkRecord] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def retained_current_work(self):
+        if self.current_work_id is not None and self.current_work_id not in self.works:
+            raise ValueError("currentWorkId must reference retained work metadata")
+        return self
+
+
+class WorkConfig(Model):
+    model_config = ConfigDict(extra="allow")
+    roles: dict[Literal["pm", "tl"], RoleWorkConfig] = Field(default_factory=dict)
+
+
 class CurrentConfig(Model):
     model_config = ConfigDict(extra="allow")
     current_project: str | None = Field(default=None, alias="currentProject")
+    projects: dict[str, WorkConfig] = Field(default_factory=dict)
+    general: WorkConfig = Field(default_factory=WorkConfig)
 
     @field_validator("current_project")
     @classmethod
