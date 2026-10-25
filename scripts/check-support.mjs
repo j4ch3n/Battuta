@@ -28,6 +28,7 @@ function pythonTests(directory, project) {
 run("bash", ["-n", "packaging/battuta", "bots/pm-bot/scripts/run-dev.sh"]);
 run("bash", ["-n", "scripts/setup-memory.sh", "scripts/setup-artifacts.sh"]);
 run("node", ["--check", "packaging/configure.mjs"]);
+run("node", ["--test", "bot-setup/tests/mcp.test.mjs"]);
 run("node", ["--check", "packaging/shared-resources.mjs"]);
 run("node", ["--check", "packaging/install-services.mjs"]);
 pythonTests("scripts/tests");

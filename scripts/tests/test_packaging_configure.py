@@ -24,6 +24,7 @@ class PackagingConfigureTests(unittest.TestCase):
                 shutil.copyfile(ROOT / "packaging" / "configure.mjs", root / "bin" / "configure.mjs")
                 shutil.copyfile(ROOT / "packaging" / "shared-resources.mjs", root / "bin" / "shared-resources.mjs")
                 shutil.copyfile(ROOT / "packaging" / "configure-subagents.mjs", root / "bin" / "configure-subagents.mjs")
+                shutil.copytree(ROOT / "bot-setup", root / "bot-setup")
                 copy_scheduler_runtime(root)
                 source = root / "shared-skills" / "project-context"
                 source.mkdir(parents=True)
@@ -97,28 +98,13 @@ class PackagingConfigureTests(unittest.TestCase):
                             self.assertEqual((root / "bots/AGENTS_personal.md").read_text(), personal)
                         self.assertEqual((root / "bots" / role / "AGENTS.md").read_text(), f"Shared instructions\n{role}")
                         mcp = json.loads((link.parent.parent / "mcp.json").read_text())
-                        self.assertEqual(
-                            mcp["mcpServers"]["linear"]["headers"], {"Authorization": "Bearer ${LINEAR_API_TOKEN}"},
-                        )
-                        self.assertEqual(mcp["mcpServers"]["linear"]["exposure"], "codemode")
                         self.assertNotIn("test-linear", json.dumps(mcp))
                         self.assertNotIn("private-oauth-token", json.dumps(mcp) + result.stdout + result.stderr)
                         self.assertEqual(mcp["mcpServers"]["other"], {"command": "other-server"})
                         auth = link.parent.parent / "mcp-auth.json"
                         self.assertEqual(auth.read_bytes(), b'{"sentinel":"private-oauth-token"}\n')
                         self.assertEqual(auth.stat().st_mode & 0o777, 0o600)
-                        if role == "pm-bot":
-                            luma = mcp["mcpServers"]["luma"]
-                            self.assertEqual(luma["url"], "https://mcp.luma.com")
-                            self.assertEqual(luma["oauth"], {"clientRegistration": "cimd"})
-                            self.assertNotIn("headers", luma)
-                            self.assertEqual(luma["exposure"], "hidden")
-                            self.assertEqual(luma["toolExposure"], {
-                                "search_*": "codemode", "lookup_*": "codemode", "get_*": "codemode",
-                                "list_*": "codemode", "find_*": "codemode",
-                            })
-                        else:
-                            self.assertNotIn("luma", mcp["mcpServers"])
+                        self.assertEqual("luma" in mcp["mcpServers"], role == "pm-bot")
                         settings_path = link.parent.parent / "settings.json"
                         settings = json.loads(settings_path.read_text())
                         if role == "tl-bot":

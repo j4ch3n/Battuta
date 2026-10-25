@@ -14,6 +14,7 @@ TypeScript on Node.js and Deno, the Pi coding-agent runtime, Telegram, Linear, a
 - Follow surrounding code and runtime-specific formatting, linting, and typing rules.
 - Scan related code before adding logic; reuse existing helpers and refactor duplication within the affected scope. Avoid unrelated rewrites.
 - Cover changed behavior, edge cases, and regressions with meaningful tests. Use parameterized tests for equivalent cases.
+- For setup/configuration tests, test behavior (validation, role separation, preservation, idempotence, failure handling, and credential privacy), not exact configured values or configuration snapshots.
 - Do not add tests that assert prompt or instruction wording. Test executable behavior and integration contracts instead.
 - Keep unit tests small and focused. Stub external services, clocks, and runtime boundaries; exercise real internal logic. Use integration tests for cross-system behavior.
 - Name Python integration tests `<subject>.it.py`; keep unit tests as `test_<subject>.py`. Run both through `pnpm check:support`; see [code checks](.agents/skills/battuta-verify/references/checks.md) for direct invocation and opt-in integration prerequisites.
@@ -54,6 +55,7 @@ Paths below are relative to the repository root.
 | `shared-skills/project-context/`                                    | Project-context skill instructions and references                                                                                                                                      |
 | `shared-skills/project-context-cli/`                                | Project registry and memory CLI package, dependencies, and tests                                                                                                                       |
 | `scripts/`, root `package.json`, `Makefile`                         | Development checks, commands, and runtime-specific tooling                                                                                                                             |
+| `bot-setup/`                                                        | Dependency-free MCP configuration helpers shared by source setup and packaged releases                                                                                                 |
 | `packaging/`, `.github/workflows/release.yml`                       | Release launcher, configuration, services, and assembly                                                                                                                                |
 | `docs/`                                                             | Shared technical references and detailed material without a dedicated workflow home                                                                                                    |
 

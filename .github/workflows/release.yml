@@ -50,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots shared-skills agent-mail project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/gogcli-setup.md docs/luma-setup.md docs/luma.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md | tar -x -C dist/stage/battuta
+          git archive HEAD bots bot-setup shared-skills agent-mail project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/gogcli-setup.md docs/luma-setup.md docs/luma.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md | tar -x -C dist/stage/battuta
           test -s dist/stage/battuta/RELEASE.md
           test -s dist/stage/battuta/docs/gogcli-setup.md
           test -s dist/stage/battuta/docs/luma-setup.md
@@ -99,6 +99,7 @@ jobs:
           done
           bash -n dist/stage/battuta/bin/battuta
           node --check dist/stage/battuta/bin/install-services.mjs
+          node --check dist/stage/battuta/bot-setup/mcp.mjs
           export UV_TOOL_DIR="$RUNNER_TEMP/project-tools"
           export UV_TOOL_BIN_DIR="$RUNNER_TEMP/project-tool-bin"
           uv tool install --offline --python 3.12 --no-index --find-links "$cli_dir/wheels" battuta-project

@@ -20,7 +20,7 @@ class SupportChecksTests(unittest.TestCase):
         self.root = Path(temp.name).resolve()
         for name in ("scripts/check-support.mjs", "packaging/battuta", "bots/pm-bot/scripts/run-dev.sh",
                      "scripts/setup-memory.sh", "scripts/setup-artifacts.sh", "packaging/configure.mjs",
-                     "packaging/shared-resources.mjs", "packaging/install-services.mjs"):
+                      "packaging/shared-resources.mjs", "packaging/install-services.mjs", "bot-setup/tests/mcp.test.mjs"):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             if name == "scripts/check-support.mjs":

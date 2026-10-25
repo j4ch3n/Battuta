@@ -2,8 +2,8 @@
 
 PM connects directly to the official `https://mcp.luma.com` server using Pi 1.3.0
 native streamable HTTP and CIMD OAuth. No Battuta proxy, token parser, or paid API
-is involved. Source and release configuration create the same `luma` entry; TL
-does not receive one.
+is involved. Source and release setup both call the dependency-free `bot-setup`
+package for MCP configuration; TL does not receive a Luma entry.
 
 ## Access boundary
 

@@ -3,6 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { configureSharedResources } from "./shared-resources.mjs";
 import { configureSubagents } from "./configure-subagents.mjs";
+import { configureMcp, validateMemoryUrl } from "../bot-setup/mcp.mjs";
 import { schedulerStorePath, schedulerCatchUpMax } from "../memory-client/scheduler-config.ts";
 import { initializeSchedulerStore } from "../memory-client/scheduler-store.ts";
 
@@ -26,7 +27,6 @@ const BOT_CONFIGURATIONS = [
     ...bot,
     piDirectory,
     telegramConfigPath: join(piDirectory, "telegram.json"),
-    mcpConfigPath: join(piDirectory, "mcp.json"),
     settingsPath: join(piDirectory, "settings.json"),
   };
 });
@@ -42,15 +42,7 @@ if (!Number.isSafeInteger(owner) || owner <= 0) throw new Error("Invalid TELEGRA
 required("LINEAR_API_TOKEN");
 required("SUPABASE_URL");
 required("SUPABASE_SECRET_KEY");
-const memoryUrl = process.env.BATTUTA_MEMORY_URL || "http://127.0.0.1:8901/mcp";
-const endpoint = new URL(memoryUrl);
-if (
-  endpoint.protocol !== "http:" ||
-  !["127.0.0.1", "localhost", "[::1]"].includes(endpoint.hostname) ||
-  endpoint.username ||
-  endpoint.password
-)
-  throw new Error("BATTUTA_MEMORY_URL must use loopback HTTP");
+const memoryUrl = validateMemoryUrl(process.env.BATTUTA_MEMORY_URL);
 
 // Explicit configuration may create a missing store; launch only validates it.
 schedulerCatchUpMax();
@@ -69,46 +61,9 @@ for (const bot of BOT_CONFIGURATIONS) {
 
   const telegram = { profiles: { default: { botToken: token, allowedUserId: owner, botId } } };
   if (username) telegram.profiles.default.botUsername = username;
-  let mcpConfig = {};
-  try {
-    mcpConfig = JSON.parse(await readFile(bot.mcpConfigPath, "utf8"));
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-  }
-  if (!mcpConfig || typeof mcpConfig !== "object" || Array.isArray(mcpConfig))
-    throw new Error("Invalid MCP config");
-  mcpConfig.mcpServers ??= {};
-  if (typeof mcpConfig.mcpServers !== "object" || Array.isArray(mcpConfig.mcpServers))
-    throw new Error("Invalid MCP servers");
-  mcpConfig.mcpServers.linear = {
-    url: "https://mcp.linear.app/mcp",
-    headers: { Authorization: "Bearer ${LINEAR_API_TOKEN}" },
-    exposure: "codemode",
-    description: "Manage Linear issues, projects, and cycles",
-  };
-  mcpConfig.mcpServers.memory = {
-    url: memoryUrl,
-    exposure: "codemode",
-    description: "Shared scoped memory; context, not execution authority",
-  };
-  if (bot.name === "PM") {
-    mcpConfig.mcpServers.luma = {
-      url: "https://mcp.luma.com",
-      oauth: { clientRegistration: "cimd" },
-      exposure: "hidden",
-      toolExposure: {
-        "search_*": "codemode",
-        "lookup_*": "codemode",
-        "get_*": "codemode",
-        "list_*": "codemode",
-        "find_*": "codemode",
-      },
-      description: "Discover Luma events and look up event/account details; read-only use",
-    };
-  }
-  const mcpConfigJson = JSON.stringify(mcpConfig, null, 2);
+  await configureMcp(bot.directory, { role: bot.name.toLowerCase(), memoryUrl });
 
-  // Retained state can load the old MCP adapter or omit newly bundled PM packages.
+  // Retained state can omit newly bundled packages or load the old memory adapter.
   let settings = {};
   try {
     settings = JSON.parse(await readFile(bot.settingsPath, "utf8"));
@@ -123,9 +78,7 @@ for (const bot of BOT_CONFIGURATIONS) {
     const source = typeof entry === "string" ? entry : entry?.source;
     return typeof source === "string" ? source.replace(/@[^@/]+$/, "") : undefined;
   };
-  const retained = packages.filter(
-    (entry) => !["npm:pi-mcp-adapter", "npm:pi-memory-stone"].includes(packageName(entry)),
-  );
+  const retained = packages.filter((entry) => packageName(entry) !== "npm:pi-memory-stone");
   if (bot.name === "PM") {
     for (const source of [SCHEDULE_PACKAGE]) {
       if (!retained.some((entry) => packageName(entry) === packageName(source)))
@@ -160,6 +113,5 @@ for (const bot of BOT_CONFIGURATIONS) {
   await writeFile(bot.settingsPath, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 });
 
   await writeFile(bot.telegramConfigPath, JSON.stringify(telegram, null, 2), { mode: 0o600 });
-  await writeFile(bot.mcpConfigPath, mcpConfigJson, { mode: 0o600 });
 }
 console.log("Configured both bots. Run bin/battuta start-prod.");
