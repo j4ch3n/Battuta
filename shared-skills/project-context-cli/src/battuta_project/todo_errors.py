@@ -12,7 +12,9 @@ class TodoErrorCode(StrEnum):
     NO_NEXT_TODO = "NO_NEXT_TODO"
     UNFINISHED_TODO = "UNFINISHED_TODO"
     INVALID_TODO_FILE = "INVALID_TODO_FILE"
-    TIMESTAMP_COLLISION = "TIMESTAMP_COLLISION"
+    WORK_ID_COLLISION = "WORK_ID_COLLISION"
+    NO_CURRENT_WORK = "NO_CURRENT_WORK"
+    INVALID_REFERENCE = "INVALID_REFERENCE"
     TODO_STORAGE_ERROR = "TODO_STORAGE_ERROR"
 
 
@@ -48,9 +50,17 @@ TODO_ERROR_MESSAGES: dict[TodoErrorCode, str] = {
         "Cannot read the TODO file {path}: {detail}. Fix this file before continuing; "
         "do not bypass it with force or fall back to older history."
     ),
-    TodoErrorCode.TIMESTAMP_COLLISION: (
-        "Cannot create {filename}: its timestamp is not newer than the active list or its filename already exists. "
-        "Check the active list and retry in a later second; no files were overwritten."
+    TodoErrorCode.WORK_ID_COLLISION: (
+        "Cannot allocate an unused work ID. Existing work metadata and files were preserved; "
+        "inspect storage for collisions and retry creation without deleting history."
+    ),
+    TodoErrorCode.NO_CURRENT_WORK: (
+        "This role has no current work ID in this scope. Use create --item to start its own work; "
+        "extend cannot initialize work or append to a legacy timestamped list."
+    ),
+    TodoErrorCode.INVALID_REFERENCE: (
+        "Supply --related-to as pm:<work-id> or tl:<work-id>, using a five-character lowercase alphanumeric ID "
+        "recorded in this project/general scope. Include ownership context in the bot-mail handoff."
     ),
     TodoErrorCode.TODO_STORAGE_ERROR: (
         "Cannot safely access TODO storage: {detail}. Check permissions and ensure managed paths are real "
