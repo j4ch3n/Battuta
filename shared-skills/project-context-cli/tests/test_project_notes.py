@@ -2,9 +2,7 @@
 
 from concurrent.futures import ProcessPoolExecutor
 import json
-import os
 from pathlib import Path
-import shutil
 import subprocess
 import tempfile
 import unittest
@@ -13,7 +11,6 @@ from unittest.mock import patch
 import click
 
 from battuta_project.notes import NoteStore
-from battuta_project.registry import ProjectRegistry
 from battuta_project.todos import TodoStore
 
 
@@ -43,33 +40,6 @@ class NoteTests(unittest.TestCase):
         self.assertIsNone(self.store.search("unknown"))
         self.assertFalse((self.home / ".battuta").exists())
 
-    @unittest.skipUnless(shutil.which("rg"), "ripgrep is required for real search verification")
-    def test_search_preserves_leading_unicode_bom_as_literal_note_text(self):
-        text = "\ufeffFinding café"
-        self.store.append(text)
-        self.assertEqual(self.store.read().lines[0].text, text)
-        for query in ("Finding", "\ufeffFinding"):
-            with self.subTest(query=query):
-                self.assertEqual([(line.number, line.text) for line in self.store.search(query).lines], [(1, text)])
-
-    @unittest.skipUnless(shutil.which("rg"), "ripgrep is required for real search verification")
-    def test_real_search_is_literal_case_insensitive_numbered_and_resumable(self):
-        texts = ["Needle.*", "other", "NEEDLE.* two", "-n $(touch nope) ; café", "needle.* three"]
-        for text in texts:
-            self.store.append(text)
-        config = self.home / "rg-config"
-        config.write_text("--files\n--glob=*.private\n")
-        with patch.dict(os.environ, {"RIPGREP_CONFIG_PATH": str(config)}):
-            result = self.store.search("needle.*", limit=1)
-        self.assertEqual([(line.number, line.text) for line in result.lines], [(1, "Needle.*")])
-        self.assertEqual(result.next_line, 3)
-        result = self.store.search("needle.*", from_line=result.next_line)
-        self.assertEqual([line.number for line in result.lines], [3, 5])
-        self.assertIsNone(result.next_line)
-        self.assertEqual([line.number for line in self.store.search("-n $(touch nope) ; CAFÉ").lines], [4])
-        self.assertEqual(self.store.search("absent").lines, [])
-        self.assertFalse((self.home / "nope").exists())
-
     def test_search_errors_and_untrusted_queries(self):
         note = self.store.append("-n literal")
         match = json.dumps({"type": "match", "data": {"line_number": 1, "lines": {"text": "-n literal\n"}}})
@@ -97,7 +67,7 @@ class NoteTests(unittest.TestCase):
             with self.assertRaises(click.ClickException):
                 self.store.search("query", **options)
 
-    def test_append_preserves_text_and_survives_restart_without_todos(self):
+    def test_append_preserves_text_and_survives_restart(self):
         first = self.store.append("  Finding **一**  ")
         self.assertEqual(first.path, self.home / ".battuta/work" / f"note-pm-{first.work_id}.md")
         self.assertEqual(first.path.stat().st_mode & 0o777, 0o600)
@@ -109,8 +79,6 @@ class NoteTests(unittest.TestCase):
         read = NoteStore("general", "pm").read()
         self.assertEqual([line.text for line in read.lines], ["  Finding **一**  ", "Thought two"])
         self.assertEqual(read.work_id, first.work_id)
-        self.assertIsNone(TodoStore("general", "pm").read())
-        self.assertFalse(list(first.path.parent.glob("todo-*.jsonl")))
 
     def test_ranges_and_continuation_preserve_complete_notes(self):
         for text in ("first", "x" * 20000, "third", "last"):
@@ -135,26 +103,6 @@ class NoteTests(unittest.TestCase):
             with self.subTest(text=repr(text)), self.assertRaises(click.ClickException):
                 self.store.append(text)
         self.assertFalse((self.home / ".battuta").exists())
-
-    def test_scopes_roles_and_todo_rotation_are_independent(self):
-        registry = ProjectRegistry()
-        registry.init("atlas")
-        for scope in ("general", "project"):
-            for role in ("pm", "tl"):
-                with self.subTest(scope=scope, role=role):
-                    todos = TodoStore(scope, role)
-                    if role == "tl":
-                        todo = todos.create(["Task first"])
-                    notes = NoteStore(scope, role)
-                    note = notes.append(f"{scope}/{role}")
-                    if role == "pm":
-                        todo = todos.create(["Task second"])
-                    self.assertNotEqual(note.work_id, todo.work_id)
-                    todos.create(["Rotated"], force=True)
-                    self.assertEqual(notes.read().work_id, note.work_id)
-                    self.assertEqual([line.text for line in notes.read().lines], [f"{scope}/{role}"])
-        registry.init("other")
-        self.assertIsNone(NoteStore("project", "pm").read())
 
     def test_empty_missing_and_malformed_published_files(self):
         note = self.store.append("Original")

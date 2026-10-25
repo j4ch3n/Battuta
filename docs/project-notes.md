@@ -63,8 +63,9 @@ large notebooks may need a streaming search implementation in a later change.
 
 ## Verification
 
-The project-context CLI's unittest suite covers independent identities, text/range
+The project-context CLI's unit tests and `tests/project_work.it.py` cover independent identities, text/range
 validation, exact byte preservation, safe paths, restarts, parallel first appends,
 parallel TODO/notebook publication, allocation/publication failures, literal query
-handling, real ripgrep, and executable CLI continuations. No deployment on Pi
-hardware or live bot session is implied by those tests.
+handling, real ripgrep, and CLI continuations through real `battuta-project`
+subprocesses. Run both with `pnpm check:support`; bare unittest discovery runs only
+the unit tests. No deployment on Pi hardware or live bot session is implied by those tests.

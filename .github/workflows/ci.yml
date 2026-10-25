@@ -110,6 +110,8 @@ jobs:
           enable-cache: true
       - name: Install scheduler setup/launcher runtime dependencies
         run: pnpm --dir memory-client install --frozen-lockfile --prod
+      - name: Install notebook search integration dependency
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
       - run: pnpm check:support
 
   quality:

@@ -89,3 +89,7 @@ class RealModelTests(unittest.IsolatedAsyncioTestCase):
                     server.should_exit = True
                     await asyncio.wait_for(task, 10)
                     sock.close()
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

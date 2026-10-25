@@ -192,7 +192,7 @@ The isolated exploration server on port **8900** is unrelated and must not be ki
 With the model already provisioned for the current HOME, run explicit HTTP integration checks:
 
 ```sh
-BATTUTA_MEMORY_INTEGRATION=1 uv run --project memory-service --locked python -m unittest discover -s memory-service/tests -p test_mcp_integration.py -v
+BATTUTA_MEMORY_INTEGRATION=1 uv run --project memory-service --locked python memory-service/tests/mcp.it.py
 BATTUTA_MEMORY_INTEGRATION=1 pnpm --dir memory-client test:integration
 ```
 

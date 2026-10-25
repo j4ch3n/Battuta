@@ -8,54 +8,35 @@ function run(command, args) {
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
+
+function pythonTests(directory, project) {
+  const prefix = [
+    "run",
+    ...(project ? ["--project", resolve(root, project)] : []),
+    "--locked",
+    "python",
+  ];
+  const tests = resolve(root, directory);
+  run("uv", [...prefix, "-m", "unittest", "discover", "-s", tests, "-v"]);
+  // unittest discovery excludes dotted module names; integration files are executable suites.
+  for (const file of readdirSync(tests)
+    .filter((name) => name.endsWith(".it.py"))
+    .sort()) {
+    run("uv", [...prefix, resolve(tests, file)]);
+  }
+}
 run("bash", ["-n", "packaging/battuta", "bots/pm-bot/scripts/run-dev.sh"]);
 run("bash", ["-n", "scripts/setup-memory.sh", "scripts/setup-artifacts.sh"]);
 run("node", ["--check", "packaging/configure.mjs"]);
 run("node", ["--check", "packaging/shared-resources.mjs"]);
 run("node", ["--check", "packaging/install-services.mjs"]);
-run("uv", ["run", "--locked", "python", "-m", "unittest", "discover", "-s", "scripts/tests", "-v"]);
-run("uv", [
-  "run",
-  "--project",
-  "memory-service",
-  "--locked",
-  "python",
-  "-m",
-  "unittest",
-  "discover",
-  "-s",
-  "memory-service/tests",
-  "-v",
-]);
+pythonTests("scripts/tests");
+pythonTests("memory-service/tests", "memory-service");
 
 const sharedSkills = resolve(root, "shared-skills");
-run("uv", [
-  "run",
-  "--project",
-  "artifact-service",
-  "--locked",
-  "python",
-  "-m",
-  "unittest",
-  "discover",
-  "-s",
-  "artifact-service/tests",
-  "-v",
-]);
+pythonTests("artifact-service/tests", "artifact-service");
 for (const cli of readdirSync(sharedSkills, { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && entry.name.endsWith("-cli"))
   .sort((left, right) => left.name.localeCompare(right.name))) {
-  run("uv", [
-    "run",
-    "--project",
-    resolve(sharedSkills, cli.name),
-    "--locked",
-    "python",
-    "-m",
-    "unittest",
-    "discover",
-    "-s",
-    resolve(sharedSkills, cli.name, "tests"),
-    "-v",
-  ]);
+  pythonTests(resolve(sharedSkills, cli.name, "tests"), resolve(sharedSkills, cli.name));
 }
