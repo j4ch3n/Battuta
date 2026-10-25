@@ -44,6 +44,15 @@ class NoteTests(unittest.TestCase):
         self.assertFalse((self.home / ".battuta").exists())
 
     @unittest.skipUnless(shutil.which("rg"), "ripgrep is required for real search verification")
+    def test_search_preserves_leading_unicode_bom_as_literal_note_text(self):
+        text = "\ufeffFinding café"
+        self.store.append(text)
+        self.assertEqual(self.store.read().lines[0].text, text)
+        for query in ("Finding", "\ufeffFinding"):
+            with self.subTest(query=query):
+                self.assertEqual([(line.number, line.text) for line in self.store.search(query).lines], [(1, text)])
+
+    @unittest.skipUnless(shutil.which("rg"), "ripgrep is required for real search verification")
     def test_real_search_is_literal_case_insensitive_numbered_and_resumable(self):
         texts = ["Needle.*", "other", "NEEDLE.* two", "-n $(touch nope) ; café", "needle.* three"]
         for text in texts:
@@ -67,7 +76,7 @@ class NoteTests(unittest.TestCase):
         with patch("battuta_project.notes.subprocess.run", return_value=subprocess.CompletedProcess([], 0, match, "")) as run:
             result = self.store.search("-n")
         self.assertEqual([line.text for line in result.lines], ["-n literal"])
-        self.assertEqual(run.call_args.args[0], ["rg", "--no-config", "--json", "--fixed-strings", "--ignore-case", "--text", "-e", "-n", "--", str(note.path)])
+        self.assertEqual(run.call_args.args[0], ["rg", "--no-config", "--json", "--fixed-strings", "--ignore-case", "--text", "--encoding", "none", "-e", "-n", "--", str(note.path)])
         self.assertFalse(run.call_args.kwargs.get("shell", False))
         for code, output in ((1, ""), (0, match)):
             with patch("battuta_project.notes.subprocess.run", return_value=subprocess.CompletedProcess([], code, output, "")):

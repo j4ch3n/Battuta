@@ -51,7 +51,8 @@ There is no implicit text truncation or default limit.
 
 Search validates the notebook and invokes upstream [ripgrep](https://github.com/BurntSushi/ripgrep)
 (MIT/Unlicense) with a subprocess argument list, `--no-config --json --fixed-strings
---ignore-case --text -e QUERY -- FILE`. Matching is delegated to ripgrep; no index
+--ignore-case --text --encoding none -e QUERY -- FILE`. Encoding detection is
+disabled so a leading Unicode BOM remains literal note text. Matching is delegated to ripgrep; no index
 or Python matcher exists. JSON match records provide source numbers and full text.
 Exit 1 is a normal no-match result; other nonzero statuses and malformed output
 fail explicitly. Search limits count matching lines, not source lines.

@@ -142,7 +142,7 @@ class NoteStore:
                 pass
             try:
                 output = subprocess.run([
-                    "rg", "--no-config", "--json", "--fixed-strings", "--ignore-case", "--text",
+                    "rg", "--no-config", "--json", "--fixed-strings", "--ignore-case", "--text", "--encoding", "none",
                     "-e", query, "--", str(result.path),
                 ], capture_output=True, text=True, encoding="utf-8")
             except FileNotFoundError as error:
