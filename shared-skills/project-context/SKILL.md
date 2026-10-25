@@ -69,6 +69,9 @@ New project initialization creates a rendered summary skeleton. The shared memor
 Use `battuta-project todo` for long-running, multi-step work to keep concrete steps
 in execution order and stay oriented as context grows. Skip lists for simple replies.
 Choose project scope for clearly project-owned work; use general scope otherwise.
+PM and TL create independent work. Use `create` for new work and `extend` for
+additional steps in the current work; optional associations and bot-mail handoffs
+are described in the [TODO command reference](references/task-todos.md#associate-work-through-a-handoff).
 
 Work through TODO items strictly in top-down execution order: read the next item,
 perform the work, then mark it done or cancelled with a detailed rational before
@@ -77,6 +80,7 @@ moving to the next item.
 | Mode                                                                                          | When and why to use it                                                                                       |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | [Create a list](references/task-todos.md#create-steps-in-execution-order)                     | Turn a long-running request into concrete steps in intended execution order.                                 |
+| [Extend current work](references/task-todos.md#append-steps-to-current-work)                  | Append steps without replacing records or creating another work ID.                                          |
 | [Next item](references/task-todos.md#show-the-next-item)                                      | Refocus on the immediate action without loading the full history.                                            |
 | [Remaining items](references/task-todos.md#show-remaining-items)                              | Understand what still needs doing and in what order.                                                         |
 | [Full list (default)](references/task-todos.md#inspect-the-full-list)                         | Understand past work through all items, including completed/cancelled items and their rational explanations. |

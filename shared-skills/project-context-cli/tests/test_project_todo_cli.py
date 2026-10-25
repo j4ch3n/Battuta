@@ -2,15 +2,81 @@
 
 import json
 import os
+import shlex
 from unittest.mock import patch
 
 from click.testing import CliRunner
 
 from battuta_project.cli import main
+from battuta_project.registry import ProjectRegistry
 from project_fixtures import ProjectTestCase
 
 
 class TodoCliTests(ProjectTestCase):
+    def test_creation_handoff_example_creates_independent_related_work(self):
+        for scope in ("project", "general"):
+            for role, counterpart in (("pm", "tl"), ("tl", "pm")):
+                with self.subTest(scope=scope, role=role), patch("pathlib.Path.home", return_value=self.home / f"{scope}-{role}"):
+                    registry = ProjectRegistry()
+                    project = "atlas-api" if scope == "project" else None
+                    if project:
+                        registry.init(project)
+                    output = self.success("create", "--item", "Initial", scope=scope, role=role)
+                    work_id = registry.current_work_id(project, role)
+                    reference = f"{role}:{work_id}"
+                    self.assertIn(f"Work: {reference}", output)
+                    self.assertIn(f"Scope: {scope}", output)
+                    if project:
+                        self.assertIn(project, output)
+                    examples = [shlex.split(line.strip()) for line in output.splitlines()
+                                if line.strip().startswith("battuta-project ")]
+                    self.assertEqual(len(examples), 1)
+                    example = examples[0]
+                    self.assertEqual(example[:5], ["battuta-project", "todo", "--scope", scope, "create"])
+                    self.assertEqual(example[example.index("--related-to") + 1], reference)
+                    with patch.dict(os.environ, {"AGENT_ROLE": counterpart}):
+                        result = self.runner.invoke(main, example[1:])
+                    self.assertEqual(result.exit_code, 0, result.output)
+                    self.assertIn(f"Related to: {reference}", result.output)
+                    self.assertNotIn("battuta-project ", result.output)
+                    other_id = registry.current_work_id(project, counterpart)
+                    self.assertNotEqual(other_id, work_id)
+                    self.assertEqual(registry.work_record(project, counterpart, other_id).related_to, reference)
+                    for args in (("list",), ("extend", "--item", "Next")):
+                        subsequent = self.success(*args, scope=scope, role=counterpart)
+                        self.assertIn(f"Work: {counterpart}:{other_id}", subsequent)
+                        self.assertNotIn("battuta-project ", subsequent)
+                    self.assertEqual(registry.current_work_id(project, role), work_id)
+
+    def test_extend_and_invalid_relationship_options_preserve_storage(self):
+        self.success("create", "--item", "First")
+        path = self.todo_path()
+        original = path.read_bytes()
+        output = self.success("extend", "--item", "Second")
+        self.assertIn("2. [todo] Second", output)
+        self.assertTrue(path.read_bytes().startswith(original))
+        before = path.read_bytes()
+        config = self.registry.state_path.read_bytes()
+        for args in (("create", "--force", "--item", "New", "--related-to", "pm:abc12"),
+                     ("create", "--force", "--item", "New", "--related-to", "bad"),
+                     ("extend", "--related-to", "pm:abc12", "--item", "New"),
+                     ("extend", "--work-id", "abc12", "--item", "New"),
+                     ("create", "--work-id", "abc12", "--item", "New")):
+            with self.subTest(args=args):
+                result = self.call(*args)
+                self.assertNotEqual(result.exit_code, 0)
+                self.assertNotIn("battuta-project ", result.output)
+                self.assertEqual(path.read_bytes(), before)
+                self.assertEqual(self.registry.state_path.read_bytes(), config)
+
+    def test_creation_initializes_missing_project_work_mappings(self):
+        for entry in ({}, {"projects": {}}, {"projects": {"atlas-api": {}}}):
+            with self.subTest(entry=entry):
+                self.registry.state_path.write_text(json.dumps({"currentProject": "atlas-api", **entry}))
+                self.success("create", "--item", "Fresh")
+                self.assertTrue(self.todo_path().exists())
+                self.assertEqual(self.registry.current_name(), "atlas-api")
+
     def setUp(self):
         super().setUp()
         self.runner = CliRunner()
