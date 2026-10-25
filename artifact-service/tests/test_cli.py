@@ -17,7 +17,8 @@ class CliTests(unittest.TestCase):
         (self.source / "index.html").write_text("trusted by extension")
         (self.source / "app.js").write_text("console.log('demo')")
         self.db = self.root / "registry.sqlite3"
-        self.runner = CliRunner(env={"BATTUTA_ARTIFACT_DB": str(self.db)})
+        self.runner = CliRunner(env={"BATTUTA_ARTIFACT_DB": str(self.db),
+                                     "BATTUTA_ARTIFACT_BASE_URL": "https://artifacts.example.test/artifacts"})
 
     def run_cli(self, *args):
         from battuta_artifacts.cli import main
@@ -40,7 +41,8 @@ class CliTests(unittest.TestCase):
         result = self.register()
         self.assertEqual(result.exit_code, 0, result.output)
         artifact = json.loads(result.output)["artifact"]
-        self.assertEqual(artifact["url"], "https://pi.fiscum.co.uk/artifacts/a/demo/")
+        self.assertEqual(artifact["url"], "https://artifacts.example.test/artifacts/a/demo/")
+        self.assertEqual(artifact["local_url"], "http://127.0.0.1:8000/artifacts/a/demo/")
         self.assertEqual(artifact["format"], "html")
         self.assertEqual(set(artifact["files"]), {"index.html", "app.js"})
         conflict = self.run_cli("update", "demo", "--title", "Changed", "--expected-revision", "9", "--json")
@@ -61,9 +63,18 @@ class CliTests(unittest.TestCase):
     def test_single_file_and_json_output_before_subcommand(self):
         self.run_cli("setup")
         result = self.run_cli("--json", "register", "--slug", "one", "--title", "One", "--description", "Page",
-                              "--entry", str(self.source / "index.html"))
+                               "--entry", str(self.source / "index.html"))
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(set(json.loads(result.output)["artifact"]["files"]), {"index.html"})
+
+    def test_public_base_url_is_required_for_artifact_output(self):
+        self.run_cli("setup")
+        self.register()
+        runner = CliRunner(env={"BATTUTA_ARTIFACT_DB": str(self.db), "BATTUTA_ARTIFACT_BASE_URL": ""})
+        from battuta_artifacts.cli import main
+        result = runner.invoke(main, ("list", "--json"))
+        self.assertEqual(result.exit_code, 2, result.output)
+        self.assertIn("BATTUTA_ARTIFACT_BASE_URL is required", result.output)
 
     def test_invalid_paths_and_parameters_have_no_side_effects(self):
         self.run_cli("setup")

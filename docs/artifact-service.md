@@ -10,7 +10,7 @@ The service exposes an artifact catalog and explicitly allowlisted original host
 - The registry has `artifacts` and `artifact_files` tables, plus Alembic's revision table. Updates and file-list replacement are transactional; optional expected revisions detect conflicting changes.
 - A persistent read-only aiosqlite connection checks SQLite `data_version` every second. SSE refresh hints update open indexes; a five-second browser fetch also covers silently buffered streams. Every catalog request queries SQLite, so no event delivery is required for correctness.
 
-The default registry is `~/.battuta/artifacts/registry.sqlite3`. `BATTUTA_ARTIFACT_DB` overrides it for setup, CLI, and service; all must use the same value. `BATTUTA_ARTIFACT_BASE_URL` overrides the public URLs printed by the CLI, defaulting to `https://pi.fiscum.co.uk/artifacts`. It does not rewrite HTTP routes: preserve the `/artifacts` prefix.
+The default registry is `~/.battuta/artifacts/registry.sqlite3`. `BATTUTA_ARTIFACT_DB` overrides it for setup, CLI, and service; all must use the same value. `BATTUTA_ARTIFACT_BASE_URL` is required by the CLI and supplies the public URLs it prints; set it in `.env.prod` from the `.env.example` entry and load it for direct CLI use. It does not rewrite HTTP routes: preserve the `/artifacts` prefix.
 
 ## Serving behavior and security
 

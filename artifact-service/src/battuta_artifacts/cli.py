@@ -20,7 +20,7 @@ class ArtifactGroup(click.Group):
             # Own the outer error boundary, including parsing before invoke().
             kwargs["standalone_mode"] = False
             return super().main(args, **kwargs)
-        except (ArtifactError, ValidationError, OSError, sqlite3.Error, click.ClickException) as exc:
+        except (ArtifactError, ValidationError, OSError, sqlite3.Error, ValueError, click.ClickException) as exc:
             if isinstance(exc, ArtifactError):
                 code, status = exc.code, exc.exit_code
             elif isinstance(exc, (OSError, sqlite3.Error)):
@@ -49,7 +49,7 @@ def output(ctx, json_output, **payload):
         click.echo(json.dumps({"ok": True, **payload}))
     elif "artifact" in payload:
         item = payload["artifact"]
-        click.echo(f"{item['slug']} (revision {item['revision']})\n{item['url']}")
+        click.echo(f"{item['slug']} (revision {item['revision']})\nDeployed: {item['url']}\nCheck locally: {item['local_url']}")
     elif "artifacts" in payload:
         for item in payload["artifacts"]:
             click.echo(f"{item['slug']}\t{item['title']}\t{item['description']}\t{item['url']}")
@@ -64,7 +64,9 @@ def registry():
 
 
 def presented(item):
-    return {**item, "url": f"{public_base_url()}/a/{item['slug']}/"}
+    public_path = f"/a/{item['slug']}/"
+    local_path = f"/artifacts{public_path}"
+    return {**item, "url": f"{public_base_url()}{public_path}", "local_url": f"http://127.0.0.1:8000{local_path}"}
 
 
 def json_option(fn):
