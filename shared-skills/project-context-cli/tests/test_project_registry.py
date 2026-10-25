@@ -16,6 +16,25 @@ from battuta_project.models import LinearConfig
 
 
 class RegistryTests(unittest.TestCase):
+    def test_note_publication_preserves_independent_todo_state_and_metadata(self):
+        self.root.mkdir()
+        self.registry.state_path.write_text(json.dumps({"custom": 7, "general": {"custom": 8}}))
+        for project in (None, "atlas"):
+            with self.subTest(project=project), self.registry.locked(create=True):
+                self.assertIsNone(self.registry.current_note_work_id(project, "pm"))
+                self.registry.set_work_id(project, "tl", "abc12")
+                self.registry.set_work_id(project, "pm", "def34", related_to="tl:abc12")
+                self.registry.set_note_work_id(project, "pm", "ghi56")
+                self.assertEqual(self.registry.current_work_id(project, "pm"), "def34")
+                self.assertEqual(self.registry.current_work_id(project, "tl"), "abc12")
+                self.assertEqual(self.registry.work_record(project, "pm", "def34").related_to, "tl:abc12")
+                self.registry.set_work_id(project, "pm", "jkl78")
+                self.assertEqual(self.registry.current_note_work_id(project, "pm"), "ghi56")
+                self.assertIsNotNone(self.registry.work_record(project, "pm", "ghi56"))
+        state = json.loads(self.registry.state_path.read_text())
+        self.assertEqual(state["custom"], 7)
+        self.assertEqual(state["general"]["custom"], 8)
+
     def test_work_defaults_and_publication_preserve_existing_state(self):
         variants = [None, {}, {"custom": 7}, {"projects": {}}, {"projects": {"other": {}}}]
         variants += [{"projects": {"atlas": entry}} for entry in
