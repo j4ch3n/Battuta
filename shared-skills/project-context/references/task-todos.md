@@ -1,7 +1,11 @@
 # Execution TODO commands
 
-Use TODOs to keep track of the next step and remaining work during long-running,
-multi-step tasks. Both PM and TL invoke `battuta-project todo` through the shell;
+TODOs preserve intended work and recorded outcomes across context changes, helping
+bots recover the next step without reconstructing a plan. Their use is optional;
+bots decide whether a list helps. Notes separately retain learnings, findings, and
+thoughts; neither capability requires the other.
+
+Both PM and TL invoke `battuta-project todo` through the shell;
 owners can ask for progress in ordinary Telegram conversation. Return a readable
 summary, not a terminal screenshot or a JSONL dump.
 
@@ -21,8 +25,9 @@ An absent list is a successful discovery result and does not create storage.
 
 ## Basic usage
 
-Work in top-down execution order: inspect the next TODO, perform that step, and
-mark it done or cancelled with a detailed rational before moving to the next.
+For a list you choose to maintain, completion/cancellation advances only the next
+TODO in top-down execution order and records its detailed rational. Using a list
+is not a prerequisite for doing work.
 
 ### Show the next item
 
@@ -87,8 +92,9 @@ status `todo` and an empty `rational` for every item. Creation succeeds when no 
 all previous items for this role are `done`/`cancelled`. Each creation generates a
 new five-character lowercase alphanumeric work ID. The other role's work is unchanged.
 
-If unfinished work exists, creation fails without changing the list. Ask the owner
-whether to resume/revise it or abandon it, and pause the new work until they decide.
+If unfinished work exists, creation fails without changing the list. Before
+replacing that list, ask the owner whether to resume/revise it or abandon it.
+This protects tracked work; it does not require a list for unrelated work.
 Only after explicit approval to abandon the previous work, run:
 
 ```sh
@@ -168,8 +174,8 @@ counts. `Next:` identifies the first remaining item; finished lists explicitly s
 
 When a command fails, it returns nonzero and explains what went wrong and what to
 do next. Follow that guidance rather than looking up failure codes. If the message
-requires an owner decision, ask in the originating conversation and pause the new
-work until they respond. After fixing a storage problem, read the current list
+requires an owner decision, ask in the originating conversation and pause that
+list-changing operation until they respond. After fixing a storage problem, read the current list
 before retrying a mutation.
 
 The CLI never waits for interactive terminal input. It does not authorize work,
@@ -178,8 +184,8 @@ change specifications or Linear issues, schedule reminders, or store durable mem
 ## Resume existing work
 
 A work ID identifies one role's work across Pi-session restarts, not a Pi run or
-thread. An item ID is a position within its list. Future notes can reference work
-identity; notebooks and run provenance are not implemented here. Use `list` to
+thread. An item ID is a position within its list. Notebooks have independent work
+identities and selections; TODO creation never rotates a notebook. Use `list` to
 reorient after a restart rather than creating replacement work automatically.
 
 Older lists without a work ID can still be read, completed, cancelled, or revised.

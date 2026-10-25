@@ -27,7 +27,7 @@ resolved against retained metadata within the same project/general boundary, not
 the target role's current pointer.
 
 Work IDs use five lowercase ASCII letters/digits generated with `secrets.choice`.
-Allocation checks both roles' retained metadata and existing paths, including
+Allocation is shared with notebooks and checks both roles' retained metadata and existing TODO/notebook paths, including
 symlinks and unpublished orphan files, retrying up to 100 candidates without
 overwriting history.
 

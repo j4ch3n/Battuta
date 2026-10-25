@@ -1,6 +1,6 @@
 ---
 name: project-context
-description: Use when working on, researching, coding, summarizing, specifying, planning, or building artifacts for a project, or managing long-running multi-step work with or without project ownership.
+description: Use when working on, researching, coding, summarizing, specifying, planning, or building artifacts for a project, retaining working learnings and findings, or managing long-running multi-step work with or without project ownership.
 ---
 
 # Project context
@@ -66,16 +66,20 @@ New project initialization creates a rendered summary skeleton. The shared memor
 
 ### Execution TODOs
 
-Use `battuta-project todo` for long-running, multi-step work to keep concrete steps
-in execution order and stay oriented as context grows. Skip lists for simple replies.
-Choose project scope for clearly project-owned work; use general scope otherwise.
+TODOs retain intended work and recorded outcomes beyond the current conversation,
+so a bot can stay oriented without reconstructing its plan. Using them is optional;
+decide whether a list helps the work. Notes and TODOs can be used independently,
+together, or not at all.
+
+`battuta-project todo` keeps concrete steps in execution order. For commands you
+choose to invoke, select project scope for project-owned work, general otherwise.
 PM and TL create independent work. Use `create` for new work and `extend` for
 additional steps in the current work; optional associations and bot-mail handoffs
 are described in the [TODO command reference](references/task-todos.md#associate-work-through-a-handoff).
 
-Work through TODO items strictly in top-down execution order: read the next item,
-perform the work, then mark it done or cancelled with a detailed rational before
-moving to the next item.
+TODO completion/cancellation advances only the next item in execution order and
+requires a detailed rational explaining its outcome. The tool does not prescribe
+whether to track a request as TODO work.
 
 | Mode                                                                                          | When and why to use it                                                                                       |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -89,6 +93,19 @@ moving to the next item.
 Present progress in ordinary chat when asked. Read the
 [TODO command reference](references/task-todos.md) before invocation; it owns
 command syntax, options, and advanced list management.
+
+### Working notes
+
+Notes retain learnings, findings, and thoughts beyond the current context; numbered
+search results let a bot recover relevant details without loading the whole
+notebook. They are optional working material, not tasks, progress reports, canonical
+specs, commitments, or automatic durable-memory entries. Notes have their own work
+identity and never require or change a TODO list. Decide whether they help; no
+capture checkpoints are required. Keep credentials out of notes.
+
+The [notebook command reference](references/task-notes.md) owns append, full/range
+read, literal search, scope selection, continuation, and recovery commands for
+both roles.
 
 ### Project documents
 
