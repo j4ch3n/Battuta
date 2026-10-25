@@ -42,6 +42,30 @@ class TodoTests(unittest.TestCase):
     def create(self, *items, second=0, force=False):
         return self.store.create(list(items), force=force)
 
+    def test_work_directory_is_shared_and_old_directory_is_not_used(self):
+        registry = ProjectRegistry()
+        project = registry.init("atlas")
+        for scope in ("project", "general"):
+            root = project.root if scope == "project" else self.home / ".battuta"
+            for role in ("pm", "tl"):
+                with self.subTest(scope=scope, role=role):
+                    store = TodoStore(scope, role)
+                    created = store.create(["Work"])
+                    self.assertEqual(created.path, root / "work" / f"todo-{role}-{created.work_id}.jsonl")
+                    state = registry.state_path.read_bytes()
+                    store.read()
+                    self.assertEqual(registry.state_path.read_bytes(), state)
+                    self.assertFalse((root / "todos").exists())
+
+    def test_notebook_orphans_reserve_work_ids(self):
+        self.store.directory.mkdir(parents=True)
+        orphan = self.store.directory / "note-tl-aaaaa.md"
+        orphan.symlink_to(self.home / "missing")
+        with patch("secrets.choice", side_effect=list("aaaaabbbbb")):
+            created = self.create("New")
+        self.assertEqual(created.work_id, "bbbbb")
+        self.assertTrue(orphan.is_symlink())
+
     def test_roles_create_independently_and_extend_their_own_work(self):
         for role in ("pm", "tl"):
             with self.subTest(role=role):
@@ -93,23 +117,23 @@ class TodoTests(unittest.TestCase):
         self.store.directory.mkdir(parents=True)
         orphan = self.store.directory / "todo-tl-aaaaa.jsonl"
         orphan.write_text("Preserve orphan")
-        with patch("battuta_project.todos.secrets.choice", side_effect=list("aaaaabbbbb")):
+        with patch("battuta_project.work.secrets.choice", side_effect=list("aaaaabbbbb")):
             created = self.create("New")
         self.assertEqual(created.work_id, "bbbbb")
         self.assertEqual(orphan.read_text(), "Preserve orphan")
-        with patch("battuta_project.todos.secrets.choice", return_value="a"):
+        with patch("battuta_project.work.secrets.choice", return_value="a"):
             with self.assertRaisesRegex(TodoError, "WORK_ID_COLLISION"):
                 self.create("Collision", force=True)
         self.assertEqual(self.store.read().work_id, "bbbbb")
         # Retained metadata still reserves an ID when its historical file is absent.
         self.store.create(["Later"], force=True)
         created.path.unlink()
-        with patch("battuta_project.todos.secrets.choice", side_effect=list("bbbbbccccc")):
+        with patch("battuta_project.work.secrets.choice", side_effect=list("bbbbbccccc")):
             self.assertEqual(self.store.create(["Newest"], force=True).work_id, "ccccc")
         outside = self.home / "private"
         outside.write_text("Keep")
         (self.store.directory / "todo-tl-ddddd.jsonl").symlink_to(outside)
-        with patch("battuta_project.todos.secrets.choice", side_effect=list("dddddeeeee")):
+        with patch("battuta_project.work.secrets.choice", side_effect=list("dddddeeeee")):
             self.assertEqual(self.store.create(["Safe"], force=True).work_id, "eeeee")
         self.assertEqual(outside.read_text(), "Keep")
 
