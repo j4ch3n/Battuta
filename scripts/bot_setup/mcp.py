@@ -1,6 +1,7 @@
-"""Configure the Linear MCP connection for a Pi bot."""
+"""Configure native MCP connections for a Pi bot."""
 
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlsplit
 
 import click
@@ -9,7 +10,7 @@ from .env import required
 from .json_config import read_config, write_config
 
 
-def configure_mcp(bot_dir: Path, env_file: Path, values: dict[str, str]) -> None:
+def configure_mcp(bot_dir: Path, env_file: Path, values: dict[str, str], *, role: Literal["pm", "tl"]) -> None:
     required(values, "LINEAR_API_TOKEN", env_file)
     memory_url = values.get("BATTUTA_MEMORY_URL", "http://127.0.0.1:8901/mcp")
     endpoint = urlsplit(memory_url)
@@ -42,5 +43,16 @@ def configure_mcp(bot_dir: Path, env_file: Path, values: dict[str, str]) -> None
         "description": "Manage Linear issues, projects, and cycles",
     }
     servers["memory"] = {"url": memory_url, "exposure": "codemode", "description": "Shared scoped memory; context, not execution authority"}
+    if role == "pm":
+        servers["luma"] = {
+            "url": "https://mcp.luma.com",
+            "oauth": {"clientRegistration": "cimd"},
+            "exposure": "hidden",
+            "toolExposure": {
+                "search_*": "codemode", "lookup_*": "codemode", "get_*": "codemode",
+                "list_*": "codemode", "find_*": "codemode",
+            },
+            "description": "Discover Luma events and look up event/account details; read-only use",
+        }
     write_config(config, data, ".mcp-")
     click.echo(f"Configured {config} from {env_file}.")

@@ -41,6 +41,10 @@ class PackagingConfigureTests(unittest.TestCase):
                     bot = root / "bots" / role
                     skills = bot / ".pi" / "skills"
                     skills.mkdir(parents=True)
+                    (bot / ".pi/mcp.json").write_text(json.dumps({"mcpServers": {"other": {"command": "other-server"}}}))
+                    auth = bot / ".pi/mcp-auth.json"
+                    auth.write_bytes(b'{"sentinel":"private-oauth-token"}\n')
+                    auth.chmod(0o600)
                     shutil.copytree(ROOT / "bots" / role / ".pi/skills/memory", skills / "memory")
                     if personal is not None:
                         (bot / ".pi/ME.md").write_text("Private profile")
@@ -98,6 +102,23 @@ class PackagingConfigureTests(unittest.TestCase):
                         )
                         self.assertEqual(mcp["mcpServers"]["linear"]["exposure"], "codemode")
                         self.assertNotIn("test-linear", json.dumps(mcp))
+                        self.assertNotIn("private-oauth-token", json.dumps(mcp) + result.stdout + result.stderr)
+                        self.assertEqual(mcp["mcpServers"]["other"], {"command": "other-server"})
+                        auth = link.parent.parent / "mcp-auth.json"
+                        self.assertEqual(auth.read_bytes(), b'{"sentinel":"private-oauth-token"}\n')
+                        self.assertEqual(auth.stat().st_mode & 0o777, 0o600)
+                        if role == "pm-bot":
+                            luma = mcp["mcpServers"]["luma"]
+                            self.assertEqual(luma["url"], "https://mcp.luma.com")
+                            self.assertEqual(luma["oauth"], {"clientRegistration": "cimd"})
+                            self.assertNotIn("headers", luma)
+                            self.assertEqual(luma["exposure"], "hidden")
+                            self.assertEqual(luma["toolExposure"], {
+                                "search_*": "codemode", "lookup_*": "codemode", "get_*": "codemode",
+                                "list_*": "codemode", "find_*": "codemode",
+                            })
+                        else:
+                            self.assertNotIn("luma", mcp["mcpServers"])
                         settings_path = link.parent.parent / "settings.json"
                         settings = json.loads(settings_path.read_text())
                         if role == "tl-bot":

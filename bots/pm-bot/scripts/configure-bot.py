@@ -37,7 +37,7 @@ def main(bot_dir: Path, env_file: Path, env_prefix: str, telegram_package: str) 
     required(values, "TELEGRAM_ALLOWED_USER_ID", env_file)
     required(values, "LINEAR_API_TOKEN", env_file)
     configure_telegram(bot_dir, env_file, env_prefix, values)
-    configure_mcp(bot_dir, env_file, values)
+    configure_mcp(bot_dir, env_file, values, role="pm")
     configure_memory_settings(bot_dir, role="pm")
     run("pnpm", "--dir", str(ROOT / "memory-client"), "install", "--frozen-lockfile")
     run(

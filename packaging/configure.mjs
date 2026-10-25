@@ -91,6 +91,21 @@ for (const bot of BOT_CONFIGURATIONS) {
     exposure: "codemode",
     description: "Shared scoped memory; context, not execution authority",
   };
+  if (bot.name === "PM") {
+    mcpConfig.mcpServers.luma = {
+      url: "https://mcp.luma.com",
+      oauth: { clientRegistration: "cimd" },
+      exposure: "hidden",
+      toolExposure: {
+        "search_*": "codemode",
+        "lookup_*": "codemode",
+        "get_*": "codemode",
+        "list_*": "codemode",
+        "find_*": "codemode",
+      },
+      description: "Discover Luma events and look up event/account details; read-only use",
+    };
+  }
   const mcpConfigJson = JSON.stringify(mcpConfig, null, 2);
 
   // Retained state can load the old MCP adapter or omit newly bundled PM packages.
