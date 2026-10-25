@@ -68,8 +68,7 @@ New project initialization creates a rendered summary skeleton. The shared memor
 
 TODOs retain intended work and recorded outcomes beyond the current conversation,
 so a bot can stay oriented without reconstructing its plan. Using them is optional;
-decide whether a list helps the work. Notes and TODOs can be used independently,
-together, or not at all.
+decide whether a list helps the work.
 
 `battuta-project todo` keeps concrete steps in execution order. For commands you
 choose to invoke, select project scope for project-owned work, general otherwise.
@@ -98,10 +97,9 @@ command syntax, options, and advanced list management.
 
 Notes retain learnings, findings, and thoughts beyond the current context; numbered
 search results let a bot recover relevant details without loading the whole
-notebook. They are optional working material, not tasks, progress reports, canonical
-specs, commitments, or automatic durable-memory entries. Notes have their own work
-identity and never require or change a TODO list. Decide whether they help; no
-capture checkpoints are required. Keep credentials out of notes.
+notebook. They are optional working material, not canonical specs, commitments,
+or automatic durable-memory entries. Decide whether they help. Keep credentials
+out of notes.
 
 The [notebook command reference](references/task-notes.md) owns append, full/range
 read, literal search, scope selection, continuation, and recovery commands for
