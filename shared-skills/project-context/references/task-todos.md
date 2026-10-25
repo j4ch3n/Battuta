@@ -99,7 +99,7 @@ battuta-project todo --scope general create --force \
 
 `--force` bypasses only the unfinished-work check. It creates a new file and keeps
 the old file unchanged, including unfinished items. It does not bypass validation,
-storage failures, or exhausted ID allocation. The bot must obtain approval; the CLI
+storage failures, or work-ID allocation errors. The bot must obtain approval; the CLI
 cannot independently verify conversational consent.
 
 ### Associate work through a handoff
@@ -175,54 +175,23 @@ before retrying a mutation.
 The CLI never waits for interactive terminal input. It does not authorize work,
 change specifications or Linear issues, schedule reminders, or store durable memory.
 
-## Storage contract
-
-Project files live under `~/.battuta/projects/<project>/todos/`; general files live
-under `~/.battuta/todos/`. Filenames are `todo-<role>-<work-id>.jsonl`, for example
-`todo-pm-k7m2q.jsonl`. The role-local pointer in
-`~/.battuta/projects/.config.json`, not file ordering or modification time, selects
-the current list. Project work uses
-`projects.<project>.roles.<role>.currentWorkId`; general work uses
-`general.roles.<role>.currentWorkId`. General creation may initialize this config
-but never registers or selects a project. Missing configuration mappings default
-to empty; malformed state is rejected without resetting it.
-
-Each role's `works` mapping retains metadata keyed by ID, including optional
-`relatedTo`. Older entries are retained when the pointer changes. ID generation
-checks both roles' retained metadata and existing paths, including symlinks and
-unpublished orphan files, retrying up to 100 candidates without overwriting history.
-
-Each JSONL record contains only `id`, `status` (`todo`, `done`, or `cancelled`),
-`description`, and `rational`. The rational starts empty for TODO items and must be
-nonblank for done/cancelled items. IDs are consecutive from 1. Completed/cancelled items form a
-prefix followed by the remaining TODO items. Updates atomically rewrite the active
-file; only creation makes a new work file. Older lists remain as history.
+## Resume existing work
 
 A work ID identifies one role's work across Pi-session restarts, not a Pi run or
 thread. An item ID is a position within its list. Future notes can reference work
-identity; notebooks and run provenance are not implemented here.
+identity; notebooks and run provenance are not implemented here. Use `list` to
+reorient after a restart rather than creating replacement work automatically.
 
-### Legacy recovery and interrupted creation
+Older lists without a work ID can still be read, completed, cancelled, or revised.
+Finish/cancel their remaining steps or obtain owner approval for `create --force`
+before starting new work. Use `create` before attempting `extend` on such work.
+Each role can make this transition independently.
 
-Before a role publishes its first work ID in a scope, existing timestamped lists
-remain readable and can be completed, cancelled, or revised. Only that role's
-latest validated timestamped list supplies the pending-work guard. Finish/cancel
-it or obtain approval for `create --force`; creation preserves its original file.
-`extend` requires a new-format current work ID. Each role transitions independently.
+If current work cannot be read, follow the reported repair guidance. Do not use
+force to bypass corruption, switch to older history, or discard files after an
+interrupted command. After repair, read the current list before retrying.
 
-After publication, there is no fallback to legacy files. A missing current file
-is a storage inconsistency to repair, not permission to start over or use older
-history. Force cannot bypass corrupt data or unsafe paths.
-
-Creation writes the new list before publishing its pointer and metadata. A normal
-config-write failure removes only the new unpublished file and retains prior state.
-A crash between writes can leave an orphan; retain it for recovery. It is never
-selected automatically and its ID remains reserved by the existing path. This is
-recoverable two-file publication, not a filesystem transaction.
-
-Lists are independent of Pi sessions; each role's list is shared by that role's
-sessions in the same scope, not a separate list for each request. Commands serialize
-config and list changes, but do not pin a caller to a previous version. There is
-one instance per role; no lease, thread tracking, or cross-run scheduling is provided.
-Store no secrets in item
-descriptions and protect these files as private project/owner notes.
+Each role uses its current work across sessions in the same scope, not a separate
+list for every request. Do not run multiple instances of the same role on the same
+work concurrently. Keep item descriptions free of secrets and treat todos as
+private project/owner information.
