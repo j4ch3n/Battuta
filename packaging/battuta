@@ -37,11 +37,12 @@ case "${1:-}" in
     exec "$root/memory-service/.venv/bin/battuta-memory" serve
     ;;
   configure)
+    shift
     [[ -f "$root/.env.prod" ]] || { printf 'Copy %s/.env.example to %s/.env.prod and fill it in first\n' "$root" "$root" >&2; exit 1; }
     set -a
     source "$root/.env.prod"
     set +a
-    exec "$root/bin/node" "$root/bin/configure.mjs"
+    exec "$root/bin/node" "$root/bin/configure.mjs" "$@"
     ;;
   start-prod-screen)
     exec bash "$root/bots/pm-bot/scripts/run-dev.sh" prod
@@ -80,7 +81,7 @@ case "${1:-}" in
     exec "$root/bin/node" "$root/bin/install-services.mjs"
     ;;
   *)
-    printf 'Usage: %s configure|setup-memory|memory|setup-artifacts|artifacts|artifact|start-prod-screen|pm|tl|install-services\n' "$0" >&2
+    printf 'Usage: %s configure [--migrate-from OLD_BOTS_DIRECTORY]|setup-memory|memory|setup-artifacts|artifacts|artifact|start-prod-screen|pm|tl|install-services\n' "$0" >&2
     exit 2
     ;;
 esac

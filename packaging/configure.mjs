@@ -1,6 +1,7 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import { configureSharedResources } from "./shared-resources.mjs";
 import { configureSubagents } from "./configure-subagents.mjs";
 import { configureMcp, validateMemoryUrl } from "../bot-setup/mcp.mjs";
@@ -37,12 +38,68 @@ function required(name) {
   return value;
 }
 
-const owner = Number(required("TELEGRAM_ALLOWED_USER_ID"));
-if (!Number.isSafeInteger(owner) || owner <= 0) throw new Error("Invalid TELEGRAM_ALLOWED_USER_ID");
+async function checkMigrationTarget(path, content) {
+  try {
+    const stat = await lstat(path);
+    if (!stat.isFile() || !(await readFile(path)).equals(content))
+      throw new Error(`Refusing to overwrite existing configuration: ${path}`);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+}
+
+const { values } = parseArgs({ options: { "migrate-from": { type: "string" } } });
+const oldBotsDirectory = values["migrate-from"];
+if (oldBotsDirectory === "") throw new Error("--migrate-from requires a bots directory");
+const migrating = oldBotsDirectory !== undefined;
+let owner;
+if (!migrating) {
+  owner = Number(required("TELEGRAM_ALLOWED_USER_ID"));
+  if (!Number.isSafeInteger(owner) || owner <= 0)
+    throw new Error("Invalid TELEGRAM_ALLOWED_USER_ID");
+}
 required("LINEAR_API_TOKEN");
 required("SUPABASE_URL");
 required("SUPABASE_SECRET_KEY");
 const memoryUrl = validateMemoryUrl(process.env.BATTUTA_MEMORY_URL);
+
+// Preflight both roles before changing private state; never log JSON parser errors.
+const migration = [];
+if (migrating) {
+  for (const bot of BOT_CONFIGURATIONS) {
+    for (const name of ["telegram.json", "mcp-auth.json"]) {
+      const source = join(resolve(oldBotsDirectory), `${bot.name.toLowerCase()}-bot`, ".pi", name);
+      let content;
+      try {
+        content = await readFile(source);
+      } catch (error) {
+        if (error.code === "ENOENT" && name === "mcp-auth.json") continue;
+        throw error;
+      }
+      let data;
+      try {
+        data = JSON.parse(content.toString("utf8"));
+      } catch {
+        throw new Error(`Invalid JSON in ${source}`);
+      }
+      if (!data || typeof data !== "object" || Array.isArray(data))
+        throw new Error(`Expected a JSON object in ${source}`);
+      const path = join(bot.piDirectory, name);
+      await checkMigrationTarget(path, content);
+      migration.push({ path, content });
+    }
+  }
+}
+for (const { path, content } of migration) {
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  try {
+    await writeFile(path, content, { flag: "wx", mode: 0o600 });
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    await checkMigrationTarget(path, content);
+  }
+  await chmod(path, 0o600);
+}
 
 // Explicit configuration may create a missing store; launch only validates it.
 schedulerCatchUpMax();
@@ -50,17 +107,20 @@ await initializeSchedulerStore(schedulerStorePath());
 for (const bot of BOT_CONFIGURATIONS) {
   await configureSharedResources(PACKAGE_ROOT, bot.directory);
 
-  const token = required(`${bot.name}_TELEGRAM_TOKEN`);
-  const [id, secret] = token.split(":");
-  const botId = Number(id);
-  if (!secret || !Number.isSafeInteger(botId) || botId <= 0)
-    throw new Error(`Invalid ${bot.name}_TELEGRAM_TOKEN`);
-  const username = (process.env[`${bot.name}_TELEGRAM_BOT_USERNAME`] || "").replace(/^@/, "");
-  if (username && !/^[a-zA-Z0-9_]+$/.test(username))
-    throw new Error(`Invalid ${bot.name}_TELEGRAM_BOT_USERNAME`);
+  let telegram;
+  if (!migrating) {
+    const token = required(`${bot.name}_TELEGRAM_TOKEN`);
+    const [id, secret] = token.split(":");
+    const botId = Number(id);
+    if (!secret || !Number.isSafeInteger(botId) || botId <= 0)
+      throw new Error(`Invalid ${bot.name}_TELEGRAM_TOKEN`);
+    const username = (process.env[`${bot.name}_TELEGRAM_BOT_USERNAME`] || "").replace(/^@/, "");
+    if (username && !/^[a-zA-Z0-9_]+$/.test(username))
+      throw new Error(`Invalid ${bot.name}_TELEGRAM_BOT_USERNAME`);
 
-  const telegram = { profiles: { default: { botToken: token, allowedUserId: owner, botId } } };
-  if (username) telegram.profiles.default.botUsername = username;
+    telegram = { profiles: { default: { botToken: token, allowedUserId: owner, botId } } };
+    if (username) telegram.profiles.default.botUsername = username;
+  }
   await configureMcp(bot.directory, { role: bot.name.toLowerCase(), memoryUrl });
 
   // Retained state can omit newly bundled packages or load the old memory adapter.
@@ -111,7 +171,7 @@ for (const bot of BOT_CONFIGURATIONS) {
     configureSubagents(settings, bot.directory);
   }
   await writeFile(bot.settingsPath, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 });
-
-  await writeFile(bot.telegramConfigPath, JSON.stringify(telegram, null, 2), { mode: 0o600 });
+  if (!migrating)
+    await writeFile(bot.telegramConfigPath, JSON.stringify(telegram, null, 2), { mode: 0o600 });
 }
 console.log("Configured both bots. Run bin/battuta start-prod.");

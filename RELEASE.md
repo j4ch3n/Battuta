@@ -217,13 +217,21 @@ This step applies only when the owner requests a newer release or a change of in
 
 ### Fresh setup
 
-For a new version or installation path, stop the screen/foreground processes or disable services with `systemctl --user disable --now battuta-pm.service battuta-tl.service` before replacing files. Back up `.env.prod` and both bots' `.pi` state, including `auth.json`, **`mcp-auth.json`**, and sessions, and protect the backups as secrets. Verify the new archive as in step 2. Preserve those private files while updating the same stable path; do not extract over them blindly. For a new root, restore PM's `bots/pm-bot/.pi/mcp-auth.json` with mode `600` **before** configuration or launch, following [OAuth-state migration](docs/luma-setup.md#5-preserve-login-during-release-upgrades). Do not overwrite existing destination credentials. Old installations with no Luma OAuth state require the owner login in step 5 rather than a token migration.
+For a new version or installation path, stop the screen/foreground processes or disable services with `systemctl --user disable --now battuta-pm.service battuta-tl.service` before replacing files. Back up `.env.prod` and both bots' `.pi` state, including `auth.json`, **`mcp-auth.json`**, `telegram.json`, and sessions, and protect the backups as secrets. Verify the new archive as in step 2. Preserve those private files while updating the same stable path; do not extract over them blindly. The configure migration below copies Telegram and MCP OAuth configuration by bot name; restore other retained private state separately. Old installations with no Luma OAuth state require the owner login in step 5 rather than a token migration.
 
 Before configuring a release that previously used `LINEAR_API_KEY`, have the owner rename that setting to `LINEAR_API_TOKEN` in `.env.prod` using a private editor, retaining its value. Apply the shell setup in step 4; if the stable installation path changes, update the shell startup snippets too. For source checkouts, manually rename the setting in `.env` and `supabase/.env` and rerun bot configuration; `make dev` does not migrate credentials.
 
 The release workflow bundles Node selected by the source checkout's `.node-version` and Pi from each bot's pinned manifest. When upgrading from an adapter-based release, retain private auth/session state while using the new release's package manifests and dependencies. `bin/battuta configure` replaces the adapter-specific Linear authentication with an environment-expanded `Authorization` header and removes `pi-mcp-adapter` package entries from retained bot settings. An adapter left enabled would replace Pi's native MCP support. No new Linear token or Linear MCP OAuth login is needed for this migration; Luma's separate owner login is required if no connected grant was retained.
 
-Then run `bin/battuta configure` again to migrate both bots, rerun the local configuration and MCP checks in step 5, and, if using services, run `bin/battuta install-services`, daemon-reload, and enable/start as in step 6.
+Then run configuration from the new installation, passing the old directory that contains `pm-bot` and `tl-bot`:
+
+```sh
+bin/battuta configure --migrate-from /path/to/old-release/bots
+```
+
+For an in-place upgrade, pass the current installation's `bots` directory instead. Upgrade mode copies each matching bot's `.pi/telegram.json` unchanged and `.pi/mcp-auth.json` when present, with mode `600`; it does not require Telegram environment variables or alter the source files. Both bots must have Telegram configuration. Invalid JSON or differing existing destination files stops migration; identical files are accepted for repeat runs. Resolve conflicts privately rather than overwriting credentials. The new `.env.prod` is still required for Linear and Supabase credentials. Without `--migrate-from`, fresh setup constructs Telegram configuration from environment variables and can replace an existing Telegram configuration.
+
+Rerun the local configuration and MCP checks in step 5, and, if using services, run `bin/battuta install-services`, daemon-reload, and enable/start as in step 6.
 
 Reinstall `battuta-project` from the updated release wheels with `--reinstall`. Project registrations live independently under `~/.battuta/projects/`. Shared memory uses `~/.battuta/memory/`; preserve both databases and the capture queue during subsequent updates. This is a breaking replacement with no historical-data migration or cleanup. PM retains read-only loading of its existing `ME.md`; profile-writing tools are removed. Run `bin/battuta setup-memory` before starting the new service. See [cutover and rollback](docs/memory-service.md#breaking-replacement-and-cutover).
 
