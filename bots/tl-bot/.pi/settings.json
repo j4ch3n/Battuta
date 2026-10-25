@@ -1,5 +1,9 @@
 {
-  "packages": ["npm:@llblab/pi-telegram@0.57.3", "npm:pi-web-access@0.43.0"],
+  "packages": [
+    "npm:@llblab/pi-telegram@0.57.3",
+    "npm:pi-web-access@0.43.0",
+    "npm:pi-subagents@0.82.1"
+  ],
   "lastChangelogVersion": "1.0.0",
   "theme": "dark",
   "defaultProvider": "openai-codex",

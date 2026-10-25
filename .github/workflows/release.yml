@@ -74,6 +74,7 @@ jobs:
           cp packaging/battuta dist/stage/battuta/bin/battuta
           cp packaging/configure.mjs dist/stage/battuta/bin/configure.mjs
           cp packaging/shared-resources.mjs dist/stage/battuta/bin/shared-resources.mjs
+          cp packaging/configure-subagents.mjs dist/stage/battuta/bin/configure-subagents.mjs
           cp packaging/install-services.mjs dist/stage/battuta/bin/install-services.mjs
           chmod +x dist/stage/battuta/bin/*
           for bot in pm-bot tl-bot; do
@@ -165,8 +166,8 @@ jobs:
           rm -rf "$memory_smoke_home"
           test -x dist/stage/battuta/bots/pm-bot/node_modules/.bin/pi
           test -x dist/stage/battuta/bots/tl-bot/node_modules/.bin/pi
-          test -f dist/stage/battuta/bots/tl-bot/.pi/extensions/bounded-subagents/index.ts
-          test -f dist/stage/battuta/bots/tl-bot/.pi/skills/use-subagent/references/tools.md
+          test -f dist/stage/battuta/bots/tl-bot/.pi/npm/node_modules/pi-subagents/bundle/index.js
+          test -f dist/stage/battuta/bots/tl-bot/.pi/npm/node_modules/pi-subagents/skills/pi-subagents/SKILL.md
           test ! -e dist/stage/battuta/bots/pm-bot/node_modules/pi-subagents
           test ! -e dist/stage/battuta/bots/tl-bot/.pi/subagents.json
           pnpm --dir dist/stage/battuta/bots/tl-bot exec node --input-type=module -e 'import upstream from "pi-subagents"; import { SUBAGENT_DELEGATION_REQUEST_EVENT } from "pi-subagents/delegation"; if (typeof upstream !== "function" || !SUBAGENT_DELEGATION_REQUEST_EVENT) process.exit(1)'

@@ -4,8 +4,9 @@ This guide is for installing the prebuilt **64-bit Linux ARM** Battuta release o
 
 ## Extension and skill setup index
 
-TL-only bounded Pi children are opt-in; see [bounded child setup](docs/subagents-setup.md)
-for the private operator grant, dedicated provider key and deployment acceptance.
+TL uses native Pi subagents with its existing Pi login and web-access-only child
+extension defaults; see [subagent setup](docs/subagents-setup.md) for verification
+and deployment acceptance.
 
 Installation navigation lives here, separate from runtime skill workflows and command contracts. Use the component's setup guide below; bundled resources do not need separate installation. When adding an extension or skill, update this index with its installation guide or explicitly state how the release configures it.
 
@@ -220,6 +221,8 @@ Reinstall `battuta-project` from the updated release wheels with `--reinstall`. 
 The remote Linear webhook also now reads `LINEAR_API_TOKEN`. Before deploying the updated Edge Function, the backend owner must provide that named secret in Supabase. For GitHub Actions deployment, rename the repository secret to `LINEAR_API_TOKEN`; the deployment workflow sets the matching Supabase secret. Confirm the updated webhook works before removing the obsolete `LINEAR_API_KEY` secret.
 
 If the installation path changes, stop/disable all three services first. Generated units use absolute paths; the installer rejects units pointing to another root. Move only the owned Battuta unit files aside before installing from the new path. Existing units from an older release also need to be moved aside explicitly before installing the changed units:
+
+As part of installation migration, update TL's retained `bots/tl-bot/.pi/settings.json` before restarting: `subagents.defaultExtensions` contains an absolute web-access extension path. Replace the old installation prefix with the new one, so the default entry points to `<new-installation-root>/bots/tl-bot/.pi/npm/node_modules/pi-web-access/dist`. Preserve any deliberate custom allowlist entries, updating their paths only if they also moved. Rerunning `bin/battuta configure` preserves this existing setting; it does not repair relocated paths. Leaving the old path can prevent children from loading their web tools. The same manual update is required when moving a source checkout or custom TL workspace.
 
 ```sh
 unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"

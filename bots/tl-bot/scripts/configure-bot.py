@@ -39,7 +39,7 @@ def main(bot_dir: Path, env_file: Path, env_prefix: str, telegram_package: str) 
     configure_mcp(bot_dir, env_file, values)
     configure_memory_settings(bot_dir, role="tl")
     configure_subagents(bot_dir, root=ROOT)
-    install_packages(bot_dir, telegram_package)
+    install_packages(bot_dir, telegram_package, extra_packages=("npm:pi-web-access@0.43.0", "npm:pi-subagents@0.82.1"))
     warn_running_session(bot_dir)
 
 
