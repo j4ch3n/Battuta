@@ -2,9 +2,11 @@
 
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+import json
 import os
 from pathlib import Path
 import stat
+import subprocess
 
 import click
 
@@ -127,3 +129,40 @@ class NoteStore:
             if result is None:
                 return None
             return self._select(result, self._lines(result.path), from_line, to_line, limit)
+
+    def search(self, query: str, *, from_line: int = 1, limit: int | None = None) -> Notebook | None:
+        _single_line(query)
+        _range(from_line, limit=limit)
+        with self._locked():
+            result = self._current()
+            if result is None:
+                return None
+            # Validate the same file contract as read/append before handing it to rg.
+            for _ in self._lines(result.path):
+                pass
+            try:
+                output = subprocess.run([
+                    "rg", "--no-config", "--json", "--fixed-strings", "--ignore-case", "--text",
+                    "-e", query, "--", str(result.path),
+                ], capture_output=True, text=True, encoding="utf-8")
+            except FileNotFoundError as error:
+                raise click.ClickException("Notebook search requires ripgrep (rg) on PATH; install it and retry") from error
+            if output.returncode == 1:
+                return result
+            if output.returncode != 0:
+                raise click.ClickException(f"ripgrep search failed (exit {output.returncode}): {output.stderr.strip()}")
+            try:
+                def matches():
+                    for record in output.stdout.splitlines():
+                        event = json.loads(record)
+                        if event["type"] != "match":
+                            continue
+                        data = event["data"]
+                        number, text = data["line_number"], data["lines"]["text"]
+                        if type(number) is not int or number < 1 or not isinstance(text, str) or not text.endswith("\n"):
+                            raise ValueError("invalid numbered match")
+                        _single_line(text[:-1])
+                        yield NoteLine(number, text[:-1])
+                return self._select(result, matches(), from_line, None, limit)
+            except (ValueError, KeyError, TypeError) as error:
+                raise click.ClickException(f"Invalid ripgrep search output: {error}") from error

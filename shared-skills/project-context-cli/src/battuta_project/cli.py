@@ -9,6 +9,7 @@ from .models import LinearConfig, LinearResult, ProjectList
 from .presentation import render
 from .registry import ProjectRegistry
 from .todo_cli import todo
+from .note_cli import note
 
 
 class _TokenGroup(click.Group):
@@ -48,6 +49,7 @@ def main(ctx):
 
 
 main.add_command(todo)
+main.add_command(note)
 
 
 @main.command()

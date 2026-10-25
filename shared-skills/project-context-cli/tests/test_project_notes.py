@@ -2,7 +2,10 @@
 
 from concurrent.futures import ProcessPoolExecutor
 import json
+import os
 from pathlib import Path
+import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -37,7 +40,53 @@ class NoteTests(unittest.TestCase):
 
     def test_absent_reads_do_not_initialize_storage(self):
         self.assertIsNone(self.store.read())
+        self.assertIsNone(self.store.search("unknown"))
         self.assertFalse((self.home / ".battuta").exists())
+
+    @unittest.skipUnless(shutil.which("rg"), "ripgrep is required for real search verification")
+    def test_real_search_is_literal_case_insensitive_numbered_and_resumable(self):
+        texts = ["Needle.*", "other", "NEEDLE.* two", "-n $(touch nope) ; café", "needle.* three"]
+        for text in texts:
+            self.store.append(text)
+        config = self.home / "rg-config"
+        config.write_text("--files\n--glob=*.private\n")
+        with patch.dict(os.environ, {"RIPGREP_CONFIG_PATH": str(config)}):
+            result = self.store.search("needle.*", limit=1)
+        self.assertEqual([(line.number, line.text) for line in result.lines], [(1, "Needle.*")])
+        self.assertEqual(result.next_line, 3)
+        result = self.store.search("needle.*", from_line=result.next_line)
+        self.assertEqual([line.number for line in result.lines], [3, 5])
+        self.assertIsNone(result.next_line)
+        self.assertEqual([line.number for line in self.store.search("-n $(touch nope) ; CAFÉ").lines], [4])
+        self.assertEqual(self.store.search("absent").lines, [])
+        self.assertFalse((self.home / "nope").exists())
+
+    def test_search_errors_and_untrusted_queries(self):
+        note = self.store.append("-n literal")
+        match = json.dumps({"type": "match", "data": {"line_number": 1, "lines": {"text": "-n literal\n"}}})
+        with patch("battuta_project.notes.subprocess.run", return_value=subprocess.CompletedProcess([], 0, match, "")) as run:
+            result = self.store.search("-n")
+        self.assertEqual([line.text for line in result.lines], ["-n literal"])
+        self.assertEqual(run.call_args.args[0], ["rg", "--no-config", "--json", "--fixed-strings", "--ignore-case", "--text", "-e", "-n", "--", str(note.path)])
+        self.assertFalse(run.call_args.kwargs.get("shell", False))
+        for code, output in ((1, ""), (0, match)):
+            with patch("battuta_project.notes.subprocess.run", return_value=subprocess.CompletedProcess([], code, output, "")):
+                self.assertEqual(len(self.store.search("query").lines), 0 if code == 1 else 1)
+        for response in (subprocess.CompletedProcess([], 2, "", "bad"),
+                         subprocess.CompletedProcess([], 0, "not json", ""),
+                         subprocess.CompletedProcess([], 0, '{"type":"match","data":{}}', "")):
+            with self.subTest(response=response), patch("battuta_project.notes.subprocess.run", return_value=response):
+                with self.assertRaises(click.ClickException):
+                    self.store.search("query")
+        with patch("battuta_project.notes.subprocess.run", side_effect=FileNotFoundError("rg")):
+            with self.assertRaisesRegex(click.ClickException, "ripgrep"):
+                self.store.search("query")
+        for query in (" ", "x\ny", "x\x00y"):
+            with self.subTest(query=query), self.assertRaises(click.ClickException):
+                self.store.search(query)
+        for options in ({"from_line": 0}, {"limit": 0}):
+            with self.assertRaises(click.ClickException):
+                self.store.search("query", **options)
 
     def test_append_preserves_text_and_survives_restart_without_todos(self):
         first = self.store.append("  Finding **一**  ")
