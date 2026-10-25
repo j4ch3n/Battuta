@@ -23,7 +23,8 @@ class AcceptanceTests(unittest.TestCase):
             (source / "main.css").write_text("body {color: green}")
             (source / "app.js").write_text("console.log('demo')")
             (source / "secret.txt").write_text("unregistered")
-            env = {**os.environ, "BATTUTA_ARTIFACT_DB": str(root / "registry.sqlite3")}
+            env = {**os.environ, "BATTUTA_ARTIFACT_DB": str(root / "registry.sqlite3"),
+                   "BATTUTA_ARTIFACT_BASE_URL": "https://artifacts.example.test/artifacts"}
             command = [sys.executable, "-c", "from battuta_artifacts.cli import main; main()"]
 
             def cli(*args):

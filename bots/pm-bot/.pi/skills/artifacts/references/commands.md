@@ -21,7 +21,7 @@ battuta-artifact register --slug demo --title "Product demo" \
 
 The entry is included automatically; repeat `--file` for each additional file. With `--root`, all file paths are relative to that directory. Without it, provide an absolute entry and no additional files. Slugs use lowercase letters/digits separated by single hyphens; title and description are required. Entries support `.html`, `.htm`, `.md`, and `.markdown` by extension, without content validation. Assets are exact files, not directories or globs. Symlinks and traversal are rejected.
 
-Registration exposes only the listed files and returns `artifact.url`, `artifact.revision`, metadata, root, and file mappings. Duplicate slugs fail rather than overwrite.
+Registration exposes only the listed files and returns the shareable `artifact.url`, local `artifact.local_url`, `artifact.revision`, metadata, root, and file mappings. Use `local_url` to check the host service; do not fetch the public URL as a registration check. Duplicate slugs fail rather than overwrite.
 
 ## Inspect and change
 

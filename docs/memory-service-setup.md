@@ -12,14 +12,12 @@ Source checkout:
 
 ```sh
 bash scripts/setup-memory.sh
-memory-service/.venv/bin/battuta-memory serve
 ```
 
 Release archive:
 
 ```sh
 bin/battuta setup-memory
-bin/battuta memory
 ```
 
 The release installs a hash-verified ARM64 wheelhouse into a target-created virtualenv. Source setup resolves only locked dependencies. Setup checks actual sqlite-vec extension loading and ONNX Runtime CPU availability; it never falls back to pseudo-embeddings or installs with sudo.
@@ -49,10 +47,6 @@ For source `--bot-dir` workspaces outside the bundled bot directory, configurati
 
 Default endpoint: `http://127.0.0.1:8901/mcp`. Default data: `~/.battuta/memory/`. Bots must use the same `BATTUTA_MEMORY_URL`. Remote binding/authentication is deliberately unsupported. Source tmux launching adds one memory window; do not run it alongside a systemd server on the same data/port.
 
-## Hardware acceptance
-
-On the physical Pi, record model/RAM/OS/Python/ONNX versions, cold readiness time, warm store/recall latency and peak RSS with both bots connected. Restart with networking unavailable and confirm semantic recall still works. Test model corruption only in a disposable HOME: readiness must fail without accepting writes. Verify a second server is refused, and a bot can keep answering while memory is unavailable, then upload its queued capture after recovery. macOS checks do not establish Raspberry Pi performance or hardware acceptance.
-
 ## Nightly PM dream setup
 
 Dream automatically changes server memories and replaces the shared personal profile. Configure it only after the owner has approved unattended consolidation. Ordinary bot configuration does not imply this approval.
@@ -74,7 +68,15 @@ An approved dream runs LLM-guided cleanup first, then global-only upstream clust
 
    The command preserves unrelated settings/tasks, an existing model configuration and the task's disabled state. A new task is enabled; the next PM startup may immediately catch up the latest missed run. It captures PM defaults only when creating model configuration, never falling back to the conversation model later. To change the model, edit `dream-config.json` with PM stopped: `{"version":1,"model":"provider/model-id"}`. Conflicting owned tasks or malformed configuration fail without replacing the schedule.
 
-5. Inspect the stable store: exactly one `battuta-memory-dream` / `nightly-memory-dream` task, `action:"prompt"`, `type:"cron"`, `schedule:"0 0 3 * * *"`, `scope:"global"`, and the fixed instruction to call `memory_dream` once, report success with its public summary, or honestly report other statuses. There are no release-local extension, cwd, or session bindings in this task. Model selection lives separately in `dream-config.json`. For an existing status-only schedule, rerun this setup with PM stopped to upgrade the exact owned prompt; disablement and scheduler history are preserved. Runtime accepts the old owned prompt but does not rewrite the live scheduler store.
-6. Start one PM process. Verify scheduler discovery, task scope, next due time and model. Both startup catch-up and `memory_dream` resolve the exact configured model independently of the conversation model. Internal model calls use fresh evidence messages without PM transcript or tools. A ten-minute whole-run deadline and shutdown cancellation bound execution. Test with disposable data and a separate memory endpoint, never production memory. Confirm `dream-state.json` marks completion, canonical `ME.md` is published and `dream.log` has one under-150-word reflection; restart must not repeat it. Scheduler delivery history alone is not completion.
+5. Verify the configuration without starting PM or invoking a model:
+
+   ```sh
+   test -s "${PI_SCHEDULER_STATE_FILE:-$HOME/.battuta/schedule-prompts.json}"
+   test -s "${BATTUTA_MEMORY_DATA_DIR:-$HOME/.battuta/memory}/dream-config.json"
+   ```
+
+   Both checks must exit zero. Stop if either file is missing or empty; do not
+   start PM to recover from incomplete setup. The configured task and model are
+   intentionally not exercised during setup.
 
 To pause future dreams, stop PM and set the owned job's `enabled` to `false`, then restart. Capture has a separate `battutaMemoryCapture.enabled` toggle: disabling capture does not disable an approved dream schedule. See [memory operations](memory-service.md#owner-profile-and-nightly-dream) for recovery and privacy boundaries. No setup command restarts bots, changes provider login, or enables an OS service automatically.

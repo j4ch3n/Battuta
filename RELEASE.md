@@ -4,17 +4,14 @@ This guide is for installing the prebuilt **64-bit Linux ARM** Battuta release o
 
 ## Extension and skill setup index
 
-TL uses native Pi subagents with its existing Pi login and web-access-only child
-extension defaults; see [subagent setup](docs/subagents-setup.md) for verification
-and deployment acceptance.
-
 Installation navigation lives here, separate from runtime skill workflows and command contracts. Use the component's setup guide below; bundled resources do not need separate installation. When adding an extension or skill, update this index with its installation guide or explicitly state how the release configures it.
 
 | Component                                                  | Installation and configuration                                                                                                                                                                                                                                 |
 | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pi, PM/TL runtime extensions, agent mail, and project-spec | Bundled with dependencies; [configure and verify both bots](#5-configure-and-verify-interactively). Deploy the remote Supabase backend separately as required in [prerequisites](#1-confirm-the-target-and-prerequisites).                                     |
-| Telegram extension (both bots)                             | Bundled; supply credentials in [step 4](#4-prepare-production-credentials), then configure and verify in [step 5](#5-configure-and-verify-interactively).                                                                                                      |
+| Pi, PM/TL runtime extensions, agent mail, and project-spec | Bundled with dependencies; [configure and launch both bots](#5-configure-and-launch). Deploy the remote Supabase backend separately as required in [prerequisites](#1-confirm-the-target-and-prerequisites).                                                   |
+| Telegram extension (both bots)                             | Bundled; supply credentials in [step 4](#4-prepare-production-credentials), then configure and launch in [step 5](#5-configure-and-launch).                                                                                                                    |
 | Prompt scheduler (PM only)                                 | Bundled; [PM scheduler](docs/scheduler.md) covers fresh setup, stable storage, scopes, and runtime checks.                                                                                                                                                     |
+| Native Pi subagents (TL only)                              | Bundled and configured by normal TL setup; reuse TL's existing Pi login. See [subagent setup](docs/subagents-setup.md).                                                                                                                                        |
 | Shared memory MCP and thin client (both bots)              | See [memory service setup](docs/memory-service-setup.md). Configuration exposes one local MCP endpoint; setup provisions the Python runtime and verified ONNX model.                                                                                           |
 | Artifact service, CLI, and PM artifact skill               | See [artifact service setup](docs/artifact-service-setup.md). Explicit setup installs dependencies and applies Alembic migrations; the tracked PM skill is discovered in place.                                                                                |
 | PM/TL memory skills                                        | Tracked directly in each bot's `.pi/skills/memory/`: PM read/write, TL read-only. Pi discovers them without skill installation or linking; bot configuration disables TL automatic capture.                                                                    |
@@ -143,11 +140,11 @@ If the Linear check does not print its confirmation, resolve the environment set
 
 Follow the [gogcli setup guide](docs/gogcli-setup.md) for installation, account selection, authentication, and read-access checks.
 
-## 5. Configure and verify interactively
+## 5. Configure and launch
 
 ### Already done?
 
-Check whether both bots already have generated instructions and Telegram/MCP configuration (`bots/pm-bot/AGENTS.md`, `bots/tl-bot/AGENTS.md`, and each bot's `.pi/telegram.json` and `.pi/mcp.json`). Confirm that each Linear MCP entry has `headers.Authorization` set to the literal `Bearer ${LINEAR_API_TOKEN}` and `exposure` set to `codemode`, and that neither bot's `.pi/settings.json` includes `pi-mcp-adapter`. If configuration is present, uses this native format, and the owner confirms credentials have not changed, do not rerun `configure`. Check for an existing tmux session and run `systemctl --user is-active battuta-pm.service battuta-tl.service` before starting anything; an inactive-service result is normal when using tmux. If both bots are already responding to the allowed Telegram user and native Linear MCP works, this step is complete. If services are active, do not start a screen session just to verify them. If only one bot works, troubleshoot that bot without starting duplicates.
+Check whether both bots already have generated instructions and Telegram/MCP configuration (`bots/pm-bot/AGENTS.md`, `bots/tl-bot/AGENTS.md`, and each bot's `.pi/telegram.json` and `.pi/mcp.json`). Confirm that each Linear MCP entry has `headers.Authorization` set to the literal `Bearer ${LINEAR_API_TOKEN}` and `exposure` set to `codemode`, and that neither bot's `.pi/settings.json` includes `pi-mcp-adapter`. If configuration is present, uses this native format, and the owner confirms credentials have not changed, do not rerun `configure`. Check for an existing tmux session and run `systemctl --user is-active battuta-pm.service battuta-tl.service` before starting anything; an inactive-service result is normal when using tmux. If services are active, do not start a screen session. Do not use a bot response as a setup check.
 
 ### Fresh setup
 
@@ -158,9 +155,9 @@ bin/battuta configure
 bin/battuta start-prod-screen
 ```
 
-Stop and resolve any configuration error before launching. If configuration was already valid but no bots are running, run only `bin/battuta start-prod-screen`. The screen command opens or reattaches a tmux session with one pane per bot. In **each** Pi pane the owner must run `/login` if not already authenticated and complete model-provider authentication. Send a message to each Telegram bot from the allowed user account and confirm both respond; investigate errors in the running panes before declaring success. Detach with `Ctrl-b d`; rerun `bin/battuta start-prod-screen` to reattach. Alternatively launch one bot in the foreground with `bin/battuta pm` or `bin/battuta tl`. Keep only one process per bot/session.
+Stop and resolve any configuration error before launching. If configuration was already valid but no bots are running, run only `bin/battuta start-prod-screen`. The screen command opens or reattaches a tmux session with one pane per bot. In **each** Pi pane the owner must run `/login` if not already authenticated and complete model-provider authentication. Detach with `Ctrl-b d`; rerun `bin/battuta start-prod-screen` to reattach. Alternatively launch one bot in the foreground with `bin/battuta pm` or `bin/battuta tl`. Keep only one process per bot/session.
 
-Pi provides MCP natively. In each pane, use `/mcp` to confirm Linear is connected, then ask the bot for a read-only Linear lookup. With `codemode` exposure, Linear tools are discovered and called through native codemode; their names use `mcp__linear__<tool>`. For connection diagnostics without starting another bot session, load `.env.prod` as in step 4 and run the bundled CLI from each bot directory:
+Pi provides MCP natively. With `codemode` exposure, Linear tools are discovered and called through native codemode; their names use `mcp__linear__<tool>`. For connection diagnostics without starting another bot session, load `.env.prod` as in step 4 and run the bundled CLI from each bot directory:
 
 ```sh
 (cd bots/pm-bot && PI_CODING_AGENT_DIR="$PWD/.pi" ../../bin/node node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js mcp list)
@@ -169,7 +166,13 @@ Pi provides MCP natively. In each pane, use `/mcp` to confirm Linear is connecte
 
 Expect Linear to be connected with tools listed; a nonzero exit indicates invalid configuration or a connection failure. Pi 1.0.0 uses fullscreen TUI by default; set `tuiMode` to `regular` in bot settings if terminal scrollback is preferred.
 
-In the PM pane, ask the bot to list schedules with `list_scheduled_tasks` and verify the intended scopes. Complete the [Google runtime checks](docs/gogcli-setup.md#8-verify-the-pm-bots-runtime-and-service) in the same PM pane.
+Confirm scheduler storage was initialized without starting a model request:
+
+```sh
+test -s "$HOME/.battuta/schedule-prompts.json"
+```
+
+The command must exit zero. Google setup uses the local [command-environment checks](docs/gogcli-setup.md#8-verify-the-command-environment); do not use a bot or model request as a setup check.
 
 The release includes `@jl1990/pi-scheduler@0.5.1` for PM, storing native tasks at `~/.battuta/schedule-prompts.json` independently of release directories. Follow [PM scheduler](docs/scheduler.md) for overrides, scopes, catch-up limits, and the **fresh-workspace-only** cutover. Old scheduler settings/jobs are not migrated. Recreate owner reminders explicitly; use global scope when they should survive session or release changes.
 
@@ -181,7 +184,7 @@ First run `bin/battuta setup-memory` as the bot login user; the memory setup gui
 
 ### Already done?
 
-Ask whether unattended services are wanted. If not, skip this step. Check existing units with `systemctl --user is-enabled battuta-pm.service battuta-tl.service` and `systemctl --user is-active battuta-pm.service battuta-tl.service`. If both are enabled, active, and responding, leave them running; do not repeat installation or start a screen session. If units exist but are inactive or point at a different install root, inspect their status and paths before changing them; follow step 7 for a path change. Only install or enable what is missing.
+Ask whether unattended services are wanted. If not, skip this step. Check existing units with `systemctl --user is-enabled battuta-pm.service battuta-tl.service` and `systemctl --user is-active battuta-pm.service battuta-tl.service`. If both are enabled and active, leave them running; do not repeat installation or start a screen session. If units exist but are inactive or point at a different install root, inspect their status and paths before changing them; follow step 7 for a path change. Only install or enable what is missing.
 
 ### Fresh setup
 
@@ -198,7 +201,7 @@ Expect both services to be active/running. If not, inspect `journalctl --user -u
 
 Make the installed `battuta-project` executable available to both services using the [service PATH instructions](shared-skills/project-context/references/installation.md#bot-service-path); shell PATH changes alone do not apply to systemd units.
 
-Complete the [Google service-environment checks](docs/gogcli-setup.md#8-verify-the-pm-bots-runtime-and-service) for the PM service.
+Complete the local [Google command-environment checks](docs/gogcli-setup.md#8-verify-the-command-environment) before enabling unattended Google operations.
 
 ## 7. Updating an existing installation
 
@@ -214,7 +217,7 @@ Before configuring a release that previously used `LINEAR_API_KEY`, have the own
 
 The release workflow bundles Node selected by the source checkout's `.node-version` and Pi from each bot's pinned manifest. When upgrading from an adapter-based release, retain private auth/session state while using the new release's package manifests and dependencies. `bin/battuta configure` replaces the adapter-specific Linear authentication with an environment-expanded `Authorization` header and removes `pi-mcp-adapter` package entries from retained bot settings. An adapter left enabled would replace Pi's native MCP support. No new Linear token or MCP OAuth login is needed for this migration.
 
-Then run `bin/battuta configure` again to migrate both bots, verify native MCP and Telegram interactively as in step 5, and, if using services, run `bin/battuta install-services`, daemon-reload, and enable/start as in step 6.
+Then run `bin/battuta configure` again to migrate both bots, rerun the local configuration and MCP checks in step 5, and, if using services, run `bin/battuta install-services`, daemon-reload, and enable/start as in step 6.
 
 Reinstall `battuta-project` from the updated release wheels with `--reinstall`. Project registrations live independently under `~/.battuta/projects/`. Shared memory uses `~/.battuta/memory/`; preserve both databases and the capture queue during subsequent updates. This is a breaking replacement with no historical-data migration or cleanup. PM retains read-only loading of its existing `ME.md`; profile-writing tools are removed. Run `bin/battuta setup-memory` before starting the new service. See [cutover and rollback](docs/memory-service.md#breaking-replacement-and-cutover).
 

@@ -9,4 +9,7 @@ def database_path() -> Path:
 
 
 def public_base_url() -> str:
-    return os.environ.get("BATTUTA_ARTIFACT_BASE_URL", "https://pi.fiscum.co.uk/artifacts").rstrip("/")
+    value = os.environ.get("BATTUTA_ARTIFACT_BASE_URL", "").rstrip("/")
+    if not value:
+        raise ValueError("BATTUTA_ARTIFACT_BASE_URL is required")
+    return value
