@@ -5,11 +5,9 @@ AGENTS.md
 !.pi/web-search.json
 !.pi/extensions/
 .pi/extensions/*
-!.pi/extensions/bounded-subagents/
 !.pi/skills/
 .pi/skills/*
 !.pi/skills/memory/
 !.pi/skills/communicate-with-pm/
 !.pi/skills/define-implementation-tasks/
-!.pi/skills/use-subagent/
 !.pi/skills/coordinate-workers/

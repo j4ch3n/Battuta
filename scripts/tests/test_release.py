@@ -15,21 +15,21 @@ class ReleaseInstallTests(ConfigFixture):
     def test_tl_subagent_release_boundary_requires_runtime_files(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         boundary = re.search(
-            r'^          test -f dist/stage/battuta/bots/tl-bot/\.pi/extensions/bounded-subagents/index.ts\n.*?^          test ! -e dist/stage/battuta/bots/tl-bot/\.pi/subagents.json$',
+            r'^          test -f dist/stage/battuta/bots/tl-bot/\.pi/npm/node_modules/pi-subagents/bundle/index.js\n.*?^          test ! -e dist/stage/battuta/bots/tl-bot/\.pi/subagents.json$',
             workflow, re.MULTILINE | re.DOTALL,
         )
         self.assertIsNotNone(boundary)
         tl = self.root / "dist/stage/battuta/bots/tl-bot"
-        extension = tl / ".pi/extensions/bounded-subagents"
+        extension = tl / ".pi/npm/node_modules/pi-subagents/bundle"
         extension.mkdir(parents=True)
-        (extension / "index.ts").write_text("// staged extension")
-        references = tl / ".pi/skills/use-subagent/references"
+        (extension / "index.js").write_text("// staged extension")
+        references = tl / ".pi/npm/node_modules/pi-subagents/skills/pi-subagents"
         references.mkdir(parents=True)
-        (references / "tools.md").write_text("staged command reference")
+        (references / "SKILL.md").write_text("staged native skill")
         command = ["bash", "-euc", textwrap.dedent(boundary.group())]
         result = subprocess.run(command, cwd=self.root, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        for path in (extension / "index.ts", references / "tools.md"):
+        for path in (extension / "index.js", references / "SKILL.md"):
             with self.subTest(missing=path.name):
                 content = path.read_text()
                 path.unlink()

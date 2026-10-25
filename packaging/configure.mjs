@@ -2,6 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { configureSharedResources } from "./shared-resources.mjs";
+import { configureSubagents } from "./configure-subagents.mjs";
 import { schedulerStorePath, schedulerCatchUpMax } from "../memory-client/scheduler-config.ts";
 import { initializeSchedulerStore } from "../memory-client/scheduler-store.ts";
 
@@ -137,7 +138,10 @@ for (const bot of BOT_CONFIGURATIONS) {
   if (settings.packages !== undefined || retained.length > 0) settings.packages = retained;
   delete settings.battutaMemory;
   settings.battutaMemoryCapture = { enabled: true, batchMessages: 6, ...capture };
-  if (bot.name === "TL") settings.battutaMemoryCapture.enabled = false;
+  if (bot.name === "TL") {
+    settings.battutaMemoryCapture.enabled = false;
+    configureSubagents(settings, bot.directory);
+  }
   await writeFile(bot.settingsPath, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 });
 
   await writeFile(bot.telegramConfigPath, JSON.stringify(telegram, null, 2), { mode: 0o600 });

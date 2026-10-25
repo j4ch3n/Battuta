@@ -1,84 +1,96 @@
-# TL bounded child setup
+# TL subagent setup
 
-The TL dependency lock installs MIT `pi-subagents@0.81.0` alongside Pi 1.3.0.
-The tracked `bounded-subagents` extension adapts its public delegation API; do
-**not** also install the unrestricted upstream extension into TL's Pi packages.
-PM has neither the adapter nor the dependency. Normal source/release installs
-discover TL's tracked extension and existing `use-subagent` skill in place.
-Custom source workspaces register the owning checkout's adapter without replacing
-existing plugins or skills; keep that checkout at a stable path.
+TL uses the native MIT `pi-subagents@0.82.1` package with Pi 1.3.0. PM does not
+install it. There is no Battuta child runtime or separate child credential.
 
-## Operator grant
+## Source setup
 
-Delegation is disabled until the operator creates a private
-`bots/tl-bot/.pi/subagents.json` (or `subagents.json` in the configured agent
-directory). Setup never creates or overwrites this grant, auth or session files.
-Use a dedicated, limited provider credential in the TL launch environment,
-preferably `BATTUTA_CHILD_API_KEY`, not a PM/TL service credential or copied Pi
-`auth.json`. Only the selected API key enters the child environment.
+Run the normal TL configuration from the repository root:
 
-```json
-{
-  "root": "/absolute/path/to/authorized/project",
-  "inputs": ["src/parser.ts", "tests/parser.test.ts"],
-  "writable": ["src/parser.ts", "tests/parser.test.ts"],
-  "model": "your-openai-compatible-model-id",
-  "baseUrl": "https://api.openai.com/v1",
-  "apiKeyEnv": "BATTUTA_CHILD_API_KEY",
-  "concurrency": 2,
-  "maxSpawns": 12,
-  "timeoutMs": 120000
-}
+```sh
+uv run --locked python bots/tl-bot/scripts/configure-bot.py
 ```
 
-Protect the grant with mode `600`. Restart TL after changing the grant; a session
-uses its first validated grant. The endpoint must support OpenAI chat completions
-and tool calls. HTTPS is required except for loopback test/local providers. URLs
-cannot contain credentials, query strings or fragments. `OPENAI_API_KEY` is also
-accepted when deliberately selected. Provider extensions, OAuth and arbitrary
-parent authentication are not inherited.
+For a custom workspace, add `--bot-dir /absolute/path/to/tl-workspace`. Setup
+registers and installs the pinned package and `pi-web-access@0.43.0`, then uses
+Pi's own settings and the package's bundled agents/skill. Restart TL afterward.
 
-Only exact named files are copied, not directories, Git metadata or hidden files.
-There are at most 64 input/writable paths, 256 KiB per input/output file and 2 MiB
-of input. Symlinks, traversal and private configuration filenames are rejected.
-Each task requests its own exact input and writable subsets; operator grants
-cannot be widened by a task. Workers can replace only that task's granted writable files inside their fresh snapshot;
-scout/reviewer cannot write. There is no shell or test execution, network research,
-MCP, memory/canonical-doc/owner-message authority, nested delegation or automatic
-application back to the repository. TL runs checks and integrates separately.
-This is a restricted tool boundary, not an OS sandbox against compromised trusted
-Node/upstream code or another hostile process under the same OS user.
+Release configuration uses the same setup-only helper; release assembly installs
+the packages. Existing authentication and other private files are not copied or
+overwritten. Old `.pi/subagents.json` grants are unused and left untouched.
+Remove an old deployed `bounded-subagents` extension directory and copied
+`use-subagent` skill before restarting an installation that retained those files;
+the repository no longer ships them. Setup removes explicit registrations of
+the obsolete adapter but does not delete operator files.
 
-Limits are per TL session: defaults above; maxima 4 concurrent, 32 lifetime
-spawns, 600000 ms. Admission rejects instead of queuing. All calls, including
-facade background calls, use upstream foreground delegation inside an owned
-private process, so upstream detached ambient-extension inheritance is unused.
-Each private HOME/agent directory contains only the selected provider config and
-generated profile. Child tool selection is enforced at execution, including
-blocking upstream's internally added supervisor-contact tool.
+## Authentication
 
-Snapshots/results are session-local and removed on orderly session shutdown or
-switch. Parent IPC loss terminates the child; abrupt OS termination can leave
-temporary snapshots requiring operator cleanup. Costs are unknown (`null`), not
-zero; the adapter has no verified price catalog for arbitrary endpoints.
+Children use the normal Pi agent directory and authentication store, selected
+provider/model, home, environment, and requested working directory. Log in once
+in TL's Pi environment, including for an `openai-codex` subscription. Do not create
+a child API key or copy `auth.json`. Native Pi handles authentication and refresh.
 
-## Acceptance run-through
+For headless/Telegram TL, use the same `PI_CODING_AGENT_DIR` when performing the
+initial interactive Pi login. A login under a different home or agent directory
+is not automatically available to TL or its children.
 
-Offline CI exercises the real pinned upstream and Pi against a local fake provider
-through headless delegation and TL's registered tool. It is **not** live Telegram
-or real-provider acceptance. In an operator-authorized deployment, use a disposable
-project and limited credential, then record:
+## Child extension selection
 
-1. Ask TL over Telegram to launch one scout and a two-task independent batch.
-   Confirm IDs, profile/model, evidence and observed token usage.
-2. Launch background review; ask for status, cancel it, and confirm terminal
-   cancellation with no remaining owned child process.
-3. Use a short deadline and a delayed test endpoint; confirm `timed_out`.
-4. Use an invalid dedicated test key; confirm explicit provider failure, not
-   completion or fabricated zero usage.
-5. Stop/switch TL with active work; confirm children exit and snapshots are removed.
-6. Confirm PM has no bounded-subagent tool and existing plugins/private files
-   remain unchanged. Never use production credentials merely to satisfy this test.
+Setup writes upstream `subagents` settings inside TL's `.pi/settings.json`:
 
-Real-provider and deployed Telegram acceptance were not performed in the isolated
-FIS-116 implementation worktree. They remain deployment acceptance steps.
+- `defaultExtensions` names only the absolute path to the installed web-access
+  package's `dist` directory. An explicit list disables ambient extension loading
+  for both foreground and background children.
+- Native role overrides include the web tools in their tool allowlists. Scouts,
+  reviewers, researchers, evidence auditors, and oracles get read/search tools;
+  workers and delegates also get shell/edit/write tools.
+- Skills, project/global instructions, and forked conversation are excluded by
+  default through native role settings. No additional context-switch interface
+  is added by Battuta.
+
+Telegram, Agent Mail, Linear/MCP, memory, notes, and todo extensions are not
+inherited. Upstream's internal child coordination hooks are not parent plugins.
+The package provides its own tool help and parent-only orchestration skill;
+use its native `subagent` tool rather than `bounded_subagents`.
+
+Existing native customization is preserved. This is an upstream **default**, not
+an immutable security policy: role/project settings, explicit skill requests,
+custom agent definitions, and host-required extensions can change the effective
+configuration. Review them if the exact allowlist matters. Setting
+`defaultExtensions: []` disables ambient plugins entirely; remove web tools from
+the relevant role allowlists too, or upstream will correctly report missing tools.
+
+Children are trusted workers, not a sandbox. Workers edit the real workspace and
+can run commands with the same user's file/environment access. TL still reviews
+changes and verification evidence; child output is not product acceptance.
+
+## Verification and remaining acceptance
+
+One-time offline verification on 2026-10-25 loaded the actual
+`pi-subagents@0.82.1` package through Pi 1.3.0's normal package registration.
+Both foreground and detached background scouts passed: every local-provider
+request used the saved fixture Pi credential, and the selected fixture web
+extension's `web_search` tool ran and returned its result. Tool lists excluded
+the ambient sentinel and Linear/memory/todo/MCP tools; load markers showed the
+selected extension loaded in the child and the ambient extension loaded only
+in the parent.
+
+After this successful proof, the upstream-feature integration test was
+deliberately removed, along with unused TL test/typecheck/coverage tooling.
+There is no ongoing Battuta integration suite for upstream plugin features.
+Battuta's Python setup/release contract tests remain and cover repeat runs,
+native configuration, private-file preservation, and release configuration.
+Background execution needs the supported installed Pi host, not just an SDK
+imported from an unrelated path.
+
+The one-time proof establishes fixture auth-store reuse and extension selection,
+not live Codex OAuth/subscription access, OAuth refresh, live web search, or
+Telegram acceptance. No live credentials were used.
+For deployment acceptance, use a disposable workspace and TL's existing login:
+
+1. Launch a scout through TL and verify its provider/model and attributable result.
+2. Ask it to search; verify web-access tools work and other integrations are absent.
+3. Repeat in background and inspect the native run's terminal result.
+4. Record deployment version, child IDs, tested conditions, and limitations without
+   credentials or raw authentication logs. Lifecycle behavior is upstream-owned;
+   do not assume the removed wrapper's process or snapshot guarantees still apply.

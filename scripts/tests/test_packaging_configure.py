@@ -23,6 +23,7 @@ class PackagingConfigureTests(unittest.TestCase):
                 (root / "bin").mkdir()
                 shutil.copyfile(ROOT / "packaging" / "configure.mjs", root / "bin" / "configure.mjs")
                 shutil.copyfile(ROOT / "packaging" / "shared-resources.mjs", root / "bin" / "shared-resources.mjs")
+                shutil.copyfile(ROOT / "packaging" / "configure-subagents.mjs", root / "bin" / "configure-subagents.mjs")
                 copy_scheduler_runtime(root)
                 source = root / "shared-skills" / "project-context"
                 source.mkdir(parents=True)
@@ -98,14 +99,22 @@ class PackagingConfigureTests(unittest.TestCase):
                         self.assertEqual(mcp["mcpServers"]["linear"]["exposure"], "codemode")
                         self.assertNotIn("test-linear", json.dumps(mcp))
                         settings_path = link.parent.parent / "settings.json"
+                        settings = json.loads(settings_path.read_text())
+                        if role == "tl-bot":
+                            subagents = settings.pop("subagents")
+                            self.assertEqual([Path(path).resolve() for path in subagents["defaultExtensions"]], [(root / "bots/tl-bot/.pi/npm/node_modules/pi-web-access/dist").resolve()])
+                            self.assertIn("web_search", subagents["agentOverrides"]["scout"]["tools"])
+                        else:
+                            self.assertNotIn("subagents", settings)
                         if settings_mode == "missing":
                             expected = {"battutaMemoryCapture": {"enabled": role == "pm-bot", "batchMessages": 6}}
                             if role == "pm-bot":
                                 expected["packages"] = ["npm:@jl1990/pi-scheduler@0.5.1"]
-                            self.assertEqual(json.loads(settings_path.read_text()), expected)
+                            else:
+                                expected["packages"] = ["npm:pi-subagents@0.82.1"]
+                            self.assertEqual(settings, expected)
                             self.assertEqual(settings_path.stat().st_mode & 0o777, 0o600)
                             continue
-                        settings = json.loads(settings_path.read_text())
                         expected_packages = [
                             "npm:@llblab/pi-telegram@0.57.3", "npm:pi-web-access@0.43.0",
                             {"source": "npm:custom-tools@1.0.0", "extensions": ["read.ts"]},
@@ -113,4 +122,6 @@ class PackagingConfigureTests(unittest.TestCase):
                         ]
                         if role == "pm-bot":
                             expected_packages.append("npm:@jl1990/pi-scheduler@0.5.1")
+                        else:
+                            expected_packages.append("npm:pi-subagents@0.82.1")
                         self.assertEqual(settings, {"theme": "dark", "packages": expected_packages, "battutaMemoryCapture": {"enabled": role == "pm-bot", "batchMessages": 6}})
