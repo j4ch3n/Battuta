@@ -6,8 +6,8 @@ storage. For invocation and bot workflows, use the
 
 ## Storage and current-work selection
 
-Project files live under `~/.battuta/projects/<project>/todos/`; general files live
-under `~/.battuta/todos/`. Filenames are `todo-<role>-<work-id>.jsonl`, for example
+Project files live under `~/.battuta/projects/<project>/work/`; general files live
+under `~/.battuta/work/`. Filenames are `todo-<role>-<work-id>.jsonl`, for example
 `todo-pm-k7m2q.jsonl`.
 
 The role-local pointer in `~/.battuta/projects/.config.json`, not file ordering or
@@ -27,7 +27,7 @@ resolved against retained metadata within the same project/general boundary, not
 the target role's current pointer.
 
 Work IDs use five lowercase ASCII letters/digits generated with `secrets.choice`.
-Allocation checks both roles' retained metadata and existing paths, including
+Allocation is shared with notebooks and checks both roles' retained metadata and existing TODO/notebook paths, including
 symlinks and unpublished orphan files, retrying up to 100 candidates without
 overwriting history.
 
@@ -46,7 +46,7 @@ replacement.
 ## Locking and filesystem safety
 
 Registry selection updates and TODO operations share `<registry>/.config.lock`.
-TODO operations also acquire the role's `.todo-<role>.lock` in its TODO directory,
+TODO operations also acquire the role's `.work-<role>.lock` in its work directory,
 after the registry lock. Locks use `flock` and validate regular-file/directory
 boundaries; symlinks cannot redirect managed writes. Absent reads do not initialize
 storage.

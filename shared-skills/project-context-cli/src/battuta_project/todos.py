@@ -6,8 +6,6 @@ from datetime import datetime
 import os
 from pathlib import Path
 import re
-import secrets
-import string
 import tempfile
 from typing import Literal
 
@@ -15,8 +13,9 @@ import click
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from .registry import ProjectRegistry
-from .storage import atomic_write, file_lock, regular_file
+from .storage import atomic_write, regular_file
 from .todo_errors import TodoError, TodoErrorCode
+from .work import WorkContext
 
 
 class TodoItem(BaseModel):
@@ -60,26 +59,19 @@ class TodoStore:
             raise TodoError(TodoErrorCode.INVALID_INPUT)
         if role not in ("pm", "tl"):
             raise TodoError(TodoErrorCode.INVALID_ROLE)
-        self.scope = scope
-        self.role = role
-        self.registry = registry or ProjectRegistry()
-        self.project = None
-        if scope == "project":
-            try:
-                project = self.registry.current()
-            except click.ClickException as error:
-                raise TodoError(TodoErrorCode.PROJECT_UNAVAILABLE, detail=error) from error
-            self.project = project.name
-            self.directory = project.root / "todos"
-        else:
-            self.directory = Path.home() / ".battuta" / "todos"
+        try:
+            self.work = WorkContext(scope, role, registry)
+        except click.ClickException as error:
+            raise TodoError(TodoErrorCode.PROJECT_UNAVAILABLE, detail=error) from error
+        self.scope, self.role = self.work.scope, self.work.role
+        self.registry, self.project = self.work.registry, self.work.project
+        self.directory = self.work.directory
 
     @contextmanager
     def _locked(self, *, create: bool = False):
         try:
-            with self.registry.locked(create=create):
-                with file_lock(self.directory / f".todo-{self.role}.lock", create=create):
-                    yield
+            with self.work.locked(create=create):
+                yield
         except (OSError, RuntimeError, click.ClickException) as error:
             raise TodoError(TodoErrorCode.TODO_STORAGE_ERROR, detail=error) from error
 
@@ -181,15 +173,10 @@ class TodoStore:
             return TodoList(path, items, self.scope, self.role, self.project, work_id, related_to)
 
     def _new_work_id(self) -> str:
-        for _ in range(100):
-            work_id = "".join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(5))
-            paths = [self.directory / f"todo-{role}-{work_id}.jsonl" for role in ("pm", "tl")]
-            if any(path.exists() or path.is_symlink() for path in paths):
-                continue
-            if any(self.registry.work_record(self.project, role, work_id) is not None for role in ("pm", "tl")):
-                continue
-            return work_id
-        raise TodoError(TodoErrorCode.WORK_ID_COLLISION)
+        try:
+            return self.work.new_work_id()
+        except click.ClickException as error:
+            raise TodoError(TodoErrorCode.WORK_ID_COLLISION, detail=error) from error
 
     def extend(self, descriptions: list[str]) -> TodoList:
         additions = self._new_items(descriptions)

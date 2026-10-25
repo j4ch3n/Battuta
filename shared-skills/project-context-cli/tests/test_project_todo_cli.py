@@ -91,7 +91,7 @@ class TodoCliTests(ProjectTestCase):
     def todo_path(self, *, scope="project", role="pm"):
         project = self.registry.current_name() if scope == "project" else None
         work_id = self.registry.current_work_id(project, role)
-        directory = self.registry.root / project / "todos" if project else self.home / ".battuta/todos"
+        directory = self.registry.root / project / "work" if project else self.home / ".battuta/work"
         return directory / f"todo-{role}-{work_id}.jsonl"
 
     def success(self, *args, **kwargs):
@@ -155,7 +155,7 @@ class TodoCliTests(ProjectTestCase):
                 self.success("create", "--item", "Completed step", "--item", "Cancelled step", "--item", "Remaining step", scope=scope)
                 self.success("done", "--rational", "Completion explanation", scope=scope)
                 self.success("cancel", "--rational", "Cancellation explanation", scope=scope)
-                directory = self.project.root / "todos" if scope == "project" else self.home / ".battuta/todos"
+                directory = self.project.root / "work" if scope == "project" else self.home / ".battuta/work"
                 path = self.todo_path(scope=scope)
                 before = path.read_bytes()
 
@@ -184,7 +184,7 @@ class TodoCliTests(ProjectTestCase):
                 self.success("create", "--item", "Completed step", "--item", "Cancelled step", "--item", "Next step", "--item", "Later step", scope=scope)
                 self.success("done", "--rational", "Completion explanation", scope=scope)
                 self.success("cancel", "--rational", "Cancellation explanation", scope=scope)
-                directory = self.project.root / "todos" if scope == "project" else self.home / ".battuta/todos"
+                directory = self.project.root / "work" if scope == "project" else self.home / ".battuta/work"
                 path = self.todo_path(scope=scope)
                 before = path.read_bytes()
 
@@ -229,7 +229,7 @@ class TodoCliTests(ProjectTestCase):
             self.assertIn("No active TODO list", self.success("list", scope="general"))
             self.assertFalse((home / ".battuta").exists())
             self.success("create", "--item", "General task", scope="general")
-            self.assertEqual(len(list((home / ".battuta/todos").glob("todo-pm-*.jsonl"))), 1)
+            self.assertEqual(len(list((home / ".battuta/work").glob("todo-pm-*.jsonl"))), 1)
             self.assertIsNone(json.loads((home / ".battuta/projects/.config.json").read_text())["currentProject"])
             result = self.call("list")
             self.assert_explained_failure(result)
@@ -247,7 +247,7 @@ class TodoCliTests(ProjectTestCase):
                 self.assert_explained_failure(result)
         result = self.call("list", role="engineer")
         self.assert_explained_failure(result)
-        self.assertFalse((self.project.root / "todos").exists())
+        self.assertFalse((self.project.root / "work").exists())
 
     def test_done_and_cancel_require_rational(self):
         self.success("create", "--item", "Next step")

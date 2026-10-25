@@ -37,12 +37,15 @@ class WorkRecord(Model):
 class RoleWorkConfig(Model):
     model_config = ConfigDict(extra="allow")
     current_work_id: WorkId | None = Field(default=None, alias="currentWorkId")
+    current_note_work_id: WorkId | None = Field(default=None, alias="currentNoteWorkId")
     works: dict[WorkId, WorkRecord] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def retained_current_work(self):
         if self.current_work_id is not None and self.current_work_id not in self.works:
             raise ValueError("currentWorkId must reference retained work metadata")
+        if self.current_note_work_id is not None and self.current_note_work_id not in self.works:
+            raise ValueError("currentNoteWorkId must reference retained work metadata")
         return self
 
 

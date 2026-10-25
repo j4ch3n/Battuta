@@ -6,6 +6,7 @@ Install as the ordinary OS user running the bots. The tool runs independently of
 
 - uv and Python **3.12+** (`requires-python` is defined in `shared-skills/project-context-cli/pyproject.toml`). uv can provision Python with `uv python install 3.12`.
 - Git and GitHub CLI (`gh`) for `init --github`; name-only initialization and metadata linking do not require them. Authenticate as the bot user with `gh auth login`, then verify `gh auth status` before cloning. Repository access uses that user's GitHub credentials.
+- ripgrep (`rg`) for notebook search. Install with `brew install ripgrep` on macOS or `sudo apt install ripgrep` on Raspberry Pi OS, then verify `rg --version`. Append/read do not need rg; search has no custom fallback. The release bundles the notebook CLI and references, not the rg executable; install this OS dependency separately.
 - A Linear personal API token in the session's `LINEAR_API_TOKEN` environment variable (reuse the value used for Linear MCP). Every `battuta-project` command, including help, requires it. Startup checks presence only; `explain` needs read access to a linked project and `linear create` needs project-creation access.
 
 See the official [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/) and [GitHub CLI installation guide](https://cli.github.com/).
@@ -59,7 +60,7 @@ systemctl --user daemon-reload
 systemctl --user restart battuta-pm.service battuta-tl.service
 ```
 
-Include custom `gh`/Git locations in PATH when needed. Source/tmux launches inherit their shell environment; make the tool available before starting them. Ensure bot services also receive `LINEAR_API_TOKEN` through their runtime environment. Verify `battuta-project --help` and `gh auth status` as the bot user with the intended PATH and token environment.
+Include custom `gh`/Git and `rg` locations in PATH when needed (Homebrew on Apple Silicon commonly uses `/opt/homebrew/bin`). Source/tmux launches inherit their shell environment; make the tool available before starting them. Ensure bot services also receive `LINEAR_API_TOKEN` through their runtime environment. Verify `battuta-project --help`, `rg --version`, and `gh auth status` as the bot user with each bot's intended PATH and token environment. After installation, verify `battuta-project note --scope general search --query installation-check`; an absent notebook or no matches is normal success, while a missing-rg error needs PATH repair (an absent notebook does not invoke rg).
 
 ## Project registrations
 
