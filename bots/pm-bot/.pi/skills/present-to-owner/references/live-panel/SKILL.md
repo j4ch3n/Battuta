@@ -5,6 +5,14 @@ description: Build a terminal-style, always-running animated architecture diagra
 
 # live-panel
 
+## Battuta binding
+
+Use only for the illustrative always-running system view selected by
+present-to-owner, not for interactive reports, real telemetry or stepwise stories.
+The owning skill controls narrative, format and publication. Label simulations;
+keep a complete readable view and a reduced-motion/static alternative. Construction
+checks establish geometry/determinism, not evidence or reader understanding.
+
 Turn a description of a system into an **always-running architecture diagram**: one fixed page that looks like a monitoring panel of a running system. Every frame is a complete, readable diagram; what moves is system state, not decoration. Two built-in themes: `terminal-dark` (the original look) and `light-pastel` (white background, rounded pastel boxes - for infographics, e.g. Xiaohongshu). Canvas presets: `4:5` (X, 1200x1500), `3:4` (Xiaohongshu, 1080x1440), `1:1` (1080x1080). Intended as the base for posts on X and Xiaohongshu.
 
 > **Credit.** The look and the motion idea come from an architecture-diagram clip by **@thedelost** (a Codex agent-tree panel, generated with GPT and screen-recorded as a web page): https://x.com/thedelost/status/2105398038026195279 . It reached many people through a quote-post by **@slashui**: https://x.com/slashui/status/2105850132365443528 . This skill is an independent re-implementation of the _method_ (the motion grammar was learned by analysing that clip). `examples/codex-agents/` is a recreation of the original picture and stays the original author's design. Keep this credit when you publish output made with the skill's Codex example.

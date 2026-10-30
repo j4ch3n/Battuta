@@ -27,6 +27,9 @@ The shared `todo`, `note-taking`, and `draft-writing` skills are bundled and lin
 by normal configuration. They use the same `battuta-project` CLI installation
 listed above; no separate package installation is needed.
 
+PM's `research` and `present-to-owner` skills are bundled under PM's `.pi/skills/`
+and discovered in place. No research framework or extra service is installed.
+
 ## 1. Confirm the target and prerequisites
 
 ### Already done?

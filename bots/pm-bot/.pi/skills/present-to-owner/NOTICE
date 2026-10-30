@@ -1,5 +1,11 @@
 MIT License
 
+Battuta local adaptations (2026-10-30): narrative and format authority resides in
+present-to-owner; package entry points are adapted for explanatory prose, honest
+uncertainty, selective style discovery, real-browser verification and artifact
+delivery. Revision fields record upstream provenance, not byte-identical copies.
+Original copyright and licence notices are retained below.
+
 Copyright (c) 2025 Nico Bailon
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

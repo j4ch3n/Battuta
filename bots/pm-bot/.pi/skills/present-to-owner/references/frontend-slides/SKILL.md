@@ -7,6 +7,15 @@ description: Create stunning, animation-rich HTML presentations from scratch or 
 
 Create zero-dependency, animation-rich HTML presentations that run entirely in the browser.
 
+## Battuta binding
+
+Use this package only for the deck selected by present-to-owner. That skill owns
+narrative, format and delivery; ordinary reading-first reports use its HTML route.
+Project design rules and confirmed preferences override aesthetic defaults. Style
+discovery/preview steps below run only when the owner requests style exploration.
+Hosting instructions in Phase 6A are inactive: use artifacts for publication.
+Keep source support and material uncertainty visible; motion never supplies evidence.
+
 ## Core Principles
 
 1. **Zero Dependencies** — Single HTML files with inline CSS/JS. No npm, no build tools.
@@ -53,7 +62,7 @@ These invariants apply to EVERY slide in EVERY presentation:
 
 ### Content Density Modes
 
-Ask the user whether this is primarily a reading deck or a speaking deck, then design around that answer:
+For an explicitly requested deck, infer speaking/reading density from the request and supplied context. Ask only if the missing choice materially changes the result:
 
 | Density mode                     | Best for                                                | Design behavior                                                                                                                                |
 | -------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -88,7 +97,7 @@ When enhancing existing presentations, fixed-stage fitting is the biggest risk:
 
 ## Phase 1: Content Discovery (New Presentations)
 
-**Ask ALL questions together** so the user fills everything out at once. If the current environment provides a native structured-question UI, use it; otherwise ask in one concise message with clearly numbered choices:
+Use supplied context to answer the following discovery prompts internally. Ask only one consequential missing question at a time; do not repeat questions already answered or make a questionnaire a prerequisite:
 
 **Question 1 — Purpose** (header: "Purpose"):
 What is this presentation for? Options: Pitch deck / Teaching-Tutorial / Conference talk / Internal presentation
@@ -135,7 +144,7 @@ If user provides an image folder:
 
 Based on purpose, audience, mood, and content density, generate 3 distinct single-slide HTML previews showing typography, colors, animation, and overall aesthetic.
 
-Do not ask the user whether they want options or a preset picker. The default discovery experience is always visual comparison.
+Run this preview sequence only when style exploration was requested. Otherwise reuse the confirmed style/project guidance and proceed to generation without preview variants.
 
 If the user already gave a vibe, use it. If they did not, infer the likely mood from the occasion, audience, content, and stakes. Keep the options diverse enough that the user can react visually instead of needing to articulate taste up front.
 
@@ -260,7 +269,7 @@ When converting PowerPoint files:
 
 ## Phase 5: Delivery
 
-1. **Clean up** — Delete `.frontend-slides/slide-previews/` if it exists
+1. **Preserve work** — Keep existing previews and unfamiliar files; do not delete a directory merely because it exists
 2. **Open** — Use `open [filename].html` to launch in browser
 3. **Summarize** — Tell the user:
    - File location, style name, slide count
@@ -273,7 +282,7 @@ When converting PowerPoint files:
 
 ## Phase 6: Share & Export (Optional)
 
-After delivery, **ask the user:** _"Would you like to share this presentation? I can deploy it to a live URL (works on any device including phones) or export it as a PDF."_
+Do not append an automatic sharing question. Use artifacts for requested HTML delivery; perform additional export only when requested. The legacy Vercel instructions below are inactive in Battuta.
 
 Options:
 

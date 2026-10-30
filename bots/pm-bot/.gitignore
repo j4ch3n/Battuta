@@ -16,6 +16,7 @@ AGENTS.md
 !.pi/skills/manage-google/
 !.pi/skills/artifacts/
 !.pi/skills/present-to-owner/
+!.pi/skills/research/
 !.pi/extensions/
 .pi/extensions/*
 !.pi/extensions/pm-bot/
