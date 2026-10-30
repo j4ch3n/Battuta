@@ -1,7 +1,7 @@
 # Working notebook persistence
 
 Implementation reference for append-only agent notes. Bot-facing usage belongs
-in the [notebook command reference](../shared-skills/project-context/references/task-notes.md).
+in the [notebook command reference](../shared-skills/note-taking/references/commands.md).
 
 ## Identity and storage
 

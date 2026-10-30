@@ -14,7 +14,8 @@ def link_project_context(bot_dir: Path) -> None:
 def link_shared_skills(bot_dir: Path, *, role: Literal["pm", "tl"], root: Path | None = None) -> None:
     if role not in {"pm", "tl"}:
         raise click.ClickException(f"Unknown bot role: {role}")
-    link_shared_skill(bot_dir, "project-context", root=root)
+    for name in ("project-context", "todo", "note-taking"):
+        link_shared_skill(bot_dir, name, root=root)
     checkout = (root or bot_dir.resolve().parent.parent).resolve()
     if bot_dir.resolve() != checkout / "bots" / f"{role}-bot":
         install_memory_skill(bot_dir, role=role, root=checkout)

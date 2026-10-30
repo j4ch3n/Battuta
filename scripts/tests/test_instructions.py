@@ -49,7 +49,7 @@ class InstructionTests(unittest.TestCase):
                 (root / "bots").mkdir(parents=True)
                 (root / "bots/AGENTS_shared.md").write_text("Shared")
                 (bot / "AGENTS_dedicated.md").write_text("Dedicated")
-                for name in ("project-context",):
+                for name in ("project-context", "todo", "note-taking"):
                     source = root / "shared-skills" / name
                     source.mkdir(parents=True)
                     (source / "SKILL.md").write_text(name)
@@ -70,7 +70,8 @@ class InstructionTests(unittest.TestCase):
                 shared = root / "bots/AGENTS_shared.md"
                 shared.write_text("Shared instructions")
                 (bot / "AGENTS_dedicated.md").write_text("Role instructions")
-                (root / "shared-skills/project-context").mkdir(parents=True)
+                for name in ("project-context", "todo", "note-taking"):
+                    (root / "shared-skills" / name).mkdir(parents=True)
                 memory = bot / ".pi/skills/memory"
                 memory.mkdir(parents=True)
                 (memory / "SKILL.md").write_text("Local memory")

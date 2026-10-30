@@ -1,6 +1,6 @@
 ---
 name: project-management
-description: Manage technical project delivery in Linear from initiation through closure; coordinate issues, cycles, dependencies, risks, forecasts, changes, and handoffs. Use when planning or reviewing a body of work, a cycle is slipping, or commitments need coordination.
+description: Use when planning or reviewing project delivery, coordinating commitments, cycles, dependencies and handoffs, assessing readiness, recovering slipping work, or closing accepted outcomes.
 metadata:
   source: https://github.com/magnus919/agent-skills/blob/main/technical-project-management/SKILL.md
 ---
@@ -52,6 +52,11 @@ Read only what the current task requires. The local references contain applicabi
 
 PM makes go/no-go/refine product decisions within the owner's mandate under AGENTS.md. It does not invent stakeholder consent, execution authorization, or cycle commitments. Apply existing authorization without asking repeatedly for the same scope. Keep drafts distinct from issued communications. Do not monitor people or turn activity counts into individual performance judgments.
 
-For a feasibility/scope assessment, use the [product decision workflow](references/product-decisions.md). PM persists full immutable document versions, reads TL's canonical checklist/review, and finalizes go/no-go with rationale and hashes in one agent-tool call. Refinement creates a new version while open. Mail to TL is only for additional context or a needed action, not a required decision announcement.
+For a feasibility/scope assessment, use the [product decision workflow](references/product-decisions.md). Establish product judgement and rationale here; use the project-context skill to inspect and persist canonical documents and decisions. Mail to TL is only for additional context or a needed action, not a required decision announcement.
+
+This skill owns delivery judgement and coordination, not research methodology,
+requirements templates, working-material commands, or presentation construction.
+Use ticket-writing for bounded issue authoring and communicate-with-tl for technical
+assessment exchanges. TODO completion is not acceptance of a delivery milestone.
 
 Complete a requested review when the update is delivered, claims have evidence or explicit uncertainty, and unresolved decisions have an accountable route and next review trigger. Do not imply ongoing monitoring without an authorized mechanism.

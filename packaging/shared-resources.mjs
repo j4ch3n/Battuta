@@ -24,7 +24,9 @@ async function linkSkill(root, botDirectory, name) {
 }
 
 export async function configureSharedResources(root, botDirectory) {
-  await linkSkill(root, botDirectory, "project-context");
+  for (const name of ["project-context", "todo", "note-taking"]) {
+    await linkSkill(root, botDirectory, name);
+  }
   const shared = await readFile(join(root, "bots", "AGENTS_shared.md"), "utf8");
   const dedicated = await readFile(join(botDirectory, "AGENTS_dedicated.md"), "utf8");
   const sections = [shared, dedicated];

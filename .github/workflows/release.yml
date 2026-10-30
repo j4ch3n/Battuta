@@ -84,7 +84,7 @@ jobs:
             test ! -e "dist/stage/battuta/bots/$bot/.pi/ME.md"
             test ! -L "dist/stage/battuta/bots/$bot/.pi/skills/memory"
             test -f "dist/stage/battuta/bots/$bot/.pi/skills/memory/SKILL.md"
-            for skill in project-context; do
+            for skill in project-context todo note-taking; do
               ln -s "../../../../shared-skills/$skill" "dist/stage/battuta/bots/$bot/.pi/skills/$skill"
               test -f "dist/stage/battuta/bots/$bot/.pi/skills/$skill/SKILL.md"
             done

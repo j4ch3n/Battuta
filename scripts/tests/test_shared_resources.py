@@ -11,6 +11,65 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SharedResourceTests(unittest.TestCase):
+    def test_release_working_skill_conflicts_and_missing_sources_fail_safely(self):
+        for role, name, kind in product(("pm", "tl"), ("todo", "note-taking"), ("directory", "file", "symlink", "missing")):
+            with self.subTest(role=role, name=name, kind=kind), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                bot = root / f"bots/{role}-bot"
+                target = bot / ".pi/skills" / name
+                target.parent.mkdir(parents=True)
+                (root / "bots/AGENTS_shared.md").write_text("Shared")
+                (bot / "AGENTS_dedicated.md").write_text("Dedicated")
+                for skill in ("project-context", "todo", "note-taking"):
+                    if kind != "missing" or skill != name:
+                        (root / "shared-skills" / skill).mkdir(parents=True)
+                if kind == "directory":
+                    target.mkdir()
+                    (target / "SKILL.md").write_text("Custom")
+                elif kind == "file":
+                    target.write_text("Custom")
+                elif kind == "symlink":
+                    target.symlink_to("custom-skill")
+                result = subprocess.run([
+                    "node", "--input-type=module", "-e",
+                    "const {configureSharedResources} = await import(process.argv[1]); await configureSharedResources(process.argv[2], process.argv[3]);",
+                    str(ROOT / "packaging/shared-resources.mjs"), str(root), str(bot),
+                ], capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+                if kind == "directory":
+                    self.assertEqual((target / "SKILL.md").read_text(), "Custom")
+                elif kind == "file":
+                    self.assertEqual(target.read_text(), "Custom")
+                elif kind == "symlink":
+                    self.assertEqual(target.readlink(), Path("custom-skill"))
+                else:
+                    self.assertFalse(target.is_symlink())
+
+    def test_release_working_skills_are_discoverable_and_idempotent(self):
+        for role in ("pm", "tl"):
+            with self.subTest(role=role), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                bot = root / f"bots/{role}-bot"
+                bot.mkdir(parents=True)
+                (root / "bots/AGENTS_shared.md").write_text("Shared")
+                (bot / "AGENTS_dedicated.md").write_text("Dedicated")
+                for name in ("project-context", "todo", "note-taking"):
+                    source = root / "shared-skills" / name
+                    (source / "references").mkdir(parents=True)
+                    (source / "SKILL.md").write_text(name)
+                    (source / "references/commands.md").write_text(f"{name} commands")
+                for _ in range(2):
+                    result = subprocess.run([
+                        "node", "--input-type=module", "-e",
+                        "const {configureSharedResources} = await import(process.argv[1]); await configureSharedResources(process.argv[2], process.argv[3]);",
+                        str(ROOT / "packaging/shared-resources.mjs"), str(root), str(bot),
+                    ], capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    for name in ("project-context", "todo", "note-taking"):
+                        link = bot / ".pi/skills" / name
+                        self.assertEqual(link.resolve(), (root / "shared-skills" / name).resolve())
+                        self.assertEqual((link / "references/commands.md").read_text(), f"{name} commands")
+
     def test_custom_memory_skills_survive_release_configuration(self):
         for role, kind in product(("pm", "tl"), ("directory", "symlink", "file")):
             with self.subTest(role=role, kind=kind), tempfile.TemporaryDirectory() as directory:
@@ -20,7 +79,8 @@ class SharedResourceTests(unittest.TestCase):
                 bot = root / f"bots/custom-{role}"
                 link = bot / ".pi/skills/memory"
                 link.parent.mkdir(parents=True)
-                (root / "shared-skills/project-context").mkdir(parents=True)
+                for name in ("project-context", "todo", "note-taking"):
+                    (root / "shared-skills" / name).mkdir(parents=True)
                 (root / "bots/AGENTS_shared.md").write_text("Shared")
                 (bot / "AGENTS_dedicated.md").write_text("Dedicated")
                 source = root / f"bots/{role}-bot/.pi/skills/memory"
@@ -52,7 +112,8 @@ class SharedResourceTests(unittest.TestCase):
                 root = Path(directory)
                 helper = root / "shared-resources.mjs"
                 shutil.copyfile(ROOT / "packaging/shared-resources.mjs", helper)
-                (root / "shared-skills/project-context").mkdir(parents=True)
+                for name in ("project-context", "todo", "note-taking"):
+                    (root / "shared-skills" / name).mkdir(parents=True)
                 source = root / f"bots/{role}-bot/.pi/skills/memory"
                 (source / "references").mkdir(parents=True)
                 (source / "SKILL.md").write_text(f"{role} memory")

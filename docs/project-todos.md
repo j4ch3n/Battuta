@@ -2,7 +2,7 @@
 
 Technical reference for the project-context CLI's role-local work state and TODO
 storage. For invocation and bot workflows, use the
-[TODO command reference](../shared-skills/project-context/references/task-todos.md).
+[TODO command reference](../shared-skills/todo/references/commands.md).
 
 ## Storage and current-work selection
 

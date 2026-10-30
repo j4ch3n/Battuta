@@ -45,7 +45,7 @@ class ReleaseInstallTests(ConfigFixture):
         )
         self.assertIsNotNone(loop)
         stage = self.root / "dist/stage/battuta"
-        for name in ("project-context",):
+        for name in ("project-context", "todo", "note-taking"):
             source = stage / "shared-skills" / name
             source.mkdir(parents=True)
             (source / "SKILL.md").write_text(name)
@@ -59,7 +59,9 @@ class ReleaseInstallTests(ConfigFixture):
             self.assertFalse(memory.is_symlink())
             self.assertEqual((memory / "SKILL.md").read_text(), (ROOT / "bots" / role / ".pi/skills/memory/SKILL.md").read_text())
             self.assertTrue((memory / "references/tools.md").is_file())
-            self.assertTrue((memory.parent / "project-context").is_symlink())
+            for name in ("project-context", "todo", "note-taking"):
+                self.assertTrue((memory.parent / name).is_symlink())
+                self.assertEqual((memory.parent / name / "SKILL.md").read_text(), name)
 
     def test_packages_are_installed_from_staged_bot_settings(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()

@@ -32,5 +32,6 @@ coverage/
 # Local Superpowers artifacts
 /.superpowers/
 
-# Local memory-service exploration (upstream source, data, and tooling)
+# Local exploration (upstream source, data, and tooling)
 /.memory-spike/
+/spikes/
