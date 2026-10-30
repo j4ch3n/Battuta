@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class SharedResourceTests(unittest.TestCase):
     def test_release_working_skill_conflicts_and_missing_sources_fail_safely(self):
-        for role, name, kind in product(("pm", "tl"), ("todo", "note-taking"), ("directory", "file", "symlink", "missing")):
+        for role, name, kind in product(("pm", "tl"), ("todo", "note-taking", "draft-writing"), ("directory", "file", "symlink", "missing")):
             with self.subTest(role=role, name=name, kind=kind), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 bot = root / f"bots/{role}-bot"
@@ -20,7 +20,7 @@ class SharedResourceTests(unittest.TestCase):
                 target.parent.mkdir(parents=True)
                 (root / "bots/AGENTS_shared.md").write_text("Shared")
                 (bot / "AGENTS_dedicated.md").write_text("Dedicated")
-                for skill in ("project-context", "todo", "note-taking"):
+                for skill in ("project-context", "todo", "note-taking", "draft-writing"):
                     if kind != "missing" or skill != name:
                         (root / "shared-skills" / skill).mkdir(parents=True)
                 if kind == "directory":
@@ -53,7 +53,7 @@ class SharedResourceTests(unittest.TestCase):
                 bot.mkdir(parents=True)
                 (root / "bots/AGENTS_shared.md").write_text("Shared")
                 (bot / "AGENTS_dedicated.md").write_text("Dedicated")
-                for name in ("project-context", "todo", "note-taking"):
+                for name in ("project-context", "todo", "note-taking", "draft-writing"):
                     source = root / "shared-skills" / name
                     (source / "references").mkdir(parents=True)
                     (source / "SKILL.md").write_text(name)
@@ -65,7 +65,7 @@ class SharedResourceTests(unittest.TestCase):
                         str(ROOT / "packaging/shared-resources.mjs"), str(root), str(bot),
                     ], capture_output=True, text=True)
                     self.assertEqual(result.returncode, 0, result.stderr)
-                    for name in ("project-context", "todo", "note-taking"):
+                    for name in ("project-context", "todo", "note-taking", "draft-writing"):
                         link = bot / ".pi/skills" / name
                         self.assertEqual(link.resolve(), (root / "shared-skills" / name).resolve())
                         self.assertEqual((link / "references/commands.md").read_text(), f"{name} commands")
@@ -79,7 +79,7 @@ class SharedResourceTests(unittest.TestCase):
                 bot = root / f"bots/custom-{role}"
                 link = bot / ".pi/skills/memory"
                 link.parent.mkdir(parents=True)
-                for name in ("project-context", "todo", "note-taking"):
+                for name in ("project-context", "todo", "note-taking", "draft-writing"):
                     (root / "shared-skills" / name).mkdir(parents=True)
                 (root / "bots/AGENTS_shared.md").write_text("Shared")
                 (bot / "AGENTS_dedicated.md").write_text("Dedicated")
@@ -112,7 +112,7 @@ class SharedResourceTests(unittest.TestCase):
                 root = Path(directory)
                 helper = root / "shared-resources.mjs"
                 shutil.copyfile(ROOT / "packaging/shared-resources.mjs", helper)
-                for name in ("project-context", "todo", "note-taking"):
+                for name in ("project-context", "todo", "note-taking", "draft-writing"):
                     (root / "shared-skills" / name).mkdir(parents=True)
                 source = root / f"bots/{role}-bot/.pi/skills/memory"
                 (source / "references").mkdir(parents=True)

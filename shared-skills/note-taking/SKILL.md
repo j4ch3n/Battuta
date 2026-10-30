@@ -17,7 +17,8 @@ not canonical specifications, commitments, approvals, or automatic durable memor
    where relevant. Preserve the distinction between evidence and inference.
 3. Search for relevant terms, then read surrounding numbered lines when useful.
    Full reads are also available; use limits and returned continuation commands
-   for large notebooks.
+   for large notebooks. Use `--meta` to discover notebook identity and registered
+   drafts without loading their bodies; use draft-writing for complete documents.
 4. On a storage error, retain existing content and follow the reported recovery
    guidance rather than replacing or silently repairing it.
 

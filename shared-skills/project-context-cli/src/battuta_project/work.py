@@ -38,8 +38,10 @@ class WorkContext:
         for _ in range(100):
             work_id = "".join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(5))
             paths = [self.directory / f"{kind}-{role}-{work_id}.{suffix}"
-                     for role in ("pm", "tl") for kind, suffix in (("todo", "jsonl"), ("note", "md"))]
+                     for role in ("pm", "tl") for kind, suffix in (("todo", "jsonl"), ("note", "md"), ("note", "json"))]
             if any(path.exists() or path.is_symlink() for path in paths):
+                continue
+            if any(self.directory.glob(f"note-*-{work_id}-draft-*.md")):
                 continue
             if any(self.registry.work_record(self.project, role, work_id) is not None for role in ("pm", "tl")):
                 continue

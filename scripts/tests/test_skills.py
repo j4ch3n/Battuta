@@ -18,24 +18,24 @@ class SharedSkillTests(unittest.TestCase):
             with self.subTest(role=role), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 bot = root / f"bots/{role}-bot"
-                for name in ("project-context", "todo", "note-taking"):
+                for name in ("project-context", "todo", "note-taking", "draft-writing"):
                     source = root / "shared-skills" / name
                     (source / "references").mkdir(parents=True)
                     (source / "SKILL.md").write_text(name)
                     (source / "references/commands.md").write_text(f"{name} commands")
                 for _ in range(2):
                     link_shared_skills(bot, role=role, root=root)
-                    for name in ("project-context", "todo", "note-taking"):
+                    for name in ("project-context", "todo", "note-taking", "draft-writing"):
                         link = bot / ".pi/skills" / name
                         self.assertEqual(link.resolve(), (root / "shared-skills" / name).resolve())
                         self.assertEqual((link / "SKILL.md").read_text(), name)
                         self.assertEqual((link / "references/commands.md").read_text(), f"{name} commands")
 
     def test_working_skill_conflicts_preserve_custom_entries(self):
-        for role, name, kind in product(("pm", "tl"), ("todo", "note-taking"), ("directory", "file", "symlink")):
+        for role, name, kind in product(("pm", "tl"), ("todo", "note-taking", "draft-writing"), ("directory", "file", "symlink")):
             with self.subTest(role=role, name=name, kind=kind), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                for skill in ("project-context", "todo", "note-taking"):
+                for skill in ("project-context", "todo", "note-taking", "draft-writing"):
                     (root / "shared-skills" / skill).mkdir(parents=True)
                 bot = root / f"bots/{role}-bot"
                 target = bot / ".pi/skills" / name
@@ -57,10 +57,10 @@ class SharedSkillTests(unittest.TestCase):
                     self.assertEqual(target.readlink(), Path("custom-skill"))
 
     def test_missing_working_skill_is_not_linked(self):
-        for role, missing in product(("pm", "tl"), ("todo", "note-taking")):
+        for role, missing in product(("pm", "tl"), ("todo", "note-taking", "draft-writing")):
             with self.subTest(role=role, missing=missing), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                for name in {"project-context", "todo", "note-taking"} - {missing}:
+                for name in {"project-context", "todo", "note-taking", "draft-writing"} - {missing}:
                     (root / "shared-skills" / name).mkdir(parents=True)
                 bot = root / f"bots/{role}-bot"
                 with self.assertRaises(click.ClickException):
@@ -71,7 +71,7 @@ class SharedSkillTests(unittest.TestCase):
         for role, existing in product(("pm", "tl"), (None, "owned", "directory", "symlink", "file")):
             with self.subTest(role=role, existing=existing), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                for name in ("project-context", "todo", "note-taking"):
+                for name in ("project-context", "todo", "note-taking", "draft-writing"):
                     (root / "shared-skills" / name).mkdir(parents=True)
                 source = root / f"bots/{role}-bot/.pi/skills/memory"
                 (source / "references").mkdir(parents=True)
@@ -108,7 +108,7 @@ class SharedSkillTests(unittest.TestCase):
         for role in ("pm", "tl"):
             with self.subTest(role=role), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                for name in ("project-context", "todo", "note-taking"):
+                for name in ("project-context", "todo", "note-taking", "draft-writing"):
                     (root / "shared-skills" / name).mkdir(parents=True)
                 source = root / f"bots/{role}-bot/.pi/skills/memory"
                 source.mkdir(parents=True)

@@ -1,6 +1,8 @@
 """Real installed CLI, filesystem and ripgrep integration across fresh processes."""
 
 import os
+import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import re
 import shlex
@@ -19,9 +21,9 @@ class ProjectWorkTests(unittest.TestCase):
         self.command = Path(sys.executable).with_name("battuta-project")
         self.env = {**os.environ, "HOME": str(self.home), "LINEAR_API_TOKEN": "test-token", "AGENT_ROLE": "pm"}
 
-    def cli(self, *args, role="pm"):
+    def cli(self, *args, role="pm", content=None):
         result = subprocess.run([str(self.command), *args], env={**self.env, "AGENT_ROLE": role},
-                                cwd=self.home, capture_output=True, text=True, timeout=15)
+                                cwd=self.home, capture_output=True, text=True, input=content, timeout=15)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
 
@@ -110,6 +112,48 @@ class ProjectWorkTests(unittest.TestCase):
         self.assertIn("1. Learning", self.cli("note", "--scope", "general", "read"))
         self.assertIn("1. [todo] Task", self.cli("todo", "--scope", "general", "list"))
 
+    def test_draft_pipeline_edits_and_missing_files_across_roles_and_scopes(self):
+        self.cli("init", "atlas")
+        for scope in ("general", "project"):
+            for role in ("pm", "tl"):
+                with self.subTest(scope=scope, role=role):
+                    body = f"# {scope}/{role}\n\nComplete document without final newline"
+                    created = self.cli("note", "--scope", scope, "draft", "--title", "Research", role=role, content=body)
+                    path = Path(created.splitlines()[0].split(" saved to ", 1)[1])
+                    self.assertEqual(path.read_text(), body)
+                    self.assertTrue(created.endswith("\n\n" + body))
+                    self.assertEqual(self.cli("note", "--scope", scope, "draft", "--get", "1", role=role), body)
+                    self.assertIn("Items: 0", self.cli("note", "--scope", scope, "--meta", role=role))
+                    path.write_text(body + "\nEdited\n")
+                    self.assertEqual(self.cli("note", "--scope", scope, "draft", "--get", "1", role=role), body + "\nEdited\n")
+                    path.unlink()
+                    self.assertIn("missing", self.cli("note", "--scope", scope, "draft", "--list", role=role))
+                    result = subprocess.run([str(self.command), "note", "--scope", scope, "draft", "--get", "1"],
+                                            env={**self.env, "AGENT_ROLE": role}, capture_output=True, text=True, timeout=15)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(result.stdout, "")
+                    self.assertIn("reference has been retained", result.stderr)
+
+    def test_parallel_draft_creation_and_legacy_upgrade_share_one_notebook(self):
+        first = self.cli("note", "--scope", "general", "append", "--text", "Legacy")
+        identifier = self.work_id(first)
+        directory = self.home / ".battuta/work"
+        metadata = directory / f"note-pm-{identifier}.json"
+        metadata.unlink()
+        self.cli("todo", "--scope", "general", "create", "--item", "Keep")
+        todo = self.cli("todo", "--scope", "general", "list")
+        def create(number):
+            return self.cli("note", "--scope", "general", "draft", "--title", f"Draft {number}", content=f"Body {number}")
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            outputs = list(pool.map(create, range(8)))
+        self.assertEqual(len(set(output.splitlines()[0].split(" saved to ")[0] for output in outputs)), 8)
+        index = json.loads(metadata.read_text())
+        self.assertEqual(index["workId"], identifier)
+        self.assertEqual([draft["id"] for draft in index["drafts"]], list(range(1, 9)))
+        self.assertEqual((directory / index["itemFile"]).read_text(), "Legacy\n")
+        self.assertEqual(self.cli("todo", "--scope", "general", "list"), todo)
+        self.assertIn("1. Legacy", self.cli("note", "--scope", "general", "item", "--search", "legacy"))
+
     def test_numbered_search_and_read_continuations_preserve_text(self):
         self.assertIsNotNone(shutil.which("rg"), "Install ripgrep to run notebook integration tests")
         texts = ["\ufeffFinding café", "Needle.*", "other", "NEEDLE.* two", "-n $(touch nope) ; café", "needle.* three"]
@@ -126,6 +170,8 @@ class ProjectWorkTests(unittest.TestCase):
         for args, expected_first, expected_next, excluded in (
             (("search", "--query", "needle.*", "--limit", "1"), "2. Needle.*", "4. NEEDLE.* two", "3. other"),
             (("read", "--from-line", "2", "--to-line", "3", "--limit", "1"), "2. Needle.*", "3. other", "4. NEEDLE.* two"),
+            (("item", "--search", "needle.*", "--limit", "1"), "2. Needle.*", "4. NEEDLE.* two", "3. other"),
+            (("item", "--list", "--from-line", "2", "--to-line", "3", "--limit", "1"), "2. Needle.*", "3. other", "4. NEEDLE.* two"),
         ):
             with self.subTest(args=args):
                 output = self.cli("note", "--scope", "general", *args)

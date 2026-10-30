@@ -11,6 +11,7 @@ import subprocess
 import click
 
 from .registry import ProjectRegistry
+from . import notebook_meta
 from .storage import file_errors, regular_file
 from .work import WorkContext
 
@@ -65,7 +66,38 @@ class NoteStore:
 
     def _current(self) -> Notebook | None:
         work_id = self.work.registry.current_note_work_id(self.work.project, self.work.role)
-        return self._notebook(work_id) if work_id is not None else None
+        if work_id is None:
+            return None
+        result = self._notebook(work_id)
+        notebook_meta.load(result)
+        return result
+
+    def metadata(self) -> tuple[Notebook, dict] | None:
+        with self._locked():
+            return self._metadata()
+
+    def _metadata(self) -> tuple[Notebook, dict] | None:
+        result = self._current()
+        if result is None:
+            return None
+        result.lines = list(self._lines(result.path))
+        return result, notebook_meta.load(result)
+
+    def _initialize(self) -> Notebook:
+        """Publish an empty notebook under the caller's notebook lock."""
+        result = self._notebook(self.work.new_work_id())
+        fd = os.open(result.path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "wb") as output:
+            output.flush()
+            os.fsync(output.fileno())
+        try:
+            notebook_meta.save(result, notebook_meta.load(result))
+            self.work.registry.set_note_work_id(self.work.project, self.work.role, result.work_id)
+        except (OSError, RuntimeError, click.ClickException):
+            result.path.unlink()
+            result.path.with_suffix(".json").unlink(missing_ok=True)
+            raise
+        return result
 
     @staticmethod
     def _lines(path: Path):
@@ -85,29 +117,18 @@ class NoteStore:
         _single_line(text)
         with self._locked(create=True):
             result = self._current()
-            first = result is None
-            if first:
-                result = self._notebook(self.work.new_work_id())
-                number = 1
-            else:
-                number = sum(1 for _ in self._lines(result.path)) + 1
+            if result is None:
+                result = self._initialize()
+            number = sum(1 for _ in self._lines(result.path)) + 1
+            notebook_meta.save(result, notebook_meta.load(result))
             flags = os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW | os.O_NONBLOCK
-            if first:
-                flags |= os.O_CREAT | os.O_EXCL
             fd = os.open(result.path, flags, 0o600)
-            try:
-                with os.fdopen(fd, "wb") as output:
-                    if not stat.S_ISREG(os.fstat(output.fileno()).st_mode):
-                        raise click.ClickException(f"Expected a regular notebook: {result.path}")
-                    output.write((text + "\n").encode("utf-8"))
-                    output.flush()
-                    os.fsync(output.fileno())
-                if first:
-                    self.work.registry.set_note_work_id(self.work.project, self.work.role, result.work_id)
-            except (OSError, RuntimeError, click.ClickException):
-                if first:
-                    result.path.unlink()
-                raise
+            with os.fdopen(fd, "wb") as output:
+                if not stat.S_ISREG(os.fstat(output.fileno()).st_mode):
+                    raise click.ClickException(f"Expected a regular notebook: {result.path}")
+                output.write((text + "\n").encode("utf-8"))
+                output.flush()
+                os.fsync(output.fileno())
             result.lines = [NoteLine(number, text)]
             return result
 

@@ -1,7 +1,7 @@
 # Working notebook persistence
 
-Implementation reference for append-only agent notes. Bot-facing usage belongs
-in the [notebook command reference](../shared-skills/note-taking/references/commands.md).
+Implementation reference for append-only items and editable draft documents.
+Bot-facing item usage belongs in the [notebook command reference](../shared-skills/note-taking/references/commands.md).
 
 ## Identity and storage
 
@@ -35,13 +35,48 @@ selections during concurrent TODO creation or project switching. File/directory
 checks reject symlinks and nonregular targets; descriptors use `O_NOFOLLOW` and
 validate regular-file status. New notes files use mode `0600`.
 
-First append exclusively creates the file, writes/fsyncs its first line, then
-publishes the notebook pointer. Ordinary publication failure removes only the new
-unpublished file. A crash between writes may leave an orphan; it stays unselected
+First mutation exclusively creates and fsyncs an empty item file, writes its index,
+then publishes the notebook pointer. Ordinary publication failure removes only the new
+unpublished files. A crash between writes may leave an orphan; it stays unselected
 and reserves its ID. Later appends use `O_APPEND`, flush/fsync before success, and
-never rewrite existing notes or update config. An interrupted/failed physical write
+never rewrite existing items or update config. An interrupted/failed physical write
 may leave an incomplete suffix; validation then blocks further operations pending
-owner recovery. This is recoverable publication, not a two-file transaction.
+owner recovery. An append failure can leave an empty published notebook; inspect
+current state before retrying. This is recoverable publication, not a transaction.
+
+## Notebook metadata and drafts
+
+`note-<role>-<work-id>.json` is the notebook index above the independent item and
+draft collections. Schema 1 records `schemaVersion`, `scope`, `role`, nullable
+`project`, `workId`, relative `itemFile`, `nextDraftId`, and `drafts`. Each draft
+has increasing `id`, single-line `title`, relative `file`, and UTC `createdAt`.
+Counts, availability and bodies are derived, not duplicated in metadata. Unknown
+fields survive writes; invalid identities/schema/paths fail without repair.
+
+Legacy notebooks without an index remain readable without creating one. A first
+mutation writes the index under the existing registry/work locks without changing
+identity, item bytes, numbers, TODO state or unrelated registry fields. Published
+missing item files are errors even if drafts exist.
+
+Draft creation accepts full UTF-8 stdin, rejects blank/NUL/invalid input, and saves
+it verbatim to `note-<role>-<work-id>-draft-<id>.md` with exclusive creation and
+mode `0600`. The file is flushed/fsynced before atomic metadata registration.
+Only registration earns success. Failure after creation retains and identifies
+the unregistered file; later creates skip occupied names instead of overwriting
+or adopting them. Gaps are permitted; registered IDs never renumber or reuse.
+
+Creation reports the absolute file path and full content. Drafts are ordinary
+editable files: agent read/edit tools update that path directly. There is no CLI
+editing, patch engine, backup, history or automatic publication. List/get inspect
+current files, not creation-time snapshots. Missing registered files remain
+listed as missing and fail retrieval with their expected path; permission,
+symlink/nonregular-target and invalid-content errors are not labelled missing.
+
+CLI locks coordinate CLI operations, not external editor writes. Direct edits
+have the editing tool's concurrency/durability guarantees and no built-in undo.
+Neither fsync nor atomic rename makes the Markdown/index/registry a crash-atomic
+multi-file transaction; directory fsync and automatic orphan recovery are not
+provided. Keep retained files for explicit recovery.
 
 ## Reads and search
 

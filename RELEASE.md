@@ -23,7 +23,7 @@ Installation navigation lives here, separate from runtime skill workflows and co
 | Additional Pi packages (source checkouts)                  | Follow the [Pi-extension installation guide](https://github.com/j4ch3n/Battuta/blob/main/docs/pi-extensions.md). This contributor workflow requires source tooling, not just the release archive.                                                              |
 | OpenCode contributor skills/plugins (source checkouts)     | Follow [OpenCode setup](https://github.com/j4ch3n/Battuta/blob/main/docs/opencode.md). These development-agent workflows are not the PM/TL runtime skill environment.                                                                                          |
 
-The shared `todo` and `note-taking` skills are bundled and linked for both bots
+The shared `todo`, `note-taking`, and `draft-writing` skills are bundled and linked for both bots
 by normal configuration. They use the same `battuta-project` CLI installation
 listed above; no separate package installation is needed.
 

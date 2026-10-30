@@ -18,7 +18,7 @@ owning role (`pm` or `tl`); `--scope` is always explicit:
 current` and select the intended project with `switch` if needed.
 - `general`: no project ownership; works without selecting or registering one.
 
-Each role/scope has an independent notebook. First append creates its work ID;
+Each role/scope has an independent notebook. First item or draft creates its work ID;
 later appends and session restarts reuse it. Creating or rotating TODO work does
 not change the notebook, and appending notes never changes TODO work. Commands
 target only the current notebook; there is no rotation or historical selector.
@@ -27,7 +27,7 @@ General operations do not change project selection.
 ## Append a learning, finding, or thought
 
 ```sh
-battuta-project note --scope general append \
+battuta-project note --scope general item \
   --text "Finding: Retry-After is expressed in seconds, not milliseconds."
 ```
 
@@ -39,10 +39,10 @@ There are no note edit/delete commands.
 ## Search and retrieve
 
 ```sh
-battuta-project note --scope general search --query "Retry-After"
-battuta-project note --scope general read --from-line 2 --to-line 4
-battuta-project note --scope general read --from-line 3 --to-line 3
-battuta-project note --scope general read
+battuta-project note --scope general item --search "Retry-After"
+battuta-project note --scope general item --list --from-line 2 --to-line 4
+battuta-project note --scope general item --list --from-line 3 --to-line 3
+battuta-project note --scope general item --list
 ```
 
 Search is literal and case-insensitive, not a regular expression. Quote queries
@@ -61,8 +61,8 @@ available suffix. No search matches is normal success.
 ## Optional output limits
 
 ```sh
-battuta-project note --scope general search --query "retry" --limit 5
-battuta-project note --scope general read --limit 20
+battuta-project note --scope general item --search "retry" --limit 5
+battuta-project note --scope general item --list --limit 20
 ```
 
 Without `--limit`, results have no application-level truncation. A limit counts
@@ -76,6 +76,14 @@ selection has not changed before resuming. External shell/agent output limits ca
 still clip large results; choose a smaller limit and resume by source line.
 
 ## Outcomes and recovery
+
+`item` requires exactly one of `--text`, `--list`, or `--search`. Ranges/limits
+are for reads; `--to-line` applies only to listing. Existing `append`, `read`, and
+`search --query` commands remain compatible aliases using the same notebook.
+
+Use `battuta-project note --scope general --meta` (or project scope) to discover
+notebook identity, item count and draft IDs/titles/paths without loading bodies.
+Use the draft-writing skill for complete long-form documents and their retrieval.
 
 Results identify scope/project, role, work reference, file, and numbered text.
 Missing notebooks are successful discovery results and create no notebook. Empty

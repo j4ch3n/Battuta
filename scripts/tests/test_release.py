@@ -45,7 +45,7 @@ class ReleaseInstallTests(ConfigFixture):
         )
         self.assertIsNotNone(loop)
         stage = self.root / "dist/stage/battuta"
-        for name in ("project-context", "todo", "note-taking"):
+        for name in ("project-context", "todo", "note-taking", "draft-writing"):
             source = stage / "shared-skills" / name
             source.mkdir(parents=True)
             (source / "SKILL.md").write_text(name)
@@ -59,7 +59,7 @@ class ReleaseInstallTests(ConfigFixture):
             self.assertFalse(memory.is_symlink())
             self.assertEqual((memory / "SKILL.md").read_text(), (ROOT / "bots" / role / ".pi/skills/memory/SKILL.md").read_text())
             self.assertTrue((memory / "references/tools.md").is_file())
-            for name in ("project-context", "todo", "note-taking"):
+            for name in ("project-context", "todo", "note-taking", "draft-writing"):
                 self.assertTrue((memory.parent / name).is_symlink())
                 self.assertEqual((memory.parent / name / "SKILL.md").read_text(), name)
 
