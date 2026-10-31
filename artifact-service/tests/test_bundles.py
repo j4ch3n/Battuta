@@ -3,6 +3,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
@@ -13,7 +14,7 @@ from battuta_artifacts.cli import main
 from battuta_artifacts.registry import Registry, migrate
 
 
-class BundleTests(unittest.TestCase):
+class BundleFixture(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -34,6 +35,8 @@ class BundleTests(unittest.TestCase):
         return CliRunner().invoke(main, ["init", "sizing", "--project", "procurement", "--title", 'VRAM <sizing> "guide"',
                                         "--description", "Evidence & assumptions", *args, "--json"])
 
+
+class BundleTests(BundleFixture):
     def test_init_creates_real_project_draft_and_returns_actual_files_without_selection(self):
         result = self.init()
         self.assertEqual(result.exit_code, 0, result.output)
@@ -96,6 +99,32 @@ class BundleTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 5, result.output)
         self.assertFalse((self.project / "artifacts/sizing").exists())
         self.assertEqual(self.store.list(), [])
+
+    def test_real_transaction_failure_rolls_back_row_and_new_files(self):
+        connect = Registry.connect
+        @contextmanager
+        def fail_commit(store, *, write=False):
+            with connect(store, write=write) as connection:
+                yield connection
+                if write:
+                    raise sqlite3.OperationalError("commit failed")
+        with patch.object(Registry, "connect", fail_commit):
+            result = self.init()
+        self.assertEqual(result.exit_code, 5, result.output)
+        self.assertEqual(self.store.list(), [])
+        self.assertFalse((self.project / "artifacts/sizing").exists())
+
+    def test_post_insert_snapshot_failure_cannot_commit_an_incomplete_init(self):
+        find = Registry._find
+        def fail_snapshot(db, slug):
+            if db.execute("SELECT 1 FROM artifacts WHERE slug=?", (slug,)).fetchone():
+                raise sqlite3.OperationalError("cannot read result")
+            return find(db, slug)
+        with patch.object(Registry, "_find", side_effect=fail_snapshot):
+            result = self.init()
+        self.assertEqual(result.exit_code, 5)
+        self.assertEqual(self.store.list(), [])
+        self.assertFalse((self.project / "artifacts/sizing").exists())
 
     def test_bad_template_inventory_is_rejected_before_writes(self):
         from battuta_artifacts.bundles import initialize

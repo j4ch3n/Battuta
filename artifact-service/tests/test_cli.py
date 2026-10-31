@@ -25,8 +25,11 @@ class CliTests(unittest.TestCase):
         return self.runner.invoke(main, args)
 
     def register(self):
-        return self.run_cli("register", "--slug", "demo", "--title", "Demo", "--description", "Walkthrough",
-                            "--root", str(self.source), "--entry", "index.html", "--file", "app.js", "--json")
+        from battuta_artifacts.registry import Registry
+        from battuta_artifacts.models import assemble_files
+        Registry(self.db).register(slug="demo", title="Demo", description="Walkthrough", status="published",
+                                   **assemble_files(self.source, "index.html", ("app.js",)))
+        return self.run_cli("show", "demo", "--json")
 
     def test_setup_is_explicit(self):
         result = self.run_cli("list", "--json")
@@ -62,10 +65,11 @@ class CliTests(unittest.TestCase):
 
     def test_single_file_and_json_output_before_subcommand(self):
         self.run_cli("setup")
-        result = self.run_cli("--json", "register", "--slug", "one", "--title", "One", "--description", "Page",
-                               "--entry", str(self.source / "index.html"))
+        (self.source / "notes.md").write_text("# Notes")
+        result = self.run_cli("--json", "add-file", "--type", "markdown", "--slug", "one", "--title", "One", "--description", "Page",
+                               "--file", str(self.source / "notes.md"))
         self.assertEqual(result.exit_code, 0, result.output)
-        self.assertEqual(set(json.loads(result.output)["artifact"]["files"]), {"index.html"})
+        self.assertEqual(set(json.loads(result.output)["artifact"]["files"]), {"notes.md"})
 
     def test_public_base_url_is_required_for_artifact_output(self):
         self.run_cli("setup")
@@ -78,26 +82,27 @@ class CliTests(unittest.TestCase):
 
     def test_invalid_paths_and_parameters_have_no_side_effects(self):
         self.run_cli("setup")
+        self.register()
         (self.source / "linked.js").symlink_to(self.source / "app.js")
         for extra in [("--file", "../secret"), ("--file", "*.js"), ("--file", "/etc/passwd"),
                       ("--file", "linked.js"), ("--file", "missing.js"), ("--file", "a%2fb.js"),
                       ("--file", "app.js", "--file", "app.js")]:
             with self.subTest(extra=extra):
-                result = self.run_cli("register", "--slug", "demo", "--title", "Demo", "--description", "Page",
+                result = self.run_cli("replace-files", "demo",
                                       "--root", str(self.source), "--entry", "index.html", *extra, "--json")
                 self.assertEqual(result.exit_code, 2, result.output)
                 self.assertFalse(json.loads(result.output)["ok"])
-        self.assertEqual(json.loads(self.run_cli("list", "--json").output)["artifacts"], [])
+        self.assertEqual(set(json.loads(self.run_cli("show", "demo", "--json").output)["artifact"]["files"]), {"index.html", "app.js"})
         for slug in ["../escape", "Bad", "bad--slug"]:
-            result = self.run_cli("register", "--slug", slug, "--title", "Demo", "--description", "Page",
-                                  "--entry", str(self.source / "index.html"))
+            result = self.run_cli("add-file", "--type", "markdown", "--slug", slug, "--title", "Demo", "--description", "Page",
+                                  "--file", str(self.source / "notes.md"))
             self.assertEqual(result.exit_code, 2)
 
     def test_update_requires_a_change_and_parser_errors_are_json(self):
         self.run_cli("setup")
         self.register()
         self.assertEqual(self.run_cli("update", "demo").exit_code, 2)
-        result = self.run_cli("register", "--json")
+        result = self.run_cli("publish", "--json")
         self.assertEqual(result.exit_code, 2)
         self.assertEqual(json.loads(result.output)["error"]["code"], "INVALID_INPUT")
 
@@ -107,7 +112,7 @@ class CliTests(unittest.TestCase):
                 result = self.run_cli(*args)
                 self.assertEqual(result.exit_code, 2)
                 self.assertEqual(json.loads(result.stdout)["error"]["code"], "INVALID_INPUT")
-        for args in [("--help",), ("register", "--help"), ()]:
+        for args in [("--help",), ("publish", "--help"), ()]:
             result = self.run_cli(*args)
             self.assertEqual(result.exit_code, 0 if args else 2)
             self.assertIn("Usage:", result.output)

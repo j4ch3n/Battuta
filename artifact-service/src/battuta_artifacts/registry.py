@@ -96,9 +96,13 @@ class Registry:
             # SELECT does not start a transaction in sqlite3's legacy mode.
             # Pin metadata and allowlist to one revision, even under WAL writers.
             db.execute("BEGIN")
-            item = self._find(db, slug)
-            item["files"] = dict(db.execute("SELECT public_path, media_type FROM artifact_files WHERE artifact_id=? ORDER BY public_path", (item["id"],)))
-            return item
+            return self._snapshot(db, slug)
+
+    @classmethod
+    def _snapshot(cls, db, slug):
+        item = cls._find(db, slug)
+        item["files"] = dict(db.execute("SELECT public_path, media_type FROM artifact_files WHERE artifact_id=? ORDER BY public_path", (item["id"],)))
+        return item
 
     def list(self, *, published_only=False) -> list[dict]:
         with self.connect() as db:
@@ -129,7 +133,7 @@ class Registry:
                        (identifier, slug, title, description, source_root, entry_path, format, now, now, status, template, project, name))
             db.executemany("INSERT INTO artifact_files VALUES (?, ?, ?)",
                            [(identifier, path, media) for path, media in files.items()])
-        return self.get(slug)
+            return self._snapshot(db, slug)
 
     def publish(self, slug: str, *, files: dict[str, str], expected_revision=None) -> dict:
         with self.connect(write=True) as db:
@@ -143,7 +147,7 @@ class Registry:
                                [(item["id"], path, media) for path, media in files.items()])
                 db.execute("UPDATE artifacts SET status='published', revision=revision+1, updated_at=? WHERE id=?",
                            (datetime.now(timezone.utc).isoformat(), item["id"]))
-        return self.get(slug)
+            return self._snapshot(db, slug)
 
     def update_metadata(self, slug: str, *, title=None, description=None, expected_revision=None) -> dict:
         with self.connect(write=True) as db:
