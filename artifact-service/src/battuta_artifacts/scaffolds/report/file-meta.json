@@ -1,0 +1,6 @@
+{
+  "entry": "index.html",
+  "files": [
+    { "path": "index.html", "purpose": "Working reading-first report example.", "serve": true }
+  ]
+}

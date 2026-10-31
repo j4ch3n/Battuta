@@ -100,22 +100,49 @@ class Registry:
             item["files"] = dict(db.execute("SELECT public_path, media_type FROM artifact_files WHERE artifact_id=? ORDER BY public_path", (item["id"],)))
             return item
 
-    def list(self) -> list[dict]:
+    def list(self, *, published_only=False) -> list[dict]:
         with self.connect() as db:
-            return [dict(row) for row in db.execute("SELECT * FROM artifacts ORDER BY updated_at DESC, slug")]
+            return [dict(row) for row in db.execute("SELECT * FROM artifacts" +
+                    (" WHERE status='published'" if published_only else "") + " ORDER BY updated_at DESC, slug")]
+
+    def project_artifact(self, project: str, name: str) -> dict:
+        with self.connect() as db:
+            row = db.execute("SELECT slug FROM artifacts WHERE project=? AND name=?", (project, name)).fetchone()
+            if row is None:
+                raise NotFound(f"Artifact not found in project {project}: {name}")
+            return self.get(row["slug"])
 
     def register(self, *, slug: str, title: str, description: str, source_root: str,
-                 entry_path: str, format: str, files: dict[str, str]) -> dict:
+                 entry_path: str, format: str, files: dict[str, str], status="draft", template=None,
+                 project=None, name=None) -> dict:
         now = datetime.now(timezone.utc).isoformat()
         identifier = str(uuid4())
         with self.connect(write=True) as db:
             db.execute("BEGIN IMMEDIATE")
             if db.execute("SELECT 1 FROM artifacts WHERE slug=?", (slug,)).fetchone():
                 raise Conflict(f"Slug already registered: {slug}")
-            db.execute("INSERT INTO artifacts VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
-                       (identifier, slug, title, description, source_root, entry_path, format, now, now))
+            if project is not None and db.execute("SELECT 1 FROM artifacts WHERE project=? AND name=?", (project, name)).fetchone():
+                raise Conflict(f"Artifact already exists in project {project}: {name}")
+            db.execute("""INSERT INTO artifacts
+                       (id, slug, title, description, source_root, entry_path, format, revision, created_at, updated_at,
+                        status, template, project, name) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)""",
+                       (identifier, slug, title, description, source_root, entry_path, format, now, now, status, template, project, name))
             db.executemany("INSERT INTO artifact_files VALUES (?, ?, ?)",
                            [(identifier, path, media) for path, media in files.items()])
+        return self.get(slug)
+
+    def publish(self, slug: str, *, files: dict[str, str], expected_revision=None) -> dict:
+        with self.connect(write=True) as db:
+            db.execute("BEGIN IMMEDIATE")
+            item = self._find(db, slug)
+            self._expect(item, expected_revision)
+            previous = dict(db.execute("SELECT public_path, media_type FROM artifact_files WHERE artifact_id=?", (item["id"],)))
+            if item["status"] != "published" or files != previous:
+                db.execute("DELETE FROM artifact_files WHERE artifact_id=?", (item["id"],))
+                db.executemany("INSERT INTO artifact_files VALUES (?, ?, ?)",
+                               [(item["id"], path, media) for path, media in files.items()])
+                db.execute("UPDATE artifacts SET status='published', revision=revision+1, updated_at=? WHERE id=?",
+                           (datetime.now(timezone.utc).isoformat(), item["id"]))
         return self.get(slug)
 
     def update_metadata(self, slug: str, *, title=None, description=None, expected_revision=None) -> dict:
