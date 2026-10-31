@@ -4,14 +4,16 @@ if (frame) {
     time = document.querySelector("#time");
   const status = document.querySelector("#status");
   let running = false,
-    last = 0;
+    last = 0,
+    elapsed = Number(time.value);
   function seek() {
-    document.querySelector("#position").textContent = `${Number(time.value).toFixed(1)} s`;
+    time.value = String(elapsed);
+    document.querySelector("#position").textContent = `${elapsed.toFixed(1)} s`;
     const panel = frame.contentWindow;
     if (panel?.__error) {
       status.textContent = "Simulation unavailable. Use the text alternative below.";
       stop();
-    } else if (panel?.seek) panel.seek(Number(time.value));
+    } else if (panel?.seek) panel.seek(elapsed);
   }
   function stop() {
     running = false;
@@ -20,7 +22,7 @@ if (frame) {
   }
   function tick(now) {
     if (!running) return;
-    time.value = String((Number(time.value) + (now - last) / 1000) % 30);
+    elapsed = (elapsed + (now - last) / 1000) % 30;
     last = now;
     seek();
     if (running) requestAnimationFrame(tick);
@@ -37,11 +39,12 @@ if (frame) {
   });
   time.addEventListener("input", () => {
     stop();
+    elapsed = Number(time.value);
     seek();
   });
   document.querySelector("#reset").addEventListener("click", () => {
     stop();
-    time.value = "0";
+    elapsed = 0;
     seek();
   });
   frame.addEventListener("load", seek);

@@ -152,6 +152,7 @@ button:disabled {
   background: #c1e4f5;
 }
 nav {
+  width: max-content;
   position: fixed;
   bottom: 8px;
   left: 50%;
@@ -163,6 +164,9 @@ nav {
   font-size: 16px;
   background: #101d28;
   padding: 4px;
+}
+#position {
+  white-space: nowrap;
 }
 #overflow {
   position: fixed;

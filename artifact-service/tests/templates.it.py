@@ -140,6 +140,40 @@ class TemplateBrowserTests(unittest.TestCase):
             page.locator('#reset').click()
             self.assertIn('unavailable', page.locator('#status').inner_text())
 
+    def test_playback_accumulates_regular_frames_independently_of_native_range_rounding(self):
+        page = self.page()
+        page.add_init_script('''
+          window.clock = {now: 0, callbacks: []};
+          performance.now = () => clock.now;
+          window.requestAnimationFrame = callback => clock.callbacks.push(callback);
+          window.advance = frames => {
+            for (let frame = 0; frame < frames; frame++) {
+              clock.now += 1000 / 60;
+              const pending = clock.callbacks.splice(0);
+              pending.forEach(callback => callback(clock.now));
+            }
+          };
+        ''')
+        page.goto(f'{self.url}/live-panel/')
+        panel = page.frames[1]
+        panel.wait_for_function('window.__ready')
+        page.locator('#play').click()
+        page.evaluate('advance(120)')
+        self.assertAlmostEqual(panel.evaluate('window.__t'), 2, places=5)
+        self.assertEqual(page.locator('#position').inner_text(), '2.0 s')
+        page.locator('#play').click()
+        page.evaluate('advance(60)')
+        self.assertAlmostEqual(panel.evaluate('window.__t'), 2, places=5)
+        page.locator('#time').fill('12')
+        page.locator('#time').dispatch_event('input')
+        page.locator('#play').click()
+        page.evaluate('advance(60)')
+        self.assertAlmostEqual(panel.evaluate('window.__t'), 13, places=5)
+        page.locator('#reset').click()
+        page.locator('#play').click()
+        page.evaluate('advance(60)')
+        self.assertAlmostEqual(panel.evaluate('window.__t'), 1, places=5)
+
     def test_markdown_viewer_is_readable_without_executing_raw_html(self):
         page = self.page(viewport={'width': 390, 'height': 844})
         dialogs = []
