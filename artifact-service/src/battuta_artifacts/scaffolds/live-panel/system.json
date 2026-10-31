@@ -1,0 +1,27 @@
+{
+  "theme": "terminal-dark",
+  "canvas": "4:5",
+  "lang": "en",
+  "title": "Planning to verified review",
+  "titlebar": "Illustrative system · simulated",
+  "rows": [
+    [{ "name": "Planner", "lines": ["defines the task", "delegates bounded work"] }],
+    [
+      {
+        "name": "Coder",
+        "lines": ["implements the change"],
+        "lane": { "busy": "running", "done": ["ready"], "log": ["implementation prepared"] }
+      },
+      {
+        "name": "Tester",
+        "lines": ["checks the behavior"],
+        "lane": { "busy": "running", "done": ["verified"], "log": ["checks completed"] }
+      }
+    ],
+    [{ "name": "Reviewer", "lines": ["assesses results", "returns findings"] }]
+  ],
+  "counters": [{ "id": "tokens", "label": "illustrative tokens", "start": 1000, "rate": 20 }],
+  "log": { "title": "simulated session", "rows": 4 },
+  "note": "Simulated cycle · not live telemetry",
+  "credit": "live-panel reference · fictional events"
+}

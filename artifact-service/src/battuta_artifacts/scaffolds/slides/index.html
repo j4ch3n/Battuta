@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title }}</title>
+    <meta name="description" content="{{ description }}" />
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="deck.js"></script>
+    <script type="module" src="plot.js"></script>
+    <script type="module" src="scene.js"></script>
+  </head>
+  <body>
+    <main id="deck" aria-label="Presentation">
+      <section class="slide" aria-label="Introduction">
+        <h1>{{ title }}</h1>
+        <p class="lead">{{ description }}</p>
+        <p>Illustrative reference deck · fictional data, not measured findings.</p>
+        <p>Use the arrow keys or the Previous and Next buttons.</p>
+      </section>
+      <section class="slide" aria-label="Decision">
+        <h2>Capacity is a constraint, not a performance claim</h2>
+        <p>
+          Start small if the working set fits with measured headroom. Buy more capacity only when
+          the constraint justifies it.
+        </p>
+        <ul>
+          <li>Measure peaks rather than relying on averages.</li>
+          <li>Compare the same workload and operating period.</li>
+          <li>Validate the choice before committing.</li>
+        </ul>
+        <h3>A bounded breakdown</h3>
+        <ol>
+          <li>Measure the working set.</li>
+          <li>Compare viable plans.</li>
+          <li>Test the preferred plan.</li>
+        </ol>
+      </section>
+      <section class="slide" aria-label="Trade-offs">
+        <h2>Explain what each option buys</h2>
+        <div class="cards">
+          <article>
+            <h3>Plan A</h3>
+            <p>24 GB of illustrative capacity. Lower commitment, less room for unexpected peaks.</p>
+          </article>
+          <article>
+            <h3>Plan B</h3>
+            <p>48 GB of illustrative capacity. More headroom, with a higher commitment.</p>
+          </article>
+        </div>
+        <table>
+          <caption>
+            Fictional plans · like-for-like capacity
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Plan</th>
+              <th scope="col">Capacity</th>
+              <th scope="col">Key condition</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">A</th>
+              <td>24 GB</td>
+              <td>Working set fits</td>
+            </tr>
+            <tr>
+              <th scope="row">B</th>
+              <td>48 GB</td>
+              <td>Additional headroom needed</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+      <section class="slide" aria-label="Plot">
+        <h2>Show the comparison, and its limits</h2>
+        <figure data-plot="data/plot.json">
+          <div class="plot"></div>
+          <figcaption>
+            Illustrative capacity: Plan A 24 GB; Plan B 48 GB. This does not compare throughput or
+            latency.
+          </figcaption>
+          <p class="figure-status" role="status"></p>
+        </figure>
+        <p>A real decision needs measured workload evidence, not capacity alone.</p>
+      </section>
+      <section class="slide" aria-label="3D">
+        <h2>3D makes headroom spatial</h2>
+        <figure data-scene>
+          <div class="scene"></div>
+          <div class="controls">
+            <button type="button" data-turn="-1">Rotate left</button
+            ><button type="button" data-turn="1">Rotate right</button>
+          </div>
+          <figcaption>
+            An inner working set sits within an outer capacity boundary. The empty space represents
+            headroom, not performance.
+          </figcaption>
+          <p class="figure-status" role="status">
+            Text alternative: total capacity contains the working set and unused headroom.
+          </p>
+        </figure>
+      </section>
+      <section class="slide" aria-label="Conclusion and sources">
+        <h2>Decide only after validating the constraint</h2>
+        <p>
+          The smaller plan is a candidate, not a verified recommendation. Change the choice if
+          measured peaks exceed its safe headroom.
+        </p>
+        <h3>Evidence and uncertainty</h3>
+        <p>
+          The fictional values in this deck are examples. Replace them with source-linked facts,
+          compatible benchmarks and material uncertainty.
+        </p>
+        <p>
+          <a href="https://threejs.org/">Three.js</a> is the 3D technology reference, not evidence
+          for the fictional comparison.
+        </p>
+      </section>
+    </main>
+    <nav aria-label="Slide navigation">
+      <button type="button" id="previous">Previous</button
+      ><output id="position" aria-live="polite"></output
+      ><button type="button" id="next">Next</button>
+    </nav>
+    <p id="overflow" role="status" hidden>
+      Slide content exceeds its stage. Shorten it or split the slide before delivery.
+    </p>
+  </body>
+</html>

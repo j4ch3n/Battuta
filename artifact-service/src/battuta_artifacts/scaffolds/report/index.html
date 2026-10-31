@@ -1,7 +1,140 @@
 <!doctype html>
 <html lang="en">
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{{ title }}</title>
-  <main><h1>{{ title }}</h1><p>{{ description }}</p></main>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="{{ description }}" />
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="plot.js"></script>
+    <script type="module" src="scene.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#content">Skip to report</a>
+    <header>
+      <h1>{{ title }}</h1>
+      <p class="lead">{{ description }}</p>
+      <p class="muted">
+        Reference example · all numbers below are illustrative, not research findings.
+      </p>
+      <nav aria-label="Report sections">
+        <a href="#recommendation">Recommendation</a><a href="#comparison">Comparison</a
+        ><a href="#spatial">3D explanation</a><a href="#sources">Sources</a>
+      </nav>
+    </header>
+    <main id="content">
+      <section id="recommendation">
+        <h2>Start with the decision, then explain the trade-off</h2>
+        <p>
+          This example compares two fictional compute plans. The smaller plan is a useful starting
+          point when the working set fits in memory. The larger plan buys headroom, but that
+          headroom has an operating cost. A real report would replace these assumptions with
+          measured evidence.
+        </p>
+        <ul>
+          <li>Make the recommendation clear without implying certainty.</li>
+          <li>State the condition that would change it.</li>
+          <li>Keep evidence, inference and illustrative material distinct.</li>
+        </ul>
+        <h3>Break the problem into bounded questions</h3>
+        <ol>
+          <li>Measure the actual working set, including peak overhead.</li>
+          <li>Compare capacity and cost under the same workload.</li>
+          <li>Validate the preferred plan before committing.</li>
+        </ol>
+        <div class="cards">
+          <article>
+            <h3>Capacity</h3>
+            <p>
+              The working set must fit with room for peaks. Averages alone do not establish that.
+            </p>
+          </article>
+          <article>
+            <h3>Cost</h3>
+            <p>
+              Compare the same period and utilization assumptions; a lower hourly price is not the
+              full cost.
+            </p>
+          </article>
+        </div>
+      </section>
+      <section id="comparison">
+        <h2>Compare like with like</h2>
+        <p>
+          Plan B offers twice the illustrative capacity of Plan A. The plot shows capacity, not
+          measured performance; it cannot establish throughput or latency.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <caption>
+              Fictional plans · capacity in GB
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Plan</th>
+                <th scope="col">Capacity</th>
+                <th scope="col">Trade-off</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Plan A</th>
+                <td>24 GB</td>
+                <td>Lower commitment; less headroom</td>
+              </tr>
+              <tr>
+                <th scope="row">Plan B</th>
+                <td>48 GB</td>
+                <td>More headroom; higher commitment</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <figure data-plot="data/plot.json">
+          <div class="plot" aria-label="Capacity comparison"></div>
+          <figcaption>
+            Illustrative capacity comparison. Plan A: 24 GB; Plan B: 48 GB. Values are also
+            available in the table.
+          </figcaption>
+          <p class="figure-status" role="status"></p>
+        </figure>
+      </section>
+      <section id="spatial">
+        <h2>Use 3D when space explains the constraint</h2>
+        <p>
+          A transparent boundary represents total capacity. The solid inner block represents a
+          working set. The space between them is headroom, not a performance promise. The geometry
+          is an explanatory model, not a physical device or benchmark.
+        </p>
+        <figure data-scene>
+          <div class="scene" aria-label="Illustrative working set within capacity"></div>
+          <div class="controls">
+            <button type="button" data-turn="-1">Rotate left</button
+            ><button type="button" data-turn="1">Rotate right</button>
+          </div>
+          <figcaption>
+            3D example: an inner working set occupies part of a larger capacity envelope. Use the
+            rotation controls to inspect the relationship.
+          </figcaption>
+          <p class="figure-status" role="status">
+            Text alternative: capacity contains the working set plus unused headroom.
+          </p>
+        </figure>
+      </section>
+      <section id="sources">
+        <h2>Evidence and uncertainty</h2>
+        <p>
+          No external evidence supports the fictional comparison above. Replace these examples with
+          source-linked facts and disclose uncertainty before delivery.
+        </p>
+        <ul>
+          <li>
+            <a href="https://threejs.org/">Three.js</a> powers the local 3D example; this is a
+            technology reference, not evidence for the fictional plans.
+          </li>
+        </ul>
+      </section>
+    </main>
+    <footer>Illustrative reference report · replace examples with supported content.</footer>
+  </body>
 </html>

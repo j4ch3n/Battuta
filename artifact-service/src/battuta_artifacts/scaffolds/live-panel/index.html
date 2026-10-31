@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title }}</title>
+    <meta name="description" content="{{ description }}" />
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="controls.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>{{ title }}</h1>
+      <p>{{ description }}</p>
+      <p>Simulated example · not connected to live services.</p>
+    </header>
+    <main>
+      <div class="controls">
+        <button type="button" id="play" aria-pressed="false">Play simulation</button
+        ><button type="button" id="reset">Reset</button
+        ><label>Time <input id="time" type="range" min="0" max="30" step="0.1" value="0" /></label
+        ><output id="position">0.0 s</output>
+      </div>
+      <iframe
+        title="Simulated planning and review system"
+        src="panel.html?config=config.json&amp;manual=1"
+      ></iframe>
+      <p role="status" id="status">Static view. Play or scrub to inspect the simulated cycle.</p>
+      <details>
+        <summary>Text alternative: how this system works</summary>
+        <p>
+          A planner sends work to a coder and a tester. A reviewer checks the results. Counters and
+          a session log illustrate progress; all values and events are simulated. This is an
+          explanation, not operational monitoring.
+        </p>
+      </details>
+    </main>
+  </body>
+</html>
