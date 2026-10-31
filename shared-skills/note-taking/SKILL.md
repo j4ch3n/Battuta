@@ -55,8 +55,7 @@ Avoids preserving credentials or unnecessary debugging chronology.
 
 ## Workflow
 
-1. Read the [command reference](references/commands.md) before invocation. Select
-   project or general scope explicitly; PM and TL have independent notebooks.
+1. Select project or general scope explicitly; PM and TL have independent notebooks.
 2. Append one physical line per finding, including its source and material limits
    where relevant. Preserve the distinction between evidence and inference.
 3. Search for relevant terms, then read surrounding numbered lines when useful.
@@ -68,3 +67,90 @@ Avoids preserving credentials or unnecessary debugging chronology.
 
 Use the memory skill for confirmed enduring context, not temporary research state.
 A notebook needs no TODO list. Keep credentials and unrelated private data out.
+
+## Scope and identity
+
+PM and TL invoke `battuta-project note` through the shell. `AGENT_ROLE` selects
+`pm` or `tl`; `--scope` is always explicit:
+
+- `project`: the selected registered project. Check `battuta-project current` and
+  select the intended project with `switch` if needed.
+- `general`: no project ownership; needs no selected project and does not change
+  project selection.
+
+Each role/scope has an independent notebook. The first item or draft creates its
+work ID; later appends and session restarts reuse it. TODO creation/rotation never
+changes the notebook, and notes never change TODO work. Commands target only the
+current notebook; there is no rotation or historical selector.
+
+## Append a learning, finding, or thought
+
+```sh
+battuta-project note --scope general item \
+  --text "Finding: Retry-After is expressed in seconds, not milliseconds."
+```
+
+`--text` preserves Markdown, Unicode and surrounding whitespace. Blank input, NUL
+and line separators are rejected: each note is one physical line. Appending reports
+the work reference, file and new line number. There are no note edit/delete commands.
+
+## Search and retrieve
+
+```sh
+battuta-project note --scope general item --search "Retry-After"
+battuta-project note --scope general item --list --from-line 2 --to-line 4
+battuta-project note --scope general item --list --from-line 3 --to-line 3
+battuta-project note --scope general item --list
+```
+
+Search is literal and case-insensitive, not a regular expression. Quote queries
+as ordinary shell data. Results include source line numbers:
+
+```text
+2. Finding: Retry-After is expressed in seconds, not milliseconds.
+```
+
+Search-then-read and full reads are both available; neither is mandatory. Line
+numbers start at 1, and ranges include both endpoints. Omitting `--to-line` reads
+through the end. Invalid/reversed ranges fail; a start beyond EOF returns no notes,
+and an end beyond EOF returns the available suffix. No search matches is success.
+
+## Optional output limits
+
+```sh
+battuta-project note --scope general item --search "retry" --limit 5
+battuta-project note --scope general item --list --limit 20
+```
+
+Without `--limit`, results have no application-level truncation. Limits count
+complete notes/matches, never characters. If more results exist, output says
+`Truncated` and provides the next source line and a continuation command preserving
+the query, range endpoint and limit. `--from-line` resumes reading/search without
+repeating notes. Line numbers and limits must be positive.
+
+Continuation targets the current project/role notebook: verify selection has not
+changed before resuming. External shell/agent output limits may still clip results;
+choose a smaller limit and resume by source line.
+
+## Outcomes and recovery
+
+`item` requires exactly one of `--text`, `--list` or `--search`. Ranges/limits are
+for reads; `--to-line` applies only to listing. Existing `append`, `read` and
+`search --query` commands remain compatible aliases using the same notebook.
+
+```sh
+battuta-project note --scope general --meta
+```
+
+Metadata shows notebook identity, item count and draft IDs/titles/paths without
+loading bodies. Results identify scope/project, role, work reference, file and
+numbered text. Missing notebooks are successful discovery and create nothing.
+Empty notebooks/ranges return no notes; searches report no matches. Neither falls
+back to another role, scope or older file.
+
+Commands fail noninteractively for missing roles/projects, malformed text, unsafe
+paths, incomplete files or storage errors. Search requires `rg` on PATH; append
+and read do not. Follow the reported error before retrying. A published notebook
+whose file is missing is an inconsistency, not a new empty notebook. Retain files
+after interrupted writes and ask the owner for recovery rather than deleting,
+replacing or silently repairing notes.

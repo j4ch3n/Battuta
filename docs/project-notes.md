@@ -1,7 +1,7 @@
 # Working notebook persistence
 
 Implementation reference for append-only items and editable draft documents.
-Bot-facing item usage belongs in the [notebook command reference](../shared-skills/note-taking/references/commands.md).
+Bot-facing item usage belongs in the [note-taking skill](../shared-skills/note-taking/SKILL.md).
 
 ## Identity and storage
 
