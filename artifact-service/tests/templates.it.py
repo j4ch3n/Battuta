@@ -8,7 +8,7 @@ import threading
 import unittest
 from pathlib import Path
 
-from jinja2 import Environment
+from jinja2 import Environment, PackageLoader, select_autoescape
 
 from battuta_artifacts.bundles import load_bundle
 
@@ -30,6 +30,12 @@ class TemplateBrowserTests(unittest.TestCase):
                     content = Environment(autoescape=True).from_string(content.decode()).render(
                         title="Capacity planning", description="An illustrative reference example").encode()
                 target.write_bytes(content)
+        from battuta_artifacts.markdown import render_markdown
+        markdown = cls.root / 'markdown'
+        markdown.mkdir()
+        viewer = Environment(loader=PackageLoader('battuta_artifacts', 'templates'), autoescape=select_autoescape())
+        (markdown / 'index.html').write_text(viewer.get_template('markdown.html').render(title='Research notes',
+            content=render_markdown(b'# Research notes\n\n- Evidence\n- Uncertainty\n\n<script>alert(1)</script>\n')))
         class QuietHandler(http.server.SimpleHTTPRequestHandler):
             def log_message(self, *_):
                 pass
@@ -133,6 +139,17 @@ class TemplateBrowserTests(unittest.TestCase):
             page.wait_for_function("document.querySelector('iframe').contentWindow.__error")
             page.locator('#reset').click()
             self.assertIn('unavailable', page.locator('#status').inner_text())
+
+    def test_markdown_viewer_is_readable_without_executing_raw_html(self):
+        page = self.page(viewport={'width': 390, 'height': 844})
+        dialogs = []
+        page.on('dialog', lambda dialog: (dialogs.append(dialog.message), dialog.dismiss()))
+        page.goto(f'{self.url}/markdown/')
+        self.assertTrue(page.get_by_role('heading', name='Research notes', exact=True).first.is_visible())
+        self.assertEqual(page.locator('li').count(), 2)
+        self.assertEqual(dialogs, [])
+        self.assertLessEqual(page.evaluate('document.documentElement.scrollWidth'), 390)
+        self.capture(page, 'markdown-390')
 
 
 if __name__ == "__main__":

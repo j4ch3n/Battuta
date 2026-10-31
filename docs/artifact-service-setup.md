@@ -18,7 +18,7 @@ bin/battuta setup-artifacts
 export PATH="$PWD/artifact-service/.venv/bin:$PATH"
 ```
 
-Source setup installs locked dependencies. Release setup verifies bundled wheel checksums and installs dependencies offline; Python/uv must already be available. Both explicitly apply Alembic migrations, preserve registrations, and do not start/restart any service. For upgrades, stop the artifact service and back up the registry first, then rerun setup and restart it. `battuta-artifact setup` applies migrations when the package is already installed.
+Source setup installs locked dependencies. Release setup verifies bundled wheel checksums, installs dependencies offline and reinstalls the bundled artifact/project packages, including template resources; Python/uv must already be available. Both call `battuta-artifact setup` to apply pending Alembic migrations, preserve registrations, and do not start/restart any service. The publication-status migration retains existing registrations as published; newly initialized presentations are drafts. For upgrades, stop the artifact service and back up the registry first, then rerun setup and restart it. `battuta-artifact setup` applies migrations when the updated package is already installed; no separate SQL step is needed.
 
 Use the same `BATTUTA_ARTIFACT_DB` value across setup, CLI, and service if overriding the default. A systemd environment override is not automatically inherited by your terminal or bots. Artifact commands do not load `.env.prod` themselves.
 

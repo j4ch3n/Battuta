@@ -9,9 +9,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from click.testing import CliRunner
+from pydantic import ValidationError
 
 from battuta_artifacts.cli import main
-from battuta_artifacts.registry import Registry, migrate
+from battuta_artifacts.registry import ArtifactError, Registry, migrate
 
 
 class BundleFixture(unittest.TestCase):
@@ -100,6 +101,35 @@ class BundleTests(BundleFixture):
         self.assertFalse((self.project / "artifacts/sizing").exists())
         self.assertEqual(self.store.list(), [])
 
+    def test_copy_failure_and_duplicate_slug_preserve_other_work(self):
+        real_open = os.open
+        def fail_write(path, flags, *args, **kwargs):
+            if path == 'styles.css' and flags & os.O_WRONLY:
+                raise OSError('copy failed')
+            return real_open(path, flags, *args, **kwargs)
+        with patch('battuta_artifacts.bundles.os.open', side_effect=fail_write):
+            self.assertEqual(self.init().exit_code, 5)
+        self.assertFalse((self.project / 'artifacts/sizing').exists())
+        self.assertEqual(self.store.list(), [])
+        self.store.register(slug='sizing', title='Existing', description='Keep', source_root=str(self.home),
+                            entry_path='other.html', format='html', files={'other.html': 'text/html'})
+        self.assertEqual(self.init().exit_code, 4)
+        self.assertFalse((self.project / 'artifacts/sizing').exists())
+        self.assertEqual(self.store.get('sizing')['title'], 'Existing')
+
+    def test_traversal_names_and_symlink_project_ancestors_never_write_outside_project(self):
+        from battuta_artifacts.bundles import initialize
+        for name in ('../escape', '/absolute', 'bad/name', 'Bad', 'bad--name'):
+            with self.subTest(name=name), self.assertRaises((ArtifactError, ValueError)):
+                initialize(self.store, project='procurement', name=name, slug='safe', template='report',
+                           title='Title', description='Description')
+        projects = self.project.parent
+        moved = self.home / 'actual-projects'
+        projects.rename(moved)
+        projects.symlink_to(moved, target_is_directory=True)
+        self.assertNotEqual(self.init().exit_code, 0)
+        self.assertFalse((moved / 'procurement/artifacts').exists())
+
     def test_real_transaction_failure_rolls_back_row_and_new_files(self):
         connect = Registry.connect
         @contextmanager
@@ -138,13 +168,13 @@ class BundleTests(BundleFixture):
         for files in cases:
             with self.subTest(files=files):
                 (template / "file-meta.json").write_text(json.dumps({"entry": "index.html", "files": files}))
-                with self.assertRaises(Exception):
+                with self.assertRaises((ArtifactError, ValidationError, OSError)):
                     initialize(self.store, project="procurement", name="sizing", slug="sizing", template="report",
                                title="Title", description="Description", scaffolds=template.parent)
                 self.assertFalse((self.project / "artifacts").exists())
         (template / "file-meta.json").write_text(json.dumps({"entry": "index.html", "files": [entry]}))
         (template / "unlisted.js").write_text("private")
-        with self.assertRaisesRegex(Exception, "inventory"):
+        with self.assertRaisesRegex(ArtifactError, "inventory"):
             initialize(self.store, project="procurement", name="sizing", slug="sizing", template="report",
                        title="Title", description="Description", scaffolds=self.home)
 

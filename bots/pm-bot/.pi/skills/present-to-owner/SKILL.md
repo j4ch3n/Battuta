@@ -23,27 +23,37 @@ not a renderer to invent unsupported links in the argument.
    mechanism before constructing the page. Preserve sources, alternatives and
    decision-changing uncertainty through the rewrite.
 3. Use [format routing](references/format-routing.md) to choose one primary format.
-   Plain text is often sufficient; table dimensions do not mandate HTML. Load only
-   the selected construction package.
+   Plain text is often sufficient; table dimensions do not mandate HTML. Use the
+   `artifacts` skill to initialize a complete reference bundle rather than
+   constructing a layout or dependencies from scratch. Its template examples are
+   starting points: adapt, replace, remove or extend any implementation as needed.
 4. Choose each interaction for what consequential relationship it teaches, then
    build. The least complexity sufficient to explain may include a replay,
    scenario or assumption control; it does not mean static by default.
 5. Check evidence, reader understanding, layout and actual interaction separately.
    State which checks ran. An attractive render is not evidence of a sound argument.
 
-## Binding for construction packages
+## Presentation checks
 
-The narrative and format decisions above override imported package defaults.
-Packages supply construction guidance, not research method, format authority or
-permission to publish. Retain their local relative layout; they are supporting
-references, not independently activated skills. Upstream revision metadata records
-provenance; the local adaptations are described in [NOTICE](NOTICE).
+- Preserve connected explanation: introduce consequential figures and explain what
+  they establish, what they do not, and why they matter. Interaction is not evidence.
+- Keep evidence, inference and simulated examples distinct. Use meaningful labels,
+  units, captions and source links; compare viable options against the same criteria
+  and retain decision-changing costs and uncertainty.
+- Make the story work without motion or graphics. Verify reading order, keyboard
+  access, narrow screens, reduced motion, and text/error alternatives. Check the
+  whole presentation and its controls, not just the opening viewport.
+
+Retained upstream code/assets are implementation references, not independent
+skills or mandatory construction, storage, dependency-installation or deployment
+recipes. Narrative/format authority stays here; creation and publication stay with
+`artifacts`. Upstream revision metadata and [NOTICE](NOTICE) retain provenance.
 
 ## Delivery
 
 Use the `active-telegram-message` skill for Telegram formatting, buttons, and proactive delivery. Keep controls valid and useful: language guidance does not remove necessary decision context, typed-answer alternatives, or bounded-choice buttons.
 
-Use artifacts to register and serve owner-facing HTML and required assets at the
+Use the `artifacts` skill to initialize drafts and publish owner-facing HTML and required assets at the
 intended sharing scope. Verify the URL before claiming delivery. Local drafts,
 render checks and publication are distinct outcomes; do not deploy elsewhere from
 an imported package's recipe.

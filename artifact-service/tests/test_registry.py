@@ -28,6 +28,10 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(item["template"], "report")
         self.assertEqual([row["slug"] for row in registry.list(published_only=True)], ["old"])
         with sqlite3.connect(self.path) as db:
+            db.execute("""INSERT INTO artifacts (id, slug, title, description, source_root, entry_path, format, created_at, updated_at)
+                       VALUES ('raw', 'raw', 'Raw', 'Default', '/source', 'index.html', 'html', 'now', 'now')""")
+            db.execute("INSERT INTO artifact_files VALUES ('raw', 'index.html', 'text/html')")
+            self.assertEqual(db.execute("SELECT status FROM artifacts WHERE id='raw'").fetchone()[0], 'draft')
             with self.assertRaises(sqlite3.IntegrityError):
                 db.execute("UPDATE artifacts SET status='private'")
 
