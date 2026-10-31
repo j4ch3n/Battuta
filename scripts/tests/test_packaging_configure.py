@@ -34,7 +34,7 @@ class PackagingConfigureTests(unittest.TestCase):
                 summary.mkdir(parents=True)
                 (summary / "prompt.md").write_text("Runtime summary prompt")
                 (summary / "template.md").write_text("Runtime summary template")
-                for name in ("todo", "note-taking", "draft-writing"):
+                for name in ("todo", "note-taking"):
                     skill = root / "shared-skills" / name
                     skill.mkdir(parents=True)
                     (skill / "SKILL.md").write_text(name)
@@ -51,6 +51,8 @@ class PackagingConfigureTests(unittest.TestCase):
                     auth.write_bytes(b'{"sentinel":"private-oauth-token"}\n')
                     auth.chmod(0o600)
                     shutil.copytree(ROOT / "bots" / role / ".pi/skills/memory", skills / "memory")
+                    if role == "pm-bot":
+                        shutil.copytree(ROOT / "bots/pm-bot/.pi/skills/draft-writing", skills / "draft-writing")
                     if personal is not None:
                         (bot / ".pi/ME.md").write_text("Private profile")
                     (bot / "AGENTS_dedicated.md").write_text(role)
@@ -93,7 +95,9 @@ class PackagingConfigureTests(unittest.TestCase):
                         self.assertEqual((link / "references" / "summary" / "template.md").read_text(), "Runtime summary template")
                         self.assertEqual(link.resolve(), source.resolve())
                         self.assertFalse(link.readlink().is_absolute())
-                        for name in ("todo", "note-taking", "draft-writing"):
+                        self.assertEqual((link.parent / "draft-writing/SKILL.md").is_file(), role == "pm-bot")
+                        self.assertFalse((link.parent / "draft-writing").is_symlink())
+                        for name in ("todo", "note-taking"):
                             self.assertEqual((link.parent / name / "SKILL.md").read_text(), name)
                         self.assertFalse((link.parent / "memory").is_symlink())
                         for resource in ("SKILL.md", "references/tools.md"):
@@ -155,7 +159,7 @@ class PackagingMigrationTests(unittest.TestCase):
         (self.root / "bin/node").symlink_to(shutil.which("node"))
         shutil.copytree(ROOT / "bot-setup", self.root / "bot-setup")
         copy_scheduler_runtime(self.root)
-        for name in ("project-context", "todo", "note-taking", "draft-writing"):
+        for name in ("project-context", "todo", "note-taking"):
             (self.root / "shared-skills" / name).mkdir(parents=True)
         (self.root / "bots").mkdir()
         (self.root / "bots/AGENTS_shared.md").write_text("Shared")

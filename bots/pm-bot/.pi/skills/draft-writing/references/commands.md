@@ -1,7 +1,7 @@
 # Draft commands
 
-PM and TL invoke `battuta-project note` through the shell. `AGENT_ROLE` selects
-`pm` or `tl`; each role has independent project/general notebooks. Project scope
+PM invokes `battuta-project note` through the shell with `AGENT_ROLE=pm`.
+PM has independent project/general notebooks. Project scope
 uses the selected registered project: confirm `battuta-project current` and switch
 if necessary. General scope needs no project and does not change selection.
 

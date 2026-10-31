@@ -45,13 +45,14 @@ class ReleaseInstallTests(ConfigFixture):
         )
         self.assertIsNotNone(loop)
         stage = self.root / "dist/stage/battuta"
-        for name in ("project-context", "todo", "note-taking", "draft-writing"):
+        for name in ("project-context", "todo", "note-taking"):
             source = stage / "shared-skills" / name
             source.mkdir(parents=True)
             (source / "SKILL.md").write_text(name)
         (stage / "shared-skills/project-context/references").mkdir()
         for role in ("pm-bot", "tl-bot"):
             shutil.copytree(ROOT / "bots" / role / ".pi/skills/memory", stage / "bots" / role / ".pi/skills/memory")
+        shutil.copytree(ROOT / "bots/pm-bot/.pi/skills/draft-writing", stage / "bots/pm-bot/.pi/skills/draft-writing")
         result = subprocess.run(["bash", "-euc", textwrap.dedent(loop.group())], cwd=self.root, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         for role in ("pm-bot", "tl-bot"):
@@ -59,7 +60,10 @@ class ReleaseInstallTests(ConfigFixture):
             self.assertFalse(memory.is_symlink())
             self.assertEqual((memory / "SKILL.md").read_text(), (ROOT / "bots" / role / ".pi/skills/memory/SKILL.md").read_text())
             self.assertTrue((memory / "references/tools.md").is_file())
-            for name in ("project-context", "todo", "note-taking", "draft-writing"):
+            draft = memory.parent / "draft-writing"
+            self.assertFalse(draft.is_symlink())
+            self.assertEqual(draft.exists(), role == "pm-bot")
+            for name in ("project-context", "todo", "note-taking"):
                 self.assertTrue((memory.parent / name).is_symlink())
                 self.assertEqual((memory.parent / name / "SKILL.md").read_text(), name)
 

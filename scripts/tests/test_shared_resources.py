@@ -11,8 +11,35 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SharedResourceTests(unittest.TestCase):
+    def test_release_removes_only_owned_shared_draft_links(self):
+        for role, existing in product(("pm", "tl"), ("owned", "custom")):
+            with self.subTest(role=role, existing=existing), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                bot = root / f"bots/{role}-bot"
+                draft = bot / ".pi/skills/draft-writing"
+                draft.parent.mkdir(parents=True)
+                if existing == "owned":
+                    draft.symlink_to("../../../../shared-skills/draft-writing")
+                else:
+                    draft.mkdir()
+                    (draft / "SKILL.md").write_text("Custom")
+                for name in ("project-context", "todo", "note-taking"):
+                    (root / "shared-skills" / name).mkdir(parents=True)
+                (root / "bots/AGENTS_shared.md").write_text("Shared")
+                (bot / "AGENTS_dedicated.md").write_text("Dedicated")
+                result = subprocess.run([
+                    "node", "--input-type=module", "-e",
+                    "const {configureSharedResources} = await import(process.argv[1]); await configureSharedResources(process.argv[2], process.argv[3]);",
+                    str(ROOT / "packaging/shared-resources.mjs"), str(root), str(bot),
+                ], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertFalse(draft.is_symlink())
+                self.assertEqual(draft.exists(), existing == "custom")
+                if existing == "custom":
+                    self.assertEqual((draft / "SKILL.md").read_text(), "Custom")
+
     def test_release_working_skill_conflicts_and_missing_sources_fail_safely(self):
-        for role, name, kind in product(("pm", "tl"), ("todo", "note-taking", "draft-writing"), ("directory", "file", "symlink", "missing")):
+        for role, name, kind in product(("pm", "tl"), ("todo", "note-taking"), ("directory", "file", "symlink", "missing")):
             with self.subTest(role=role, name=name, kind=kind), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 bot = root / f"bots/{role}-bot"
@@ -20,7 +47,7 @@ class SharedResourceTests(unittest.TestCase):
                 target.parent.mkdir(parents=True)
                 (root / "bots/AGENTS_shared.md").write_text("Shared")
                 (bot / "AGENTS_dedicated.md").write_text("Dedicated")
-                for skill in ("project-context", "todo", "note-taking", "draft-writing"):
+                for skill in ("project-context", "todo", "note-taking"):
                     if kind != "missing" or skill != name:
                         (root / "shared-skills" / skill).mkdir(parents=True)
                 if kind == "directory":
@@ -53,7 +80,7 @@ class SharedResourceTests(unittest.TestCase):
                 bot.mkdir(parents=True)
                 (root / "bots/AGENTS_shared.md").write_text("Shared")
                 (bot / "AGENTS_dedicated.md").write_text("Dedicated")
-                for name in ("project-context", "todo", "note-taking", "draft-writing"):
+                for name in ("project-context", "todo", "note-taking"):
                     source = root / "shared-skills" / name
                     (source / "references").mkdir(parents=True)
                     (source / "SKILL.md").write_text(name)
@@ -65,7 +92,7 @@ class SharedResourceTests(unittest.TestCase):
                         str(ROOT / "packaging/shared-resources.mjs"), str(root), str(bot),
                     ], capture_output=True, text=True)
                     self.assertEqual(result.returncode, 0, result.stderr)
-                    for name in ("project-context", "todo", "note-taking", "draft-writing"):
+                    for name in ("project-context", "todo", "note-taking"):
                         link = bot / ".pi/skills" / name
                         self.assertEqual(link.resolve(), (root / "shared-skills" / name).resolve())
                         self.assertEqual((link / "references/commands.md").read_text(), f"{name} commands")
@@ -79,7 +106,7 @@ class SharedResourceTests(unittest.TestCase):
                 bot = root / f"bots/custom-{role}"
                 link = bot / ".pi/skills/memory"
                 link.parent.mkdir(parents=True)
-                for name in ("project-context", "todo", "note-taking", "draft-writing"):
+                for name in ("project-context", "todo", "note-taking"):
                     (root / "shared-skills" / name).mkdir(parents=True)
                 (root / "bots/AGENTS_shared.md").write_text("Shared")
                 (bot / "AGENTS_dedicated.md").write_text("Dedicated")
@@ -112,7 +139,7 @@ class SharedResourceTests(unittest.TestCase):
                 root = Path(directory)
                 helper = root / "shared-resources.mjs"
                 shutil.copyfile(ROOT / "packaging/shared-resources.mjs", helper)
-                for name in ("project-context", "todo", "note-taking", "draft-writing"):
+                for name in ("project-context", "todo", "note-taking"):
                     (root / "shared-skills" / name).mkdir(parents=True)
                 source = root / f"bots/{role}-bot/.pi/skills/memory"
                 (source / "references").mkdir(parents=True)

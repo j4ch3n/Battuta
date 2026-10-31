@@ -12,7 +12,7 @@ published artifacts. Research and editorial judgement belong to the task at hand
 ## Workflow
 
 1. Read the [command reference](references/commands.md). Choose project or general
-   scope explicitly; PM and TL have independent notebooks.
+   scope explicitly; use PM's notebook.
 2. Pipe the complete document to creation with a descriptive title. The CLI assigns
    its ID and registers the file automatically; do not fabricate bookkeeping.
 3. Creation returns the absolute path and full content. Read/edit that path with

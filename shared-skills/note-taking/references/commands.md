@@ -83,7 +83,7 @@ are for reads; `--to-line` applies only to listing. Existing `append`, `read`, a
 
 Use `battuta-project note --scope general --meta` (or project scope) to discover
 notebook identity, item count and draft IDs/titles/paths without loading bodies.
-Use the draft-writing skill for complete long-form documents and their retrieval.
+PM uses the draft-writing skill for complete long-form documents and their retrieval.
 
 Results identify scope/project, role, work reference, file, and numbered text.
 Missing notebooks are successful discovery results and create no notebook. Empty

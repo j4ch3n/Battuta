@@ -17,6 +17,7 @@ AGENTS.md
 !.pi/skills/artifacts/
 !.pi/skills/present-to-owner/
 !.pi/skills/research/
+!.pi/skills/draft-writing/
 !.pi/extensions/
 .pi/extensions/*
 !.pi/extensions/pm-bot/
