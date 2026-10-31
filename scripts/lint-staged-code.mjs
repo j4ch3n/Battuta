@@ -19,7 +19,8 @@ function run(command, args, cwd = root) {
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
-if (nodeFiles.length) run("pnpm", ["exec", "eslint", "--max-warnings=0", ...nodeFiles]);
+if (nodeFiles.length)
+  run("pnpm", ["exec", "eslint", "--no-warn-ignored", "--max-warnings=0", ...nodeFiles]);
 for (const [name, files] of functions) {
   run("deno", ["lint", ...files], resolve(root, "supabase/functions", name));
 }

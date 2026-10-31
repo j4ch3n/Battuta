@@ -1,0 +1,88 @@
+:root {
+  color-scheme: light;
+  font:
+    17px/1.6 system-ui,
+    sans-serif;
+  color: #172c3e;
+  background: #f8fbfd;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0 auto;
+  max-width: 76rem;
+  padding: 2rem 1.5rem;
+}
+h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+p {
+  max-width: 72ch;
+  overflow-wrap: anywhere;
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding-block: 1rem;
+}
+button {
+  font: inherit;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: 1px solid #a3bdcd;
+  color: #185e81;
+  background: white;
+  cursor: pointer;
+}
+button:hover {
+  background: #e2f0f7;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+input {
+  min-height: 44px;
+  accent-color: #185e81;
+}
+output {
+  font-variant-numeric: tabular-nums;
+}
+iframe {
+  display: block;
+  width: 100%;
+  height: min(78vh, 900px);
+  border: 1px solid #a3bdcd;
+  background: #111;
+}
+details {
+  margin-block: 1.5rem;
+}
+summary {
+  cursor: pointer;
+  min-height: 44px;
+}
+:focus-visible {
+  outline: 3px solid #185e81;
+  outline-offset: 4px;
+}
+::selection {
+  color: #142d3d;
+  background: #c1e4f5;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

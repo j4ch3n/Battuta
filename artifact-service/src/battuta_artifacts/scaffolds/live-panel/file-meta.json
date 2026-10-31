@@ -1,0 +1,42 @@
+{
+  "entry": "index.html",
+  "files": [
+    {
+      "path": "index.html",
+      "purpose": "System explanation with accessible simulation controls and text alternative.",
+      "serve": true
+    },
+    { "path": "styles.css", "purpose": "Responsive panel page and controls.", "serve": true },
+    {
+      "path": "controls.js",
+      "purpose": "Opt-in play/pause, deterministic scrubbing and failure state.",
+      "serve": true
+    },
+    {
+      "path": "panel.html",
+      "purpose": "Existing live-panel HTML runtime, rendering config.json at a stable layout.",
+      "serve": true
+    },
+    {
+      "path": "config.json",
+      "purpose": "Ready-made simulated system configuration and computed layout.",
+      "serve": true
+    },
+    {
+      "path": "system.json",
+      "purpose": "Semantic rows, relationships and counters used for the example; not served.",
+      "serve": false
+    },
+    {
+      "path": "scaffold.py",
+      "purpose": "Optional dependency-free semantic layout helper; not served.",
+      "serve": false
+    },
+    { "path": "NOTICE.txt", "purpose": "Retained upstream MIT license notices.", "serve": true },
+    {
+      "path": "USAGE.md",
+      "purpose": "Reference-example usage and capabilities; not served.",
+      "serve": false
+    }
+  ]
+}

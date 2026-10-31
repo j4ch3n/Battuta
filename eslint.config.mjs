@@ -22,7 +22,10 @@ export default defineConfig(
     languageOptions: { globals: globals.node },
   },
   {
-    files: ["artifact-service/src/battuta_artifacts/assets/*.js"],
+    files: [
+      "artifact-service/src/battuta_artifacts/assets/*.js",
+      "artifact-service/src/battuta_artifacts/scaffolds/**/*.js",
+    ],
     languageOptions: { globals: globals.browser },
   },
   {

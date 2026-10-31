@@ -47,12 +47,17 @@ def main(ctx, json_output):
 def output(ctx, json_output, **payload):
     if json_output or ctx.obj["json"]:
         click.echo(json.dumps({"ok": True, **payload}))
+    elif "directory" in payload:
+        from .bundles import file_tree
+        click.echo(payload["guidance"] + "\n\nFiles and purposes:\n" + file_tree(payload["files"]))
     elif "artifact" in payload:
         item = payload["artifact"]
-        click.echo(f"{item['slug']} (revision {item['revision']})\nDeployed: {item['url']}\nCheck locally: {item['local_url']}")
+        click.echo(f"{item['slug']} — {item['status']} (revision {item['revision']})")
+        if "url" in item:
+            click.echo(f"URL: {item['url']}\nCheck locally: {item['local_url']}")
     elif "artifacts" in payload:
         for item in payload["artifacts"]:
-            click.echo(f"{item['slug']}\t{item['title']}\t{item['description']}\t{item['url']}")
+            click.echo(f"{item['slug']}\t{item['status']}\t{item['title']}\t{item['description']}\t{item.get('url', '')}")
     else:
         click.echo(payload.get("message", "Done."))
 
@@ -64,6 +69,8 @@ def registry():
 
 
 def presented(item):
+    if item["status"] != "published":
+        return item
     public_path = f"/a/{item['slug']}/"
     local_path = f"/artifacts{public_path}"
     return {**item, "url": f"{public_base_url()}{public_path}", "local_url": f"http://127.0.0.1:8000{local_path}"}
@@ -90,16 +97,59 @@ def setup(ctx, json_output):
 
 
 @main.command()
+@click.argument("name")
+@click.option("--project", required=True)
+@click.option("--slug")
+@click.option("--template", default="report", help="Packaged reference template; see the artifacts skill for selection guidance.")
+@click.option("--title", required=True)
+@click.option("--description", required=True)
+@json_option
+@click.pass_context
+def init(ctx, name, project, slug, template, title, description, json_output):
+    """Initialize a project-owned reference bundle as a private draft."""
+    from .bundles import initialize
+    output(ctx, json_output, **initialize(registry(), project=project, name=name, slug=slug or name,
+                                         template=template, title=title, description=description))
+
+
+@main.command()
+@click.option("--project", required=True)
+@click.option("--artifact", required=True, help="Artifact name within the owning project.")
+@click.option("--file", "files", multiple=True, help="Explicit additional relative asset; repeat for each file.")
+@click.option("--expected-revision", type=click.IntRange(min=1))
+@json_option
+@click.pass_context
+def publish(ctx, project, artifact, files, expected_revision, json_output):
+    """Publish an existing project draft after validating its exact intended files."""
+    public_base_url()  # Validate output configuration before making anything public.
+    store = registry()
+    current = store.project_artifact(project, artifact)
+    store._expect(current, expected_revision)
+    paths = [path for path in current["files"] if path != current["entry_path"]]
+    mapping = assemble_files(Path(current["source_root"]), current["entry_path"], tuple(dict.fromkeys([*paths, *files])))
+    item = store.publish(current["slug"], files=mapping["files"], expected_revision=current["revision"])
+    output(ctx, json_output, artifact=presented(item))
+
+
+@main.command("add-file")
+@click.option("--type", "file_type", type=click.Choice(["markdown"]), required=True)
+@click.option("--file", "source", type=click.Path(path_type=Path), required=True)
 @click.option("--slug", required=True)
 @click.option("--title", required=True)
 @click.option("--description", required=True)
-@file_options
 @json_option
 @click.pass_context
-def register(ctx, slug, title, description, root, entry, files, json_output):
-    """Register a new artifact and exact file allowlist."""
+def add_file(ctx, file_type, source, slug, title, description, json_output):
+    """Immediately publish one existing absolute UTF-8 Markdown file in place."""
+    from .files import open_source
     metadata = Metadata(slug=slug, title=title, description=description)
-    item = registry().register(**metadata.model_dump(), **assemble_files(root, entry, files))
+    public_base_url()
+    store = registry()
+    if not source.is_absolute() or source.suffix.lower() not in (".md", ".markdown"):
+        raise ArtifactError("Provide an absolute Markdown file path (.md or .markdown).")
+    with open_source(str(source.parent), source.name) as stream:
+        stream.read().decode("utf-8")
+    item = store.register(**metadata.model_dump(), **assemble_files(None, str(source), ()), status="published")
     output(ctx, json_output, artifact=presented(item))
 
 
@@ -116,6 +166,7 @@ def update(ctx, slug, title, description, expected_revision, json_output):
         raise ArtifactError("Provide --title or --description.")
     store = registry()
     current = store.get(slug)
+    presented(current)
     Metadata(slug=slug, title=title if title is not None else current["title"],
              description=description if description is not None else current["description"])
     output(ctx, json_output, artifact=presented(store.update_metadata(slug, title=title, description=description,
@@ -130,7 +181,14 @@ def update(ctx, slug, title, description, expected_revision, json_output):
 @click.pass_context
 def replace_files(ctx, slug, root, entry, files, expected_revision, json_output):
     """Replace the complete file configuration; omitted files lose access."""
-    item = registry().replace_files(slug, **assemble_files(root, entry, files), expected_revision=expected_revision)
+    store = registry()
+    current = store.get(slug)
+    presented(current)
+    mapping = assemble_files(root, entry, files)
+    if current["project"] is not None and (mapping["source_root"] != current["source_root"] or mapping["entry_path"] != "index.html"):
+        raise ArtifactError("Project presentations retain their managed directory and index.html entry.")
+    store._expect(current, expected_revision)
+    item = store.replace_files(slug, **mapping, expected_revision=current["revision"])
     output(ctx, json_output, artifact=presented(item))
 
 

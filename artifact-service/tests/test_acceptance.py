@@ -24,6 +24,7 @@ class AcceptanceTests(unittest.TestCase):
             (source / "app.js").write_text("console.log('demo')")
             (source / "secret.txt").write_text("unregistered")
             env = {**os.environ, "BATTUTA_ARTIFACT_DB": str(root / "registry.sqlite3"),
+                   "HOME": str(root),
                    "BATTUTA_ARTIFACT_BASE_URL": "https://artifacts.example.test/artifacts"}
             command = [sys.executable, "-c", "from battuta_artifacts.cli import main; main()"]
 
@@ -33,8 +34,17 @@ class AcceptanceTests(unittest.TestCase):
                 return json.loads(result.stdout)
 
             cli("setup")
-            cli("register", "--slug", "demo", "--title", "Demo", "--description", "Walkthrough",
-                "--root", str(source), "--entry", "index.html", "--file", "main.css", "--file", "app.js")
+            project = root / ".battuta/projects/procurement"
+            (project / "code").mkdir(parents=True)
+            (project / "project.yaml").write_text(json.dumps({"version": 1,
+                "project": {"name": "procurement", "path": str(project / "code")},
+                "linear": {"project_id": None, "team_id": None}, "github": {"repository": None}}))
+            initialized = cli("init", "demo", "--project", "procurement", "--title", "Demo", "--description", "Walkthrough")
+            destination = Path(initialized["directory"])
+            for file in source.iterdir():
+                (destination / file.name).write_bytes(file.read_bytes())
+            source = destination
+            cli("replace-files", "demo", "--root", str(source), "--entry", "index.html", "--file", "main.css", "--file", "app.js")
             with (root / "server.log").open("w+") as log:
                 process = subprocess.Popen([*command, "serve", "--port", "0"], env=env, stdout=log, stderr=log)
                 try:
@@ -53,6 +63,11 @@ class AcceptanceTests(unittest.TestCase):
                         with urlopen(address + path, timeout=4) as response:
                             return response.read().decode()
 
+                    self.assertEqual(json.loads(get("/artifacts/catalog")), {"artifacts": []})
+                    with self.assertRaises(HTTPError) as error:
+                        get("/artifacts/a/demo/app.js")
+                    self.assertEqual(error.exception.code, 404)
+                    cli("publish", "--project", "procurement", "--artifact", "demo")
                     self.assertIn("Demo", get("/artifacts/"))
                     self.assertIn('src="app.js"', get("/artifacts/a/demo/"))
                     self.assertIn("color: green", get("/artifacts/a/demo/main.css"))
@@ -79,12 +94,17 @@ class AcceptanceTests(unittest.TestCase):
                     self.assertIn("Updated", get("/artifacts/"))
                     (source / "report.md").write_text("# Report\n\n![Image](chart.png)")
                     (source / "chart.png").write_bytes(b"trusted extension")
-                    cli("replace-files", "demo", "--root", str(source), "--entry", "report.md", "--file", "chart.png")
-                    self.assertIn("<h1>Report</h1>", get("/artifacts/a/demo/"))
+                    cli("add-file", "--type", "markdown", "--file", str(source / "report.md"), "--slug", "notes",
+                        "--title", "Research", "--description", "Existing Markdown")
+                    self.assertIn("<h1>Report</h1>", get("/artifacts/a/notes/"))
+                    with self.assertRaises(HTTPError):
+                        get("/artifacts/a/notes/chart.png")
+                    cli("replace-files", "demo", "--root", str(source), "--entry", "index.html")
                     with self.assertRaises(HTTPError) as error:
                         get("/artifacts/a/demo/app.js")
                     self.assertEqual(error.exception.code, 404)
                     cli("deregister", "demo")
+                    cli("deregister", "notes")
                     self.assertEqual(json.loads(get("/artifacts/catalog")), {"artifacts": []})
                     with self.assertRaises(HTTPError) as error:
                         get("/artifacts/a/demo/")

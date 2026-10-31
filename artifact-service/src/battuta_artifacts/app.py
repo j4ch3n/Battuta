@@ -47,7 +47,7 @@ def create_app(path: Path | None = None) -> FastAPI:
 
     def catalog():
         return [{**{key: row[key] for key in ("slug", "title", "description", "format", "revision", "updated_at")},
-                 "url": f"/artifacts/a/{row['slug']}/"} for row in registry.list()]
+                 "url": f"/artifacts/a/{row['slug']}/"} for row in registry.list(published_only=True)]
 
     @app.get("/artifacts/")
     def index():
@@ -84,6 +84,8 @@ def create_app(path: Path | None = None) -> FastAPI:
     def artifact(slug: str, path: str = ""):
         try:
             item = registry.get(slug)
+            if item["status"] != "published":
+                raise HTTPException(404, "Artifact resource not found")
             selected = path or item["entry_path"]
             if selected not in item["files"]:
                 raise HTTPException(404, "Artifact resource not found")

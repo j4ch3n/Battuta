@@ -23,7 +23,7 @@ class HttpFixture(unittest.TestCase):
         (self.source / "secret.txt").write_text("private")
         migrate(self.db)
         self.registry = Registry(self.db)
-        self.registry.register(slug="demo", title="Demo", description="Description", source_root=str(self.source),
+        self.registry.register(slug="demo", title="Demo", description="Description", source_root=str(self.source), status="published",
                                entry_path="index.html", format="html",
                                files={"index.html": "text/html", "js/app.js": "text/javascript"})
 

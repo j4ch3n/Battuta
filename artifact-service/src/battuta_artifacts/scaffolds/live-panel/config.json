@@ -1,0 +1,326 @@
+{
+  "meta": {
+    "title": "Planning to verified review",
+    "lang": "en"
+  },
+  "canvas": {
+    "preset": "4:5",
+    "duration": 30,
+    "fps": 30,
+    "preroll": 12
+  },
+  "theme": {
+    "preset": "terminal-dark",
+    "fontSize": 21,
+    "lineHeight": 30,
+    "colors": {
+      "mute": "#aab1c0",
+      "rd": "#f07178"
+    }
+  },
+  "machines": {
+    "tokens": {
+      "type": "counter",
+      "start": 1000,
+      "rate": 20,
+      "format": "comma"
+    },
+    "coder_l": {
+      "type": "lane",
+      "period": 7.5,
+      "run": 5.1,
+      "off": 0.3,
+      "busy": "running",
+      "done": ["ready"],
+      "phase": 0,
+      "log": {
+        "who": "coder",
+        "c": "gr",
+        "msgs": [["implementation prepared", ""]]
+      }
+    },
+    "tester_l": {
+      "type": "lane",
+      "period": 8.5,
+      "run": 5.8,
+      "off": 1.0,
+      "busy": "running",
+      "done": ["verified"],
+      "phase": 1,
+      "log": {
+        "who": "tester",
+        "c": "pu",
+        "msgs": [["checks completed", ""]]
+      }
+    }
+  },
+  "elements": [
+    {
+      "type": "text",
+      "x": 0,
+      "w": 1200,
+      "y": 84,
+      "align": "center",
+      "size": 24,
+      "c": "wh",
+      "b": 1,
+      "t": "Planning to verified review"
+    },
+    {
+      "type": "rule",
+      "x": 34,
+      "y": 112,
+      "w": 1132
+    },
+    {
+      "type": "text",
+      "x": 0,
+      "w": 1200,
+      "y": 1456,
+      "align": "center",
+      "size": 13,
+      "c": "dim",
+      "t": "Simulated cycle · not live telemetry"
+    },
+    {
+      "type": "text",
+      "x": 34,
+      "w": 1132,
+      "y": 1424,
+      "runs": [
+        {
+          "t": "illustrative tokens ",
+          "c": "dim"
+        },
+        {
+          "t": "[",
+          "c": "gr",
+          "b": 1
+        },
+        {
+          "v": "tokens",
+          "c": "gr",
+          "b": 1
+        },
+        {
+          "t": "]",
+          "c": "gr",
+          "b": 1
+        }
+      ]
+    },
+    {
+      "type": "path",
+      "points": [
+        [600, 390],
+        [600, 505],
+        [314, 505],
+        [314, 618]
+      ],
+      "color": "line",
+      "r": 0,
+      "width": 2,
+      "flow": {
+        "period": 1.8,
+        "offsets": [0, 0.9],
+        "color": "bl"
+      }
+    },
+    {
+      "type": "path",
+      "points": [
+        [600, 390],
+        [600, 505],
+        [886, 505],
+        [886, 618]
+      ],
+      "color": "line",
+      "r": 0,
+      "width": 2,
+      "flow": {
+        "period": 2.1,
+        "offsets": [0, 0.9],
+        "color": "bl"
+      }
+    },
+    {
+      "type": "path",
+      "points": [
+        [314, 735],
+        [314, 850],
+        [600, 850],
+        [600, 963]
+      ],
+      "color": "line",
+      "r": 0,
+      "width": 2,
+      "flow": {
+        "period": 2.4,
+        "offsets": [0, 0.9],
+        "color": "bl"
+      }
+    },
+    {
+      "type": "path",
+      "points": [
+        [886, 735],
+        [886, 850],
+        [600, 850],
+        [600, 963]
+      ],
+      "color": "line",
+      "r": 0,
+      "width": 2,
+      "flow": {
+        "period": 2.7,
+        "offsets": [0, 0.9],
+        "color": "bl"
+      }
+    },
+    {
+      "type": "box",
+      "x": 320,
+      "y": 275,
+      "w": 560,
+      "h": 115,
+      "color": "cy",
+      "pad": [13, 14],
+      "lines": [
+        {
+          "t": "Planner",
+          "c": "cy",
+          "b": 1
+        },
+        {
+          "t": "defines the task",
+          "c": "mute"
+        },
+        {
+          "t": "delegates bounded work",
+          "c": "mute"
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "x": 40,
+      "y": 620,
+      "w": 549,
+      "h": 115,
+      "color": "gr",
+      "pad": [13, 14],
+      "lines": [
+        {
+          "t": "Coder",
+          "c": "fg",
+          "b": 1
+        },
+        {
+          "t": "implements the change",
+          "c": "mute"
+        },
+        {
+          "runs": [
+            {
+              "v": "coder_l"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "x": 611,
+      "y": 620,
+      "w": 549,
+      "h": 115,
+      "color": "pu",
+      "pad": [13, 14],
+      "lines": [
+        {
+          "t": "Tester",
+          "c": "fg",
+          "b": 1
+        },
+        {
+          "t": "checks the behavior",
+          "c": "mute"
+        },
+        {
+          "runs": [
+            {
+              "v": "tester_l"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "x": 320,
+      "y": 965,
+      "w": 560,
+      "h": 115,
+      "color": "cy",
+      "pad": [13, 14],
+      "lines": [
+        {
+          "t": "Reviewer",
+          "c": "cy",
+          "b": 1
+        },
+        {
+          "t": "assesses results",
+          "c": "mute"
+        },
+        {
+          "t": "returns findings",
+          "c": "mute"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "x": 40,
+      "y": 1243,
+      "w": 1120,
+      "rows": 4,
+      "padTop": 16,
+      "padBottom": 29,
+      "padLeft": 20,
+      "title": "simulated session",
+      "titleX": 38,
+      "titleW": 254,
+      "cols": [
+        {
+          "key": "time",
+          "x": 0
+        },
+        {
+          "key": "who",
+          "x": 123
+        },
+        {
+          "key": "m",
+          "x": 222
+        },
+        {
+          "key": "g",
+          "x": 760
+        }
+      ]
+    }
+  ],
+  "clock": {
+    "start": "23:48:04",
+    "rate": 3
+  },
+  "titlebar": {
+    "text": "Illustrative system · simulated"
+  },
+  "credit": {
+    "text": "live-panel reference · fictional events",
+    "y": 1484,
+    "size": 12
+  }
+}

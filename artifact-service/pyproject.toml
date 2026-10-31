@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Allowlisted local artifact catalog and HTTP service"
 requires-python = ">=3.12"
 dependencies = [
+    "battuta-project",
     "aiosqlite>=0.21,<1",
     "alembic>=1.16,<2",
     "click>=8.1,<9",
@@ -18,6 +19,9 @@ dependencies = [
 
 [dependency-groups]
 dev = ["httpx2"]
+
+[tool.uv.sources]
+battuta-project = { path = "../shared-skills/project-context-cli" }
 
 [project.scripts]
 battuta-artifact = "battuta_artifacts.cli:main"

@@ -5,6 +5,49 @@ from pathlib import Path
 
 
 class RegistryTests(unittest.TestCase):
+    def test_upgrade_preserves_published_records_and_defaults_new_rows_to_draft(self):
+        from alembic import command
+        from sqlalchemy import URL, create_engine
+        from battuta_artifacts.registry import Registry, migrate, migration_config
+
+        engine = create_engine(URL.create("sqlite", database=str(self.path)))
+        with engine.begin() as connection:
+            config = migration_config()
+            config.attributes["connection"] = connection
+            command.upgrade(config, "0001_registry")
+            connection.exec_driver_sql("INSERT INTO artifacts VALUES ('old', 'old', 'Old', 'Existing', '/source', 'index.html', 'html', 1, 'then', 'then')")
+            connection.exec_driver_sql("INSERT INTO artifact_files VALUES ('old', 'index.html', 'text/html')")
+        engine.dispose()
+        migrate(self.path)
+        registry = Registry(self.path)
+        self.assertEqual(registry.get("old")["status"], "published")
+        item = registry.register(slug="new", title="New", description="Draft", source_root="/source",
+                                 entry_path="index.html", format="html", files={"index.html": "text/html"},
+                                 template="report", project="procurement", name="new")
+        self.assertEqual(item["status"], "draft")
+        self.assertEqual(item["template"], "report")
+        self.assertEqual([row["slug"] for row in registry.list(published_only=True)], ["old"])
+        with sqlite3.connect(self.path) as db:
+            db.execute("""INSERT INTO artifacts (id, slug, title, description, source_root, entry_path, format, created_at, updated_at)
+                       VALUES ('raw', 'raw', 'Raw', 'Default', '/source', 'index.html', 'html', 'now', 'now')""")
+            db.execute("INSERT INTO artifact_files VALUES ('raw', 'index.html', 'text/html')")
+            self.assertEqual(db.execute("SELECT status FROM artifacts WHERE id='raw'").fetchone()[0], 'draft')
+            with self.assertRaises(sqlite3.IntegrityError):
+                db.execute("UPDATE artifacts SET status='private'")
+
+    def test_publication_is_atomic_idempotent_and_revision_guarded(self):
+        from battuta_artifacts.registry import Conflict, Registry, migrate
+        migrate(self.path)
+        registry = Registry(self.path)
+        item = registry.register(slug="draft", title="Draft", description="Hidden", source_root="/source",
+                                 entry_path="index.html", format="html", files={"index.html": "text/html"})
+        item = registry.publish("draft", files={**item["files"], "plot.json": "application/json"}, expected_revision=1)
+        self.assertEqual((item["status"], item["revision"]), ("published", 2))
+        self.assertIn("plot.json", item["files"])
+        self.assertEqual(registry.publish("draft", files=item["files"], expected_revision=2), item)
+        with self.assertRaises(Conflict):
+            registry.publish("draft", files=item["files"], expected_revision=1)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)

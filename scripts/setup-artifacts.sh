@@ -38,8 +38,10 @@ PY
     --require-hashes --only-binary :all: -r "$component/requirements.txt"
   shopt -s nullglob
   own=("$component"/wheels/battuta_artifacts-*.whl)
+  project=("$component"/wheels/battuta_project-*.whl)
   [[ ${#own[@]} == 1 ]] || { printf 'Expected one Battuta artifact wheel.\n' >&2; exit 1; }
-  uv pip install --python "$python" --offline --no-index --no-deps "${own[0]}"
+  [[ ${#project[@]} == 1 ]] || { printf 'Expected one Battuta project wheel.\n' >&2; exit 1; }
+  uv pip install --python "$python" --offline --no-index --no-deps --reinstall "${project[0]}" "${own[0]}"
 else
   uv sync --project "$component" --locked --no-dev --python 3.12
 fi

@@ -1,0 +1,42 @@
+{
+  "entry": "index.html",
+  "files": [
+    {
+      "path": "index.html",
+      "purpose": "Reading-first report with prose, breakdowns, comparison, plot and 3D examples.",
+      "serve": true
+    },
+    { "path": "styles.css", "purpose": "Responsive reading layout and typography.", "serve": true },
+    {
+      "path": "plot.js",
+      "purpose": "Native SVG plot example with data loading and text fallback.",
+      "serve": true
+    },
+    {
+      "path": "scene.js",
+      "purpose": "On-demand 3D capacity example with rotation controls and fallback.",
+      "serve": true
+    },
+    {
+      "path": "data/plot.json",
+      "purpose": "Illustrative capacity values, labels and units.",
+      "serve": true
+    },
+    {
+      "path": "vendor/three.module.js",
+      "purpose": "Pinned local Three.js 0.160.1 runtime for 3D.",
+      "serve": true
+    },
+    { "path": "vendor/THREE-LICENSE.txt", "purpose": "Three.js MIT license.", "serve": true },
+    {
+      "path": "NOTICE.txt",
+      "purpose": "Retained licenses and dependency provenance.",
+      "serve": true
+    },
+    {
+      "path": "USAGE.md",
+      "purpose": "Reference-example usage and capabilities; not served.",
+      "serve": false
+    }
+  ]
+}
