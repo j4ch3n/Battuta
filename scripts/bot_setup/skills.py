@@ -1,4 +1,4 @@
-"""Link shared context and install each bot's bundled memory skill."""
+"""Link shared skills and preserve bot-local skills in custom workspaces."""
 from shutil import copytree
 from pathlib import Path
 from os.path import relpath
@@ -14,28 +14,34 @@ def link_project_context(bot_dir: Path) -> None:
 def link_shared_skills(bot_dir: Path, *, role: Literal["pm", "tl"], root: Path | None = None) -> None:
     if role not in {"pm", "tl"}:
         raise click.ClickException(f"Unknown bot role: {role}")
-    link_shared_skill(bot_dir, "project-context", root=root)
+    for name in ("project-context", "todo", "note-taking"):
+        link_shared_skill(bot_dir, name, root=root)
     checkout = (root or bot_dir.resolve().parent.parent).resolve()
+    draft = bot_dir.resolve() / ".pi/skills/draft-writing"
+    if draft.is_symlink() and draft.readlink() == Path(relpath(checkout / "shared-skills/draft-writing", draft.parent)):
+        draft.unlink()
     if bot_dir.resolve() != checkout / "bots" / f"{role}-bot":
-        install_memory_skill(bot_dir, role=role, root=checkout)
+        install_bot_skill(bot_dir, role=role, root=checkout, name="memory")
+        if role == "pm":
+            install_bot_skill(bot_dir, role=role, root=checkout, name="draft-writing")
 
 
-def install_memory_skill(bot_dir: Path, *, role: Literal["pm", "tl"], root: Path | None = None) -> None:
+def install_bot_skill(bot_dir: Path, *, role: Literal["pm", "tl"], name: str, root: Path | None = None) -> None:
     bot_dir = bot_dir.resolve()
     root = (root or bot_dir.parent.parent).resolve()
-    source = root / "bots" / f"{role}-bot" / ".pi/skills/memory"
-    target = bot_dir / ".pi/skills/memory"
+    source = root / "bots" / f"{role}-bot" / ".pi/skills" / name
+    target = bot_dir / ".pi/skills" / name
     if target.is_dir() and not target.is_symlink():
         return  # Bundled or custom local content is already owned by this bot.
     if target.is_symlink():
-        old_names = ("memory", "memory-tl") if role == "tl" else ("memory",)
-        owned = {Path(relpath(root / "shared-skills" / name, target.parent)) for name in old_names}
+        old_names = ("memory", "memory-tl") if role == "tl" and name == "memory" else (name,)
+        owned = {Path(relpath(root / "shared-skills" / old_name, target.parent)) for old_name in old_names}
         if target.readlink() not in owned:
             raise click.ClickException(f"Refusing to replace existing skill link: {target}")
     elif target.exists():
         raise click.ClickException(f"Refusing to replace existing local skill: {target}")
     if source.is_symlink() or not (source / "SKILL.md").is_file():
-        raise click.ClickException(f"Missing bundled memory skill: {source}")
+        raise click.ClickException(f"Missing bundled {name} skill: {source}")
     if target.is_symlink():
         target.unlink()
     target.parent.mkdir(parents=True, exist_ok=True)

@@ -6,8 +6,8 @@ Use after technical assessment when selecting a useful achievement milestone, re
 
 1. Read registered project metadata, the named spec's actual latest version, canonical checklist/review, TL findings, and the owner's mandate. Use the `project-context` skill when inspecting managed project/spec artifacts.
 2. Compare the smallest useful achievement with broader alternatives: acceptance boundary, deferred capabilities, consequences, evidence, and unknowns. Decide within delegated authority; request a bounded probe for missing evidence or take owner-reserved choices to the owner.
-3. For refinement, save complete revised requirements/acceptance using PM's available authoring tools. Use the `project-context` skill for managed document persistence. Earlier versions remain immutable. PM persists managed versioned documents; TL supplies technical content and maintains canonical checklist/review. Refinement keeps the spec open and is not a final decision.
-4. Establish the rationale before go/no-go. Record the outcome and full rationale using PM's available decision tool. Both outcomes are terminal; inspect the saved result/metadata before reporting success. File hashes snapshot the actual artifacts, with no checklist/review approval gate.
+3. For refinement, establish the revised requirements, acceptance boundary and what evidence would resolve the remaining uncertainty. Use the project-context skill for canonical persistence. Refinement keeps the proposal open and is not a final decision.
+4. Establish the rationale before go/no-go: why this outcome follows from the evidence, alternatives, constraints and conditions. Use the project-context skill to record the outcome and full rationale together and inspect the saved result before reporting success. A technical review informs judgement; it does not transfer product authority.
 5. Send TL additional context, an answer, or a bounded action only when needed. Reference saved version/decision paths; a standalone decision announcement and acknowledgment are unnecessary. Outstanding questions still need answers, and affected active work still needs explicit pause/context.
 
 ## Decision meaning
@@ -17,4 +17,4 @@ Use after technical assessment when selecting a useful achievement milestone, re
 
 ## Completion
 
-The intended version contains the current requirements, the go/no-go and rationale are saved together, metadata records the artifact fingerprints, and necessary next actions have an owner. A recorded decision does not prove implementation, verification, acceptance, or release. Finalized documents cannot be amended.
+The assessed requirements are current, the go/no-go and rationale are recorded against the intended version, and necessary next actions have an owner. A recorded decision does not prove implementation, verification, acceptance, or release. Use project-context for terminal-state and document-persistence contracts.

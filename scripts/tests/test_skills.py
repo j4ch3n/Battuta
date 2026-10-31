@@ -9,19 +9,128 @@ import unittest
 import click
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from bot_setup.skills import link_project_context, link_shared_skills  # noqa: E402
+from bot_setup.skills import install_bot_skill, link_project_context, link_shared_skills  # noqa: E402
 
 
 class SharedSkillTests(unittest.TestCase):
+    def test_custom_pm_draft_installation_preserves_content_and_rejects_conflicts(self):
+        for kind in ("directory", "file", "symlink", "missing-source"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                source = root / "bots/pm-bot/.pi/skills/draft-writing"
+                if kind != "missing-source":
+                    source.mkdir(parents=True)
+                    (source / "SKILL.md").write_text("Bundled")
+                target = root / "bots/custom/.pi/skills/draft-writing"
+                target.parent.mkdir(parents=True)
+                if kind == "directory":
+                    target.mkdir()
+                    (target / "SKILL.md").write_text("Custom")
+                    install_bot_skill(target.parents[2], role="pm", root=root, name="draft-writing")
+                    self.assertEqual((target / "SKILL.md").read_text(), "Custom")
+                else:
+                    if kind == "file":
+                        target.write_text("Custom")
+                    elif kind == "symlink":
+                        target.symlink_to("custom-draft")
+                    with self.assertRaises(click.ClickException):
+                        install_bot_skill(target.parents[2], role="pm", root=root, name="draft-writing")
+                    if kind == "file":
+                        self.assertEqual(target.read_text(), "Custom")
+                    elif kind == "symlink":
+                        self.assertEqual(target.readlink(), Path("custom-draft"))
+                    else:
+                        self.assertFalse(target.exists())
+
+    def test_draft_writing_is_local_to_pm_and_custom_pm_workspaces(self):
+        for role in ("pm", "tl"):
+            with self.subTest(role=role), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                for name in ("project-context", "todo", "note-taking"):
+                    (root / "shared-skills" / name).mkdir(parents=True)
+                for name in ("memory", "draft-writing"):
+                    source = root / f"bots/{role}-bot/.pi/skills" / name
+                    source.mkdir(parents=True)
+                    (source / "SKILL.md").write_text(name)
+                bot = root / "bots/custom"
+                draft = bot / ".pi/skills/draft-writing"
+                draft.parent.mkdir(parents=True)
+                draft.symlink_to("../../../../shared-skills/draft-writing")
+                for _ in range(2):
+                    link_shared_skills(bot, role=role, root=root)
+                    self.assertFalse(draft.is_symlink())
+                    self.assertEqual(draft.exists(), role == "pm")
+                    if role == "pm":
+                        self.assertEqual((draft / "SKILL.md").read_text(), "draft-writing")
+
+    def test_working_skills_are_discoverable_and_idempotent_for_both_roles(self):
+        for role in ("pm", "tl"):
+            with self.subTest(role=role), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                bot = root / f"bots/{role}-bot"
+                for name in ("project-context", "todo", "note-taking"):
+                    source = root / "shared-skills" / name
+                    (source / "references").mkdir(parents=True)
+                    (source / "SKILL.md").write_text(name)
+                    (source / "references/commands.md").write_text(f"{name} commands")
+                for _ in range(2):
+                    link_shared_skills(bot, role=role, root=root)
+                    for name in ("project-context", "todo", "note-taking"):
+                        link = bot / ".pi/skills" / name
+                        self.assertEqual(link.resolve(), (root / "shared-skills" / name).resolve())
+                        self.assertEqual((link / "SKILL.md").read_text(), name)
+                        self.assertEqual((link / "references/commands.md").read_text(), f"{name} commands")
+
+    def test_working_skill_conflicts_preserve_custom_entries(self):
+        for role, name, kind in product(("pm", "tl"), ("todo", "note-taking"), ("directory", "file", "symlink")):
+            with self.subTest(role=role, name=name, kind=kind), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                for skill in ("project-context", "todo", "note-taking"):
+                    (root / "shared-skills" / skill).mkdir(parents=True)
+                bot = root / f"bots/{role}-bot"
+                target = bot / ".pi/skills" / name
+                target.parent.mkdir(parents=True)
+                if kind == "directory":
+                    target.mkdir()
+                    (target / "SKILL.md").write_text("Custom")
+                elif kind == "file":
+                    target.write_text("Custom")
+                else:
+                    target.symlink_to("custom-skill")
+                with self.assertRaises(click.ClickException):
+                    link_shared_skills(bot, role=role, root=root)
+                if kind == "directory":
+                    self.assertEqual((target / "SKILL.md").read_text(), "Custom")
+                elif kind == "file":
+                    self.assertEqual(target.read_text(), "Custom")
+                else:
+                    self.assertEqual(target.readlink(), Path("custom-skill"))
+
+    def test_missing_working_skill_is_not_linked(self):
+        for role, missing in product(("pm", "tl"), ("todo", "note-taking")):
+            with self.subTest(role=role, missing=missing), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                for name in {"project-context", "todo", "note-taking"} - {missing}:
+                    (root / "shared-skills" / name).mkdir(parents=True)
+                bot = root / f"bots/{role}-bot"
+                with self.assertRaises(click.ClickException):
+                    link_shared_skills(bot, role=role, root=root)
+                self.assertFalse((bot / ".pi/skills" / missing).is_symlink())
+
     def test_local_memory_installation_migrates_owned_links_and_preserves_custom_entries(self):
         for role, existing in product(("pm", "tl"), (None, "owned", "directory", "symlink", "file")):
             with self.subTest(role=role, existing=existing), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                (root / "shared-skills/project-context").mkdir(parents=True)
+                for name in ("project-context", "todo", "note-taking"):
+                    (root / "shared-skills" / name).mkdir(parents=True)
                 source = root / f"bots/{role}-bot/.pi/skills/memory"
                 (source / "references").mkdir(parents=True)
                 (source / "SKILL.md").write_text(f"{role} memory")
                 (source / "references/tools.md").write_text(f"{role} tools")
+                if role == "pm":
+                    draft = root / "bots/pm-bot/.pi/skills/draft-writing"
+                    draft.mkdir(parents=True)
+                    (draft / "SKILL.md").write_text("Draft writing")
                 bot = root / "bots/custom-assistant"
                 link = bot / ".pi/skills/memory"
                 link.parent.mkdir(parents=True)
@@ -53,7 +162,8 @@ class SharedSkillTests(unittest.TestCase):
         for role in ("pm", "tl"):
             with self.subTest(role=role), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                (root / "shared-skills/project-context").mkdir(parents=True)
+                for name in ("project-context", "todo", "note-taking"):
+                    (root / "shared-skills" / name).mkdir(parents=True)
                 source = root / f"bots/{role}-bot/.pi/skills/memory"
                 source.mkdir(parents=True)
                 (source / "SKILL.md").write_text(f"{role} memory")

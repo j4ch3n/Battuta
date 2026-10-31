@@ -12,21 +12,8 @@ from bot_setup.instructions import configure_instructions  # noqa: E402
 
 
 class InstructionTests(unittest.TestCase):
-    def test_shared_research_policy_is_assembled_for_both_bots(self):
+    def test_source_instructions_are_assembled_for_both_bots(self):
         root = Path(__file__).resolve().parents[2]
-        required_guidance = (
-            "web_search",
-            "web_fetch",
-            "current or external factual claims",
-            "user-provided external link",
-            "source-linked summary",
-            "benchmark comparability",
-            "inspected local files or code",
-            "Research request:",
-            "Link request:",
-            "Comparison request:",
-            "Local-only request:",
-        )
 
         for role in ("pm", "tl"):
             with self.subTest(role=role), tempfile.TemporaryDirectory() as directory:
@@ -37,8 +24,8 @@ class InstructionTests(unittest.TestCase):
                 configure_instructions(bot, role=role, root=root)
 
                 instructions = (bot / "AGENTS.md").read_text()
-                for guidance in required_guidance:
-                    self.assertIn(guidance, instructions)
+                sources = [root / "bots/AGENTS_shared.md", bot / "AGENTS_dedicated.md"]
+                self.assertEqual(instructions, "\n".join(source.read_text() for source in sources))
 
     def test_explicit_role_installs_into_custom_bot_directory(self):
         for role in ("pm", "tl"):
@@ -49,17 +36,22 @@ class InstructionTests(unittest.TestCase):
                 (root / "bots").mkdir(parents=True)
                 (root / "bots/AGENTS_shared.md").write_text("Shared")
                 (bot / "AGENTS_dedicated.md").write_text("Dedicated")
-                for name in ("project-context",):
+                for name in ("project-context", "todo", "note-taking"):
                     source = root / "shared-skills" / name
                     source.mkdir(parents=True)
                     (source / "SKILL.md").write_text(name)
                 source = root / f"bots/{role}-bot/.pi/skills/memory"
                 source.mkdir(parents=True)
                 (source / "SKILL.md").write_text(f"{role} memory")
+                if role == "pm":
+                    draft = source.parent / "draft-writing"
+                    draft.mkdir()
+                    (draft / "SKILL.md").write_text("PM drafts")
                 configure_instructions(bot, role=role, root=root)
                 self.assertEqual((bot / "AGENTS.md").read_text(), "Shared\nDedicated")
                 self.assertEqual((bot / ".pi/skills/memory/SKILL.md").read_text(), f"{role} memory")
                 self.assertFalse((bot / ".pi/skills/memory").is_symlink())
+                self.assertEqual((bot / ".pi/skills/draft-writing/SKILL.md").is_file(), role == "pm")
 
     def test_legacy_personal_guidance_is_preserved_but_not_embedded(self):
         for role, personal in product(("pm-bot", "tl-bot"), (None, "Personal guidance")):
@@ -70,7 +62,8 @@ class InstructionTests(unittest.TestCase):
                 shared = root / "bots/AGENTS_shared.md"
                 shared.write_text("Shared instructions")
                 (bot / "AGENTS_dedicated.md").write_text("Role instructions")
-                (root / "shared-skills/project-context").mkdir(parents=True)
+                for name in ("project-context", "todo", "note-taking"):
+                    (root / "shared-skills" / name).mkdir(parents=True)
                 memory = bot / ".pi/skills/memory"
                 memory.mkdir(parents=True)
                 (memory / "SKILL.md").write_text("Local memory")

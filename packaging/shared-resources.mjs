@@ -24,7 +24,20 @@ async function linkSkill(root, botDirectory, name) {
 }
 
 export async function configureSharedResources(root, botDirectory) {
-  await linkSkill(root, botDirectory, "project-context");
+  for (const name of ["project-context", "todo", "note-taking"]) {
+    await linkSkill(root, botDirectory, name);
+  }
+  const draft = join(botDirectory, ".pi/skills/draft-writing");
+  try {
+    if (
+      (await lstat(draft)).isSymbolicLink() &&
+      (await readlink(draft)) ===
+        relative(join(botDirectory, ".pi/skills"), join(root, "shared-skills/draft-writing"))
+    )
+      await unlink(draft);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
   const shared = await readFile(join(root, "bots", "AGENTS_shared.md"), "utf8");
   const dedicated = await readFile(join(botDirectory, "AGENTS_dedicated.md"), "utf8");
   const sections = [shared, dedicated];

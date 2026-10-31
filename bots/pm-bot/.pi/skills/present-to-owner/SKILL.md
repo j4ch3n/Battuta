@@ -1,31 +1,49 @@
 ---
 name: present-to-owner
-description: Use when preparing a durable owner-facing research presentation, report, visual explanation, live system diagram, or slide deck.
+description: Use when shaping an owner-facing explanation, comparison, research synthesis, report, visual explanation, system view, or slide deck, or choosing between a concise answer and a durable presentation.
 metadata:
   visual-explainer-revision: 5f378868e0ea745a6284b51e710c390f0c76f72c
   live-panel-revision: 439c9addce7e7ac2b4e384aa847a351926c8f945
   frontend-slides-revision: 9906a34d640d2111f724544cbc50f7f130569ae1
+  battuta-adaptation: narrative-and-format-boundaries-2026-10-30
 ---
 
 # Present to owner
 
-Use this skill for a durable research presentation, report, visual explanation, workflow/system view, or slides—not routine short research or a compact bounded comparison. PM's standing communication guidance owns the response route, content, and evidence policy; this skill selects the presentation format and construction approach.
+Turn an evidence-backed synthesis into a story the owner can follow. This skill
+owns narrative order and format selection; standing instructions retain authority,
+privacy and evidence policy. Use research for investigation or missing evidence,
+not a renderer to invent unsupported links in the argument.
 
-A research presentation preserves the decision question, source-backed evidence for each viable option, direct decision-critical trade-offs, recommendation, material uncertainty, and any decision required. Keep the evidence that changes the decision visible; make methods, full source detail, and supporting material available without obscuring the conclusion. Follow the standing `web_search` and `web_fetch` requirements before relying on current, external, or owner-provided sources.
+## Editorial workflow
 
-| Reader need                                                                                        | Primary format                 | Load                                                     |
-| -------------------------------------------------------------------------------------------------- | ------------------------------ | -------------------------------------------------------- |
-| A direct answer, compact status, question, short research result, or bounded comparison            | Plain text                     | No presentation reference                                |
-| A reader will work through evidence, a report, comparison, or interactive figure at their own pace | Reading-first HTML explanation | [Visual Explainer](references/visual-explainer/SKILL.md) |
-| Understanding depends on seeing a complete workflow or system's ongoing state and flow             | Animated system/workflow panel | [live-panel](references/live-panel/SKILL.md)             |
-| A presenter will guide the audience through a sequence, or the owner explicitly asks for slides    | Speaker-led deck               | [Frontend Slides](references/frontend-slides/SKILL.md)   |
+1. Establish the reader's question, existing knowledge and why this matters to
+   their confirmed goals. Learning/exploration is a valid outcome without a decision.
+2. Read [narrative guidance](references/narrative.md). Outline the takeaway and
+   mechanism before constructing the page. Preserve sources, alternatives and
+   decision-changing uncertainty through the rewrite.
+3. Use [format routing](references/format-routing.md) to choose one primary format.
+   Plain text is often sufficient; table dimensions do not mandate HTML. Load only
+   the selected construction package.
+4. Choose each interaction for what consequential relationship it teaches, then
+   build. The least complexity sufficient to explain may include a replay,
+   scenario or assumption control; it does not mean static by default.
+5. Check evidence, reader understanding, layout and actual interaction separately.
+   State which checks ran. An attractive render is not evidence of a sound argument.
 
-Choose one primary format and load only its reference. Honor an explicit viable format request; otherwise prefer the least complex format that makes the point clear. Do not use a visual format or animation as decoration. Keep conclusions, warnings, evidence limits, and simulated figures understandable without animation.
+## Binding for construction packages
 
-Each selected package retains its upstream relative layout under `references/`; use its local files rather than an upstream checkout. These packages are presentation support, not independently activated skills.
+The narrative and format decisions above override imported package defaults.
+Packages supply construction guidance, not research method, format authority or
+permission to publish. Retain their local relative layout; they are supporting
+references, not independently activated skills. Upstream revision metadata records
+provenance; the local adaptations are described in [NOTICE](NOTICE).
 
-## Telegram
+## Delivery
 
 Use the `active-telegram-message` skill for Telegram formatting, buttons, and proactive delivery. Keep controls valid and useful: language guidance does not remove necessary decision context, typed-answer alternatives, or bounded-choice buttons.
 
-See [NOTICE](NOTICE) for required source notices.
+Use artifacts to register and serve owner-facing HTML and required assets at the
+intended sharing scope. Verify the URL before claiming delivery. Local drafts,
+render checks and publication are distinct outcomes; do not deploy elsewhere from
+an imported package's recipe.

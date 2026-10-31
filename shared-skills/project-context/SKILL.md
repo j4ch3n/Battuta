@@ -1,13 +1,13 @@
 ---
 name: project-context
-description: Use when working on, researching, coding, summarizing, specifying, planning, or building artifacts for a project, retaining working learnings and findings, or managing long-running multi-step work with or without project ownership.
+description: Use when discovering or selecting a project, inspecting checkout context and repository guidance, associating Linear projects, or inspecting and authoring canonical project documents.
 ---
 
 # Project context
 
 ## Overview
 
-`battuta-project` owns high-level project management: discovery, selection, checkout context, summaries, repository guidance, and Linear association. Use the memory skill for prior project facts, decisions, requirements, implementation context, and project-specific preferences. Personal owner understanding is separate; short project facts do not belong in the owner profile. Project-spec agent tools own spec inventory, versioned documents, checklists/reviews, and terminal decisions. Obtain project/checkout locations from the CLI and document references from spec tools rather than assuming storage layout. Run commands from any directory.
+`battuta-project` owns project discovery, selection, checkout context, summaries, repository guidance, and Linear association—not delivery judgement. Use the memory skill for prior project facts, decisions, requirements, implementation context, and project-specific preferences. Personal owner understanding is separate; short project facts do not belong in the owner profile. Project-spec agent tools own spec inventory, versioned documents, checklists/reviews, and terminal decisions. Obtain project/checkout locations from the CLI and document references from spec tools rather than assuming storage layout. Run commands from any directory.
 
 Use `list` to discover projects, `current` to read the selected name, and `switch` to select the intended project. Run `explain` and read applicable README/AGENTS guidance before project work. Use `inspect_specs` with that exact name to discover documents, then `describe_spec` for a named document's details and content. Spec tools use explicit project names and do not change CLI selection.
 
@@ -63,47 +63,6 @@ An empty constitution scaffold is not adopted policy. Apply confirmed project gu
 New project initialization creates a rendered summary skeleton. The shared memory bridge handles memory without project-local memory files. Spec tools establish document storage only when authoring is requested. Older projects may lack artifacts: `explain` stays read-only, while requested authoring creates only what is needed. Complete the summary using its shared Markdown reference rather than guessing product context.
 
 ## Tools and command navigation
-
-### Execution TODOs
-
-TODOs retain intended work and recorded outcomes beyond the current conversation,
-so a bot can stay oriented without reconstructing its plan. Using them is optional;
-decide whether a list helps the work.
-
-`battuta-project todo` keeps concrete steps in execution order. For commands you
-choose to invoke, select project scope for project-owned work, general otherwise.
-PM and TL create independent work. Use `create` for new work and `extend` for
-additional steps in the current work; optional associations and bot-mail handoffs
-are described in the [TODO command reference](references/task-todos.md#associate-work-through-a-handoff).
-
-TODO completion/cancellation advances only the next item in execution order and
-requires a detailed rational explaining its outcome. The tool does not prescribe
-whether to track a request as TODO work.
-
-| Mode                                                                                          | When and why to use it                                                                                       |
-| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| [Create a list](references/task-todos.md#create-steps-in-execution-order)                     | Turn a long-running request into concrete steps in intended execution order.                                 |
-| [Extend current work](references/task-todos.md#append-steps-to-current-work)                  | Append steps without replacing records or creating another work ID.                                          |
-| [Next item](references/task-todos.md#show-the-next-item)                                      | Refocus on the immediate action without loading the full history.                                            |
-| [Remaining items](references/task-todos.md#show-remaining-items)                              | Understand what still needs doing and in what order.                                                         |
-| [Full list (default)](references/task-todos.md#inspect-the-full-list)                         | Understand past work through all items, including completed/cancelled items and their rational explanations. |
-| [Complete or cancel the next item](references/task-todos.md#complete-or-cancel-the-next-item) | Record the outcome and relevant verification, or the reason for cancellation, before moving on.              |
-
-Present progress in ordinary chat when asked. Read the
-[TODO command reference](references/task-todos.md) before invocation; it owns
-command syntax, options, and advanced list management.
-
-### Working notes
-
-Notes retain learnings, findings, and thoughts beyond the current context; numbered
-search results let a bot recover relevant details without loading the whole
-notebook. They are optional working material, not canonical specs, commitments,
-or automatic durable-memory entries. Decide whether they help. Keep credentials
-out of notes.
-
-The [notebook command reference](references/task-notes.md) owns append, full/range
-read, literal search, scope selection, continuation, and recovery commands for
-both roles.
 
 ### Project documents
 

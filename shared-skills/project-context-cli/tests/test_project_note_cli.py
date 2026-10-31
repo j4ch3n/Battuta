@@ -13,6 +13,28 @@ from battuta_project.notes import NoteStore
 
 
 class NoteCliTests(unittest.TestCase):
+    def test_item_namespace_metadata_and_legacy_commands_share_content(self):
+        self.success("item", "--text", "  Finding 一  ")
+        self.success("append", "--text", "Second finding")
+        result = self.success("item", "--list", "--limit", "1")
+        self.assertIn("1.   Finding 一  ", result)
+        self.assertIn("item --list", result)
+        self.assertIn("--from-line 2", result)
+        self.assertIn("2. Second finding", self.success("read"))
+        self.assertIn("2. Second finding", self.success("item", "--search", "second"))
+        metadata = self.success("--meta")
+        self.assertIn("Items: 2", metadata)
+        self.assertIn("Drafts: 0", metadata)
+        self.assertNotIn("Finding 一", metadata)
+
+    def test_item_actions_and_metadata_cannot_be_combined(self):
+        for args in (("item",), ("item", "--list", "--text", "new"),
+                     ("item", "--list", "--search", "new"), ("--meta", "append", "--text", "new"),
+                     ("item", "--text", "new", "--limit", "1")):
+            with self.subTest(args=args):
+                self.assertNotEqual(self.invoke(*args).exit_code, 0)
+        self.assertIsNone(NoteStore("general", "pm").read())
+
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)

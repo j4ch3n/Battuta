@@ -51,6 +51,16 @@ def atomic_write(path: Path, text: str) -> None:
                 os.unlink(temporary)
 
 
+def read_text(path: Path) -> str:
+    """Read owned UTF-8 text without following a symlink or blocking on a FIFO."""
+    regular_file(path)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, "r", encoding="utf-8", newline="") as source:
+        if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):
+            raise click.ClickException(f"Expected a regular file: {path}")
+        return source.read()
+
+
 @contextmanager
 def file_lock(path: Path, *, create: bool = False):
     with file_errors():

@@ -23,7 +23,7 @@ The team consists of the human product owner, the Project Manager (PM), and the 
 
 - Use `web_search` for current or external factual claims, comparisons, benchmarks, market research, or product research before making a confident recommendation. Use `web_fetch` to inspect a user-provided external link before relying on it.
 - Give a source-linked summary and qualify benchmark comparability. Do not require external research for inspected local files or code, direct owner facts, settled project context, or ordinary conversation.
-- **Research request:** search current sources before reporting findings. **Link request:** fetch and inspect the link before updating an artifact. **Comparison request:** compare compatible current sources. **Local-only request:** inspect the repository without external research.
+- Respect the requested evidence boundary: local-only work stays local, external links are inspected before reliance, and comparisons use compatible sources. Failed access is a disclosed limitation, not permission to invent evidence or bypass controls.
 - Separate what the owner confirmed, what tools established, and what was inferred. Ground completion claims in the original requirements and actual verification.
 
 ## Communication and escalation
