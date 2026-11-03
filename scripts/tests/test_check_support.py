@@ -18,13 +18,13 @@ class SupportChecksTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name).resolve()
-        for name in ("scripts/check-support.mjs", "packaging/battuta", "bots/pm-bot/scripts/run-dev.sh",
+        for name in ("scripts/checks/check-support.mjs", "packaging/battuta", "bots/pm-bot/scripts/run-dev.sh",
                      "scripts/setup-memory.sh", "scripts/setup-artifacts.sh", "packaging/configure.mjs",
                        "packaging/shared-resources.mjs", "packaging/stage-skills.mjs", "packaging/install-services.mjs",
                        "bot-setup/tests/mcp.test.mjs", "bot-setup/tests/skills.test.mjs"):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
-            if name == "scripts/check-support.mjs":
+            if name == "scripts/checks/check-support.mjs":
                 shutil.copyfile(ROOT / name, path)
             else:
                 path.touch()
@@ -47,7 +47,7 @@ class SupportChecksTests(unittest.TestCase):
         self.env = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "UV_LOG": str(self.log)}
 
     def run_checks(self, **env):
-        result = subprocess.run(["node", "scripts/check-support.mjs"], cwd=self.root,
+        result = subprocess.run(["node", "scripts/checks/check-support.mjs"], cwd=self.root,
                                 env={**self.env, **env}, capture_output=True, text=True, timeout=15)
         calls = [json.loads(line) for line in self.log.read_text().splitlines()]
         return result, calls

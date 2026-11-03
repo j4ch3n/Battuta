@@ -26,10 +26,10 @@ Run source-checkout commands from the repository root. See [development](../.age
 ## Script entry points
 
 - Root `package.json` defines individual formatting, Node/Deno lint and type checks, unit tests, coverage, integration tests, and supporting checks. The [code-check reference](../.agents/skills/battuta-verify/references/checks.md) lists their invocations.
-- `scripts/check-deno.mjs` discovers each function's `lint`, `check`, or `test` task.
-- `scripts/check-supabase.mjs` manages isolated Supabase integration checks, migrations, database permissions tests, and Node integration tests.
-- `scripts/check-support.mjs` validates packaging JavaScript and shell syntax and runs the focused Python tests under `scripts/tests/`, service packages, and `project-context-cli/tests/`, using the corresponding package's locked environment.
-- `scripts/lint-staged-code.mjs` applies runtime-specific linting to staged code through lint-staged/Husky.
+- `scripts/checks/check-deno.mjs` discovers each function's `lint`, `check`, or `test` task.
+- `scripts/checks/check-supabase.mjs` manages isolated Supabase integration checks, migrations, database permissions tests, and Node integration tests; diagnostics are retained in the printed `/tmp/battuta-check-reports-*` directory.
+- `scripts/checks/check-support.mjs` validates packaging JavaScript and shell syntax and runs the focused Python tests under `scripts/tests/`, service packages, and `project-context-cli/tests/`, using the corresponding package's locked environment.
+- `scripts/checks/lint-staged-code.mjs` applies runtime-specific linting to staged code through lint-staged/Husky.
 - `bots/{pm-bot,tl-bot}/scripts/configure-bot.py` generates bot instructions and runtime configuration; use `uv run --locked python <script-path> --help` for options.
 - `bots/pm-bot/scripts/run-dev.sh` implements the `dev` and `prod` tmux launch modes.
 - `scripts/refresh-telegram.py` validates and refreshes both Telegram profiles without reinstalling packages or regenerating instructions.

@@ -2,7 +2,7 @@ import { readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
-const root = resolve(import.meta.dirname, "..");
+const root = resolve(import.meta.dirname, "../..");
 const task = process.argv[2];
 if (!["lint", "check", "test"].includes(task)) throw new Error("Expected lint, check, or test");
 const functions = readdirSync(resolve(root, "supabase/functions"), { withFileTypes: true })

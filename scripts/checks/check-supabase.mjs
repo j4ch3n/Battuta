@@ -10,13 +10,13 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { setTimeout } from "node:timers/promises";
 
-const root = resolve(import.meta.dirname, "..");
-const workdir = mkdtempSync(resolve(tmpdir(), "battuta-check-"));
-const reports = resolve(root, ".reports");
+const root = resolve(import.meta.dirname, "../..");
+const workdir = mkdtempSync("/tmp/battuta-check-");
+const reports = mkdtempSync("/tmp/battuta-check-reports-");
+console.log(`Integration reports: ${reports}`);
 mkdirSync(resolve(workdir, "supabase"));
 mkdirSync(reports, { recursive: true });
 // Separate project, ports and copied sources: never reset or stop the developer's stack.

@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { relative, resolve, sep } from "node:path";
 
-const root = resolve(import.meta.dirname, "..");
+const root = resolve(import.meta.dirname, "../..");
 const nodeFiles = [];
 const functions = new Map();
 for (const file of process.argv.slice(2)) {
