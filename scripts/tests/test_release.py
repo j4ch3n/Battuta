@@ -7,8 +7,11 @@ import re
 import shutil
 import subprocess
 import textwrap
+import tempfile
+import unittest
 
 from fixtures import ConfigFixture, ROOT
+from skill_fixtures import skill_catalog
 
 
 class ReleaseInstallTests(ConfigFixture):
@@ -37,42 +40,82 @@ class ReleaseInstallTests(ConfigFixture):
                 self.assertNotEqual(result.returncode, 0)
                 path.write_text(content)
 
-    def test_archive_materializes_memory_and_links_shared_context_from_manifests(self):
+    def test_archive_skills_are_fixed_portable_and_repeatable_from_fresh_staging(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
-        loop = re.search(
-            r'^          for bot in pm-bot tl-bot; do\n            mkdir .*?^          done$',
+        assembly = re.search(
+            r'^          node packaging/stage-skills\.mjs dist/stage/battuta\n(?:          rm -rf dist/stage/battuta/skills-hub\n)?',
             workflow, re.MULTILINE | re.DOTALL,
         )
-        self.assertIsNotNone(loop)
-        stage = self.root / "dist/stage/battuta"
-        for name in ("project-context", "todo", "note-taking"):
-            source = stage / "skills-hub" / name
-            source.mkdir(parents=True)
-            (source / "SKILL.md").write_text(name)
-        (stage / "skills-hub/project-context/references").mkdir()
-        shutil.copytree(ROOT / "skills-hub/memory", stage / "skills-hub/memory")
-        shutil.copytree(ROOT / "skills-hub/draft-writing", stage / "skills-hub/draft-writing")
-        for role in ("pm-bot", "tl-bot"):
-            bot = stage / "bots" / role
-            bot.mkdir(parents=True)
-            names = ["project-context", "todo", "note-taking", "memory"]
-            if role == "pm-bot":
-                names.append("draft-writing")
-            (bot / "skills.json").write_text(json.dumps({"skills": names}))
-        subprocess.run(["node", str(ROOT / "packaging/stage-skills.mjs"), str(stage)], check=True, capture_output=True)
-        result = subprocess.run(["bash", "-euc", textwrap.dedent(loop.group())], cwd=self.root, capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        for role in ("pm-bot", "tl-bot"):
-            memory = stage / "bots" / role / ".pi/skills/memory"
-            self.assertFalse(memory.is_symlink())
-            self.assertEqual((memory / "SKILL.md").read_text(), (ROOT / "skills-hub/memory/SKILL.md").read_text())
-            self.assertTrue((memory / "references/tools.md").is_file())
-            draft = memory.parent / "draft-writing"
-            self.assertFalse(draft.is_symlink())
-            self.assertEqual(draft.exists(), role == "pm-bot")
-            for name in ("project-context", "todo", "note-taking"):
-                self.assertTrue((memory.parent / name).is_symlink())
-                self.assertEqual((memory.parent / name / "SKILL.md").read_text(), name)
+        self.assertIsNotNone(assembly)
+        validation = re.search(
+            r"^          node --input-type=module -e '\n.*?^          ' \"\$PWD/dist/stage/battuta\"$",
+            workflow, re.MULTILINE | re.DOTALL,
+        )
+        self.assertIsNotNone(validation)
+        snapshots = []
+        for _ in range(2):
+            with tempfile.TemporaryDirectory(dir=self.root) as directory:
+                work = Path(directory)
+                stage = work / "dist/stage/battuta"
+                for role in ("pm", "tl"):
+                    skill_catalog(stage, role)
+                for source in (stage / "skills-hub").iterdir():
+                    (source / "LICENSE").write_text("Required notice")
+                command = textwrap.dedent(assembly.group()).replace("node packaging/stage-skills.mjs", f"node {ROOT / 'packaging/stage-skills.mjs'}")
+                result = subprocess.run(["bash", "-euc", command], cwd=work, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertFalse((stage / "skills-hub").exists())
+                (stage / "bin").mkdir()
+                shutil.copyfile(ROOT / "packaging/shared-resources.mjs", stage / "bin/shared-resources.mjs")
+                shutil.copytree(ROOT / "bot-setup", stage / "bot-setup")
+                moved = work / "relocated"
+                stage.rename(moved)
+                for role in ("pm", "tl"):
+                    bot = moved / f"bots/{role}-bot"
+                    skills = bot / ".pi/skills"
+                    names = json.loads((bot / "skills.json").read_text())["skills"]
+                    self.assertEqual({p.name for p in skills.iterdir()}, set(names))
+                    for name in names:
+                        self.assertEqual((skills / name / "references/tools.md").read_text(), f"{name} tools")
+                        self.assertEqual((skills / name / "LICENSE").read_text(), "Required notice")
+                    self.assertFalse(any(p.is_symlink() for p in skills.rglob("*")))
+                command = textwrap.dedent(validation.group()).replace('"$PWD/dist/stage/battuta"', '"$BUNDLE_ROOT"')
+                result = subprocess.run(["bash", "-euc", command], env={**os.environ, "BUNDLE_ROOT": str(moved)}, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                snapshots.append({str(p.relative_to(moved)): p.read_bytes() for p in moved.rglob("*") if p.is_file()})
+        self.assertEqual(snapshots[0], snapshots[1])
+
+    def test_extraction_stops_on_visible_or_hidden_existing_content(self):
+        guide = (ROOT / "RELEASE.md").read_text()
+        commands = guide.split("```sh\nset -eu\n", 1)[1].split("tar -xzf", 1)[0]
+        for content in (None, "existing", ".private", "\n"):
+            with self.subTest(content=content), tempfile.TemporaryDirectory(dir=self.root) as directory:
+                target = Path(directory) / "apps/battuta"
+                target.mkdir(parents=True)
+                if content:
+                    (target / content).write_text("preserve")
+                command = "set -eu\n" + commands + "\nprintf extraction-reached\n"
+                result = subprocess.run(["bash", "-c", command], env={**os.environ, "HOME": directory}, capture_output=True, text=True)
+                self.assertEqual(result.returncode == 0, content is None)
+                self.assertEqual("extraction-reached" in result.stdout, content is None)
+                if content:
+                    self.assertTrue(result.stderr)
+                    self.assertEqual((target / content).read_text(), "preserve")
+
+    @unittest.skipIf(os.geteuid() == 0, "root bypasses directory read permissions")
+    def test_extraction_stops_if_target_cannot_be_inspected(self):
+        guide = (ROOT / "RELEASE.md").read_text()
+        commands = guide.split("```sh\nset -eu\n", 1)[1].split("tar -xzf", 1)[0]
+        with tempfile.TemporaryDirectory(dir=self.root) as directory:
+            target = Path(directory) / "apps/battuta"
+            target.mkdir(parents=True)
+            target.chmod(0o300)
+            try:
+                result = subprocess.run(["bash", "-c", "set -eu\n" + commands + "\nprintf extraction-reached\n"], env={**os.environ, "HOME": directory}, capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn("extraction-reached", result.stdout)
+            finally:
+                target.chmod(0o700)
 
     def test_packages_are_installed_from_staged_bot_settings(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()

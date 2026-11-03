@@ -1,8 +1,7 @@
-import { cp, lstat, mkdir, readlink, symlink, unlink } from "node:fs/promises";
-import { join, relative, resolve } from "node:path";
+import { cp, mkdir, rm } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadSkillSelection } from "../bot-setup/skills.mjs";
-import { sharedSkillNames } from "./shared-resources.mjs";
 
 export async function stageSkills(root) {
   const selections = [];
@@ -16,24 +15,18 @@ export async function stageSkills(root) {
   }
   for (const { directory, names } of selections) {
     const skills = join(directory, ".pi/skills");
+    // Staging is disposable: discard archived development discovery links, not runtime state.
+    await rm(skills, { recursive: true, force: true });
     await mkdir(skills, { recursive: true });
     for (const name of names) {
       const source = join(root, "skills-hub", name);
       const destination = join(skills, name);
-      try {
-        if ((await lstat(destination)).isSymbolicLink()) {
-          if ((await readlink(destination)) !== relative(skills, source))
-            throw new Error(`Unexpected staged skill link: ${destination}`);
-          await unlink(destination);
-        }
-      } catch (error) {
-        if (error.code !== "ENOENT") throw error;
-      }
-      if (sharedSkillNames.includes(name)) {
-        await symlink(relative(skills, source), destination, "dir");
-      } else {
-        await cp(source, destination, { recursive: true, errorOnExist: true, force: false });
-      }
+      await cp(source, destination, {
+        recursive: true,
+        dereference: true,
+        errorOnExist: true,
+        force: false,
+      });
     }
   }
 }

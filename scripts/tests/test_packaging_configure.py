@@ -1,4 +1,4 @@
-"""Release configuration installs shared skills from the archive root."""
+"""Release configuration validates self-contained bundled skills."""
 
 import json
 from itertools import product
@@ -10,16 +10,16 @@ import tempfile
 import unittest
 
 from fixtures import copy_scheduler_runtime
-from skill_fixtures import skill_catalog
+from skill_fixtures import skill_bundle
 
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class PackagingConfigureTests(unittest.TestCase):
-    def test_install_and_migrate_links_for_both_bots(self):
-        for existing, settings_mode, personal in product((None, "../../../shared-skills/project-context"), ("missing", "legacy"), (None, "Personal instructions")):
-            with self.subTest(existing=existing, settings_mode=settings_mode, personal=personal), tempfile.TemporaryDirectory() as directory:
+    def test_configures_both_bots_with_bundled_skills(self):
+        for settings_mode, personal in product(("missing", "legacy"), (None, "Personal instructions")):
+            with self.subTest(settings_mode=settings_mode, personal=personal), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 (root / "bin").mkdir()
                 shutil.copyfile(ROOT / "packaging" / "configure.mjs", root / "bin" / "configure.mjs")
@@ -27,34 +27,23 @@ class PackagingConfigureTests(unittest.TestCase):
                 shutil.copyfile(ROOT / "packaging" / "configure-subagents.mjs", root / "bin" / "configure-subagents.mjs")
                 shutil.copytree(ROOT / "bot-setup", root / "bot-setup")
                 copy_scheduler_runtime(root)
-                source = root / "skills-hub" / "project-context"
-                source.mkdir(parents=True)
-                (source / "SKILL.md").write_text("Shared project context")
-                references = source / "references"
-                summary = references / "summary"
-                summary.mkdir(parents=True)
-                (summary / "prompt.md").write_text("Runtime summary prompt")
-                (summary / "template.md").write_text("Runtime summary template")
-                for name in ("todo", "note-taking"):
-                    skill = root / "skills-hub" / name
-                    skill.mkdir(parents=True)
-                    (skill / "SKILL.md").write_text(name)
-                (root / "bots").mkdir()
+                for role in ("pm", "tl"):
+                    skill_bundle(root, role)
+                shutil.rmtree(root / "skills-hub")
                 (root / "bots" / "AGENTS_shared.md").write_text("Shared instructions")
                 if personal is not None:
                     (root / "bots" / "AGENTS_personal.md").write_text(personal)
                 for role in ("pm-bot", "tl-bot"):
                     bot = root / "bots" / role
                     skills = bot / ".pi" / "skills"
-                    skills.mkdir(parents=True)
-                    (bot / "skills.json").write_text(json.dumps({"skills": ["project-context", "todo", "note-taking"]}))
+                    summary = skills / "project-context/references/summary"
+                    summary.mkdir()
+                    (summary / "prompt.md").write_text("Runtime summary prompt")
+                    (summary / "template.md").write_text("Runtime summary template")
                     (bot / ".pi/mcp.json").write_text(json.dumps({"mcpServers": {"other": {"command": "other-server"}}}))
                     auth = bot / ".pi/mcp-auth.json"
                     auth.write_bytes(b'{"sentinel":"private-oauth-token"}\n')
                     auth.chmod(0o600)
-                    shutil.copytree(ROOT / "skills-hub/memory", skills / "memory")
-                    if role == "pm-bot":
-                        shutil.copytree(ROOT / "skills-hub/draft-writing", skills / "draft-writing")
                     if personal is not None:
                         (bot / ".pi/ME.md").write_text("Private profile")
                     (bot / "AGENTS_dedicated.md").write_text(role)
@@ -71,8 +60,6 @@ class PackagingConfigureTests(unittest.TestCase):
                         if settings_mode == "legacy":
                             settings["battutaMemoryCapture"] = {"enabled": True, "batchMessages": 6}
                         (bot / ".pi/settings.json").write_text(json.dumps(settings))
-                    if existing:
-                        (skills / "project-context").symlink_to(existing, target_is_directory=True)
                 env = {
                     **os.environ,
                     "PI_SCHEDULER_STATE_FILE": str(root / "stable/schedule-prompts.json"),
@@ -92,18 +79,16 @@ class PackagingConfigureTests(unittest.TestCase):
                     self.assertEqual(json.loads((root / "stable/schedule-prompts.json").read_text()), {"version": 2, "revision": 0, "tasks": []})
                     for role in ("pm-bot", "tl-bot"):
                         link = root / "bots" / role / ".pi" / "skills" / "project-context"
-                        self.assertEqual((link / "SKILL.md").read_text(), "Shared project context")
+                        self.assertTrue((link / "SKILL.md").is_file())
                         self.assertEqual((link / "references" / "summary" / "prompt.md").read_text(), "Runtime summary prompt")
                         self.assertEqual((link / "references" / "summary" / "template.md").read_text(), "Runtime summary template")
-                        self.assertEqual(link.resolve(), source.resolve())
-                        self.assertFalse(link.readlink().is_absolute())
+                        self.assertFalse(link.is_symlink())
                         self.assertEqual((link.parent / "draft-writing/SKILL.md").is_file(), role == "pm-bot")
                         self.assertFalse((link.parent / "draft-writing").is_symlink())
                         for name in ("todo", "note-taking"):
-                            self.assertEqual((link.parent / name / "SKILL.md").read_text(), name)
+                            self.assertTrue((link.parent / name / "SKILL.md").is_file())
                         self.assertFalse((link.parent / "memory").is_symlink())
-                        for resource in ("SKILL.md", "references/tools.md"):
-                            self.assertEqual((link.parent / "memory" / resource).read_text(), (ROOT / "skills-hub/memory" / resource).read_text())
+                        self.assertEqual((link.parent / "memory/references/tools.md").read_text(), "memory tools")
                         profile = link.parent.parent / "ME.md"
                         self.assertEqual(profile.read_text() if profile.exists() else None, "Private profile" if personal is not None else None)
                         if personal is not None:
@@ -162,11 +147,11 @@ class PackagingMigrationTests(unittest.TestCase):
         shutil.copytree(ROOT / "bot-setup", self.root / "bot-setup")
         copy_scheduler_runtime(self.root)
         for role in ("pm", "tl"):
-            skill_catalog(self.root, role, ["project-context", "todo", "note-taking"])
+            skill_bundle(self.root, role, ["project-context", "todo", "note-taking"])
+        shutil.rmtree(self.root / "skills-hub")
         (self.root / "bots/AGENTS_shared.md").write_text("Shared")
         for role in ("pm-bot", "tl-bot"):
             bot = self.root / "bots" / role
-            (bot / ".pi").mkdir(parents=True)
             (bot / "AGENTS_dedicated.md").write_text(role)
             old_pi = self.old / role / ".pi"
             old_pi.mkdir(parents=True)
@@ -230,6 +215,31 @@ class PackagingMigrationTests(unittest.TestCase):
                     self.assertEqual(target.read_bytes(), b'{"existing":"private-destination"}')
                     target.unlink()
                 source.write_bytes(original)
+
+    def test_restored_auth_and_sessions_do_not_restore_old_skills(self):
+        before = {}
+        for role in ("pm-bot", "tl-bot"):
+            source = self.old / role / ".pi"
+            (source / "auth.json").write_bytes(b'{"private":"auth"}\n')
+            (source / "mail-sessions").mkdir()
+            (source / "mail-sessions/session.jsonl").write_bytes(b'{"private":"session"}\n')
+            (source / "skills/obsolete").mkdir(parents=True)
+            (source / "skills/obsolete/SKILL.md").write_text("old skill")
+            target = self.root / "bots" / role / ".pi"
+            shutil.copy2(source / "auth.json", target / "auth.json")
+            shutil.copytree(source / "mail-sessions", target / "mail-sessions")
+            skills = target / "skills"
+            before[role] = {str(p.relative_to(skills)): p.read_bytes() for p in skills.rglob("*") if p.is_file()}
+        result = self.configure("--migrate-from", str(self.old))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for role in ("pm-bot", "tl-bot"):
+            source = self.old / role / ".pi"
+            target = self.root / "bots" / role / ".pi"
+            for name in ("auth.json", "mail-sessions/session.jsonl"):
+                self.assertEqual((target / name).read_bytes(), (source / name).read_bytes())
+            skills = target / "skills"
+            self.assertEqual({str(p.relative_to(skills)): p.read_bytes() for p in skills.rglob("*") if p.is_file()}, before[role])
+            self.assertNotIn("private", result.stdout + result.stderr)
 
     def test_missing_telegram_fails_without_env_fallback(self):
         (self.old / "tl-bot/.pi/telegram.json").unlink()

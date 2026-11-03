@@ -66,11 +66,20 @@ there is no separate ownership registry. Empty selections remove all such
 links. Custom directories, files, absolute links, and unrelated links remain
 untouched when deselected. Preflight failures leave skill output unchanged.
 
-Release staging reads the same manifests, copies selected formerly bot-local
-skills completely, and links selected shared skills to the bundled hub.
-Installed configuration preserves local skill content. FIS-132 owns fresh
-hub-free bundles, exact selection enforcement, and upgrade-state handling;
-current releases intentionally retain the hub. Setup/installation navigation
+Release staging starts fresh, validates both bot selections, discards archived
+development discovery links, and copies each complete selected skill directory,
+including nested resources and required notices. Resource links are materialized
+as copies; the final archive contains neither the hub nor skill symlinks.
+Installed configuration validates exact agreement between each manifest and its
+bundled skill directories without a catalog, and does not modify skill content.
+Editing a deployed manifest cannot enable an unbundled skill; selection changes
+require a new release.
+
+Extract only into the intended stable installation directory after checking it
+is empty, including hidden files. If it is nonempty, stop and alert the owner;
+do not clear it or choose another folder automatically. After the owner resolves
+the target, recheck it before extracting. Restore private auth/session state
+separately, never the old `.pi/skills/` directory. Setup/installation navigation
 is maintained in the [release setup index](../RELEASE.md#extension-and-skill-setup-index).
 
 ## Changing skills
@@ -84,7 +93,7 @@ is maintained in the [release setup index](../RELEASE.md#extension-and-skill-set
   links, callers, tests, and active documentation together.
 - **Remove:** remove affected selections and callers, rerun source setup to
   reconcile owned links, then remove the source. Custom entries require
-  explicit handling; release upgrade-state handling belongs to FIS-132.
+  explicit handling; releases replace the selection through fresh assembly.
   Never discard custom content or private auth/session state.
 
 Run `pnpm check:skills`, `pnpm check:support`, affected Node tests, formatting,

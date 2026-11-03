@@ -6,25 +6,25 @@ This guide is for installing the prebuilt **64-bit Linux ARM** Battuta release o
 
 Installation navigation lives here, separate from runtime skill workflows and command contracts. Use the component's setup guide below; bundled resources do not need separate installation. When adding an extension or skill, update this index with its installation guide or explicitly state how the release configures it.
 
-| Component                                                  | Installation and configuration                                                                                                                                                                                                                              |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pi, PM/TL runtime extensions, agent mail, and project-spec | Bundled with dependencies; [configure and launch both bots](#5-configure-and-launch). Deploy the remote Supabase backend separately as required in [prerequisites](#1-confirm-the-target-and-prerequisites).                                                |
-| Telegram extension (both bots)                             | Bundled; supply credentials in [step 4](#4-prepare-production-credentials), then configure and launch in [step 5](#5-configure-and-launch).                                                                                                                 |
-| Prompt scheduler (PM only)                                 | Bundled; [PM scheduler](docs/scheduler.md) covers fresh setup, stable storage, scopes, and runtime checks.                                                                                                                                                  |
-| Native Pi subagents (TL only)                              | Bundled and configured by normal TL setup; reuse TL's existing Pi login. See [subagent setup](docs/subagents-setup.md).                                                                                                                                     |
-| Shared memory MCP and thin client (both bots)              | See [memory service setup](docs/memory-service-setup.md). Configuration exposes one local MCP endpoint; setup provisions the Python runtime and verified ONNX model.                                                                                        |
-| Artifact service, CLI, and PM artifact skill               | See [artifact service setup](docs/artifact-service-setup.md). Explicit setup installs dependencies and applies Alembic migrations; the manifest-selected skill is bundled for PM.                                                                           |
-| Memory skill (both bots)                                   | Selected from `skills-hub/memory/` and bundled under each bot's `.pi/skills/memory/`: PM read/write, TL read-only. Bot configuration disables TL automatic capture. See [skill management](docs/skill-management.md).                                       |
-| Nightly PM memory dream                                    | Optional operator activation after model login and timezone/profile review; follow [nightly dream setup](docs/memory-service-setup.md#nightly-pm-dream-setup). Uses the bundled PM scheduler, not a second timer.                                           |
-| Project-context skill and `battuta-project`                | The skill is bundled and linked for both bots. Install the CLI and ripgrep for notebook search using the [project-context installation guide](skills-hub/project-context/references/installation.md), including release wheels and both bots' service PATH. |
-| Google management skill (PM only)                          | The skill is bundled; install and authenticate its external `gog` CLI using the [Google setup guide](docs/gogcli-setup.md).                                                                                                                                 |
-| Luma event discovery (PM only)                             | Configured by normal setup; complete owner-initiated Pi OAuth using [Luma setup](docs/luma-setup.md) before launching PM. Preserve `mcp-auth.json` during upgrades.                                                                                         |
-| Other runtime Markdown skills                              | Selected by each bot's `skills.json` and bundled under `.pi/skills/`; no package installation. Sources live in `skills-hub/`; configuration establishes selected shared skill links. See [skill management](docs/skill-management.md).                      |
-| Additional Pi packages (source checkouts)                  | Follow the [Pi-extension installation guide](https://github.com/j4ch3n/Battuta/blob/main/docs/pi-extensions.md). This contributor workflow requires source tooling, not just the release archive.                                                           |
-| OpenCode contributor skills/plugins (source checkouts)     | Follow [OpenCode setup](https://github.com/j4ch3n/Battuta/blob/main/docs/opencode.md). These development-agent workflows are not the PM/TL runtime skill environment.                                                                                       |
+| Component                                                  | Installation and configuration                                                                                                                                                                                                                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pi, PM/TL runtime extensions, agent mail, and project-spec | Bundled with dependencies; [configure and launch both bots](#5-configure-and-launch). Deploy the remote Supabase backend separately as required in [prerequisites](#1-confirm-the-target-and-prerequisites).                                                                   |
+| Telegram extension (both bots)                             | Bundled; supply credentials in [step 4](#4-prepare-production-credentials), then configure and launch in [step 5](#5-configure-and-launch).                                                                                                                                    |
+| Prompt scheduler (PM only)                                 | Bundled; [PM scheduler](docs/scheduler.md) covers fresh setup, stable storage, scopes, and runtime checks.                                                                                                                                                                     |
+| Native Pi subagents (TL only)                              | Bundled and configured by normal TL setup; reuse TL's existing Pi login. See [subagent setup](docs/subagents-setup.md).                                                                                                                                                        |
+| Shared memory MCP and thin client (both bots)              | See [memory service setup](docs/memory-service-setup.md). Configuration exposes one local MCP endpoint; setup provisions the Python runtime and verified ONNX model.                                                                                                           |
+| Artifact service, CLI, and PM artifact skill               | See [artifact service setup](docs/artifact-service-setup.md). Explicit setup installs dependencies and applies Alembic migrations; the manifest-selected skill is bundled for PM.                                                                                              |
+| Memory skill (both bots)                                   | Selected from `skills-hub/memory/` and bundled under each bot's `.pi/skills/memory/`: PM read/write, TL read-only. Bot configuration disables TL automatic capture. See [skill management](docs/skill-management.md).                                                          |
+| Nightly PM memory dream                                    | Optional operator activation after model login and timezone/profile review; follow [nightly dream setup](docs/memory-service-setup.md#nightly-pm-dream-setup). Uses the bundled PM scheduler, not a second timer.                                                              |
+| Project-context skill and `battuta-project`                | The complete skill is copied into both bots' bundles. Install the CLI and ripgrep for notebook search using the [project-context installation guide](bots/pm-bot/.pi/skills/project-context/references/installation.md), including release wheels and both bots' service PATH. |
+| Google management skill (PM only)                          | The skill is bundled; install and authenticate its external `gog` CLI using the [Google setup guide](docs/gogcli-setup.md).                                                                                                                                                    |
+| Luma event discovery (PM only)                             | Configured by normal setup; complete owner-initiated Pi OAuth using [Luma setup](docs/luma-setup.md) before launching PM. Preserve `mcp-auth.json` during upgrades.                                                                                                            |
+| Other runtime Markdown skills                              | Selected by each bot's `skills.json` and copied completely under `.pi/skills/`; no package installation. Configuration validates the fixed bundle without a source catalog. See [skill management](docs/skill-management.md).                                                  |
+| Additional Pi packages (source checkouts)                  | Follow the [Pi-extension installation guide](https://github.com/j4ch3n/Battuta/blob/main/docs/pi-extensions.md). This contributor workflow requires source tooling, not just the release archive.                                                                              |
+| OpenCode contributor skills/plugins (source checkouts)     | Follow [OpenCode setup](https://github.com/j4ch3n/Battuta/blob/main/docs/opencode.md). These development-agent workflows are not the PM/TL runtime skill environment.                                                                                                          |
 
-The shared `todo` and `note-taking` skills are bundled and linked for both bots
-by normal configuration. They use the same `battuta-project` CLI installation
+The shared `todo` and `note-taking` skills are copied completely for both bots
+during release assembly. They use the same `battuta-project` CLI installation
 listed above; no separate package installation is needed.
 
 PM's `draft-writing`, `research`, and `present-to-owner` skills are bundled under PM's `.pi/skills/`
@@ -48,7 +48,7 @@ systemctl --version
 tmux -V
 ```
 
-Expect `aarch64`/`arm64` and Python **3.12+**. The release bundles Node, Pi, and bot dependencies; it does not require pnpm, Docker, or local Supabase. Project-context tooling requires uv; Git and GitHub CLI are needed only for GitHub cloning, not name-only initialization or metadata linking. Its bundled wheels target Python **3.12** on Linux ARM64. Install it using the [project-context installation reference](skills-hub/project-context/references/installation.md) before project work. If Python is missing or too old, arrange a supported installation without replacing the OS Python, then recheck. `tmux` is needed for the interactive screen launcher; on Raspberry Pi OS install it if missing with `sudo apt update && sudo apt install tmux`. `script` and working `systemctl --user` are needed only for the optional services in step 6. Check those separately before choosing services; follow the OS's supported user-session setup if unavailable. Do not continue until the tools for the chosen launch method work.
+Expect `aarch64`/`arm64` and Python **3.12+**. The release bundles Node, Pi, and bot dependencies; it does not require pnpm, Docker, or local Supabase. Project-context tooling requires uv; Git and GitHub CLI are needed only for GitHub cloning, not name-only initialization or metadata linking. Its bundled wheels target Python **3.12** on Linux ARM64. Install it using the [project-context installation reference](bots/pm-bot/.pi/skills/project-context/references/installation.md) before project work. If Python is missing or too old, arrange a supported installation without replacing the OS Python, then recheck. `tmux` is needed for the interactive screen launcher; on Raspberry Pi OS install it if missing with `sudo apt update && sudo apt install tmux`. `script` and working `systemctl --user` are needed only for the optional services in step 6. Check those separately before choosing services; follow the OS's supported user-session setup if unavailable. Do not continue until the tools for the chosen launch method work.
 
 Confirm with the owner that a **remote Supabase project** has already been deployed with Battuta's database migrations and Edge Functions, and that they have two distinct Telegram bot tokens, their numeric Telegram user ID, a Linear API key, and remote Supabase URL and secret key. This archive does not deploy Supabase. If the remote backend is not ready, pause here and arrange its deployment before launching the bots.
 
@@ -78,10 +78,16 @@ Inspect the intended target before extraction. If `bin/battuta`, `.env.example`,
 
 ### Fresh setup
 
-Choose an installation path with no spaces if services may be used. Check whether the target already exists before extracting: if it does, preserve its configuration and Pi state and follow step 7 rather than overwriting it. For a new install at `~/apps/battuta`:
+Use the intended stable installation path, with no spaces if services may be used. Keep using that same path for upgrades (step 7). Extract only into an empty target directory, including no hidden files. If it is not empty, stop and alert the owner; do not delete its contents, extract over them, or choose another folder. Wait for the owner to resolve the nonempty target before continuing. For installation at `~/apps/battuta`, run this check and extraction together:
 
 ```sh
-mkdir -p ~/apps
+set -eu
+mkdir -p ~/apps/battuta
+target_contents=$(ls -Aq ~/apps/battuta)
+if [ -n "$target_contents" ]; then
+  printf 'STOP: ~/apps/battuta is not empty. Alert the owner; do not continue or choose another folder.\n' >&2
+  exit 1
+fi
 tar -xzf battuta-<version>-linux-arm64.tar.gz -C ~/apps
 cd ~/apps/battuta
 test -x bin/battuta && test -f .env.example && test -f RELEASE.md
@@ -89,7 +95,7 @@ test -x bin/battuta && test -f .env.example && test -f RELEASE.md
 
 Run subsequent commands from this extracted installation directory. If the final check fails, stop and inspect the extraction.
 
-Install `battuta-project` from the included wheels as described in the [installation reference](skills-hub/project-context/references/installation.md). If GitHub cloning is needed, verify GitHub authentication as the bot user; defer `battuta-project --help` until step 4 has made the required Linear token available.
+Install `battuta-project` from the included wheels as described in the [installation reference](bots/pm-bot/.pi/skills/project-context/references/installation.md). If GitHub cloning is needed, verify GitHub authentication as the bot user; defer `battuta-project --help` until step 4 has made the required Linear token available.
 
 ## 4. Prepare production credentials
 
@@ -212,7 +218,7 @@ systemctl --user status battuta-memory.service battuta-pm.service battuta-tl.ser
 
 Expect both services to be active/running. If not, inspect `journalctl --user -u battuta-pm.service -f` and the corresponding Tech Lead service logs, fix the cause, and recheck. `install-services` only writes user units; enabling/starting is a separate step. To run services at boot without an interactive login, an administrator can enable linger with `sudo loginctl enable-linger "$USER"`. Never run tmux bots alongside active services.
 
-Make the installed `battuta-project` executable available to both services using the [service PATH instructions](skills-hub/project-context/references/installation.md#bot-service-path); shell PATH changes alone do not apply to systemd units.
+Make the installed `battuta-project` executable available to both services using the [service PATH instructions](bots/pm-bot/.pi/skills/project-context/references/installation.md#bot-service-path); shell PATH changes alone do not apply to systemd units.
 
 Complete the local [Google command-environment checks](docs/gogcli-setup.md#8-verify-the-command-environment) before enabling unattended Google operations.
 
@@ -224,19 +230,19 @@ This step applies only when the owner requests a newer release or a change of in
 
 ### Fresh setup
 
-For a new version or installation path, stop the screen/foreground processes or disable services with `systemctl --user disable --now battuta-pm.service battuta-tl.service` before replacing files. Back up `.env.prod` and both bots' `.pi` state, including `auth.json`, **`mcp-auth.json`**, `telegram.json`, and sessions, and protect the backups as secrets. Verify the new archive as in step 2. Preserve those private files while updating the same stable path; do not extract over them blindly. The configure migration below copies Telegram and MCP OAuth configuration by bot name; restore other retained private state separately. Old installations with no Luma OAuth state require the owner login in step 5 rather than a token migration.
+For a new version, keep the same stable installation path unless the owner explicitly requests a path change. Stop the screen/foreground processes or disable services with `systemctl --user disable --now battuta-pm.service battuta-tl.service` before updating. Back up `.env.prod` and both bots' `.pi` state, including `auth.json`, **`mcp-auth.json`**, `telegram.json`, and sessions, and protect the backups as secrets. Verify the new archive as in step 2 and check the intended target using step 3. If it is not empty, stop and alert the owner; do not clear it or choose another folder automatically. Continue extraction only after the owner has resolved the target and the empty-folder check passes. Restore private state separately after extraction, not the old `.pi/skills/` directory. The configure migration below copies Telegram and MCP OAuth configuration by bot name from the backup; restore other retained private state separately. Old installations with no Luma OAuth state require the owner login in step 5 rather than a token migration.
 
 Before configuring a release that previously used `LINEAR_API_KEY`, have the owner rename that setting to `LINEAR_API_TOKEN` in `.env.prod` using a private editor, retaining its value. Apply the shell setup in step 4; if the stable installation path changes, update the shell startup snippets too. For source checkouts, manually rename the setting in `.env` and `supabase/.env` and rerun bot configuration; `make dev` does not migrate credentials.
 
 The release workflow bundles Node selected by the source checkout's `.node-version` and Pi from each bot's pinned manifest. When upgrading from an adapter-based release, retain private auth/session state while using the new release's package manifests and dependencies. `bin/battuta configure` replaces the adapter-specific Linear authentication with an environment-expanded `Authorization` header and removes `pi-mcp-adapter` package entries from retained bot settings. An adapter left enabled would replace Pi's native MCP support. No new Linear token or Linear MCP OAuth login is needed for this migration; Luma's separate owner login is required if no connected grant was retained.
 
-Then run configuration from the new installation, passing the old directory that contains `pm-bot` and `tl-bot`:
+Then run configuration from the updated installation, passing the backup directory that contains `pm-bot` and `tl-bot`:
 
 ```sh
-bin/battuta configure --migrate-from /path/to/old-release/bots
+bin/battuta configure --migrate-from /path/to/backup/bots
 ```
 
-For an in-place upgrade, pass the current installation's `bots` directory instead. Upgrade mode copies each matching bot's `.pi/telegram.json` unchanged and `.pi/mcp-auth.json` when present, with mode `600`; it does not require Telegram environment variables or alter the source files. Both bots must have Telegram configuration. Invalid JSON or differing existing destination files stops migration; identical files are accepted for repeat runs. Resolve conflicts privately rather than overwriting credentials. The new `.env.prod` is still required for Linear and Supabase credentials. Without `--migrate-from`, fresh setup constructs Telegram configuration from environment variables and can replace an existing Telegram configuration.
+Upgrade mode copies each matching bot's `.pi/telegram.json` unchanged and `.pi/mcp-auth.json` when present, with mode `600`; it does not require Telegram environment variables or alter the source files. Both bots must have Telegram configuration. Invalid JSON or differing existing destination files stops migration; identical files are accepted for repeat runs. Resolve conflicts privately rather than overwriting credentials. The new `.env.prod` is still required for Linear and Supabase credentials. Without `--migrate-from`, fresh setup constructs Telegram configuration from environment variables and can replace an existing Telegram configuration.
 
 If using artifacts, rerun `bin/battuta setup-artifacts` from the new release as part of the [artifact setup procedure](docs/artifact-service-setup.md#install-and-migrate). Setup installs the bundled service and dependencies, then runs `battuta-artifact setup` to apply pending registry migrations; it does not start or restart the service.
 
