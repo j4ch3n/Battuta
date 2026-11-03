@@ -43,12 +43,10 @@ class ReleaseInstallTests(ConfigFixture):
                 self.assertNotEqual(result.returncode, 0)
                 path.write_text(content)
 
-    def test_archive_skills_are_fixed_portable_and_repeatable_from_fresh_staging(self):
+    def test_shared_catalog_is_portable_without_per_bot_materialization(self):
         workflow = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
         script = next(step["run"] for step in workflow["jobs"]["build"]["steps"] if step.get("name") == "Assemble release")
-        assembly = [line for line in script.splitlines() if ("battuta-packaging stage-skills" in line or line == "rm -rf dist/stage/battuta/skills-hub")]
         validation = [line for line in script.splitlines() if "battuta-packaging validate-skills" in line]
-        self.assertTrue(assembly)
         self.assertEqual(len(validation), 1)
         self.executable("uv", '''import os, sys
 args = sys.argv[1:]
@@ -65,21 +63,16 @@ os.execv(sys.executable, [sys.executable, "-m", "battuta_packaging.cli", *args[i
                     skill_catalog(stage, role)
                 for source in (stage / "skills-hub").iterdir():
                     (source / "LICENSE").write_text("Required notice")
-                command = "\n".join(assembly)
-                result = subprocess.run(["bash", "-euc", command], cwd=work, env=env, capture_output=True, text=True)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertFalse((stage / "skills-hub").exists())
                 moved = work / "relocated"
                 stage.rename(moved)
                 for role in ("pm", "tl"):
                     bot = moved / f"bots/{role}-bot"
                     skills = bot / ".pi/skills"
                     names = json.loads((bot / "skills.json").read_text())["skills"]
-                    self.assertEqual({p.name for p in skills.iterdir()}, set(names))
+                    self.assertFalse(skills.exists())
                     for name in names:
-                        self.assertEqual((skills / name / "references/tools.md").read_text(), f"{name} tools")
-                        self.assertEqual((skills / name / "LICENSE").read_text(), "Required notice")
-                    self.assertFalse(any(p.is_symlink() for p in skills.rglob("*")))
+                        self.assertEqual((moved / "skills-hub" / name / "references/tools.md").read_text(), f"{name} tools")
+                        self.assertEqual((moved / "skills-hub" / name / "LICENSE").read_text(), "Required notice")
                 command = validation[0].replace("dist/stage/battuta", shlex.quote(str(moved)))
                 result = subprocess.run(["bash", "-euc", command], cwd=work, env=env, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -139,10 +132,6 @@ os.execv(sys.executable, [sys.executable, "-m", "battuta_packaging.cli", *args[i
                 if isinstance(entry, str)
                 if (source := entry).startswith("npm:")
             ]
-            skill = bot / ".pi/skills/manage-google"
-            if role == "pm-bot":
-                skill.mkdir(parents=True)
-                (skill / "SKILL.md").write_text("Google skill")
         self.executable("pnpm", '''import os, pathlib, sys
 args = sys.argv[1:]
 if args[:1] == ["--dir"]:

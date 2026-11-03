@@ -54,14 +54,11 @@ jobs:
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
           git archive HEAD bots scripts/bot_setup scripts/packaging skills-hub project-context-cli agent-mail project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/skill-management.md docs/gogcli-setup.md docs/luma-setup.md docs/luma.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md | tar -x -C dist/stage/battuta
-          uv run --project scripts/packaging --locked battuta-packaging stage-skills dist/stage/battuta
-          rm -rf dist/stage/battuta/skills-hub
           test -s dist/stage/battuta/RELEASE.md
           test -s dist/stage/battuta/docs/gogcli-setup.md
           test -s dist/stage/battuta/docs/luma-setup.md
           test -s dist/stage/battuta/docs/luma.md
-          test -s dist/stage/battuta/bots/pm-bot/.pi/skills/memory/references/tools.md
-          test -s dist/stage/battuta/bots/tl-bot/.pi/skills/memory/references/tools.md
+          test -s dist/stage/battuta/skills-hub/memory/references/tools.md
           test ! -e dist/stage/battuta/bots/AGENTS_personal.md
           tool_dir="$PWD/dist/stage/battuta/scripts/packaging"
           uv export --project "$tool_dir" --locked --no-dev --no-emit-project --no-emit-package battuta-bot-setup --format requirements-txt --output-file "$RUNNER_TEMP/tool-requirements.txt"
@@ -87,7 +84,7 @@ jobs:
           cp "$(command -v node)" dist/stage/battuta/bin/node
           cp scripts/packaging/battuta dist/stage/battuta/bin/battuta
           chmod +x dist/stage/battuta/bin/*
-          test ! -e dist/stage/battuta/skills-hub
+          test -d dist/stage/battuta/skills-hub
           uv run --project scripts/packaging --locked battuta-packaging validate-skills dist/stage/battuta
           for bot in pm-bot tl-bot; do
             test ! -e "dist/stage/battuta/bots/$bot/.pi/ME.md"
@@ -142,7 +139,7 @@ jobs:
                 console.log(`${source}\t${packageName}`);
               }
             ' "$bot_dir/.pi/settings.json")
-            if [ "$bot" = pm-bot ]; then test -f "$bot_dir/.pi/skills/manage-google/SKILL.md"; fi
+            test ! -e "$bot_dir/.pi/skills"
           done
           pnpm --dir dist/stage/battuta/agent-mail install --frozen-lockfile --prod
           pnpm --dir dist/stage/battuta/project-spec install --frozen-lockfile --prod

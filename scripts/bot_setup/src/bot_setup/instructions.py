@@ -7,9 +7,13 @@ import click
 
 
 def configure_instructions(bot_dir: Path, *, role: Literal["pm", "tl"], root: Path | None = None) -> None:
+    from .skills import load_selection
+    if role not in {"pm", "tl"}:
+        raise click.ClickException(f"Unknown bot role: {role}")
+    root = (root or bot_dir.parent.parent).resolve()
+    manifest = bot_dir / "skills.json"
+    load_selection(manifest if manifest.exists() else root / f"bots/{role}-bot/skills.json", root / "skills-hub")
     write_instructions(bot_dir, root=root)
-    from .skills import link_shared_skills
-    link_shared_skills(bot_dir, role=role, root=root)
 
 
 def write_instructions(bot_dir: Path, *, root: Path | None = None) -> None:

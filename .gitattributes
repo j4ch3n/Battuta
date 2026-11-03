@@ -15,6 +15,6 @@ scripts/packaging/.venv export-ignore
 scripts/bot_setup/tests export-ignore
 scripts/packaging/tests export-ignore
 **/node_modules/** export-ignore
-bots/pm-bot/.pi/skills/present-to-owner/references/live-panel/assets/fonts/*-OFL.txt whitespace=-trailing-space
+skills-hub/present-to-owner/references/live-panel/assets/fonts/*-OFL.txt whitespace=-trailing-space
 .memory-spike/** export-ignore
 .superpowers/** export-ignore

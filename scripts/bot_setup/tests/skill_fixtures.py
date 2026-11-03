@@ -5,6 +5,7 @@ from pathlib import Path
 
 
 def skill_catalog(root: Path, role: str, names=None) -> list[str]:
+    (root / "skills-hub").mkdir(parents=True, exist_ok=True)
     names = names if names is not None else ["project-context", "todo", "note-taking", "memory", *(["draft-writing"] if role == "pm" else [])]
     for name in names:
         source = root / "skills-hub" / name

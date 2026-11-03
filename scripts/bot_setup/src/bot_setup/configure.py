@@ -14,7 +14,7 @@ from .mcp import configure_mcp, validate_memory_url
 from .memory import configure_memory_settings
 from .subagents import SUBAGENT_PACKAGE, WEB_PACKAGE, configure_subagents
 from .telegram import configure_telegram, prepare_telegram_config
-from .skills import validate_bundle
+from .skills import check_manifests
 
 
 def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_file: Path | None = None, env_prefix: str | None = None, telegram_package: str = TELEGRAM_PACKAGE) -> None:
@@ -46,46 +46,17 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
     warn_running_session(bot_dir)
 
 
-def _migration_target(path: Path, content: bytes) -> None:
-    if path.is_symlink() or (path.exists() and (not path.is_file() or path.read_bytes() != content)):
-        raise click.ClickException(f"Refusing to overwrite existing configuration: {path}")
-
-
-def configure_release(root: Path, *, migrate_from: Path | None = None) -> None:
+def configure_release(root: Path) -> None:
     values = dict(os.environ)
     env_file = root / ".env.prod"
     for key in ("LINEAR_API_TOKEN", "SUPABASE_URL", "SUPABASE_SECRET_KEY"):
         required(values, key, env_file)
     url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
     bots = [(role, root / f"bots/{role}-bot") for role in ("pm", "tl")]
-    migration = []
+    check_manifests(root)
     telegram = []
     for role, bot in bots:
-        validate_bundle(bot)
-        if migrate_from is None:
-            telegram.append(prepare_telegram_config(bot, env_file, role.upper(), values))
-        else:
-            for name in ("telegram.json", "mcp-auth.json"):
-                source = migrate_from / f"{role}-bot/.pi" / name
-                if not source.exists() and name == "mcp-auth.json":
-                    continue
-                if not source.is_file():
-                    raise click.ClickException(f"Missing configuration: {source}")
-                read_config(source)
-                content = source.read_bytes()
-                path = bot / ".pi" / name
-                _migration_target(path, content)
-                migration.append((path, content))
-    for path, content in migration:
-        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        try:
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        except FileExistsError:
-            _migration_target(path, content)
-        else:
-            with os.fdopen(fd, "wb") as output:
-                output.write(content)
-        path.chmod(0o600)
+        telegram.append(prepare_telegram_config(bot, env_file, role.upper(), values))
     run("node", str(root / "memory-client/configure-scheduler.mjs"), "--initialize")
     for role, bot in bots:
         write_instructions(bot, root=root)

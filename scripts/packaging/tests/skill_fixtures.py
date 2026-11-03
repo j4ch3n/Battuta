@@ -2,10 +2,10 @@
 
 import json
 from pathlib import Path
-import shutil
 
 
 def skill_catalog(root: Path, role: str, names=None) -> list[str]:
+    (root / "skills-hub").mkdir(parents=True, exist_ok=True)
     if names is None:
         names = ["project-context", "todo", "note-taking", "memory"]
         if role == "pm":
@@ -19,12 +19,3 @@ def skill_catalog(root: Path, role: str, names=None) -> list[str]:
     bot.mkdir(parents=True, exist_ok=True)
     (bot / "skills.json").write_text(json.dumps({"skills": names}))
     return names
-
-
-def skill_bundle(root: Path, role: str, names=None) -> list[str]:
-    selected = skill_catalog(root, role, names)
-    skills = root / f"bots/{role}-bot/.pi/skills"
-    skills.mkdir(parents=True, exist_ok=True)
-    for name in selected:
-        shutil.copytree(root / "skills-hub" / name, skills / name)
-    return selected

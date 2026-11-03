@@ -47,10 +47,9 @@ def refresh_telegram(root, env_file):
 
 @main.command("configure-release")
 @click.option("--root", type=DIRECTORY, required=True)
-@click.option("--migrate-from", type=DIRECTORY)
-def release(root, migrate_from):
-    """Configure a fixed installed release, optionally restoring backup credentials."""
-    configure_release(root, migrate_from=migrate_from)
+def release(root):
+    """Configure a clean installed release."""
+    configure_release(root)
 
 
 @main.group("skills")

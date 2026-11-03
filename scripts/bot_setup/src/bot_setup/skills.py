@@ -1,11 +1,10 @@
-"""Expose manifest-selected hub skills without overwriting custom content."""
+"""Validate skill selection metadata against the canonical catalog."""
 
-from os.path import relpath
 from pathlib import Path
 import re
 import stat
 import subprocess
-from typing import Annotated, Literal
+from typing import Annotated
 
 import click
 from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError, field_validator
@@ -72,72 +71,3 @@ def check_manifests(root: Path, *, staged: bool = False) -> None:
             if not entry or entry[0] not in {"100644", "100755"}:
                 raise click.ClickException(f"Missing skill entry point in Git index: {name}")
 
-
-def validate_bundle(bot_dir: Path) -> list[str]:
-    skills = bot_dir / ".pi/skills"
-    if skills.is_symlink() or not skills.is_dir():
-        raise click.ClickException(f"Expected a local bundled skills directory: {skills}")
-    names = load_selection(bot_dir / "skills.json", skills)
-    entries = list(skills.iterdir())
-    if {entry.name for entry in entries} != set(names) or any(entry.is_symlink() or not entry.is_dir() for entry in entries):
-        raise click.ClickException(f"Bundled skills do not match manifest: {bot_dir}")
-    if any(entry.is_symlink() for entry in skills.rglob("*")):
-        raise click.ClickException(f"Unexpected bundled skill link: {skills}")
-    return names
-
-
-def _owned_skill_targets(root: Path, skills: Path, name: str) -> set[Path]:
-    old_names = ("memory", "memory-tl") if name == "memory" else (name,)
-    targets = {Path(relpath(root / "shared-skills" / old, skills)) for old in old_names}
-    targets.add(Path(relpath(root / "skills-hub" / name, skills)))
-    if name == "project-context":
-        targets.add(Path("../../../shared-skills/project-context"))
-    return targets
-
-
-def link_shared_skills(bot_dir: Path, *, role: Literal["pm", "tl"], root: Path | None = None) -> None:
-    if role not in {"pm", "tl"}:
-        raise click.ClickException(f"Unknown bot role: {role}")
-    bot_dir = bot_dir.resolve()
-    root = (root or bot_dir.parent.parent).resolve()
-    manifest = bot_dir / "skills.json"
-    if not manifest.exists():
-        manifest = root / f"bots/{role}-bot/skills.json"
-    names = load_selection(manifest, root / "skills-hub")
-
-    skills = bot_dir / ".pi/skills"
-    if skills.is_symlink() or (skills.exists() and not skills.is_dir()):
-        raise click.ClickException(f"Expected a local skill directory, refusing to replace: {skills}")
-    links = []
-    for name in names:
-        link = skills / name
-        target = Path(relpath(root / "skills-hub" / name, skills))
-        if link.is_symlink():
-            existing = link.readlink()
-            if existing == target:
-                continue
-            if existing not in _owned_skill_targets(root, skills, name):
-                raise click.ClickException(f"Refusing to replace existing skill link: {link}")
-        elif link.is_dir():
-            continue  # Custom or bundled directories retain their owner's content.
-        elif link.exists():
-            raise click.ClickException(f"Refusing to replace existing local skill: {link}")
-        links.append((link, target))
-
-    removals = []
-    if skills.is_dir():
-        for link in skills.iterdir():
-            if (
-                link.name not in names
-                and link.is_symlink()
-                and link.readlink() in _owned_skill_targets(root, skills, link.name)
-            ):
-                removals.append(link)
-
-    skills.mkdir(parents=True, exist_ok=True)
-    for link in removals:
-        link.unlink()
-    for link, target in links:
-        if link.is_symlink():
-            link.unlink()
-        link.symlink_to(target, target_is_directory=True)

@@ -3,6 +3,7 @@
 from pathlib import Path
 import re
 import unittest
+from bot_setup.skills import check_manifests
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -26,14 +27,8 @@ class SkillCatalogTests(unittest.TestCase):
                 names.append(name.group(1))
         self.assertEqual(len(names), len(set(names)))
 
-    def test_bot_links_discover_complete_catalog_directories(self):
+    def test_bot_selections_validate_without_discovery_output(self):
+        check_manifests(ROOT)
         for role in ("pm", "tl"):
             skills = ROOT / f"bots/{role}-bot/.pi/skills"
-            for entry in skills.iterdir():
-                if not (entry / "SKILL.md").is_file() and not entry.is_symlink():
-                    continue
-                with self.subTest(role=role, skill=entry.name):
-                    self.assertTrue(entry.is_symlink())
-                    self.assertEqual(entry.resolve(), ROOT / "skills-hub" / entry.name)
-                    self.assertTrue((entry / "SKILL.md").is_file())
-                    self.assertFalse(entry.readlink().is_absolute())
+            self.assertFalse(skills.exists() and any(skills.iterdir()))
