@@ -9,6 +9,15 @@ from typing import Literal
 import click
 
 
+def _owned_skill_targets(root: Path, skills: Path, name: str) -> set[Path]:
+    old_names = ("memory", "memory-tl") if name == "memory" else (name,)
+    targets = {Path(relpath(root / "shared-skills" / old, skills)) for old in old_names}
+    targets.add(Path(relpath(root / "skills-hub" / name, skills)))
+    if name == "project-context":
+        targets.add(Path("../../../shared-skills/project-context"))
+    return targets
+
+
 def link_shared_skills(bot_dir: Path, *, role: Literal["pm", "tl"], root: Path | None = None) -> None:
     if role not in {"pm", "tl"}:
         raise click.ClickException(f"Unknown bot role: {role}")
@@ -30,6 +39,8 @@ def link_shared_skills(bot_dir: Path, *, role: Literal["pm", "tl"], root: Path |
         raise click.ClickException(f"Cannot run skill validation: {error}") from error
 
     skills = bot_dir / ".pi/skills"
+    if skills.is_symlink() or (skills.exists() and not skills.is_dir()):
+        raise click.ClickException(f"Expected a local skill directory, refusing to replace: {skills}")
     links = []
     for name in names:
         link = skills / name
@@ -38,11 +49,7 @@ def link_shared_skills(bot_dir: Path, *, role: Literal["pm", "tl"], root: Path |
             existing = link.readlink()
             if existing == target:
                 continue
-            old_names = ("memory", "memory-tl") if name == "memory" else (name,)
-            owned = {Path(relpath(root / "shared-skills" / old, skills)) for old in old_names}
-            if name == "project-context":
-                owned.add(Path("../../../shared-skills/project-context"))
-            if existing not in owned:
+            if existing not in _owned_skill_targets(root, skills, name):
                 raise click.ClickException(f"Refusing to replace existing skill link: {link}")
         elif link.is_dir():
             continue  # Custom or bundled directories retain their owner's content.
@@ -50,7 +57,19 @@ def link_shared_skills(bot_dir: Path, *, role: Literal["pm", "tl"], root: Path |
             raise click.ClickException(f"Refusing to replace existing local skill: {link}")
         links.append((link, target))
 
+    removals = []
+    if skills.is_dir():
+        for link in skills.iterdir():
+            if (
+                link.name not in names
+                and link.is_symlink()
+                and link.readlink() in _owned_skill_targets(root, skills, link.name)
+            ):
+                removals.append(link)
+
     skills.mkdir(parents=True, exist_ok=True)
+    for link in removals:
+        link.unlink()
     for link, target in links:
         if link.is_symlink():
             link.unlink()

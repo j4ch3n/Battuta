@@ -56,10 +56,15 @@ Source setup validates the complete selection before changing skills, then
 creates individual relative `.pi/skills/<name>` links into the hub. Custom
 workspaces use their own manifest when present, otherwise the owning role's
 manifest. Setup preserves custom directories, refuses conflicting files or
-unrelated links, and recognizes known legacy links for migration. Repeating
-setup is idempotent. Existing tracked links bridge source ownership until
-development-output reconciliation is implemented under FIS-133; removing a
-manifest selection does not yet remove its previous runtime entry.
+unrelated links, and recognizes known legacy links for migration. The
+`.pi/skills/` directory itself must be a local directory, not a catalog link.
+Repeating setup is idempotent. After validating the entire selection and
+checking selected-entry conflicts, setup removes deselected links whose
+relative targets exactly match the same-name hub path or a recognized legacy
+path, including broken links. These target patterns identify setup ownership;
+there is no separate ownership registry. Empty selections remove all such
+links. Custom directories, files, absolute links, and unrelated links remain
+untouched when deselected. Preflight failures leave skill output unchanged.
 
 Release staging reads the same manifests, copies selected formerly bot-local
 skills completely, and links selected shared skills to the bundled hub.
@@ -77,9 +82,10 @@ is maintained in the [release setup index](../RELEASE.md#extension-and-skill-set
   separately authorized.
 - **Rename:** update the directory, frontmatter name, manifests, discovery
   links, callers, tests, and active documentation together.
-- **Remove:** remove affected selections and callers, handle existing runtime
-  entries explicitly under current reconciliation limits, then remove the
-  source. Never discard custom content or private auth/session state.
+- **Remove:** remove affected selections and callers, rerun source setup to
+  reconcile owned links, then remove the source. Custom entries require
+  explicit handling; release upgrade-state handling belongs to FIS-132.
+  Never discard custom content or private auth/session state.
 
 Run `pnpm check:skills`, `pnpm check:support`, affected Node tests, formatting,
 and lint checks. Check local documentation links and complete nested resources.
