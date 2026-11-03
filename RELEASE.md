@@ -95,6 +95,12 @@ test -x bin/battuta && test -f .env.example && test -f RELEASE.md
 
 Run subsequent commands from this extracted installation directory. If the final check fails, stop and inspect the extraction.
 
+Release configuration and service installation use the Python bot setup and
+packaging packages. On first use, `bin/battuta` verifies the bundled wheel
+checksums and uses uv with Python 3.12 to create `scripts/packaging/.venv` offline.
+It does not use a repository-root Python environment or download Python/packages.
+If Python 3.12, uv, or the bundled wheels are unavailable, stop and alert the owner.
+
 Install `battuta-project` from the included wheels as described in the [installation reference](bots/pm-bot/.pi/skills/project-context/references/installation.md). If GitHub cloning is needed, verify GitHub authentication as the bot user; defer `battuta-project --help` until step 4 has made the required Linear token available.
 
 ## 4. Prepare production credentials

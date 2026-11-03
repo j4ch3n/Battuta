@@ -108,6 +108,12 @@ jobs:
         with:
           version: "0.11.19"
           enable-cache: true
+          cache-dependency-glob: |
+            scripts/bot_setup/uv.lock
+            scripts/packaging/uv.lock
+            memory-service/uv.lock
+            artifact-service/uv.lock
+            project-context-cli/uv.lock
       - name: Install scheduler setup/launcher runtime dependencies
         run: pnpm --dir memory-client install --frozen-lockfile --prod
       - name: Install notebook search integration dependency

@@ -35,11 +35,11 @@ Use the same bot directory in both the environment variable and `--dir` argument
 
 For a standard Battuta extension, update its owning setup and release paths:
 
-- Add the pinned package to `scripts/bot_setup/install.py` and export it from `scripts/bot_setup/__init__.py`; include it in `bots/<bot-name>/scripts/configure-bot.py`'s installation list.
+- Add the pinned package to `scripts/bot_setup/src/bot_setup/install.py`; include it in the owning role's installation list in `configure.py`.
 - Bundle it for the same bot in `.github/workflows/release.yml`.
-- Update `packaging/configure.mjs` so retained release settings discover the bundled package without duplicating existing entries or replacing package resource selections.
-- Add required runtime environment to the source launcher `bots/pm-bot/scripts/run-dev.sh` and the release foreground/service launcher `packaging/battuta`.
+- Update the shared setup package's `configure_release` flow so retained settings discover the bundled package without duplicating entries or replacing package resource selections.
+- Add required runtime environment to the source launcher `bots/pm-bot/scripts/run-dev.sh` and the release foreground/service launcher `scripts/packaging/battuta`.
 
-Keep runtime data out of source control. Extend the relevant tests in `scripts/tests/` for installation, retained-settings migration, and launcher environment behavior. See [local setup](../.agents/skills/battuta-setup/references/development.md) for full bot configuration and launch instructions.
+Keep runtime data out of source control. Extend tests in the owning `scripts/bot_setup/tests/` or `scripts/packaging/tests/` project for installation, retained settings, and launcher environment behavior. See [local setup](../.agents/skills/battuta-setup/references/development.md) for full bot configuration and launch instructions.
 
 Memory is supplied by the shared [headless MCP service and thin Pi client](memory-service.md). Existing launchers load `memory-client/index.ts`; native MCP configuration exposes the shared tools. The retired Stone extension must not be loaded alongside it.

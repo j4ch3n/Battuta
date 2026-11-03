@@ -9,7 +9,7 @@
   "scripts": {
     "prepare": "husky",
     "setup:node-checks": "pnpm --dir agent-mail install --frozen-lockfile && pnpm --dir project-spec install --frozen-lockfile && pnpm --dir memory-client install --frozen-lockfile && pnpm --dir bots/pm-bot install --frozen-lockfile && pnpm --dir bots/tl-bot install --frozen-lockfile",
-    "setup:checks": "pnpm setup:node-checks && uv sync --locked",
+    "setup:checks": "pnpm setup:node-checks && uv sync --project scripts/bot_setup --locked && uv sync --project scripts/packaging --locked",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint:node": "eslint . --max-warnings=0",
@@ -24,10 +24,10 @@
     "test:coverage": "pnpm --dir agent-mail test:coverage && pnpm --dir project-spec test:coverage && pnpm --dir memory-client test:coverage",
     "test:integration": "node scripts/checks/check-supabase.mjs",
     "check:support": "node scripts/checks/check-support.mjs",
-    "check:skills": "node bot-setup/skills.mjs --check",
+    "check:skills": "uv run --project scripts/bot_setup --locked battuta-bot-setup skills check --root .",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm check:support",
     "check:all": "pnpm check && pnpm test:integration",
-    "precommit": "node bot-setup/skills.mjs --check --staged && lint-staged --concurrent false"
+    "precommit": "uv run --project scripts/bot_setup --locked battuta-bot-setup skills check --root . --staged && lint-staged --concurrent false"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

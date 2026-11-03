@@ -8,7 +8,7 @@ install it. There is no Battuta child runtime or separate child credential.
 Run the normal TL configuration from the repository root:
 
 ```sh
-uv run --locked python bots/tl-bot/scripts/configure-bot.py
+uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role tl
 ```
 
 For a custom workspace, add `--bot-dir /absolute/path/to/tl-workspace`. Setup

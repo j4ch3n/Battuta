@@ -17,8 +17,7 @@ help:
 		'  make refresh-telegram ENV_FILE=.env  Update both Telegram profiles from an env file' \
 		'  make dev              Attach to dev bots + Supabase using .env' \
 		'  make prod             Attach to prod bots using .env.prod (remote Supabase)' \
-		'  uv run python bots/pm-bot/scripts/configure-bot.py --help  PM bot setup options' \
-		'  uv run python bots/tl-bot/scripts/configure-bot.py --help  TL setup options'
+		'  uv run --project scripts/bot_setup --locked battuta-bot-setup configure --help  Bot setup options'
 
 db-diff:
 	@test -n "$(NAME)" || (printf '%s\n' 'Set NAME, for example: make db-diff NAME=create_tasks' >&2; exit 1)
@@ -30,12 +29,12 @@ functions-serve:
 	supabase functions serve --env-file "$(ENV_FILE)" --no-verify-jwt
 
 setup-pm-bot:
-	uv run --locked python bots/pm-bot/scripts/configure-bot.py
+	uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role pm
 	pnpm --dir agent-mail install
 	pnpm --dir project-spec install --frozen-lockfile
 
 setup-tl-bot:
-	uv run --locked python bots/tl-bot/scripts/configure-bot.py
+	uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role tl
 	pnpm --dir agent-mail install
 	pnpm --dir project-spec install --frozen-lockfile
 	pnpm --dir memory-client install --frozen-lockfile
@@ -44,7 +43,7 @@ setup-bot: setup-pm-bot setup-tl-bot
 
 refresh-telegram: ENV_FILE ?= .env
 refresh-telegram:
-	uv run --locked python scripts/refresh-telegram.py "$(ENV_FILE)"
+	uv run --project scripts/bot_setup --locked battuta-bot-setup refresh-telegram --root . "$(ENV_FILE)"
 
 dev:
 	bash bots/pm-bot/scripts/run-dev.sh dev

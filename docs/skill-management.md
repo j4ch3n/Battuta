@@ -34,11 +34,11 @@ remain named PM/TL until the identity migration. All future worker instances
 consume the single `bots/worker/skills.json` profile; it does not create or
 launch workers.
 
-`bot-setup/skills.mjs` maintains the shared validation implementation:
+The `scripts/bot_setup/` Python package maintains shared manifest and bundle validation:
 
 - `pnpm check:skills` validates all profile manifests against the checkout hub.
-- `node bot-setup/skills.mjs <skills.json> <skills-hub>` prints validated names
-  as JSON for source setup; Node release staging imports the same validator.
+- `uv run --project scripts/bot_setup --locked battuta-bot-setup skills check --root .`
+  validates source selections; Python setup and packaging import the same validator.
 - `pnpm precommit` validates staged manifests and selected entry points from
   the Git index before formatting/linting staged files. Unstaged repairs do
   not make an invalid staged selection valid. Failures block the commit.

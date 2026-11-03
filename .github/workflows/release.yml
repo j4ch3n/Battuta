@@ -53,8 +53,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots bot-setup skills-hub project-context-cli agent-mail project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/skill-management.md docs/gogcli-setup.md docs/luma-setup.md docs/luma.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md | tar -x -C dist/stage/battuta
-          node packaging/stage-skills.mjs dist/stage/battuta
+          git archive HEAD bots scripts/bot_setup scripts/packaging skills-hub project-context-cli agent-mail project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/skill-management.md docs/gogcli-setup.md docs/luma-setup.md docs/luma.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md | tar -x -C dist/stage/battuta
+          uv run --project scripts/packaging --locked battuta-packaging stage-skills dist/stage/battuta
           rm -rf dist/stage/battuta/skills-hub
           test -s dist/stage/battuta/RELEASE.md
           test -s dist/stage/battuta/docs/gogcli-setup.md
@@ -63,6 +63,12 @@ jobs:
           test -s dist/stage/battuta/bots/pm-bot/.pi/skills/memory/references/tools.md
           test -s dist/stage/battuta/bots/tl-bot/.pi/skills/memory/references/tools.md
           test ! -e dist/stage/battuta/bots/AGENTS_personal.md
+          tool_dir="$PWD/dist/stage/battuta/scripts/packaging"
+          uv export --project "$tool_dir" --locked --no-dev --no-emit-project --no-emit-package battuta-bot-setup --format requirements-txt --output-file "$RUNNER_TEMP/tool-requirements.txt"
+          uv build --project "$PWD/dist/stage/battuta/scripts/bot_setup" --wheel --out-dir "$tool_dir/wheels"
+          uv build --project "$tool_dir" --wheel --out-dir "$tool_dir/wheels"
+          python3 -m pip download --require-hashes --no-deps --only-binary=:all: --dest "$tool_dir/wheels" -r "$RUNNER_TEMP/tool-requirements.txt"
+          (cd "$tool_dir/wheels" && sha256sum *.whl > SHA256SUMS)
           cli_dir="$PWD/dist/stage/battuta/project-context-cli"
           uv export --project "$cli_dir" --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/project-requirements.txt"
           uv build --project "$cli_dir" --wheel --out-dir "$cli_dir/wheels"
@@ -79,25 +85,14 @@ jobs:
           python3 -m pip download --require-hashes --no-deps --only-binary=:all: --dest "$artifact_dir/wheels" -r "$artifact_dir/requirements.txt"
           (cd "$artifact_dir/wheels" && sha256sum *.whl > SHA256SUMS)
           cp "$(command -v node)" dist/stage/battuta/bin/node
-          cp packaging/battuta dist/stage/battuta/bin/battuta
-          cp packaging/configure.mjs dist/stage/battuta/bin/configure.mjs
-          cp packaging/shared-resources.mjs dist/stage/battuta/bin/shared-resources.mjs
-          cp packaging/configure-subagents.mjs dist/stage/battuta/bin/configure-subagents.mjs
-          cp packaging/install-services.mjs dist/stage/battuta/bin/install-services.mjs
+          cp scripts/packaging/battuta dist/stage/battuta/bin/battuta
           chmod +x dist/stage/battuta/bin/*
           test ! -e dist/stage/battuta/skills-hub
-          node --input-type=module -e '
-            import { pathToFileURL } from "node:url";
-            const root = process.argv[1];
-            const { validateBundledSkills } = await import(pathToFileURL(`${root}/bin/shared-resources.mjs`));
-            for (const bot of ["pm-bot", "tl-bot"]) await validateBundledSkills(`${root}/bots/${bot}`);
-          ' "$PWD/dist/stage/battuta"
+          uv run --project scripts/packaging --locked battuta-packaging validate-skills dist/stage/battuta
           for bot in pm-bot tl-bot; do
             test ! -e "dist/stage/battuta/bots/$bot/.pi/ME.md"
           done
           bash -n dist/stage/battuta/bin/battuta
-          node --check dist/stage/battuta/bin/install-services.mjs
-          node --check dist/stage/battuta/bot-setup/mcp.mjs
           export UV_TOOL_DIR="$RUNNER_TEMP/project-tools"
           export UV_TOOL_BIN_DIR="$RUNNER_TEMP/project-tool-bin"
           uv tool install --offline --python 3.12 --no-index --find-links "$cli_dir/wheels" battuta-project

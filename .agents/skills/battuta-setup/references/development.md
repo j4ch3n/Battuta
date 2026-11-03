@@ -29,7 +29,7 @@ For local Supabase, start Docker and run `supabase start`, then copy its URL and
 ## Run
 
 ```sh
-uv sync --locked
+uv sync --project scripts/bot_setup --locked
 make setup-bot
 make dev
 ```
@@ -43,8 +43,8 @@ Complete `/login` in each Pi pane and finish model-provider authentication, then
 Pi handles Linear MCP natively. `make setup-bot` writes the environment-expanded `Authorization` header to each bot's `.pi/mcp.json` and removes older `pi-mcp-adapter` package entries from settings. Rerun setup to migrate an existing checkout. The Make setup targets use `.env`; for production credentials, invoke each setup script explicitly:
 
 ```sh
-uv run --locked python bots/pm-bot/scripts/configure-bot.py --env-file .env.prod
-uv run --locked python bots/tl-bot/scripts/configure-bot.py --env-file .env.prod
+uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role pm --env-file .env.prod
+uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role tl --env-file .env.prod
 ```
 
 Restart running bots separately to load the migration. In each pane, check `/mcp` and request a read-only Linear lookup. Linear uses native `codemode` exposure for tool discovery and calls.
