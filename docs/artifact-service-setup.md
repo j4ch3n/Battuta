@@ -43,7 +43,7 @@ journalctl --user -u battuta-artifacts.service -n 50
 
 The unit restarts on failure and mounts the filesystem read-only within its namespace. User-service sandbox support depends on the host's namespace configuration; inspect systemd errors rather than silently disabling protection. To run while logged out/at boot, ask the operator to enable lingering for this account according to host policy. No service installation, activation, or lingering is performed automatically. For a source checkout, use the foreground command under the host's supervisor; the packaged unit targets the release's `bin/battuta` launcher. macOS development uses the foreground command or an operator-managed launchd job.
 
-Production bot launch adds the artifact virtual environment to PATH; the source tmux launcher does so for PM. Restart existing bot sessions to pick it up. Standalone sessions need the PATH export above.
+Production bot launch adds the artifact virtual environment to PATH; the source tmux launcher does so for CoS. Restart existing bot sessions to pick it up. Standalone sessions need the PATH export above.
 
 ## Verify
 

@@ -1,6 +1,6 @@
 ---
 name: battuta-setup
-description: Use when setting up Battuta development dependencies or configuring and launching PM/TL bots from a source checkout.
+description: Use when setting up Battuta development dependencies or configuring and launching CoS/Manager bots from a source checkout.
 ---
 
 # Battuta setup
@@ -12,7 +12,7 @@ Set up a source checkout for local development. Paths below are relative to the 
 1. Read [local development](references/development.md) and the shared [stack details](../../../docs/tech-stack.md). Check installed tools against the version files before installing dependencies.
 2. Use the development guide's **Contributor tooling** section for contributor dependencies, or **Bot configuration** and **Run** sections to launch bots. Installing checks does not configure bots. The shared [command reference](../../../docs/commands.md) maps tooling entry points.
 3. Confirm whether the backend is local or remote; use the corresponding environment template and launch target. Keep credentials private and ask the owner to complete provider login interactively.
-4. Verify both bots respond to the allowed Telegram user. Inspect failures before reporting setup complete; avoid duplicate bot processes.
+4. Verify generated configuration and command paths without messaging bots or invoking models. CoS alone has Telegram configuration; Manager has none. Inspect failures before reporting setup complete; avoid duplicate bot processes.
 
 ## Contributor skills
 

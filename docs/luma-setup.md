@@ -1,16 +1,16 @@
-# Luma connection setup (PM only)
+# Luma connection setup (CoS only)
 
 Battuta uses [Luma's official MCP server](https://help.luma.com/p/mcp) through
 [Pi's native OAuth support](https://github.com/earendil-works/pi/blob/v1.3.0/packages/coding-agent/docs/mcp.md#authenticate-with-oauth).
 A regular Luma account is enough; no Luma Plus, API key, client secret, or paid API
-is required. TL is not configured for Luma.
+is required. Manager is not configured for Luma.
 
 See [runtime boundaries and product acceptance](luma.md) for the separate live
 verification procedure; do not use bot/model requests as installation checks.
 
 ## 1. Check configuration
 
-Run normal Battuta configuration first. PM's `.pi/mcp.json` must contain:
+Run normal Battuta configuration first. CoS's `.pi/mcp.json` must contain:
 
 ```json
 {
@@ -38,11 +38,11 @@ required because Luma does not support dynamic client registration.
 
 ## 2. Owner sign-in
 
-Run as the ordinary user who runs PM, from the extracted release root. Do not run
+Run as the ordinary user who runs CoS, from the extracted release root. Do not run
 with `sudo`. With the owner's approval, run:
 
 ```sh
-(cd bots/pm-bot && PI_CODING_AGENT_DIR="$PWD/.pi" ../../bin/node node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js mcp login luma)
+(cd bots/cos-bot && PI_CODING_AGENT_DIR="$PWD/.pi" ../../bin/node node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js mcp login luma)
 ```
 
 The owner completes Luma's browser authorization, checking the account and access
@@ -50,29 +50,29 @@ being granted. Over SSH, open the authorization page on the owner's browser and
 paste the resulting redirected URL into Pi's sign-in prompt if the callback
 cannot reach the Raspberry Pi. Paste it only into that prompt, never chat,
 documentation, shell history, or a log. Stop if authorization fails; do not launch
-PM expecting it to repair authentication.
+CoS expecting it to repair authentication.
 
-If PM is already running interactively, the owner can instead use
-`/mcp login luma` in that same PM Pi session; its next turn uses the new login.
+If CoS is already running interactively, the owner can instead use
+`/mcp login luma` in that same CoS Pi session; its next turn uses the new login.
 This is separate from `/login`, which authenticates the model provider.
 
 For a source checkout, use the same bot environment:
 
 ```sh
-(cd bots/pm-bot && PI_CODING_AGENT_DIR="$PWD/.pi" node_modules/.bin/pi mcp login luma)
+(cd bots/cos-bot && PI_CODING_AGENT_DIR="$PWD/.pi" node_modules/.bin/pi mcp login luma)
 ```
 
-For a custom PM workspace, use its directory and installed Pi executable instead.
-A login under the default `~/.pi/agent` directory is not a login for Battuta PM.
+For a custom CoS workspace, use its directory and installed Pi executable instead.
+A login under the default `~/.pi/agent` directory is not a login for Battuta CoS.
 
 ## 3. Validate without a bot or model request
 
 From the release root, with the normal production credential environment loaded:
 
 ```sh
-(cd bots/pm-bot && PI_CODING_AGENT_DIR="$PWD/.pi" ../../bin/node node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js mcp list)
-test -s bots/pm-bot/.pi/mcp-auth.json
-test "$(stat -c '%a' bots/pm-bot/.pi/mcp-auth.json)" = 600
+(cd bots/cos-bot && PI_CODING_AGENT_DIR="$PWD/.pi" ../../bin/node node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js mcp list)
+test -s bots/cos-bot/.pi/mcp-auth.json
+test "$(stat -c '%a' bots/cos-bot/.pi/mcp-auth.json)" = 600
 ```
 
 Expect `luma` connected with tools listed, the effective exposure shown for its
@@ -85,7 +85,7 @@ source checkout, substitute `node_modules/.bin/pi` as above; on macOS use
 The exposure patterns permit discovery and lookup tools, while tools not matching
 them remain hidden. Review the connected tool descriptions before use: a naming
 pattern is not proof of a tool's effects or a provider-side read-only permission.
-If a matching tool can mutate data, keep PM stopped and narrow the configuration
+If a matching tool can mutate data, keep CoS stopped and narrow the configuration
 before proceeding. Do not enable RSVP, purchase, event/guest changes, messages,
 or Luma's diagnostic-note submission tools.
 
@@ -93,7 +93,7 @@ or Luma's diagnostic-note submission tools.
 
 - **Local disconnect:** run the login command above with `mcp logout luma`
   instead. Pi removes that server's saved credential. To prevent reconnecting,
-  set the PM entry's `enabled` to `false` and restart PM; normal Battuta
+  set the CoS entry's `enabled` to `false` and restart CoS; normal Battuta
   configuration recreates the managed entry.
 - **Provider revocation:** local logout removes local state; it does not promise
   that the Luma grant is revoked. Use Luma's account authorization controls or

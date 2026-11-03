@@ -1,19 +1,19 @@
-# TL subagent setup
+# Manager subagent setup
 
-TL uses the native MIT `pi-subagents@0.82.1` package with Pi 1.3.0. PM does not
+Manager uses the native MIT `pi-subagents@0.82.1` package with Pi 1.3.0. CoS does not
 install it. There is no Battuta child runtime or separate child credential.
 
 ## Source setup
 
-Run the normal TL configuration from the repository root:
+Run the normal Manager configuration from the repository root:
 
 ```sh
-uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role tl
+uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role manager
 ```
 
-For a custom workspace, add `--bot-dir /absolute/path/to/tl-workspace`. Setup
+For a custom workspace, add `--bot-dir /absolute/path/to/manager-workspace`. Setup
 registers and installs the pinned package and `pi-web-access@0.43.0`, then uses
-Pi's own settings and the package's bundled agents/skill. Restart TL afterward.
+Pi's own settings and the package's bundled agents/skill. Restart Manager afterward.
 
 Release configuration uses the same setup-only helper; release assembly installs
 the packages. Existing authentication and other private files are not copied or
@@ -27,16 +27,16 @@ the obsolete adapter but does not delete operator files.
 
 Children use the normal Pi agent directory and authentication store, selected
 provider/model, home, environment, and requested working directory. Log in once
-in TL's Pi environment, including for an `openai-codex` subscription. Do not create
+in Manager's Pi environment, including for an `openai-codex` subscription. Do not create
 a child API key or copy `auth.json`. Native Pi handles authentication and refresh.
 
-For headless/Telegram TL, use the same `PI_CODING_AGENT_DIR` when performing the
+For headless/Telegram Manager, use the same `PI_CODING_AGENT_DIR` when performing the
 initial interactive Pi login. A login under a different home or agent directory
-is not automatically available to TL or its children.
+is not automatically available to Manager or its children.
 
 ## Child extension selection
 
-Setup writes upstream `subagents` settings inside TL's `.pi/settings.json`:
+Setup writes upstream `subagents` settings inside Manager's `.pi/settings.json`:
 
 - `defaultExtensions` names only the absolute path to the installed web-access
   package's `dist` directory. An explicit list disables ambient extension loading
@@ -61,5 +61,5 @@ configuration. Review them if the exact allowlist matters. Setting
 the relevant role allowlists too, or upstream will correctly report missing tools.
 
 Children are trusted workers, not a sandbox. Workers edit the real workspace and
-can run commands with the same user's file/environment access. TL still reviews
+can run commands with the same user's file/environment access. Manager still reviews
 changes and verification evidence; child output is not product acceptance.

@@ -8,7 +8,7 @@ storage. For invocation and bot workflows, use the
 
 Project files live under `~/.battuta/projects/<project>/work/`; general files live
 under `~/.battuta/work/`. Filenames are `todo-<role>-<work-id>.jsonl`, for example
-`todo-pm-k7m2q.jsonl`.
+`todo-cos-k7m2q.jsonl`.
 
 The role-local pointer in `~/.battuta/projects/.config.json`, not file ordering or
 modification time, selects the current list:
@@ -60,7 +60,7 @@ one instance per role; no leases, thread tracking, or cross-run scheduling exist
 
 Before a role publishes its first work ID in a scope, its latest validated
 timestamped file supplies reads and the pending-work guard. Legacy filenames use
-`todo-<role>-<UTC timestamp>.jsonl`, such as `todo-pm-20261023T143015Z.jsonl`.
+`todo-<role>-<UTC timestamp>.jsonl`, such as `todo-cos-20261023T143015Z.jsonl`.
 Filename order, not modification time, determines legacy selection. Each role
 transitions independently; creation leaves legacy files untouched.
 

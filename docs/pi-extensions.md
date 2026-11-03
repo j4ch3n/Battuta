@@ -38,7 +38,7 @@ For a standard Battuta extension, update its owning setup and release paths:
 - Add the pinned package to `scripts/bot_setup/src/bot_setup/install.py`; include it in the owning role's installation list in `configure.py`.
 - Bundle it for the same bot in `.github/workflows/release.yml`.
 - Update the shared setup package's `configure_release` flow so retained settings discover the bundled package without duplicating entries or replacing package resource selections.
-- Add required runtime environment to the source launcher `bots/pm-bot/scripts/run-dev.sh` and the release foreground/service launcher `scripts/packaging/battuta`.
+- Add required runtime environment to the source launcher `bots/cos-bot/scripts/run-dev.sh` and the release foreground/service launcher `scripts/packaging/battuta`.
 
 Keep runtime data out of source control. Extend tests in the owning `scripts/bot_setup/tests/` or `scripts/packaging/tests/` project for installation, retained settings, and launcher environment behavior. See [local setup](../.agents/skills/battuta-setup/references/development.md) for full bot configuration and launch instructions.
 

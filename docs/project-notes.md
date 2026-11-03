@@ -6,7 +6,7 @@ Bot-facing item usage belongs in the [note-taking skill](../skills-hub/note-taki
 ## Identity and storage
 
 Project notebooks live in `~/.battuta/projects/<project>/work/`; general notebooks
-in `~/.battuta/work/`. Filenames are `note-<pm|tl>-<work-id>.md`, alongside TODO
+in `~/.battuta/work/`. Filenames are `note-<cos|manager>-<work-id>.md`, alongside TODO
 files. There is no fallback or migration from the old `todos/` directory.
 
 `WorkContext` shares role/scope resolution, registry-first locking, and five-character

@@ -13,10 +13,12 @@ Each profile declares an ordered selection in `bots/<profile>/skills.json`:
 { "skills": ["memory", "project-context", "note-taking"] }
 ```
 
-These selections are **metadata only**. Setup and release assembly do not
-copy skills, create symlinks, configure skill paths, or bind them to Pi.
-Selection does not grant tools, permissions, or runtime discovery. Empty
-selections are valid. Worker selections do not create or launch workers.
+These selections do not grant tools or permissions. Local source configuration
+creates relative `.pi/skills/<name>` links into the catalog for Pi discovery;
+all `.pi/skills/` output is ignored and must never be committed. Reconfiguring
+reconciles only owned same-name hub links and refuses to overwrite custom
+selected content. Empty selections are valid. Worker selections do not create
+or launch workers.
 
 Names must be unique lowercase kebab-case and match catalog directory and
 frontmatter names. The shared validator rejects unknown fields, invalid
@@ -38,8 +40,8 @@ alongside the profile manifests. They contain no generated per-agent skill
 discovery output. Installed configuration validates metadata, not a fixed
 per-agent bundle. Runtime skill loading is intentionally not configured yet.
 
-Setup validates before configuration writes and does not wipe discovery
-directories. When removing generated checkout links, inspect them first;
+Source setup validates selections before configuration writes and does not wipe
+custom discovery content. When removing generated checkout links, inspect them first;
 report unfamiliar local content rather than deleting it or following links
 into the catalog.
 

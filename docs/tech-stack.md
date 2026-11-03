@@ -1,12 +1,12 @@
 # Tech stack
 
-Shared memory uses an isolated Python 3.12 MCP service with pinned mcp-memory-service 12.1.1, SQLite/sqlite-vec and local ONNX MiniLM CPU embeddings. A TypeScript Pi adapter performs configurable conversation capture, PM-only profile loading and scheduled dream consolidation through PM's model. See [memory architecture](memory-service.md).
+Shared memory uses an isolated Python 3.12 MCP service with pinned mcp-memory-service 12.1.1, SQLite/sqlite-vec and local ONNX MiniLM CPU embeddings. A TypeScript Pi adapter performs configurable conversation capture, CoS-only profile loading and scheduled dream consolidation through CoS's model. See [memory architecture](memory-service.md).
 
 ## Main application and support tooling
 
 | Layer                      | Technology and responsibility                                                                  | Version source                                                            |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Agents                     | Pi coding-agent runtime; active PM and TL bots                                                 | Each bot's `package.json` and lockfile                                    |
+| Agents                     | Pi coding-agent runtime; active CoS and Manager bots                                           | Each bot's `package.json` and lockfile                                    |
 | Node                       | TypeScript extensions, Telegram integration, agent-mail client                                 | `.node-version`, `.nvmrc`, root and package `package.json`                |
 | Backend                    | Supabase PostgreSQL, migrations, Edge Functions, and Realtime                                  | `.supabase-version`, `supabase/config.toml`                               |
 | Edge Functions             | Deno TypeScript for agent mail and Linear webhooks                                             | `.deno-version`, each function's `deno.json` and lockfile                 |

@@ -1,6 +1,6 @@
 # gogcli installation and headless Google login
 
-This is the setup reference for the PM bot's Gmail and Calendar access. `gog`
+This is the setup reference for the CoS bot's Gmail and Calendar access. `gog`
 is an external command and is not bundled with Battuta. Run
 checks as the ordinary user who will run the bot. Installation and Google
 authentication are manual owner steps; an installation agent can inspect and
@@ -229,7 +229,7 @@ gog auth list --check --json --no-input >/dev/null
 Both commands must exit zero. The first must print the expected executable
 path; the second must produce no error. Stop here if either check fails.
 
-For a PM user service, make `gog` and the file-keyring variables available in
+For a CoS user service, make `gog` and the file-keyring variables available in
 that service's environment before enabling it. Shell startup files do not
 configure systemd user services. Keep `GOG_KEYRING_PASSWORD` private; do not
 inspect or print service environment values as a setup check.
