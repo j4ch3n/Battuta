@@ -19,5 +19,5 @@ bots/**/.pi/*
 !bots/**/.pi/settings.json
 !bots/**/.pi/extensions/
 !bots/**/.pi/skills/
-bots/**/.pi/skills/project-context/
-bots/**/.pi/skills/memory/
+# Runtime skill sources/resources retain their upstream and migrated formatting.
+skills-hub/

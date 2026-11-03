@@ -51,7 +51,7 @@ function checkLinks(file: string) {
 
 for (const collection of collections) {
   test(`${collection.role} discovers only its outbound templates and examples satisfy Agent Mail`, () => {
-    const skill = resolve(root, `bots/${collection.role}-bot/.pi/skills/${collection.skill}`);
+    const skill = resolve(root, `skills-hub/${collection.skill}`);
     checkLinks(resolve(skill, "SKILL.md"));
     assert.ok(
       readFileSync(resolve(skill, "SKILL.md"), "utf8").includes("references/templates/index.md"),
@@ -81,19 +81,13 @@ test("completed assessment template covers the PM assessment requirements verbat
   const request = validate(
     SendArguments,
     examples(
-      resolve(
-        root,
-        "bots/pm-bot/.pi/skills/communicate-with-tl/references/templates/request-assessment.md",
-      ),
+      resolve(root, "skills-hub/communicate-with-tl/references/templates/request-assessment.md"),
     )[0],
   );
   const assessment = validate(
     ReplyArguments,
     examples(
-      resolve(
-        root,
-        "bots/tl-bot/.pi/skills/communicate-with-pm/references/templates/report-assessment.md",
-      ),
+      resolve(root, "skills-hub/communicate-with-pm/references/templates/report-assessment.md"),
     )[0],
   );
   assert.equal(assessment.content.result?.state, "complete");
@@ -102,13 +96,13 @@ test("completed assessment template covers the PM assessment requirements verbat
 
 test("product-decision workflow links reach the shared command reference", () => {
   for (const file of [
-    "bots/pm-bot/.pi/skills/project-management/SKILL.md",
-    "bots/pm-bot/.pi/skills/project-management/references/product-decisions.md",
-    "shared-skills/project-context/SKILL.md",
-    "shared-skills/project-context/references/decisions.md",
-    "shared-skills/project-context/references/commands.md",
-    "shared-skills/project-context/references/spec-tools.md",
-    "shared-skills/project-context/references/spec-metadata.md",
+    "skills-hub/project-management/SKILL.md",
+    "skills-hub/project-management/references/product-decisions.md",
+    "skills-hub/project-context/SKILL.md",
+    "skills-hub/project-context/references/decisions.md",
+    "skills-hub/project-context/references/commands.md",
+    "skills-hub/project-context/references/spec-tools.md",
+    "skills-hub/project-context/references/spec-metadata.md",
   ])
     checkLinks(resolve(root, file));
 });

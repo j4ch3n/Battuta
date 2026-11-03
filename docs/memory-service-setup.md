@@ -37,9 +37,9 @@ Run doctor before starting the server; it takes the same single-owner data lock.
 
 ## Bot skill exposure
 
-Each bot owns a tracked `.pi/skills/memory/` directory: PM's skill is read/write and TL's is read-only. Pi discovers these local files directly; ordinary source/release configuration does not install or link a memory skill. Both frontmatters are named `memory`; do not install both into one bot. Project-context remains shared and linked.
+Both bot manifests select the single `skills-hub/memory/` skill. It retains PM read/write and TL read-only workflows. Source setup exposes it through each bot's `.pi/skills/memory/` link; release staging supplies complete local copies. See [skill management](skill-management.md) for ownership and manifest validation.
 
-For source `--bot-dir` workspaces outside the bundled bot directory, configuration copies the role's memory skill only when missing, or replaces its known old shared-memory link with a local copy. Existing local directories are preserved; unrelated links/files are refused rather than overwritten. Release configuration leaves memory entries alone. PM capture defaults on and TL capture defaults off. The shared server may still expose write tools: TL's read-only boundary is role guidance, not server-side access control. Setup does not edit private profiles or start bots.
+Source `--bot-dir` workspaces use their own manifest or the owning role's selection. Existing local directories are preserved; unrelated links/files are refused rather than overwritten. Release configuration leaves local memory entries alone. PM capture defaults on and TL capture defaults off. The shared server may still expose write tools: TL's read-only boundary is role guidance, not server-side access control. Setup does not edit private profiles or start bots.
 
 ## Services
 

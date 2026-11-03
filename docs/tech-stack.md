@@ -19,13 +19,13 @@ Shared memory uses an isolated Python 3.12 MCP service with pinned mcp-memory-se
 
 ## Individual shared skills
 
-Each skill keeps its instructions and references in `shared-skills/<skill>/`. Its sibling `shared-skills/<skill>-cli/` contains the tool source, bundled templates, package metadata, dependencies, lockfile, and tests. CLI packages are not dependencies of the main application's root Python project.
+Runtime instructions and complete owned resources live in `skills-hub/<skill>/`, selected by profile manifests. See [skill management](skill-management.md) for naming, validation, and distribution. The executable project CLI lives in `project-context-cli/`, including tool source, bundled CLI templates, package metadata, dependencies, lockfile, and tests. CLI packages are not dependencies of the main application's root Python project.
 
-| Skill                                                        | Technology and responsibility                                                | Version source                                                                                  |
-| ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| [Project context](../shared-skills/project-context/SKILL.md) | Python 3.12+, Click, Pydantic v2, PyYAML, Jinja2, uv; GitHub CLI for cloning | `shared-skills/project-context-cli/pyproject.toml`, `shared-skills/project-context-cli/uv.lock` |
+| Skill                                                     | Technology and responsibility                                                | Version source                                                      |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| [Project context](../skills-hub/project-context/SKILL.md) | Python 3.12+, Click, Pydantic v2, PyYAML, Jinja2, uv; GitHub CLI for cloning | `project-context-cli/pyproject.toml`, `project-context-cli/uv.lock` |
 
-CLI tests live under `shared-skills/<skill>-cli/tests/`. `pnpm check:support` runs each suite using that CLI package's own locked Python environment.
+Project CLI tests live under `project-context-cli/tests/`. `pnpm check:support` runs the suite using the package's own locked Python environment.
 
 ## Dependency ownership and verification
 

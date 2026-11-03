@@ -2,7 +2,7 @@
 
 Technical reference for the project-context CLI's role-local work state and TODO
 storage. For invocation and bot workflows, use the
-[todo skill](../shared-skills/todo/SKILL.md).
+[todo skill](../skills-hub/todo/SKILL.md).
 
 ## Storage and current-work selection
 
@@ -76,7 +76,7 @@ This is recoverable two-file publication, not a filesystem transaction.
 
 ## Implementation and checks
 
-Implementation lives in `shared-skills/project-context-cli/src/battuta_project/`:
+Implementation lives in `project-context-cli/src/battuta_project/`:
 `models.py` validates metadata, `registry.py` manages configuration, `storage.py`
 provides atomic writes/locks, and `todos.py` manages ordered lists. Co-located
 package tests cover discovery, state preservation, associations, collisions,

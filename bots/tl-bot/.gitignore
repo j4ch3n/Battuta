@@ -7,7 +7,10 @@ AGENTS.md
 .pi/extensions/*
 !.pi/skills/
 .pi/skills/*
-!.pi/skills/memory/
-!.pi/skills/communicate-with-pm/
-!.pi/skills/define-implementation-tasks/
-!.pi/skills/coordinate-workers/
+!.pi/skills/memory
+!.pi/skills/communicate-with-pm
+!.pi/skills/define-implementation-tasks
+!.pi/skills/coordinate-workers
+!.pi/skills/project-context
+!.pi/skills/todo
+!.pi/skills/note-taking

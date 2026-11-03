@@ -19,7 +19,7 @@ class MemoryPrivacyTests(unittest.TestCase):
             "memory.db.queue/job.job.json", "memory.db.queue/job.state.json",
             "capture-queue/pm/state.json", "onnx_models/all-MiniLM-L6-v2/model.onnx",
         ]
-        public = [f"bots/{role}-bot/.pi/skills/memory/{resource}" for role in ("pm", "tl") for resource in ("SKILL.md", "references/tools.md")]
+        public = [f"skills-hub/memory/{resource}" for resource in ("SKILL.md", "references/tools.md", "references/tools-tl.md")]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             subprocess.run(["git", "init", "-q", str(root)], check=True)

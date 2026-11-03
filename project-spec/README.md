@@ -6,4 +6,4 @@ Shared Pi extension for versioned project specifications, canonical checklists/r
 - Serialized document/metadata writes with recovery and SHA-256 decision snapshots.
 - Terminal decisions and guards against direct Pi write/edit of managed artifacts.
 
-See [tool workflows](../shared-skills/project-context/references/spec-tools.md) and the [metadata contract](../shared-skills/project-context/references/spec-metadata.md).
+See [tool workflows](../skills-hub/project-context/references/spec-tools.md) and the [metadata contract](../skills-hub/project-context/references/spec-metadata.md).

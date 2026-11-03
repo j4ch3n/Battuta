@@ -24,9 +24,10 @@
     "test:coverage": "pnpm --dir agent-mail test:coverage && pnpm --dir project-spec test:coverage && pnpm --dir memory-client test:coverage",
     "test:integration": "node scripts/check-supabase.mjs",
     "check:support": "node scripts/check-support.mjs",
+    "check:skills": "node bot-setup/skills.mjs --check",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm check:support",
     "check:all": "pnpm check && pnpm test:integration",
-    "precommit": "lint-staged --concurrent false"
+    "precommit": "node bot-setup/skills.mjs --check --staged && lint-staged --concurrent false"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

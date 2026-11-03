@@ -44,13 +44,17 @@ jobs:
       - name: Install pnpm
         run: corepack enable && corepack prepare pnpm@10.20.0 --activate
 
+      - name: Validate skill manifests
+        run: pnpm check:skills
+
       - name: Assemble release
         env:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots bot-setup shared-skills agent-mail project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/gogcli-setup.md docs/luma-setup.md docs/luma.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md | tar -x -C dist/stage/battuta
+          git archive HEAD bots bot-setup skills-hub project-context-cli agent-mail project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/skill-management.md docs/gogcli-setup.md docs/luma-setup.md docs/luma.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md | tar -x -C dist/stage/battuta
+          node packaging/stage-skills.mjs dist/stage/battuta
           test -s dist/stage/battuta/RELEASE.md
           test -s dist/stage/battuta/docs/gogcli-setup.md
           test -s dist/stage/battuta/docs/luma-setup.md
@@ -58,7 +62,7 @@ jobs:
           test -s dist/stage/battuta/bots/pm-bot/.pi/skills/memory/references/tools.md
           test -s dist/stage/battuta/bots/tl-bot/.pi/skills/memory/references/tools.md
           test ! -e dist/stage/battuta/bots/AGENTS_personal.md
-          cli_dir="$PWD/dist/stage/battuta/shared-skills/project-context-cli"
+          cli_dir="$PWD/dist/stage/battuta/project-context-cli"
           uv export --project "$cli_dir" --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/project-requirements.txt"
           uv build --project "$cli_dir" --wheel --out-dir "$cli_dir/wheels"
           python3 -m pip download --require-hashes --no-deps --only-binary=:all: --dest "$cli_dir/wheels" -r "$RUNNER_TEMP/project-requirements.txt"
@@ -86,7 +90,6 @@ jobs:
             test ! -L "dist/stage/battuta/bots/$bot/.pi/skills/memory"
             test -f "dist/stage/battuta/bots/$bot/.pi/skills/memory/SKILL.md"
             for skill in project-context todo note-taking; do
-              ln -s "../../../../shared-skills/$skill" "dist/stage/battuta/bots/$bot/.pi/skills/$skill"
               test -f "dist/stage/battuta/bots/$bot/.pi/skills/$skill/SKILL.md"
             done
             if [ "$bot" = pm-bot ]; then
@@ -96,7 +99,7 @@ jobs:
               test ! -e "dist/stage/battuta/bots/$bot/.pi/skills/draft-writing"
               test ! -L "dist/stage/battuta/bots/$bot/.pi/skills/draft-writing"
             fi
-            source_references="dist/stage/battuta/shared-skills/project-context/references"
+            source_references="dist/stage/battuta/skills-hub/project-context/references"
             runtime_references="dist/stage/battuta/bots/$bot/.pi/skills/project-context/references"
             ls -l "$runtime_references/"
             for document in "$source_references"/*/*.md; do

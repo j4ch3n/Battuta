@@ -4,7 +4,7 @@ Install as the ordinary OS user running the bots. The tool runs independently of
 
 ## Prerequisites
 
-- uv and Python **3.12+** (`requires-python` is defined in `shared-skills/project-context-cli/pyproject.toml`). uv can provision Python with `uv python install 3.12`.
+- uv and Python **3.12+** (`requires-python` is defined in `project-context-cli/pyproject.toml`). uv can provision Python with `uv python install 3.12`.
 - Git and GitHub CLI (`gh`) for `init --github`; name-only initialization and metadata linking do not require them. Authenticate as the bot user with `gh auth login`, then verify `gh auth status` before cloning. Repository access uses that user's GitHub credentials.
 - ripgrep (`rg`) for notebook search. Install with `brew install ripgrep` on macOS or `sudo apt install ripgrep` on Raspberry Pi OS, then verify `rg --version`. Append/read do not need rg; search has no custom fallback. The release bundles the notebook CLI and references, not the rg executable; install this OS dependency separately.
 - A Linear personal API token in the session's `LINEAR_API_TOKEN` environment variable (reuse the value used for Linear MCP). Every `battuta-project` command, including help, requires it. Startup checks presence only; `explain` needs read access to a linked project and `linear create` needs project-creation access.
@@ -16,7 +16,7 @@ See the official [uv installation guide](https://docs.astral.sh/uv/getting-start
 From the Battuta repository root:
 
 ```sh
-uv tool install --python 3.12 ./shared-skills/project-context-cli
+uv tool install --python 3.12 ./project-context-cli
 uv tool update-shell
 battuta-project --help
 ```
@@ -24,10 +24,10 @@ battuta-project --help
 Open a new shell after `update-shell` if necessary. For an update, reinstall from the updated checkout:
 
 ```sh
-uv tool install --reinstall --python 3.12 ./shared-skills/project-context-cli
+uv tool install --reinstall --python 3.12 ./project-context-cli
 ```
 
-For source development without a global tool installation, run `uv run --project shared-skills/project-context-cli --locked battuta-project <command>` from the Battuta root. Run `pnpm check:support` to verify the CLI and support tooling.
+For source development without a global tool installation, run `uv run --project project-context-cli --locked battuta-project <command>` from the Battuta root. Run `pnpm check:support` to verify the CLI and support tooling.
 
 ## Released archive
 
@@ -35,7 +35,7 @@ The release includes a built tool and locked dependency wheels. From the extract
 
 ```sh
 uv tool install --python 3.12 --no-index \
-  --find-links ./shared-skills/project-context-cli/wheels battuta-project
+  --find-links ./project-context-cli/wheels battuta-project
 uv tool update-shell
 battuta-project --help
 ```

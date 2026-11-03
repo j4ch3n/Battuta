@@ -156,4 +156,4 @@ Version-2 checkpoints add the acknowledged graph generation before profile publi
 
 Upstream automatic semantic merging/compression/forgetting, confidence/importance-based tiers, automatic global promotion, project graphs, graph-based recall ranking, historical Stone import, multilingual-model adoption, model migration tooling, remote authentication, dashboards and per-agent permission boundaries are not implemented. Dream uses Battuta's validated server APIs and selected read-only upstream analysis components rather than enabling upstream's direct-storage consolidation engine.
 
-For operational configuration, recovery, and cutover, see [memory operations](../docs/memory-service.md). For invocation examples and user-visible tool behavior, see [tool workflow](../bots/pm-bot/.pi/skills/memory/references/tools.md).
+For operational configuration, recovery, and cutover, see [memory operations](../docs/memory-service.md). For invocation examples and user-visible tool behavior, see [tool workflow](../skills-hub/memory/references/tools.md).

@@ -20,14 +20,15 @@ class SupportChecksTests(unittest.TestCase):
         self.root = Path(temp.name).resolve()
         for name in ("scripts/check-support.mjs", "packaging/battuta", "bots/pm-bot/scripts/run-dev.sh",
                      "scripts/setup-memory.sh", "scripts/setup-artifacts.sh", "packaging/configure.mjs",
-                      "packaging/shared-resources.mjs", "packaging/install-services.mjs", "bot-setup/tests/mcp.test.mjs"):
+                       "packaging/shared-resources.mjs", "packaging/stage-skills.mjs", "packaging/install-services.mjs",
+                       "bot-setup/tests/mcp.test.mjs", "bot-setup/tests/skills.test.mjs"):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             if name == "scripts/check-support.mjs":
                 shutil.copyfile(ROOT / name, path)
             else:
                 path.touch()
-        for directory in ("scripts/tests", "memory-service/tests", "artifact-service/tests", "shared-skills/example-cli/tests"):
+        for directory in ("scripts/tests", "memory-service/tests", "artifact-service/tests", "project-context-cli/tests"):
             folder = self.root / directory
             folder.mkdir(parents=True)
             (folder / "test_unit.py").touch()
@@ -55,7 +56,7 @@ class SupportChecksTests(unittest.TestCase):
         result, calls = self.run_checks()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(len(calls), 12)
-        for index, project in enumerate((None, "memory-service", "artifact-service", "shared-skills/example-cli")):
+        for index, project in enumerate((None, "memory-service", "artifact-service", "project-context-cli")):
             group = calls[index * 3:index * 3 + 3]
             prefix = ["run", "--locked"] if project is None else ["run", "--project", str(self.root / project), "--locked"]
             self.assertTrue(all(call[:len(prefix)] == prefix for call in group), group)

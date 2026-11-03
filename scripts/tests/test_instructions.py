@@ -9,6 +9,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from bot_setup.instructions import configure_instructions  # noqa: E402
+from skill_fixtures import skill_catalog  # noqa: E402
 
 
 class InstructionTests(unittest.TestCase):
@@ -36,21 +37,11 @@ class InstructionTests(unittest.TestCase):
                 (root / "bots").mkdir(parents=True)
                 (root / "bots/AGENTS_shared.md").write_text("Shared")
                 (bot / "AGENTS_dedicated.md").write_text("Dedicated")
-                for name in ("project-context", "todo", "note-taking"):
-                    source = root / "shared-skills" / name
-                    source.mkdir(parents=True)
-                    (source / "SKILL.md").write_text(name)
-                source = root / f"bots/{role}-bot/.pi/skills/memory"
-                source.mkdir(parents=True)
-                (source / "SKILL.md").write_text(f"{role} memory")
-                if role == "pm":
-                    draft = source.parent / "draft-writing"
-                    draft.mkdir()
-                    (draft / "SKILL.md").write_text("PM drafts")
+                skill_catalog(root, role)
                 configure_instructions(bot, role=role, root=root)
                 self.assertEqual((bot / "AGENTS.md").read_text(), "Shared\nDedicated")
-                self.assertEqual((bot / ".pi/skills/memory/SKILL.md").read_text(), f"{role} memory")
-                self.assertFalse((bot / ".pi/skills/memory").is_symlink())
+                self.assertEqual((bot / ".pi/skills/memory").resolve(), (root / "skills-hub/memory").resolve())
+                self.assertTrue((bot / ".pi/skills/memory").is_symlink())
                 self.assertEqual((bot / ".pi/skills/draft-writing/SKILL.md").is_file(), role == "pm")
 
     def test_legacy_personal_guidance_is_preserved_but_not_embedded(self):
@@ -62,8 +53,7 @@ class InstructionTests(unittest.TestCase):
                 shared = root / "bots/AGENTS_shared.md"
                 shared.write_text("Shared instructions")
                 (bot / "AGENTS_dedicated.md").write_text("Role instructions")
-                for name in ("project-context", "todo", "note-taking"):
-                    (root / "shared-skills" / name).mkdir(parents=True)
+                skill_catalog(root, role.removesuffix("-bot"))
                 memory = bot / ".pi/skills/memory"
                 memory.mkdir(parents=True)
                 (memory / "SKILL.md").write_text("Local memory")

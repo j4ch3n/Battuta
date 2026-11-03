@@ -29,15 +29,12 @@ run("bash", ["-n", "packaging/battuta", "bots/pm-bot/scripts/run-dev.sh"]);
 run("bash", ["-n", "scripts/setup-memory.sh", "scripts/setup-artifacts.sh"]);
 run("node", ["--check", "packaging/configure.mjs"]);
 run("node", ["--test", "bot-setup/tests/mcp.test.mjs"]);
+run("node", ["--test", "bot-setup/tests/skills.test.mjs"]);
 run("node", ["--check", "packaging/shared-resources.mjs"]);
+run("node", ["--check", "packaging/stage-skills.mjs"]);
 run("node", ["--check", "packaging/install-services.mjs"]);
 pythonTests("scripts/tests");
 pythonTests("memory-service/tests", "memory-service");
 
-const sharedSkills = resolve(root, "shared-skills");
 pythonTests("artifact-service/tests", "artifact-service");
-for (const cli of readdirSync(sharedSkills, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory() && entry.name.endsWith("-cli"))
-  .sort((left, right) => left.name.localeCompare(right.name))) {
-  pythonTests(resolve(sharedSkills, cli.name, "tests"), resolve(sharedSkills, cli.name));
-}
+pythonTests("project-context-cli/tests", "project-context-cli");

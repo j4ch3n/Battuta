@@ -37,7 +37,7 @@ class ReleaseInstallTests(ConfigFixture):
                 self.assertNotEqual(result.returncode, 0)
                 path.write_text(content)
 
-    def test_archive_preserves_local_memory_skills_and_links_shared_context(self):
+    def test_archive_materializes_memory_and_links_shared_context_from_manifests(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         loop = re.search(
             r'^          for bot in pm-bot tl-bot; do\n            mkdir .*?^          done$',
@@ -46,19 +46,26 @@ class ReleaseInstallTests(ConfigFixture):
         self.assertIsNotNone(loop)
         stage = self.root / "dist/stage/battuta"
         for name in ("project-context", "todo", "note-taking"):
-            source = stage / "shared-skills" / name
+            source = stage / "skills-hub" / name
             source.mkdir(parents=True)
             (source / "SKILL.md").write_text(name)
-        (stage / "shared-skills/project-context/references").mkdir()
+        (stage / "skills-hub/project-context/references").mkdir()
+        shutil.copytree(ROOT / "skills-hub/memory", stage / "skills-hub/memory")
+        shutil.copytree(ROOT / "skills-hub/draft-writing", stage / "skills-hub/draft-writing")
         for role in ("pm-bot", "tl-bot"):
-            shutil.copytree(ROOT / "bots" / role / ".pi/skills/memory", stage / "bots" / role / ".pi/skills/memory")
-        shutil.copytree(ROOT / "bots/pm-bot/.pi/skills/draft-writing", stage / "bots/pm-bot/.pi/skills/draft-writing")
+            bot = stage / "bots" / role
+            bot.mkdir(parents=True)
+            names = ["project-context", "todo", "note-taking", "memory"]
+            if role == "pm-bot":
+                names.append("draft-writing")
+            (bot / "skills.json").write_text(json.dumps({"skills": names}))
+        subprocess.run(["node", str(ROOT / "packaging/stage-skills.mjs"), str(stage)], check=True, capture_output=True)
         result = subprocess.run(["bash", "-euc", textwrap.dedent(loop.group())], cwd=self.root, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         for role in ("pm-bot", "tl-bot"):
             memory = stage / "bots" / role / ".pi/skills/memory"
             self.assertFalse(memory.is_symlink())
-            self.assertEqual((memory / "SKILL.md").read_text(), (ROOT / "bots" / role / ".pi/skills/memory/SKILL.md").read_text())
+            self.assertEqual((memory / "SKILL.md").read_text(), (ROOT / "skills-hub/memory/SKILL.md").read_text())
             self.assertTrue((memory / "references/tools.md").is_file())
             draft = memory.parent / "draft-writing"
             self.assertFalse(draft.is_symlink())
