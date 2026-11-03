@@ -47,7 +47,7 @@ class TodoList:
     path: Path
     items: list[TodoItem]
     scope: Literal["project", "general"]
-    role: Literal["pm", "tl"]
+    role: Literal["cos", "manager"]
     project: str | None
     work_id: str | None = None
     related_to: str | None = None
@@ -57,7 +57,7 @@ class TodoStore:
     def __init__(self, scope: str, role: str, registry: ProjectRegistry | None = None):
         if scope not in ("project", "general"):
             raise TodoError(TodoErrorCode.INVALID_INPUT)
-        if role not in ("pm", "tl"):
+        if role not in ("cos", "manager"):
             raise TodoError(TodoErrorCode.INVALID_ROLE)
         try:
             self.work = WorkContext(scope, role, registry)
@@ -135,7 +135,7 @@ class TodoStore:
         items = self._new_items(descriptions)
         with self._locked(create=True):
             if related_to is not None:
-                if not isinstance(related_to, str) or not re.fullmatch(r"(pm|tl):[a-z0-9]{5}", related_to):
+                if not isinstance(related_to, str) or not re.fullmatch(r"(cos|manager):[a-z0-9]{5}", related_to):
                     raise TodoError(TodoErrorCode.INVALID_REFERENCE)
                 role, target = related_to.split(":")
                 if self.registry.work_record(self.project, role, target) is None:

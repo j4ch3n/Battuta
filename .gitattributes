@@ -2,6 +2,8 @@
 bots/AGENTS_personal.md export-ignore
 **/.pi/ME.md export-ignore
 **/.pi/ME.md.* export-ignore
+**/.pi/mail-sessions/** export-ignore
+**/.pi/sessions/** export-ignore
 *.db export-ignore
 *.db-wal export-ignore
 *.db-shm export-ignore

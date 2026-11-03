@@ -14,7 +14,7 @@ from battuta_project.registry import ProjectRegistry
 
 def advance_in_process(home):
     with patch("pathlib.Path.home", return_value=Path(home)):
-        TodoStore("general", "pm").advance("done", rational="Verified the step's outcome")
+        TodoStore("general", "cos").advance("done", rational="Verified the step's outcome")
 
 
 def create_in_process(args):
@@ -37,7 +37,7 @@ class TodoTests(unittest.TestCase):
         home = patch("pathlib.Path.home", return_value=self.home)
         home.start()
         self.addCleanup(home.stop)
-        self.store = TodoStore("general", "pm")
+        self.store = TodoStore("general", "cos")
 
     def create(self, *items, second=0, force=False):
         return self.store.create(list(items), force=force)
@@ -47,7 +47,7 @@ class TodoTests(unittest.TestCase):
         project = registry.init("atlas")
         for scope in ("project", "general"):
             root = project.root if scope == "project" else self.home / ".battuta"
-            for role in ("pm", "tl"):
+            for role in ("cos", "manager"):
                 with self.subTest(scope=scope, role=role):
                     store = TodoStore(scope, role)
                     created = store.create(["Work"])
@@ -59,7 +59,7 @@ class TodoTests(unittest.TestCase):
 
     def test_notebook_orphans_reserve_work_ids(self):
         self.store.directory.mkdir(parents=True)
-        orphan = self.store.directory / "note-tl-aaaaa.md"
+        orphan = self.store.directory / "note-manager-aaaaa.md"
         orphan.symlink_to(self.home / "missing")
         with patch("secrets.choice", side_effect=list("aaaaabbbbb")):
             created = self.create("New")
@@ -67,7 +67,7 @@ class TodoTests(unittest.TestCase):
         self.assertTrue(orphan.is_symlink())
 
     def test_roles_create_independently_and_extend_their_own_work(self):
-        for role in ("pm", "tl"):
+        for role in ("cos", "manager"):
             with self.subTest(role=role):
                 store = TodoStore("general", role)
                 with self.assertRaisesRegex(TodoError, "NO_CURRENT_WORK"):
@@ -92,30 +92,30 @@ class TodoTests(unittest.TestCase):
                 self.assertNotEqual(store.create(["New work"]).work_id, created.work_id)
 
     def test_related_work_retains_historical_target_and_does_not_switch_roles(self):
-        pm = self.store.create(["PM"])
-        tl_store = TodoStore("general", "tl")
-        tl = tl_store.create(["TL"], related_to=f"pm:{pm.work_id}")
-        self.assertNotEqual(pm.work_id, tl.work_id)
-        self.assertEqual(self.store.read().path, pm.path)
-        self.store.create(["Later PM"], force=True)
-        self.assertEqual(tl_store.extend(["More TL"]).related_to, f"pm:{pm.work_id}")
-        tl_store.create(["Later TL"], force=True, related_to=f"pm:{pm.work_id}")
-        self.assertEqual(tl_store.registry.work_record(None, "tl", tl.work_id).related_to, f"pm:{pm.work_id}")
+        cos = self.store.create(["CoS"])
+        manager_store = TodoStore("general", "manager")
+        manager = manager_store.create(["Manager"], related_to=f"cos:{cos.work_id}")
+        self.assertNotEqual(cos.work_id, manager.work_id)
+        self.assertEqual(self.store.read().path, cos.path)
+        self.store.create(["Later CoS"], force=True)
+        self.assertEqual(manager_store.extend(["More Manager"]).related_to, f"cos:{cos.work_id}")
+        manager_store.create(["Later Manager"], force=True, related_to=f"cos:{cos.work_id}")
+        self.assertEqual(manager_store.registry.work_record(None, "manager", manager.work_id).related_to, f"cos:{cos.work_id}")
 
     def test_invalid_related_references_do_not_publish_work(self):
-        for reference in ("pm:../xx", "pm:abc12", "engineer:abc12", "abc12", "pm:ABCDE"):
+        for reference in ("cos:../xx", "cos:abc12", "engineer:abc12", "abc12", "cos:ABCDE"):
             with self.subTest(reference=reference), self.assertRaisesRegex(TodoError, "INVALID_REFERENCE"):
                 self.store.create(["New"], related_to=reference)
         self.assertIsNone(self.store.read())
         registry = ProjectRegistry()
         registry.init("atlas")
-        project_work = TodoStore("project", "tl").create(["Project TL"])
+        project_work = TodoStore("project", "manager").create(["Project Manager"])
         with self.assertRaisesRegex(TodoError, "INVALID_REFERENCE"):
-            self.store.create(["General"], related_to=f"tl:{project_work.work_id}")
+            self.store.create(["General"], related_to=f"manager:{project_work.work_id}")
 
     def test_collision_checks_both_roles_orphans_and_metadata(self):
         self.store.directory.mkdir(parents=True)
-        orphan = self.store.directory / "todo-tl-aaaaa.jsonl"
+        orphan = self.store.directory / "todo-manager-aaaaa.jsonl"
         orphan.write_text("Preserve orphan")
         with patch("battuta_project.work.secrets.choice", side_effect=list("aaaaabbbbb")):
             created = self.create("New")
@@ -132,7 +132,7 @@ class TodoTests(unittest.TestCase):
             self.assertEqual(self.store.create(["Newest"], force=True).work_id, "ccccc")
         outside = self.home / "private"
         outside.write_text("Keep")
-        (self.store.directory / "todo-tl-ddddd.jsonl").symlink_to(outside)
+        (self.store.directory / "todo-manager-ddddd.jsonl").symlink_to(outside)
         with patch("battuta_project.work.secrets.choice", side_effect=list("dddddeeeee")):
             self.assertEqual(self.store.create(["Safe"], force=True).work_id, "eeeee")
         self.assertEqual(outside.read_text(), "Keep")
@@ -140,7 +140,7 @@ class TodoTests(unittest.TestCase):
     def test_legacy_continuation_and_independent_role_migration(self):
         self.store.directory.mkdir(parents=True)
         paths = {}
-        for role in ("pm", "tl"):
+        for role in ("cos", "manager"):
             path = self.store.directory / f"todo-{role}-20261023T120000Z.jsonl"
             path.write_text('{"id":1,"status":"todo","description":"Legacy","rational":""}\n')
             paths[role] = path
@@ -150,13 +150,13 @@ class TodoTests(unittest.TestCase):
         with self.assertRaisesRegex(TodoError, "NO_CURRENT_WORK"):
             self.store.extend(["No legacy extension"])
         self.store.advance("done", "Checked legacy")
-        legacy_bytes = paths["pm"].read_bytes()
+        legacy_bytes = paths["cos"].read_bytes()
         current = self.create("New")
-        self.assertEqual(paths["pm"].read_bytes(), legacy_bytes)
-        tl = TodoStore("general", "tl")
-        self.assertIsNone(tl.read().work_id)
-        tl.update_todo(["Revised legacy"])
-        tl.advance("cancelled", "No longer needed")
+        self.assertEqual(paths["cos"].read_bytes(), legacy_bytes)
+        manager = TodoStore("general", "manager")
+        self.assertIsNone(manager.read().work_id)
+        manager.update_todo(["Revised legacy"])
+        manager.advance("cancelled", "No longer needed")
         current.path.unlink()
         for action in (self.store.read, lambda: self.store.extend(["Missing"]), lambda: self.create("Force", force=True)):
             with self.assertRaisesRegex(TodoError, "INVALID_TODO_FILE"):
@@ -164,7 +164,7 @@ class TodoTests(unittest.TestCase):
 
     def test_invalid_legacy_timestamp_is_rejected(self):
         self.store.directory.mkdir(parents=True)
-        (self.store.directory / "todo-pm-20261323T120000Z.jsonl").write_text("unused")
+        (self.store.directory / "todo-cos-20261323T120000Z.jsonl").write_text("unused")
         with self.assertRaisesRegex(TodoError, "INVALID_TODO_FILE"):
             self.store.read()
 
@@ -181,8 +181,8 @@ class TodoTests(unittest.TestCase):
 
     def test_parallel_role_publication_preserves_both_pointers(self):
         with ProcessPoolExecutor(max_workers=2) as pool:
-            ids = list(pool.map(create_in_process, [(str(self.home), role) for role in ("pm", "tl")]))
-        for role, work_id in zip(("pm", "tl"), ids):
+            ids = list(pool.map(create_in_process, [(str(self.home), role) for role in ("cos", "manager")]))
+        for role, work_id in zip(("cos", "manager"), ids):
             self.assertEqual(TodoStore("general", role).read().work_id, work_id)
 
     def test_publication_and_project_switch_preserve_state(self):
@@ -190,12 +190,12 @@ class TodoTests(unittest.TestCase):
         registry.init("atlas")
         registry.init("harbor")
         with ProcessPoolExecutor(max_workers=2) as pool:
-            publication = pool.submit(create_in_process, (str(self.home), "tl"))
+            publication = pool.submit(create_in_process, (str(self.home), "manager"))
             switch = pool.submit(switch_in_process, (str(self.home), "atlas"))
             work_id = publication.result()
             switch.result()
         self.assertEqual(registry.current_name(), "atlas")
-        self.assertEqual(registry.current_work_id(None, "tl"), work_id)
+        self.assertEqual(registry.current_work_id(None, "manager"), work_id)
 
     def test_error_explanations_render_without_relying_on_exact_wording(self):
         for code in TodoErrorCode:
@@ -273,7 +273,7 @@ class TodoTests(unittest.TestCase):
             {"id": 2, "status": "todo", "description": "Skipped ID"},
             {"id": 1, "status": "pending", "description": "Bad status"},
             {"id": 1, "status": "todo", "description": " "},
-            {"id": 1, "status": "todo", "description": "Extra", "role": "pm"},
+            {"id": 1, "status": "todo", "description": "Extra", "role": "cos"},
         ]
         invalid_records += [
             {"id": 1, "status": "done", "description": "Missing explanation", "rational": ""},

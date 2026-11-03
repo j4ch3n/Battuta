@@ -23,7 +23,7 @@ test("Pi loads a staged extension with only production dependencies for both rol
         join(staged, "node_modules", dependency),
         "dir",
       );
-    for (const role of ["pm", "tl"]) {
+    for (const role of ["cos", "manager"]) {
       process.env.AGENT_ROLE = role;
       const agentDir = join(f.root, role);
       await mkdir(agentDir);
@@ -43,10 +43,10 @@ test("Pi loads a staged extension with only production dependencies for both rol
       assert.ok(extension, "Shared extension must load through Pi's real loader");
       assert.ok(extension.tools.has("describe_spec"));
       assert.ok(extension.tools.has("read_constitution"));
-      assert.equal(extension.tools.has("init_constitution"), role === "pm");
-      assert.equal(extension.tools.has("update_constitution"), role === "pm");
-      assert.equal(extension.tools.has("finalize_spec"), role === "pm");
-      assert.equal(extension.tools.has("write_spec_review"), role === "tl");
+      assert.equal(extension.tools.has("init_constitution"), role === "cos");
+      assert.equal(extension.tools.has("update_constitution"), role === "cos");
+      assert.equal(extension.tools.has("finalize_spec"), role === "cos");
+      assert.equal(extension.tools.has("write_spec_review"), role === "manager");
     }
   } finally {
     if (previous === undefined) delete process.env.AGENT_ROLE;

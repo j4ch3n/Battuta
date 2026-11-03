@@ -16,4 +16,4 @@ Spec tools own metadata and document storage. Use `inspect_specs` for a project'
 
 `describe_spec` returns presence, paths, fingerprints, and `review_status: missing | current | stale` from one locked snapshot. With `include_content: true`, it also returns complete document text paired with those fingerprints. Latest-version review coverage is current only when its assessed version, checklist fingerprint, and review bytes match. This is informational and never a finalization gate.
 
-Saved specs are immutable. Before finalization, TL can fully replace checklist/review; after finalization, every artifact is locked. Product decision metadata is not a claim that engineering verification or product acceptance passed.
+Saved specs are immutable. Before finalization, Manager can fully replace checklist/review; after finalization, every artifact is locked. Product decision metadata is not a claim that engineering verification or product acceptance passed.

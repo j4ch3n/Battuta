@@ -9,8 +9,8 @@ from battuta_memory.service import MemoryService
 class CaptureTests(StorageFixture):
     def batch(self, items=None):
         items = items if items is not None else [{"item_id": "fact-1", "content": "Useful fact", "scope": {"global": True},
-            "sources": [{"agent_id": "pm", "session_id": "s", "entry_id": "entry-1"}]}]
-        payload = {"session_id": "s", "batch_id": "batch", "agent_id": "pm", "items": items}
+            "sources": [{"agent_id": "cos", "session_id": "s", "entry_id": "entry-1"}]}]
+        payload = {"session_id": "s", "batch_id": "batch", "agent_id": "cos", "items": items}
         # Digest canonicalization covers normalized item defaults in both clients.
         provisional = CaptureBatch(**payload, payload_digest="0" * 64)
         payload["payload_digest"] = CaptureService.digest(provisional)

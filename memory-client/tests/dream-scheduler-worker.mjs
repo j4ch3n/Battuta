@@ -115,8 +115,8 @@ let signalDelivery;
 const delivered = new Promise((resolve) => {
   signalDelivery = resolve;
 });
-// Deterministic PM boundary: accept the delivered instruction and call its tool.
-// Delivery alone cannot force a real PM model to choose this call.
+// Deterministic CoS boundary: accept the delivered instruction and call its tool.
+// Delivery alone cannot force a real CoS model to choose this call.
 loaded.runtime.sendUserMessage = (prompt) => {
   assert.ok(prompt.endsWith(DREAM_PROMPT));
   scheduled = tool.execute("scheduled", {}, undefined, undefined, ctx);
@@ -136,7 +136,7 @@ const ctx = {
       assert.deepEqual(model, { provider: "offline", id: "dream" });
       assert.equal(input.tools, undefined);
       assert.equal(input.messages.length, 1);
-      assert.ok(!JSON.stringify(input).includes("PRIVATE PM transcript"));
+      assert.ok(!JSON.stringify(input).includes("PRIVATE CoS transcript"));
       assert.ok(!JSON.stringify(input).includes(reflection));
       modelCalls++;
       const text = input.systemPrompt.includes("Refresh the whole high-level personal profile")
@@ -156,8 +156,8 @@ const ctx = {
     },
   },
   sessionManager: {
-    getSessionFile: () => "normal-PM.jsonl",
-    getBranch: () => [{ content: "PRIVATE PM transcript" }],
+    getSessionFile: () => "normal-CoS.jsonl",
+    getBranch: () => [{ content: "PRIVATE CoS transcript" }],
   },
   ui: { setStatus: (...args) => publicEvents.push(args) },
 };

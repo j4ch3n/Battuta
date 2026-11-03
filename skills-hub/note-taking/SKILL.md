@@ -55,13 +55,13 @@ Avoids preserving credentials or unnecessary debugging chronology.
 
 ## Workflow
 
-1. Select project or general scope explicitly; PM and TL have independent notebooks.
+1. Select project or general scope explicitly; CoS and Manager have independent notebooks.
 2. Append one physical line per finding, including its source and material limits
    where relevant. Preserve the distinction between evidence and inference.
 3. Search for relevant terms, then read surrounding numbered lines when useful.
    Full reads are also available; use limits and returned continuation commands
    for large notebooks. Use `--meta` to discover notebook identity and registered
-   drafts without loading their bodies; PM uses draft-writing for complete documents.
+   drafts without loading their bodies; CoS uses draft-writing for complete documents.
 4. On a storage error, retain existing content and follow the reported recovery
    guidance rather than replacing or silently repairing it.
 
@@ -70,8 +70,8 @@ A notebook needs no TODO list. Keep credentials and unrelated private data out.
 
 ## Scope and identity
 
-PM and TL invoke `battuta-project note` through the shell. `AGENT_ROLE` selects
-`pm` or `tl`; `--scope` is always explicit:
+CoS and Manager invoke `battuta-project note` through the shell. `AGENT_ROLE` selects
+`cos` or `manager`; `--scope` is always explicit:
 
 - `project`: the selected registered project. Check `battuta-project current` and
   select the intended project with `switch` if needed.

@@ -3,6 +3,13 @@ from battuta_memory.contracts import CaptureBatch, UpdateRequest, RecallRequest
 
 
 class ContractTests(unittest.TestCase):
+    def test_source_provenance_accepts_current_role_identities(self):
+        from battuta_memory.contracts import SourceRef
+        for role in ("cos", "manager"):
+            with self.subTest(role=role):
+                source = SourceRef(agent_id=role, session_id="session", entry_id="entry")
+                self.assertEqual(source.agent_id, role)
+
     def test_consolidation_has_fixed_scope_and_requires_an_explicit_run_instant(self):
         from battuta_memory.contracts import ConsolidateGlobalRequest
         self.assertEqual(ConsolidateGlobalRequest(run_id="2026-10-21T03:00:00Z").run_id, "2026-10-21T03:00:00Z")
@@ -33,5 +40,5 @@ class ContractTests(unittest.TestCase):
 
     def test_capture_rejects_foreign_session_citation(self):
         with self.assertRaises(ValueError):
-            CaptureBatch(session_id="current", batch_id="b", agent_id="tl", payload_digest="a" * 64,
-                items=[{"item_id": "i", "content": "note", "scope": {"global": True}, "sources": [{"agent_id": "tl", "session_id": "other", "entry_id": "e"}]}])
+            CaptureBatch(session_id="current", batch_id="b", agent_id="manager", payload_digest="a" * 64,
+                items=[{"item_id": "i", "content": "note", "scope": {"global": True}, "sources": [{"agent_id": "manager", "session_id": "other", "entry_id": "e"}]}])

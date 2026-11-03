@@ -58,7 +58,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-1. **Setup**: Discover the named specification through `inspect_specs` and resolve its version through `describe_spec`. Use the returned reference as FEATURE_SPEC. Select a separate display name for IMPL_PLAN; PM will persist it through spec tools. Read `template.md` beside this prompt as the IMPL_PLAN template. BRANCH is optional checkout metadata, not a feature selector.
+1. **Setup**: Discover the named specification through `inspect_specs` and resolve its version through `describe_spec`. Use the returned reference as FEATURE_SPEC. Select a separate display name for IMPL_PLAN; CoS will persist it through spec tools. Read `template.md` beside this prompt as the IMPL_PLAN template. BRANCH is optional checkout metadata, not a feature selector.
 
 2. **Load context**: Read FEATURE_SPEC and applicable checkout README/AGENTS guidance from CLI workspace discovery. Resolve any adopted named principles document through `inspect_specs` and `describe_spec`. Load the shared IMPL_PLAN template.
 

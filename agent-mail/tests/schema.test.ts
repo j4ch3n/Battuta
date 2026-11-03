@@ -13,9 +13,9 @@ import {
 import { content, completedContent, requestContent } from "./fixtures.ts";
 import { validateCoverage } from "../content.ts";
 
-const agent = { role: "pm" as const, sessionId: randomUUID() };
+const agent = { role: "cos" as const, sessionId: randomUUID() };
 const intent = {
-  recipient: "tl",
+  recipient: "manager",
   message_type: "chat",
   content: content("Review the design"),
   reply_expectation: null,
@@ -33,7 +33,7 @@ test("LLM expectations translate to offsets; runtime owns identity and conversat
       reply_expectation: window === null ? null : { window },
     });
     assert.equal(request.response_due_minutes, minutes);
-    assert.equal(request.sender_role, "pm");
+    assert.equal(request.sender_role, "cos");
     assert.equal(request.conversation_id, agent.sessionId);
     assert.ok(!("response_due" in request));
     assert.ok(!("reply_expectation" in request));
@@ -44,7 +44,7 @@ test("strict LLM schemas reject malformed, coerced, omitted and injected fields"
   for (const bad of [
     { ...intent, recipient: "engineer" },
     { ...intent, recipient: agent.role },
-    { ...intent, sender_role: "tl" },
+    { ...intent, sender_role: "manager" },
     { ...intent, response_due: "tomorrow" },
     { ...intent, reply_expectation: { window: 5 } },
     { ...intent, reply_expectation: { window: "urgent" } },
@@ -60,7 +60,7 @@ test("strict LLM schemas reject malformed, coerced, omitted and injected fields"
     { ...intent, content: { ...intent.content, kind: "technical_request" } },
     { ...intent, content: { ...intent.content, schema_version: 2 } },
     { ...intent, content: { ...intent.content, request: { action: "Investigate" } } },
-    { recipient: "tl", message_type: "chat", content: { content: "missing expectation" } },
+    { recipient: "manager", message_type: "chat", content: { content: "missing expectation" } },
   ])
     assert.throws(() => sendRequest(agent, bad));
   assert.equal(validate(SendArguments, intent).reply_expectation, null);
@@ -81,7 +81,7 @@ test("reply requires a composite reference and transports no new conversation or
   assert.ok(!("conversation_id" in request));
   for (const badParent of [
     { id: parent.id },
-    { conversation_id: "pm", id: parent.id },
+    { conversation_id: "cos", id: parent.id },
     { conversation_id: parent.conversation_id, id: randomUUID() },
   ]) {
     assert.throws(() => validate(ReplyArguments, { ...args, parent: badParent }));
@@ -93,8 +93,8 @@ test("injected JSON includes current and parent composite references", () => {
     conversation_id: randomUUID(),
     id: "b8d02f4c5e73",
     in_reply_to: "a7c91e3b4d62",
-    sender: "tl",
-    recipient: "pm",
+    sender: "manager",
+    recipient: "cos",
     message_type: "chat",
     content: content("Answer"),
     response_due: null,
@@ -125,7 +125,9 @@ test("one role-independent schema requires explicit requests and evidence-backed
   assert.ok(sendRequest(agent, { ...ask, reply_expectation: { window: "medium" } }));
   const done = completedContent("Investigation complete", ["Use existing infrastructure"]);
   assert.ok(sendRequest(agent, { ...intent, content: done }));
-  assert.ok(sendRequest({ ...agent, role: "tl" }, { ...intent, recipient: "pm", content: done }));
+  assert.ok(
+    sendRequest({ ...agent, role: "manager" }, { ...intent, recipient: "cos", content: done }),
+  );
   validateCoverage(done, [ask.content]);
   assert.throws(
     () => validateCoverage(done, [requestContent("Assess", ["A missing expectation"])]),

@@ -17,7 +17,7 @@ await writeFile(
   process.env.PI_SCHEDULER_STATE_FILE,
   JSON.stringify({ version: 2, revision: 0, tasks: [] }),
 );
-for (const role of ["pm", "tl"]) {
+for (const role of ["cos", "manager"]) {
   const agent = join(directory, role);
   await mkdir(agent, { recursive: true });
   const profile = "# Owner\nPrefers concise answers.\n";
@@ -25,14 +25,14 @@ for (const role of ["pm", "tl"]) {
   await writeFile(join(agent, "ME.md"), "Legacy private profile must not be loaded or changed.\n");
   await writeFile(
     join(agent, "settings.json"),
-    JSON.stringify(role === "pm" ? { battutaMemoryCapture: { enabled: false } } : {}),
+    JSON.stringify(role === "cos" ? { battutaMemoryCapture: { enabled: false } } : {}),
   );
   process.env.AGENT_ROLE = role;
   process.env.PI_CODING_AGENT_DIR = agent;
   const loaded = await discoverAndLoadExtensions(
     [
       new URL("../index.ts", import.meta.url).pathname,
-      ...(role === "pm" && schedulerEntry ? [schedulerEntry] : []),
+      ...(role === "cos" && schedulerEntry ? [schedulerEntry] : []),
     ],
     agent,
     agent,
@@ -57,7 +57,7 @@ for (const role of ["pm", "tl"]) {
     const result = await handler({ systemPrompt: "Original prompt" }, ctx);
     if (result?.systemPrompt) prompt = result.systemPrompt;
   }
-  if (role === "pm") assert.ok(prompt?.includes(profile));
+  if (role === "cos") assert.ok(prompt?.includes(profile));
   else assert.equal(prompt, undefined);
   for (const event of [
     "session_start",

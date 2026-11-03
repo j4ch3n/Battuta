@@ -6,7 +6,7 @@ from bot_setup.instructions import configure_instructions
 from skill_fixtures import skill_catalog
 
 
-@pytest.mark.parametrize("role", ["pm", "tl"])
+@pytest.mark.parametrize("role", ["cos", "manager"])
 def test_custom_workspace_assembles_sources_and_preserves_private_files(tmp_path, role):
     skill_catalog(tmp_path, role)
     bot = tmp_path / "custom assistant"
@@ -19,4 +19,4 @@ def test_custom_workspace_assembles_sources_and_preserves_private_files(tmp_path
         configure_instructions(bot, role=role, root=tmp_path)
         assert (bot / "AGENTS.md").read_text() == "Shared fixture\nDedicated fixture"
         assert private.read_text() == "Private guidance"
-        assert not (bot / ".pi/skills").exists()
+        assert (bot / ".pi/skills/memory").is_symlink()

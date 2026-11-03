@@ -22,7 +22,7 @@ def main():
 
 @main.command()
 @click.option("--root", type=DIRECTORY, required=True)
-@click.option("--role", type=click.Choice(["pm", "tl"]), required=True)
+@click.option("--role", type=click.Choice(["cos", "manager"]), required=True)
 @click.option("--bot-dir", type=DIRECTORY)
 @click.option("--env-file", type=FILE)
 @click.option("--env-prefix")
@@ -36,13 +36,12 @@ def configure(root, role, bot_dir, env_file, env_prefix, telegram_package):
 @click.option("--root", type=DIRECTORY, required=True)
 @click.argument("env_file", type=FILE)
 def refresh_telegram(root, env_file):
-    """Refresh both Telegram profiles without reinstalling packages."""
+    """Refresh CoS Telegram without reinstalling packages."""
     values = read_env(env_file)
-    prepared = [prepare_telegram_config(root / f"bots/{role}-bot", env_file, role.upper(), values) for role in ("pm", "tl")]
-    for path, data, changed in prepared:
-        if changed:
-            write_config(path, data, ".telegram-")
-            click.echo(f"Updated {path} from {env_file}.")
+    path, data, changed = prepare_telegram_config(root / "bots/cos-bot", env_file, "COS", values)
+    if changed:
+        write_config(path, data, ".telegram-")
+        click.echo(f"Updated {path} from {env_file}.")
 
 
 @main.command("configure-release")

@@ -1,17 +1,19 @@
-"""Skill selection is validated metadata, never discovery output."""
+"""Local setup exposes selected catalog skills through generated links."""
 
 import json
 
 import click
 import pytest
+import subprocess
+from pathlib import Path
 
 from bot_setup.instructions import configure_instructions
 from skill_fixtures import skill_catalog
 
 
-@pytest.mark.parametrize("role", ["pm", "tl"])
+@pytest.mark.parametrize("role", ["cos", "manager"])
 @pytest.mark.parametrize("names", [["memory", "note-taking"], []])
-def test_setup_validates_selection_without_materializing_it(tmp_path, role, names):
+def test_source_setup_links_selected_skills_idempotently(tmp_path, role, names):
     skill_catalog(tmp_path, role, names)
     bot = tmp_path / f"bots/{role}-bot"
     (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
@@ -20,29 +22,91 @@ def test_setup_validates_selection_without_materializing_it(tmp_path, role, name
     before = manifest.read_bytes()
     for _ in range(2):
         configure_instructions(bot, role=role, root=tmp_path)
-        assert not (bot / ".pi/skills").exists()
+        skills = bot / ".pi/skills"
+        assert {entry.name for entry in skills.iterdir()} == set(names)
+        for name in names:
+            assert (skills / name).is_symlink()
+            assert (skills / name).resolve() == tmp_path / "skills-hub" / name
         assert manifest.read_bytes() == before
         assert (bot / "AGENTS.md").read_text() == "Shared\nDedicated"
 
 
 def test_invalid_selection_does_not_write_instructions(tmp_path):
-    skill_catalog(tmp_path, "pm")
-    bot = tmp_path / "bots/pm-bot"
+    skill_catalog(tmp_path, "cos")
+    bot = tmp_path / "bots/cos-bot"
     (bot / "skills.json").write_text(json.dumps({"skills": ["missing"]}))
     (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
     (bot / "AGENTS_dedicated.md").write_text("Dedicated")
     with pytest.raises(click.ClickException):
-        configure_instructions(bot, role="pm", root=tmp_path)
+        configure_instructions(bot, role="cos", root=tmp_path)
     assert not (bot / "AGENTS.md").exists()
     assert not (bot / ".pi").exists()
 
 
-def test_custom_workspace_manifest_is_validated_without_discovery(tmp_path):
-    skill_catalog(tmp_path, "pm")
+def test_custom_workspace_manifest_controls_local_discovery(tmp_path):
+    skill_catalog(tmp_path, "cos")
     bot = tmp_path / "custom"
     bot.mkdir()
     (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
     (bot / "AGENTS_dedicated.md").write_text("Dedicated")
     (bot / "skills.json").write_text('{"skills":["note-taking"]}')
-    configure_instructions(bot, role="pm", root=tmp_path)
-    assert not (bot / ".pi").exists()
+    configure_instructions(bot, role="cos", root=tmp_path)
+    assert {entry.name for entry in (bot / ".pi/skills").iterdir()} == {"note-taking"}
+
+
+@pytest.mark.parametrize("role", ["cos", "manager"])
+def test_generated_discovery_paths_are_git_ignored(tmp_path, role):
+    root = Path(__file__).resolve().parents[3]
+    (tmp_path / ".gitignore").write_text((root / f"bots/{role}-bot/.gitignore").read_text())
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    result = subprocess.run(["git", "check-ignore", "--stdin"], cwd=tmp_path, input=".pi/skills/memory\n.pi/skills/custom\n.pi/mail-sessions/example.jsonl\n.pi/sessions/example.jsonl\n.pi/settings.json\nskills.json\n", text=True, capture_output=True)
+    assert set(result.stdout.splitlines()) == {".pi/skills/memory", ".pi/skills/custom", ".pi/mail-sessions/example.jsonl", ".pi/sessions/example.jsonl"}
+
+
+def test_reselection_removes_only_owned_links_and_preserves_custom_content(tmp_path):
+    skill_catalog(tmp_path, "manager", ["memory", "note-taking"])
+    bot = tmp_path / "bots/manager-bot"
+    (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
+    (bot / "AGENTS_dedicated.md").write_text("Dedicated")
+    configure_instructions(bot, role="manager", root=tmp_path)
+    skills = bot / ".pi/skills"
+    custom = skills / "custom"
+    custom.write_text("Private content")
+    (bot / "skills.json").write_text('{"skills":["memory"]}')
+    configure_instructions(bot, role="manager", root=tmp_path)
+    assert (skills / "memory").is_symlink()
+    assert not (skills / "note-taking").exists()
+    assert custom.read_text() == "Private content"
+
+
+@pytest.mark.parametrize("kind", ["file", "directory", "link", "root-link"])
+def test_custom_skill_content_is_never_replaced(tmp_path, kind):
+    skill_catalog(tmp_path, "manager", ["memory"])
+    bot = tmp_path / "bots/manager-bot"
+    (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
+    (bot / "AGENTS_dedicated.md").write_text("Dedicated")
+    outside = tmp_path / "custom"
+    outside.mkdir()
+    (outside / "private").write_text("Preserve")
+    skills = bot / ".pi/skills"
+    skills.parent.mkdir()
+    if kind == "root-link":
+        skills.symlink_to(outside, target_is_directory=True)
+    else:
+        skills.mkdir()
+        target = skills / "memory"
+        if kind == "file":
+            target.write_text("Preserve")
+        elif kind == "directory":
+            target.mkdir()
+            (target / "private").write_text("Preserve")
+        else:
+            target.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(click.ClickException):
+        configure_instructions(bot, role="manager", root=tmp_path)
+    assert (outside / "private").read_text() == "Preserve"
+    assert (tmp_path / "skills-hub/memory/SKILL.md").is_file()
+    if kind == "file":
+        assert (skills / "memory").read_text() == "Preserve"
+    elif kind == "directory":
+        assert (skills / "memory/private").read_text() == "Preserve"

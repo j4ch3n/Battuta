@@ -14,7 +14,7 @@ def install_services(root: Path) -> None:
         raise click.ClickException("Install path must not contain spaces or systemd special characters")
     directory = Path(os.environ.get("XDG_CONFIG_HOME", home / ".config")) / "systemd/user"
     units = {}
-    for role in ("pm", "tl"):
+    for role in ("cos", "manager"):
         units[f"battuta-{role}.service"] = f'''[Unit]
 Description=Battuta {role.upper()} bot
 After=network-online.target battuta-memory.service

@@ -27,14 +27,14 @@ test.each(["missing parent", "missing store", "empty registry", "unknown project
         expected = /No Battuta project store has been initialized.*battuta-project init/s;
       if (state === "empty registry") expected = /No registered projects.*battuta-project init/s;
       const before = await readdir(f.root, { recursive: true });
-      const store = new ProjectSpecStore("pm", root);
+      const store = new ProjectSpecStore("cos", root);
       for (const operation of [
         () => store.inspectSpecs("Battuta"),
         () => store.readConstitution("Battuta"),
       ])
         await assert.rejects(operation, expected);
       const fake = fakePi();
-      register(fake.pi, { role: "pm", projectsRoot: root });
+      register(fake.pi, { role: "cos", projectsRoot: root });
       const tool = fake.tools.get("inspect_specs")!;
       await assert.rejects(
         () =>
@@ -59,7 +59,7 @@ test("discovery preserves invalid-store errors instead of suggesting initializat
   try {
     await rm(f.projects, { recursive: true });
     await writeFile(f.projects, "Not a directory");
-    await assert.rejects(f.pm.inspectSpecs("Battuta"), /Expected a directory/);
+    await assert.rejects(f.cos.inspectSpecs("Battuta"), /Expected a directory/);
     assert.equal((await stat(f.projects)).isFile(), true);
   } finally {
     await f.cleanup();
@@ -69,7 +69,7 @@ test("discovery preserves invalid-store errors instead of suggesting initializat
 test("unknown project messages preserve literal project names", async () => {
   const f = await fixture();
   try {
-    await assert.rejects(f.pm.inspectSpecs("$&{name}"), /Project '\$&\{name\}' is not registered/);
+    await assert.rejects(f.cos.inspectSpecs("$&{name}"), /Project '\$&\{name\}' is not registered/);
   } finally {
     await f.cleanup();
   }

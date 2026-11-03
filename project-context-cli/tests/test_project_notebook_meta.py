@@ -20,7 +20,7 @@ class NotebookMetaTests(unittest.TestCase):
         home = patch("pathlib.Path.home", return_value=self.home)
         home.start()
         self.addCleanup(home.stop)
-        self.store = NoteStore("general", "pm")
+        self.store = NoteStore("general", "cos")
 
     def test_absent_metadata_does_not_create_storage(self):
         self.assertIsNone(self.store.metadata())
@@ -30,7 +30,7 @@ class NotebookMetaTests(unittest.TestCase):
         note = self.store.append("  Original **一**  ")
         metadata = note.path.with_suffix(".json")
         metadata.unlink(missing_ok=True)
-        todo = TodoStore("general", "pm").create(["Independent"])
+        todo = TodoStore("general", "cos").create(["Independent"])
         state = self.store.work.registry.state_path.read_bytes()
         content = note.path.read_bytes()
         result, index = self.store.metadata()
@@ -46,16 +46,16 @@ class NotebookMetaTests(unittest.TestCase):
         self.assertEqual(index["nextDraftId"], 1)
         self.assertEqual(note.path.read_bytes(), content + b"Second\n")
         self.assertEqual(self.store.work.registry.state_path.read_bytes(), state)
-        self.assertEqual(TodoStore("general", "pm").read().work_id, todo.work_id)
+        self.assertEqual(TodoStore("general", "cos").read().work_id, todo.work_id)
         self.assertEqual(metadata.stat().st_mode & 0o777, 0o600)
 
     def test_invalid_metadata_blocks_reads_and_writes_without_repair(self):
         note = self.store.append("Original")
         path = note.path.with_suffix(".json")
-        valid = {"schemaVersion": 1, "scope": "general", "role": "pm", "project": None,
+        valid = {"schemaVersion": 1, "scope": "general", "role": "cos", "project": None,
                  "workId": note.work_id, "itemFile": note.path.name, "nextDraftId": 1, "drafts": []}
         cases = ["broken", "[]", *[json.dumps({**valid, key: value}) for key, value in (
-            ("schemaVersion", 2), ("schemaVersion", True), ("role", "tl"), ("scope", "project"),
+            ("schemaVersion", 2), ("schemaVersion", True), ("role", "manager"), ("scope", "project"),
             ("workId", "other"), ("itemFile", "../private"), ("nextDraftId", 0), ("drafts", {}))]]
         for data in cases:
             with self.subTest(data=data):
@@ -101,7 +101,7 @@ class NotebookMetaTests(unittest.TestCase):
     def test_allocation_avoids_metadata_only_and_draft_only_orphans(self):
         directory = self.store.work.directory
         directory.mkdir(parents=True)
-        (directory / "note-pm-aaaaa.json").write_text("preserve")
-        (directory / "note-tl-bbbbb-draft-1.md").write_text("preserve")
+        (directory / "note-cos-aaaaa.json").write_text("preserve")
+        (directory / "note-manager-bbbbb-draft-1.md").write_text("preserve")
         with patch("battuta_project.work.secrets.choice", side_effect=list("aaaaabbbbbccccc")):
             self.assertEqual(self.store.append("New").work_id, "ccccc")

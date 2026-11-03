@@ -28,7 +28,7 @@ test("Edge Function authenticates, validates, and dispatches transactional send/
       { ...request(conversation), response_due_minutes: "10" },
       { ...request(conversation), response_due_minutes: 15 },
       { ...request(conversation), response_due: "tomorrow" },
-      { ...request(conversation), conversation_id: "pm" },
+      { ...request(conversation), conversation_id: "cos" },
       { ...request(conversation), content: "not a JSON object" },
       { ...request(conversation), content: [] },
     ])

@@ -24,7 +24,7 @@ export function registerReviewTools(pi: ExtensionAPI, store: ProjectSpecStore) {
     name: "write_spec_review",
     label: "Write spec review",
     description:
-      "TL only: fully replace the one review using the canonical checklist. Record actual assessed inputs; stale coverage is allowed and reported honestly. Finalization has no review gate.",
+      "Manager only: fully replace the one review using the canonical checklist. Record actual assessed inputs; stale coverage is allowed and reported honestly. Finalization has no review gate.",
     parameters,
     async execute(_id, args) {
       return result(await store.writeReview(argumentsFor(parameters, args)));

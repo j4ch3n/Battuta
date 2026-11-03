@@ -13,17 +13,17 @@ ROOT = Path(__file__).resolve().parents[3]
 class MemoryPrivacyTests(unittest.TestCase):
     def test_private_state_is_ignored_and_force_tracked_state_is_not_archived(self):
         private = [
-            "bots/pm-bot/.pi/ME.md", "bots/tl-bot/.pi/ME.md",
-            "bots/pm-bot/.pi/ME.md.id.tmp", "bots/pm-bot/.pi/ME.md.lock",
+            "bots/cos-bot/.pi/ME.md", "bots/manager-bot/.pi/ME.md",
+            "bots/cos-bot/.pi/ME.md.id.tmp", "bots/cos-bot/.pi/ME.md.lock",
             "bots/AGENTS_personal.md", "memory.db", "memory.db-wal",
             "memory.db.queue/job.job.json", "memory.db.queue/job.state.json",
-            "capture-queue/pm/state.json", "onnx_models/all-MiniLM-L6-v2/model.onnx",
+            "capture-queue/cos/state.json", "onnx_models/all-MiniLM-L6-v2/model.onnx",
         ]
-        public = [f"skills-hub/memory/{resource}" for resource in ("SKILL.md", "references/tools.md", "references/tools-tl.md")]
+        public = [f"skills-hub/memory/{resource}" for resource in ("SKILL.md", "references/tools.md", "references/tools-manager.md")]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
-            for name in (".gitignore", ".gitattributes", "bots/pm-bot/.gitignore", "bots/tl-bot/.gitignore"):
+            for name in (".gitignore", ".gitattributes", "bots/cos-bot/.gitignore", "bots/manager-bot/.gitignore"):
                 source = ROOT / name
                 if source.exists():
                     (root / name).parent.mkdir(parents=True, exist_ok=True)

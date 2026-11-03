@@ -34,5 +34,5 @@ not a research ceremony. Local-only requests stay local.
 
 Research owns investigation and synthesis, not delivery commitments, requirements
 approval, rendering or publication. Use problem-framing for product-problem
-definition and communicate-with-tl for a technical assessment. Learning can be the
+definition and communicate-with-manager for a technical assessment. Learning can be the
 outcome; do not manufacture a recommendation or owner action.

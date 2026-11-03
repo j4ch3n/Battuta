@@ -17,12 +17,12 @@ from battuta_project.todos import TodoStore
 def append_in_process(args):
     home, text = args
     with patch("pathlib.Path.home", return_value=Path(home)):
-        return NoteStore("general", "pm").append(text).work_id
+        return NoteStore("general", "cos").append(text).work_id
 
 
 def todo_in_process(home):
     with patch("pathlib.Path.home", return_value=Path(home)):
-        return TodoStore("general", "pm").create(["Independent task"]).work_id
+        return TodoStore("general", "cos").create(["Independent task"]).work_id
 
 
 class NoteTests(unittest.TestCase):
@@ -33,7 +33,7 @@ class NoteTests(unittest.TestCase):
         home = patch("pathlib.Path.home", return_value=self.home)
         home.start()
         self.addCleanup(home.stop)
-        self.store = NoteStore("general", "pm")
+        self.store = NoteStore("general", "cos")
 
     def test_absent_reads_do_not_initialize_storage(self):
         self.assertIsNone(self.store.read())
@@ -69,14 +69,14 @@ class NoteTests(unittest.TestCase):
 
     def test_append_preserves_text_and_survives_restart(self):
         first = self.store.append("  Finding **一**  ")
-        self.assertEqual(first.path, self.home / ".battuta/work" / f"note-pm-{first.work_id}.md")
+        self.assertEqual(first.path, self.home / ".battuta/work" / f"note-cos-{first.work_id}.md")
         self.assertEqual(first.path.stat().st_mode & 0o777, 0o600)
         state = self.store.work.registry.state_path.read_bytes()
         result = self.store.append("Thought two")
         self.assertEqual([(line.number, line.text) for line in result.lines], [(2, "Thought two")])
         self.assertEqual(first.path.read_bytes(), "  Finding **一**  \nThought two\n".encode())
         self.assertEqual(self.store.work.registry.state_path.read_bytes(), state)
-        read = NoteStore("general", "pm").read()
+        read = NoteStore("general", "cos").read()
         self.assertEqual([line.text for line in read.lines], ["  Finding **一**  ", "Thought two"])
         self.assertEqual(read.work_id, first.work_id)
 
@@ -145,7 +145,7 @@ class NoteTests(unittest.TestCase):
             self.store.append("new")
         directory.unlink()
         directory.mkdir()
-        (directory / ".work-pm.lock").symlink_to(target / "lock")
+        (directory / ".work-cos.lock").symlink_to(target / "lock")
         with self.assertRaises(click.ClickException):
             self.store.append("new")
         self.assertEqual(list(target.iterdir()), [])
@@ -153,7 +153,7 @@ class NoteTests(unittest.TestCase):
     def test_failed_first_publication_removes_only_unpublished_file(self):
         directory = self.home / ".battuta/work"
         directory.mkdir(parents=True)
-        orphan = directory / "note-pm-aaaaa.md"
+        orphan = directory / "note-cos-aaaaa.md"
         orphan.write_text("Preserve\n")
         with patch("battuta_project.work.secrets.choice", side_effect=list("aaaaabbbbb")), patch(
             "battuta_project.registry.atomic_write", side_effect=OSError("disk full")
@@ -161,7 +161,7 @@ class NoteTests(unittest.TestCase):
             with self.assertRaises(click.ClickException):
                 self.store.append("New")
         self.assertEqual(orphan.read_text(), "Preserve\n")
-        self.assertFalse((directory / "note-pm-bbbbb.md").exists())
+        self.assertFalse((directory / "note-cos-bbbbb.md").exists())
         self.assertIsNone(self.store.read())
 
     def test_parallel_appends_preserve_every_complete_note(self):
@@ -181,4 +181,4 @@ class NoteTests(unittest.TestCase):
             note_id, todo_id = note.result(), todo.result()
         self.assertNotEqual(note_id, todo_id)
         self.assertEqual(self.store.read().work_id, note_id)
-        self.assertEqual(TodoStore("general", "pm").read().work_id, todo_id)
+        self.assertEqual(TodoStore("general", "cos").read().work_id, todo_id)

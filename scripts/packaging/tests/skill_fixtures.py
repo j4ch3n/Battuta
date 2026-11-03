@@ -8,7 +8,7 @@ def skill_catalog(root: Path, role: str, names=None) -> list[str]:
     (root / "skills-hub").mkdir(parents=True, exist_ok=True)
     if names is None:
         names = ["project-context", "todo", "note-taking", "memory"]
-        if role == "pm":
+        if role == "cos":
             names.append("draft-writing")
     for name in names:
         source = root / "skills-hub" / name

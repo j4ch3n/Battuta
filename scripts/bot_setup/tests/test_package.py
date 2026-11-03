@@ -17,11 +17,12 @@ class PackageTests(unittest.TestCase):
                 result = subprocess.run([sys.executable, "-m", "bot_setup.cli", *command, "--help"], cwd=root, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
             env = root / "private.env"
-            env.write_text("PM_TELEGRAM_TOKEN=101:private-pm\nTL_TELEGRAM_TOKEN=102:private-tl\nTELEGRAM_ALLOWED_USER_ID=123\n")
+            env.write_text("COS_TELEGRAM_TOKEN=101:private-cos\nTELEGRAM_ALLOWED_USER_ID=123\n")
             result = subprocess.run([sys.executable, "-m", "bot_setup.cli", "refresh-telegram", "--root", str(root), str(env)], cwd="/tmp", capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            for role in ("pm", "tl"):
+            for role in ("cos",):
                 config = root / f"bots/{role}-bot/.pi/telegram.json"
                 self.assertEqual(json.loads(config.read_text())["profiles"]["default"]["allowedUserId"], 123)
                 self.assertEqual(config.stat().st_mode & 0o777, 0o600)
-            self.assertNotIn("private-pm", result.stdout + result.stderr)
+            self.assertNotIn("private-cos", result.stdout + result.stderr)
+            self.assertFalse((root / "bots/manager-bot/.pi/telegram.json").exists())

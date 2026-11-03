@@ -17,7 +17,7 @@ import { fixture, input } from "./fixtures.ts";
 test("managed write/edit targets are protected including relative paths and symlink aliases", async () => {
   const f = await fixture();
   try {
-    const file = await f.pm.initSpec(input);
+    const file = await f.cos.initSpec(input);
     const alias = join(f.root, "alias");
     await symlink(join(f.projects, "atlas/specs"), alias, "dir");
     assert.equal(await managedPath(file.path, f.root, f.projects), true);
@@ -38,7 +38,7 @@ test.each(["file", "dangling", "relative", "directory", "missing-directory"])(
   async (kind) => {
     const f = await fixture();
     try {
-      await f.pm.initSpec(input);
+      await f.cos.initSpec(input);
       const ordinary = join(f.root, "ordinary.md");
       await writeFile(ordinary, "Original");
       const alias = join(f.root, "alias");
@@ -98,7 +98,7 @@ test.each(["file", "dangling", "relative", "directory", "missing-directory"])(
 test("registered guard blocks Pi-normalized tilde, at-prefix, file URL and Unicode-space aliases", async () => {
   const f = await fixture();
   try {
-    const saved = await f.pm.initSpec(input);
+    const saved = await f.cos.initSpec(input);
     const alias = join(f.root, "alias space");
     await symlink(join(f.projects, "atlas/specs"), alias, "dir");
     let handler:

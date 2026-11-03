@@ -42,48 +42,48 @@ class RealModelTests(unittest.IsolatedAsyncioTestCase):
                             await asyncio.sleep(0.02)
                     url = f"http://127.0.0.1:{sock.getsockname()[1]}/mcp"
                     async with streamablehttp_client(url) as (ar, aw, _), streamablehttp_client(url) as (br, bw, _):
-                        async with ClientSession(ar, aw) as pm, ClientSession(br, bw) as tl:
-                            await asyncio.gather(pm.initialize(), tl.initialize())
+                        async with ClientSession(ar, aw) as cos, ClientSession(br, bw) as manager:
+                            await asyncio.gather(cos.initialize(), manager.initialize())
                             async def call(client, name, **args):
                                 result = await client.call_tool("memory_" + name, args)
                                 self.assertFalse(result.isError, result.content)
                                 return result.structuredContent["data"]
-                            self.assertTrue((await call(pm, "health"))["ready"])
+                            self.assertTrue((await call(cos, "health"))["ready"])
                             if restart:
-                                self.assertEqual((await call(tl, "get", ref=ref))["content"], "Atlas stores project data in SQLite.")
-                                self.assertEqual((await call(pm, "consolidate_global", run_id=run_id))["generation_id"], generation)
-                                self.assertEqual((await call(pm, "global_relationships"))["status"], "current")
+                                self.assertEqual((await call(manager, "get", ref=ref))["content"], "Atlas stores project data in SQLite.")
+                                self.assertEqual((await call(cos, "consolidate_global", run_id=run_id))["generation_id"], generation)
+                                self.assertEqual((await call(cos, "global_relationships"))["status"], "current")
                                 continue
-                            first = await call(pm, "remember", content="Atlas stores project data in Postgres.", scope={"global": False, "projects": ["atlas"]})
-                            personal = await call(pm, "remember", content="The owner prefers concise replies.", scope={"global": True})
-                            await call(tl, "remember", content="Beacon stores project data in Postgres.", scope={"global": False, "projects": ["beacon"]})
+                            first = await call(cos, "remember", content="Atlas stores project data in Postgres.", scope={"global": False, "projects": ["atlas"]})
+                            personal = await call(cos, "remember", content="The owner prefers concise replies.", scope={"global": True})
+                            await call(manager, "remember", content="Beacon stores project data in Postgres.", scope={"global": False, "projects": ["beacon"]})
                             with sqlite3.connect(config.database) as db:
                                 db.enable_load_extension(True)
                                 sqlite_vec.load(db)
                                 before = db.execute("SELECT content_embedding FROM memory_embeddings e JOIN memories m ON m.id=e.rowid WHERE content_hash=?", (first["ref"],)).fetchone()[0]
-                            await call(pm, "link_projects", ref=first["ref"], add=["beacon"])
+                            await call(cos, "link_projects", ref=first["ref"], add=["beacon"])
                             with sqlite3.connect(config.database) as db:
                                 db.enable_load_extension(True)
                                 sqlite_vec.load(db)
                                 after = db.execute("SELECT content_embedding FROM memory_embeddings e JOIN memories m ON m.id=e.rowid WHERE content_hash=?", (first["ref"],)).fetchone()[0]
                             self.assertEqual(before, after)
-                            revised = await call(tl, "update", ref=first["ref"], content="Atlas stores project data in SQLite.", reason="Owner correction")
+                            revised = await call(manager, "update", ref=first["ref"], content="Atlas stores project data in SQLite.", reason="Owner correction")
                             ref = revised["ref"]
-                            history = await call(pm, "get", ref=ref, include_history=True)
+                            history = await call(cos, "get", ref=ref, include_history=True)
                             self.assertEqual(len(history["history"]), 2)
-                            recalled = await call(tl, "recall", query="Which database stores project data?", selector="projects", projects=["atlas"], include_global=False)
+                            recalled = await call(manager, "recall", query="Which database stores project data?", selector="projects", projects=["atlas"], include_global=False)
                             self.assertEqual([r["ref"] for r in recalled["records"]], [ref])
-                            inventory = await call(pm, "list", selector="all")
+                            inventory = await call(cos, "list", selector="all")
                             self.assertEqual(inventory["total"], 3)
-                            personal = await call(pm, "update", ref=personal["ref"], content="The owner prefers concise replies with enough context to decide.", reason="Owner clarified the preference")
-                            consolidated = await call(pm, "consolidate_global", run_id=run_id)
+                            personal = await call(cos, "update", ref=personal["ref"], content="The owner prefers concise replies with enough context to decide.", reason="Owner clarified the preference")
+                            consolidated = await call(cos, "consolidate_global", run_id=run_id)
                             generation = consolidated["generation_id"]
                             self.assertEqual(consolidated["input_count"], 1)
-                            hints = await call(pm, "global_relationships")
+                            hints = await call(cos, "global_relationships")
                             self.assertEqual(hints["status"], "current")
                             self.assertEqual(hints["edges"], [])  # A single global survivor has no pair.
-                            self.assertEqual((await call(pm, "list", selector="all"))["total"], 3)
-                            too_long = await pm.call_tool("memory_remember", {"content": "word " * 300, "scope": {"global": True}})
+                            self.assertEqual((await call(cos, "list", selector="all"))["total"], 3)
+                            too_long = await cos.call_tool("memory_remember", {"content": "word " * 300, "scope": {"global": True}})
                             self.assertTrue(too_long.isError)
                 finally:
                     server.should_exit = True

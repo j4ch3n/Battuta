@@ -15,7 +15,7 @@ from project_fixtures import ProjectTestCase
 class TodoCliTests(ProjectTestCase):
     def test_creation_handoff_example_creates_independent_related_work(self):
         for scope in ("project", "general"):
-            for role, counterpart in (("pm", "tl"), ("tl", "pm")):
+            for role, counterpart in (("cos", "manager"), ("manager", "cos")):
                 with self.subTest(scope=scope, role=role), patch("pathlib.Path.home", return_value=self.home / f"{scope}-{role}"):
                     registry = ProjectRegistry()
                     project = "atlas-api" if scope == "project" else None
@@ -57,9 +57,9 @@ class TodoCliTests(ProjectTestCase):
         self.assertTrue(path.read_bytes().startswith(original))
         before = path.read_bytes()
         config = self.registry.state_path.read_bytes()
-        for args in (("create", "--force", "--item", "New", "--related-to", "pm:abc12"),
+        for args in (("create", "--force", "--item", "New", "--related-to", "cos:abc12"),
                      ("create", "--force", "--item", "New", "--related-to", "bad"),
-                     ("extend", "--related-to", "pm:abc12", "--item", "New"),
+                     ("extend", "--related-to", "cos:abc12", "--item", "New"),
                      ("extend", "--work-id", "abc12", "--item", "New"),
                      ("create", "--work-id", "abc12", "--item", "New")):
             with self.subTest(args=args):
@@ -80,15 +80,15 @@ class TodoCliTests(ProjectTestCase):
     def setUp(self):
         super().setUp()
         self.runner = CliRunner()
-        env = patch.dict(os.environ, {"AGENT_ROLE": "pm", "LINEAR_API_TOKEN": "test-token"})
+        env = patch.dict(os.environ, {"AGENT_ROLE": "cos", "LINEAR_API_TOKEN": "test-token"})
         env.start()
         self.addCleanup(env.stop)
 
-    def call(self, *args, scope="project", second=0, role="pm"):
+    def call(self, *args, scope="project", second=0, role="cos"):
         with patch.dict(os.environ, {"AGENT_ROLE": role}):
             return self.runner.invoke(main, ["todo", "--scope", scope, *args])
 
-    def todo_path(self, *, scope="project", role="pm"):
+    def todo_path(self, *, scope="project", role="cos"):
         project = self.registry.current_name() if scope == "project" else None
         work_id = self.registry.current_work_id(project, role)
         directory = self.registry.root / project / "work" if project else self.home / ".battuta/work"
@@ -210,16 +210,16 @@ class TodoCliTests(ProjectTestCase):
                 self.assertNotIn("Later step", output)
 
     def test_scopes_roles_and_projects_are_isolated(self):
-        self.success("create", "--item", "PM project")
-        self.assertNotIn("PM project", self.success("list", role="tl"))
-        self.success("create", "--item", "TL project", role="tl")
-        self.success("create", "--item", "PM general", scope="general")
+        self.success("create", "--item", "CoS project")
+        self.assertNotIn("CoS project", self.success("list", role="manager"))
+        self.success("create", "--item", "Manager project", role="manager")
+        self.success("create", "--item", "CoS general", scope="general")
         self.registry.init("other-project")
-        self.assertNotIn("PM project", self.success("list"))
-        self.assertIn("PM general", self.success("list", scope="general"))
+        self.assertNotIn("CoS project", self.success("list"))
+        self.assertIn("CoS general", self.success("list", scope="general"))
         self.registry.switch("atlas-api")
-        self.assertIn("PM project", self.success("list"))
-        self.assertIn("TL project", self.success("list", role="tl"))
+        self.assertIn("CoS project", self.success("list"))
+        self.assertIn("Manager project", self.success("list", role="manager"))
 
     def test_general_scope_needs_no_registry_or_selection(self):
         # Use a fresh home, not the registered-project fixture.
@@ -229,7 +229,7 @@ class TodoCliTests(ProjectTestCase):
             self.assertIn("No active TODO list", self.success("list", scope="general"))
             self.assertFalse((home / ".battuta").exists())
             self.success("create", "--item", "General task", scope="general")
-            self.assertEqual(len(list((home / ".battuta/work").glob("todo-pm-*.jsonl"))), 1)
+            self.assertEqual(len(list((home / ".battuta/work").glob("todo-cos-*.jsonl"))), 1)
             self.assertIsNone(json.loads((home / ".battuta/projects/.config.json").read_text())["currentProject"])
             result = self.call("list")
             self.assert_explained_failure(result)

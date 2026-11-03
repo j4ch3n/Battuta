@@ -21,16 +21,16 @@ class RegistryTests(unittest.TestCase):
         self.registry.state_path.write_text(json.dumps({"custom": 7, "general": {"custom": 8}}))
         for project in (None, "atlas"):
             with self.subTest(project=project), self.registry.locked(create=True):
-                self.assertIsNone(self.registry.current_note_work_id(project, "pm"))
-                self.registry.set_work_id(project, "tl", "abc12")
-                self.registry.set_work_id(project, "pm", "def34", related_to="tl:abc12")
-                self.registry.set_note_work_id(project, "pm", "ghi56")
-                self.assertEqual(self.registry.current_work_id(project, "pm"), "def34")
-                self.assertEqual(self.registry.current_work_id(project, "tl"), "abc12")
-                self.assertEqual(self.registry.work_record(project, "pm", "def34").related_to, "tl:abc12")
-                self.registry.set_work_id(project, "pm", "jkl78")
-                self.assertEqual(self.registry.current_note_work_id(project, "pm"), "ghi56")
-                self.assertIsNotNone(self.registry.work_record(project, "pm", "ghi56"))
+                self.assertIsNone(self.registry.current_note_work_id(project, "cos"))
+                self.registry.set_work_id(project, "manager", "abc12")
+                self.registry.set_work_id(project, "cos", "def34", related_to="manager:abc12")
+                self.registry.set_note_work_id(project, "cos", "ghi56")
+                self.assertEqual(self.registry.current_work_id(project, "cos"), "def34")
+                self.assertEqual(self.registry.current_work_id(project, "manager"), "abc12")
+                self.assertEqual(self.registry.work_record(project, "cos", "def34").related_to, "manager:abc12")
+                self.registry.set_work_id(project, "cos", "jkl78")
+                self.assertEqual(self.registry.current_note_work_id(project, "cos"), "ghi56")
+                self.assertIsNotNone(self.registry.work_record(project, "cos", "ghi56"))
         state = json.loads(self.registry.state_path.read_text())
         self.assertEqual(state["custom"], 7)
         self.assertEqual(state["general"]["custom"], 8)
@@ -38,8 +38,8 @@ class RegistryTests(unittest.TestCase):
     def test_work_defaults_and_publication_preserve_existing_state(self):
         variants = [None, {}, {"custom": 7}, {"projects": {}}, {"projects": {"other": {}}}]
         variants += [{"projects": {"atlas": entry}} for entry in
-                     ({}, {"roles": {}}, {"roles": {"tl": {}}}, {"roles": {"pm": {}}},
-                      {"roles": {"pm": {"works": {}}}})]
+                     ({}, {"roles": {}}, {"roles": {"manager": {}}}, {"roles": {"cos": {}}},
+                      {"roles": {"cos": {"works": {}}}})]
         for index, value in enumerate(variants):
             with self.subTest(value=value):
                 registry = ProjectRegistry(self.root / str(index))
@@ -47,13 +47,13 @@ class RegistryTests(unittest.TestCase):
                     registry.root.mkdir(parents=True)
                     registry.state_path.write_text(json.dumps(value))
                 before = sorted(registry.root.iterdir()) if registry.root.exists() else []
-                self.assertIsNone(registry.current_work_id("atlas", "pm"))
-                self.assertIsNone(registry.current_work_id(None, "tl"))
+                self.assertIsNone(registry.current_work_id("atlas", "cos"))
+                self.assertIsNone(registry.current_work_id(None, "manager"))
                 self.assertEqual(sorted(registry.root.iterdir()) if registry.root.exists() else [], before)
                 with registry.locked(create=True):
-                    registry.set_work_id("atlas", "pm", "abc12")
-                self.assertEqual(registry.current_work_id("atlas", "pm"), "abc12")
-                self.assertIsNone(registry.current_work_id("atlas", "tl"))
+                    registry.set_work_id("atlas", "cos", "abc12")
+                self.assertEqual(registry.current_work_id("atlas", "cos"), "abc12")
+                self.assertIsNone(registry.current_work_id("atlas", "manager"))
                 state = json.loads(registry.state_path.read_text())
                 for key, item in (value or {}).items():
                     if key != "projects":
@@ -63,39 +63,39 @@ class RegistryTests(unittest.TestCase):
         self.registry.init("atlas")
         self.registry.init("harbor")
         data = json.loads(self.registry.state_path.read_text())
-        data["projects"] = {"atlas": {"custom": 7, "roles": {"pm": {"custom": 9}}}}
+        data["projects"] = {"atlas": {"custom": 7, "roles": {"cos": {"custom": 9}}}}
         self.registry.state_path.write_text(json.dumps(data))
         with self.registry.locked():
-            self.registry.set_work_id("atlas", "pm", "abc12")
-            self.registry.set_work_id("atlas", "tl", "def34", related_to="pm:abc12")
-            self.registry.set_work_id("atlas", "pm", "ghi56")
-            self.registry.set_work_id(None, "tl", "jkl78")
+            self.registry.set_work_id("atlas", "cos", "abc12")
+            self.registry.set_work_id("atlas", "manager", "def34", related_to="cos:abc12")
+            self.registry.set_work_id("atlas", "cos", "ghi56")
+            self.registry.set_work_id(None, "manager", "jkl78")
         self.registry.switch("atlas")
-        self.assertEqual(self.registry.current_work_id("atlas", "pm"), "ghi56")
-        self.assertEqual(self.registry.current_work_id("atlas", "tl"), "def34")
-        self.assertEqual(self.registry.work_record("atlas", "tl", "def34").related_to, "pm:abc12")
-        self.assertIsNotNone(self.registry.work_record("atlas", "pm", "abc12"))
-        self.assertIsNone(self.registry.work_record("harbor", "pm", "abc12"))
-        self.assertEqual(self.registry.current_work_id(None, "tl"), "jkl78")
+        self.assertEqual(self.registry.current_work_id("atlas", "cos"), "ghi56")
+        self.assertEqual(self.registry.current_work_id("atlas", "manager"), "def34")
+        self.assertEqual(self.registry.work_record("atlas", "manager", "def34").related_to, "cos:abc12")
+        self.assertIsNotNone(self.registry.work_record("atlas", "cos", "abc12"))
+        self.assertIsNone(self.registry.work_record("harbor", "cos", "abc12"))
+        self.assertEqual(self.registry.current_work_id(None, "manager"), "jkl78")
         state = json.loads(self.registry.state_path.read_text())["projects"]["atlas"]
         self.assertEqual(state["custom"], 7)
-        self.assertEqual(state["roles"]["pm"]["custom"], 9)
+        self.assertEqual(state["roles"]["cos"]["custom"], 9)
 
     def test_malformed_work_state_cannot_be_overwritten(self):
         self.root.mkdir()
         variants = [{"projects": []}, {"projects": {"atlas": []}}, {"general": []}]
         variants += [{"projects": {"atlas": {"roles": roles}}} for roles in
-                     ([], {"engineer": {}}, {"pm": []}, {"pm": {"works": []}},
-                      {"pm": {"currentWorkId": "../xx"}}, {"pm": {"currentWorkId": "abc12"}},
-                      {"pm": {"works": {"bad": {}}}},
-                      {"pm": {"works": {"abc12": {"relatedTo": "tl:../xx"}}}})]
+                     ([], {"engineer": {}}, {"cos": []}, {"cos": {"works": []}},
+                      {"cos": {"currentWorkId": "../xx"}}, {"cos": {"currentWorkId": "abc12"}},
+                      {"cos": {"works": {"bad": {}}}},
+                      {"cos": {"works": {"abc12": {"relatedTo": "manager:../xx"}}}})]
         for value in variants:
             with self.subTest(value=value):
                 original = json.dumps(value)
                 self.registry.state_path.write_text(original)
                 with self.assertRaises(click.ClickException):
                     with self.registry.locked():
-                        self.registry.set_work_id("atlas", "pm", "abc12")
+                        self.registry.set_work_id("atlas", "cos", "abc12")
                 self.assertEqual(self.registry.state_path.read_text(), original)
 
     def test_config_lock_symlink_cannot_redirect_publication(self):
@@ -105,7 +105,7 @@ class RegistryTests(unittest.TestCase):
         (self.root / ".config.lock").symlink_to(outside)
         with self.assertRaises(click.ClickException):
             with self.registry.locked(create=True):
-                self.registry.set_work_id(None, "tl", "abc12")
+                self.registry.set_work_id(None, "manager", "abc12")
         self.assertEqual(outside.read_text(), "keep")
         self.assertFalse(self.registry.state_path.exists())
 

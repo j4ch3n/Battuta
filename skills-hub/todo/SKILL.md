@@ -18,14 +18,14 @@ use a list when it helps continuity, not as a prerequisite for every request.
 4. Report progress in ordinary language, not a storage dump. A completed TODO is
    not milestone acceptance, an approved commitment, or execution authorisation.
 
-PM and TL maintain independent work. A handoff can associate their lists without
+CoS and Manager maintain independent work. A handoff can associate their lists without
 synchronising ownership or status. Notes and drafts are separate working material;
 neither is required to use TODOs. Never store credentials or invent outcome evidence.
 
 ## Scope and current work
 
-PM and TL invoke `battuta-project todo` through the shell. `AGENT_ROLE` selects
-`pm` or `tl`; `--scope` is always explicit:
+CoS and Manager invoke `battuta-project todo` through the shell. `AGENT_ROLE` selects
+`cos` or `manager`; `--scope` is always explicit:
 
 - `project`: work owned by the selected registered project. Confirm selection with
   `battuta-project current` and switch if needed. Do not assign unrelated work to
@@ -98,14 +98,14 @@ consent. A list is not required for unrelated work.
 
 ## Associate work through a handoff
 
-Creation reports a reference such as `Work: pm:k7m2q`. Without `--related-to`, it
+Creation reports a reference such as `Work: cos:k7m2q`. Without `--related-to`, it
 also returns optional bot-mail handoff guidance. When coordination helps, include
 the exact reference and project name or general scope in the message. The other
 role can create independent work:
 
 ```sh
-# TL, after selecting the same project named in PM's message:
-battuta-project todo --scope project create --related-to pm:k7m2q \
+# Manager, after selecting the same project named in CoS's message:
+battuta-project todo --scope project create --related-to cos:k7m2q \
   --item "Assess the technical implications"
 ```
 

@@ -31,7 +31,7 @@ afterEach(async () => {
     .mockResolvedValue({ status: "complete", summary: "Learned your concise-reply preference." });
   await Promise.all(directories.splice(0).map((d) => rm(d, { recursive: true, force: true })));
 });
-async function harness(role = "pm", job: Record<string, unknown> | null = {}) {
+async function harness(role = "cos", job: Record<string, unknown> | null = {}) {
   const dir = await mkdtemp(join(tmpdir(), "dream-extension-"));
   directories.push(dir);
   vi.stubEnv("AGENT_ROLE", role);
@@ -92,12 +92,12 @@ async function harness(role = "pm", job: Record<string, unknown> | null = {}) {
   } as unknown as ExtensionToolContext;
   return { hooks, tools, ctx, setActiveTools, appendEntry, status, dir };
 }
-test("TL never registers the dream tool or lifecycle", async () => {
-  const h = await harness("tl");
+test("Manager never registers the dream tool or lifecycle", async () => {
+  const h = await harness("manager");
   expect(h.tools).toEqual([]);
   expect(h.hooks.size).toBe(0);
 });
-test("PM tool returns a public summary, not the private reflection, without changing normal active tools", async () => {
+test("CoS tool returns a public summary, not the private reflection, without changing normal active tools", async () => {
   const h = await harness();
   run.mockResolvedValueOnce({
     status: "complete",
@@ -118,7 +118,7 @@ test("PM tool returns a public summary, not the private reflection, without chan
   expect(h.status).not.toHaveBeenCalledWith(expect.anything(), expect.stringContaining("Private"));
 });
 test.each(["partial", "already_completed"] as const)(
-  "PM tool honestly reports %s without a summary",
+  "CoS tool honestly reports %s without a summary",
   async (status) => {
     const h = await harness();
     run.mockResolvedValueOnce({ status });
@@ -127,7 +127,7 @@ test.each(["partial", "already_completed"] as const)(
     expect(result.content[0]).toEqual({ type: "text", text: JSON.stringify({ status }) });
   },
 );
-test("PM catches up once without restricting normal tools", async () => {
+test("CoS catches up once without restricting normal tools", async () => {
   const h = await harness();
   await h.hooks.get("session_start")!({}, h.ctx);
   await h.hooks.get("session_start")!({}, h.ctx);
@@ -137,7 +137,7 @@ test("PM catches up once without restricting normal tools", async () => {
 test.each(["startup", "tool"])(
   "%s uses the exact dream model without changing the conversation model",
   async (trigger) => {
-    const h = await harness("pm", { model: "fake/dream-model" });
+    const h = await harness("cos", { model: "fake/dream-model" });
     const complete = vi.spyOn(h.ctx.modelRegistry, "complete");
     run.mockImplementationOnce(async (deps, signal) => {
       await deps.complete("prompt", "evidence", signal);
@@ -209,7 +209,7 @@ test.each([
   { status: "cancelled" },
   { prompt: "Changed prompt" },
 ])("rejects absent, disabled, mismatched or unsafe dream configuration %j", async (job) => {
-  const h = await harness("pm", job);
+  const h = await harness("cos", job);
   await expect(h.tools[0].execute("id", {}, undefined, undefined, h.ctx)).rejects.toThrow(
     "Dream unavailable: configure an enabled nightly dream model and retry.",
   );

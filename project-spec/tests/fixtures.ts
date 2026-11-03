@@ -21,9 +21,15 @@ export async function fixture() {
     const directory = join(projects, name);
     await mkdir(join(directory, "code"), { recursive: true });
   }
-  const pm = new ProjectSpecStore("pm", projects);
-  const tl = new ProjectSpecStore("tl", projects);
-  return { root, projects, pm, tl, cleanup: () => rm(root, { recursive: true, force: true }) };
+  const cos = new ProjectSpecStore("cos", projects);
+  const manager = new ProjectSpecStore("manager", projects);
+  return {
+    root,
+    projects,
+    cos,
+    manager,
+    cleanup: () => rm(root, { recursive: true, force: true }),
+  };
 }
 
 export const input = {

@@ -22,7 +22,7 @@ export async function extractMemories(
   job: CaptureJob,
   ctx: ExtensionContext,
   signal: AbortSignal,
-  role: "pm" | "tl" = "pm",
+  role: "cos" | "manager" = "cos",
   onUsage: (usage: unknown) => void = () => {},
 ) {
   signal.throwIfAborted();

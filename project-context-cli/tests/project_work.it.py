@@ -19,16 +19,16 @@ class ProjectWorkTests(unittest.TestCase):
         self.addCleanup(temp.cleanup)
         self.home = Path(temp.name)
         self.command = Path(sys.executable).with_name("battuta-project")
-        self.env = {**os.environ, "HOME": str(self.home), "LINEAR_API_TOKEN": "test-token", "AGENT_ROLE": "pm"}
+        self.env = {**os.environ, "HOME": str(self.home), "LINEAR_API_TOKEN": "test-token", "AGENT_ROLE": "cos"}
 
-    def cli(self, *args, role="pm", content=None):
+    def cli(self, *args, role="cos", content=None):
         result = subprocess.run([str(self.command), *args], env={**self.env, "AGENT_ROLE": role},
                                 cwd=self.home, capture_output=True, text=True, input=content, timeout=15)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
 
     def work_id(self, output):
-        match = re.search(r"^Work: (?:pm|tl):([a-z0-9]{5})$", output, re.MULTILINE)
+        match = re.search(r"^Work: (?:cos|manager):([a-z0-9]{5})$", output, re.MULTILINE)
         self.assertIsNotNone(match, output)
         return match[1]
 
@@ -41,7 +41,7 @@ class ProjectWorkTests(unittest.TestCase):
     def assert_independent(self, *, notes_first):
         self.cli("init", "atlas")
         for scope in ("general", "project"):
-            for role in ("pm", "tl"):
+            for role in ("cos", "manager"):
                 with self.subTest(scope=scope, role=role):
                     def call(kind, *args):
                         return self.cli(kind, "--scope", scope, *args, role=role)
@@ -87,24 +87,24 @@ class ProjectWorkTests(unittest.TestCase):
     def test_roles_scopes_and_projects_do_not_mix(self):
         self.cli("init", "atlas")
         for scope in ("general", "project"):
-            for role in ("pm", "tl"):
+            for role in ("cos", "manager"):
                 marker = f"{scope}/{role}"
                 self.cli("note", "--scope", scope, "append", "--text", marker, role=role)
                 self.cli("todo", "--scope", scope, "create", "--item", marker, role=role)
         for scope in ("general", "project"):
-            for role in ("pm", "tl"):
+            for role in ("cos", "manager"):
                 for kind, action in (("note", "read"), ("todo", "list")):
                     with self.subTest(scope=scope, role=role, kind=kind):
                         output = self.cli(kind, "--scope", scope, action, role=role)
                         self.assertIn(f"{scope}/{role}", output)
-                        for other in ({"general/pm", "general/tl", "project/pm", "project/tl"} - {f"{scope}/{role}"}):
+                        for other in ({"general/cos", "general/manager", "project/cos", "project/manager"} - {f"{scope}/{role}"}):
                             self.assertNotIn(other, output)
         self.cli("init", "beacon")
-        for role in ("pm", "tl"):
+        for role in ("cos", "manager"):
             self.assertIn("No notebook", self.cli("note", "--scope", "project", "read", role=role))
             self.assertIn("No active TODO list", self.cli("todo", "--scope", "project", "list", role=role))
         self.cli("switch", "atlas")
-        self.assertIn("project/pm", self.cli("note", "--scope", "project", "read"))
+        self.assertIn("project/cos", self.cli("note", "--scope", "project", "read"))
 
     def test_general_work_requires_no_project(self):
         self.cli("note", "--scope", "general", "append", "--text", "Learning")
@@ -115,7 +115,7 @@ class ProjectWorkTests(unittest.TestCase):
     def test_draft_pipeline_edits_and_missing_files_across_roles_and_scopes(self):
         self.cli("init", "atlas")
         for scope in ("general", "project"):
-            for role in ("pm", "tl"):
+            for role in ("cos", "manager"):
                 with self.subTest(scope=scope, role=role):
                     body = f"# {scope}/{role}\n\nComplete document without final newline"
                     created = self.cli("note", "--scope", scope, "draft", "--title", "Research", role=role, content=body)
@@ -138,7 +138,7 @@ class ProjectWorkTests(unittest.TestCase):
         first = self.cli("note", "--scope", "general", "append", "--text", "Legacy")
         identifier = self.work_id(first)
         directory = self.home / ".battuta/work"
-        metadata = directory / f"note-pm-{identifier}.json"
+        metadata = directory / f"note-cos-{identifier}.json"
         metadata.unlink()
         self.cli("todo", "--scope", "general", "create", "--item", "Keep")
         todo = self.cli("todo", "--scope", "general", "list")

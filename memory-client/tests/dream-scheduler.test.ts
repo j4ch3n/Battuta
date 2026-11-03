@@ -17,7 +17,7 @@ test("native scheduler delivery and startup catch-up share a private deduplicate
           PATH: process.env.PATH,
           HOME: directory,
           PI_CODING_AGENT_DIR: join(directory, ".pi"),
-          AGENT_ROLE: "pm",
+          AGENT_ROLE: "cos",
           TZ: "America/New_York",
         },
       },

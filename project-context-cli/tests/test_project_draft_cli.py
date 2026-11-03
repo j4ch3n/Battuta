@@ -20,7 +20,7 @@ class DraftCliTests(unittest.TestCase):
         home = patch("pathlib.Path.home", return_value=self.home)
         home.start()
         self.addCleanup(home.stop)
-        env = patch.dict(os.environ, {"LINEAR_API_TOKEN": "test", "AGENT_ROLE": "pm"})
+        env = patch.dict(os.environ, {"LINEAR_API_TOKEN": "test", "AGENT_ROLE": "cos"})
         env.start()
         self.addCleanup(env.stop)
 

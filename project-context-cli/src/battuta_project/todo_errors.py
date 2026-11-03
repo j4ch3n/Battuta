@@ -29,7 +29,7 @@ TODO_ERROR_MESSAGES: dict[TodoErrorCode, str] = {
         "the outcome/verification or why the next item is cancelled."
     ),
     TodoErrorCode.INVALID_ROLE: (
-        "Set AGENT_ROLE to pm or tl so the CLI can select the intended bot's TODO list, then retry the command."
+        "Set AGENT_ROLE to cos or manager so the CLI can select the intended bot's TODO list, then retry the command."
     ),
     TodoErrorCode.PROJECT_UNAVAILABLE: (
         "Cannot use the selected project: {detail}. Select the intended registered project first, "
@@ -59,7 +59,7 @@ TODO_ERROR_MESSAGES: dict[TodoErrorCode, str] = {
         "extend cannot initialize work or append to a legacy timestamped list."
     ),
     TodoErrorCode.INVALID_REFERENCE: (
-        "Supply --related-to as pm:<work-id> or tl:<work-id>, using a five-character lowercase alphanumeric ID "
+        "Supply --related-to as cos:<work-id> or manager:<work-id>, using a five-character lowercase alphanumeric ID "
         "recorded in this project/general scope. Include ownership context in the bot-mail handoff."
     ),
     TodoErrorCode.TODO_STORAGE_ERROR: (

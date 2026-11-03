@@ -9,9 +9,9 @@ const root = resolve(import.meta.dirname, "../..");
 const sessionId = "550e8400-e29b-41d4-a716-446655440000";
 const collections = [
   {
-    role: "pm" as const,
-    peer: "tl",
-    skill: "communicate-with-tl",
+    role: "cos" as const,
+    peer: "manager",
+    skill: "communicate-with-manager",
     files: [
       "request-assessment.md",
       "clarify-product-scope.md",
@@ -20,9 +20,9 @@ const collections = [
     ],
   },
   {
-    role: "tl" as const,
-    peer: "pm",
-    skill: "communicate-with-pm",
+    role: "manager" as const,
+    peer: "cos",
+    skill: "communicate-with-cos",
     files: [
       "report-assessment.md",
       "request-product-clarification.md",
@@ -52,6 +52,12 @@ function checkLinks(file: string) {
 for (const collection of collections) {
   test(`${collection.role} discovers only its outbound templates and examples satisfy Agent Mail`, () => {
     const skill = resolve(root, `skills-hub/${collection.skill}`);
+    const manifest = JSON.parse(
+      readFileSync(resolve(root, `bots/${collection.role}-bot/skills.json`), "utf8"),
+    ) as { skills: string[] };
+    assert.ok(manifest.skills.includes(collection.skill));
+    const other = collections.find((item) => item.role !== collection.role)!;
+    assert.ok(!manifest.skills.includes(other.skill));
     checkLinks(resolve(skill, "SKILL.md"));
     assert.ok(
       readFileSync(resolve(skill, "SKILL.md"), "utf8").includes("references/templates/index.md"),
@@ -77,17 +83,20 @@ for (const collection of collections) {
   });
 }
 
-test("completed assessment template covers the PM assessment requirements verbatim", () => {
+test("completed assessment template covers the CoS assessment requirements verbatim", () => {
   const request = validate(
     SendArguments,
     examples(
-      resolve(root, "skills-hub/communicate-with-tl/references/templates/request-assessment.md"),
+      resolve(
+        root,
+        "skills-hub/communicate-with-manager/references/templates/request-assessment.md",
+      ),
     )[0],
   );
   const assessment = validate(
     ReplyArguments,
     examples(
-      resolve(root, "skills-hub/communicate-with-pm/references/templates/report-assessment.md"),
+      resolve(root, "skills-hub/communicate-with-cos/references/templates/report-assessment.md"),
     )[0],
   );
   assert.equal(assessment.content.result?.state, "complete");

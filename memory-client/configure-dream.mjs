@@ -7,7 +7,7 @@ import { schedulerStorePath } from "./scheduler-config.ts";
 import { readSchedulerStore } from "./scheduler-store.ts";
 import { dreamConfigSchema } from "./dream-config.ts";
 
-// Run only during operator-invoked configuration, with the PM stopped. Never
+// Run only during operator-invoked configuration, with the CoS stopped. Never
 // edit the scheduler's store concurrently with its in-process read/modify/write.
 export async function configureDream(botDirectory) {
   const directory = join(botDirectory, ".pi");
@@ -18,10 +18,10 @@ export async function configureDream(botDirectory) {
   const settingsText = await optionalText(settingsPath);
   const settings = settingsText ? JSON.parse(settingsText) : {};
   if (!settings || typeof settings !== "object" || Array.isArray(settings))
-    throw new Error("Invalid PM settings");
+    throw new Error("Invalid CoS settings");
   const modelText = await optionalText(modelPath);
   if (!modelText && (!settings.defaultProvider || !settings.defaultModel))
-    throw new Error("Configure PM defaultProvider/defaultModel before dream setup");
+    throw new Error("Configure CoS defaultProvider/defaultModel before dream setup");
   const model = dreamConfigSchema.parse(
     modelText
       ? JSON.parse(modelText)
@@ -33,7 +33,7 @@ export async function configureDream(botDirectory) {
     settings.extensions !== undefined &&
     (!Array.isArray(settings.extensions) || settings.extensions.some((e) => typeof e !== "string"))
   )
-    throw new Error("Invalid PM extensions");
+    throw new Error("Invalid CoS extensions");
   const extension = fileURLToPath(new URL("./dream-extension.ts", import.meta.url));
   settings.extensions = (settings.extensions ?? []).filter(
     (e) => !e.replaceAll("\\", "/").endsWith("/memory-client/dream-extension.ts"),
@@ -50,6 +50,6 @@ export async function configureDream(botDirectory) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (!process.argv[2])
-    throw new Error("Usage: node memory-client/configure-dream.mjs <PM bot directory>");
+    throw new Error("Usage: node memory-client/configure-dream.mjs <CoS bot directory>");
   await configureDream(resolve(process.argv[2]));
 }

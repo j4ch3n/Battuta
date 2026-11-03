@@ -29,6 +29,6 @@ class SkillCatalogTests(unittest.TestCase):
 
     def test_bot_selections_validate_without_discovery_output(self):
         check_manifests(ROOT)
-        for role in ("pm", "tl"):
+        for role in ("cos", "manager"):
             skills = ROOT / f"bots/{role}-bot/.pi/skills"
             self.assertFalse(skills.exists() and any(skills.iterdir()))

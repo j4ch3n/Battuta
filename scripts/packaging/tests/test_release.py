@@ -18,18 +18,18 @@ from skill_fixtures import skill_catalog
 
 
 class ReleaseInstallTests(ConfigFixture):
-    def test_tl_subagent_release_boundary_requires_runtime_files(self):
+    def test_manager_subagent_release_boundary_requires_runtime_files(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         boundary = re.search(
-            r'^          test -f dist/stage/battuta/bots/tl-bot/\.pi/npm/node_modules/pi-subagents/bundle/index.js\n.*?^          test ! -e dist/stage/battuta/bots/tl-bot/\.pi/subagents.json$',
+            r'^          test -f dist/stage/battuta/bots/manager-bot/\.pi/npm/node_modules/pi-subagents/bundle/index.js\n.*?^          test ! -e dist/stage/battuta/bots/manager-bot/\.pi/subagents.json$',
             workflow, re.MULTILINE | re.DOTALL,
         )
         self.assertIsNotNone(boundary)
-        tl = self.root / "dist/stage/battuta/bots/tl-bot"
-        extension = tl / ".pi/npm/node_modules/pi-subagents/bundle"
+        manager = self.root / "dist/stage/battuta/bots/manager-bot"
+        extension = manager / ".pi/npm/node_modules/pi-subagents/bundle"
         extension.mkdir(parents=True)
         (extension / "index.js").write_text("// staged extension")
-        references = tl / ".pi/npm/node_modules/pi-subagents/skills/pi-subagents"
+        references = manager / ".pi/npm/node_modules/pi-subagents/skills/pi-subagents"
         references.mkdir(parents=True)
         (references / "SKILL.md").write_text("staged native skill")
         command = ["bash", "-euc", textwrap.dedent(boundary.group())]
@@ -59,13 +59,13 @@ os.execv(sys.executable, [sys.executable, "-m", "battuta_packaging.cli", *args[i
             with tempfile.TemporaryDirectory(dir=self.root) as directory:
                 work = Path(directory)
                 stage = work / "dist/stage/battuta"
-                for role in ("pm", "tl"):
+                for role in ("cos", "manager"):
                     skill_catalog(stage, role)
                 for source in (stage / "skills-hub").iterdir():
                     (source / "LICENSE").write_text("Required notice")
                 moved = work / "relocated"
                 stage.rename(moved)
-                for role in ("pm", "tl"):
+                for role in ("cos", "manager"):
                     bot = moved / f"bots/{role}-bot"
                     skills = bot / ".pi/skills"
                     names = json.loads((bot / "skills.json").read_text())["skills"]
@@ -114,13 +114,13 @@ os.execv(sys.executable, [sys.executable, "-m", "battuta_packaging.cli", *args[i
     def test_packages_are_installed_from_staged_bot_settings(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         loop = re.search(
-            r'^          for bot in pm-bot tl-bot; do\n            bot_dir=.*?^          done$',
+            r'^          for bot in cos-bot manager-bot; do\n            bot_dir=.*?^          done$',
             workflow, re.MULTILINE | re.DOTALL,
         )
         self.assertIsNotNone(loop)
         stage = self.root / "dist/stage/battuta/bots"
         expected_packages = {}
-        for role in ("pm-bot", "tl-bot"):
+        for role in ("cos-bot", "manager-bot"):
             bot = stage / role
             (bot / "node_modules/.bin").mkdir(parents=True)
             settings = json.loads((ROOT / "bots" / role / ".pi/settings.json").read_text())
@@ -149,7 +149,7 @@ package = pathlib.Path.cwd() / ".pi/npm/node_modules" / name
 (package / "extensions/scheduler").mkdir(parents=True, exist_ok=True)
 (package / "extensions/scheduler/index.ts").write_text("Extension boundary stub")
 ''')
-        for role in ("pm-bot", "tl-bot"):
+        for role in ("cos-bot", "manager-bot"):
             shutil.copy2(self.bin / "pi", stage / role / "node_modules/.bin/pi")
         result = subprocess.run(
             ["bash", "-euc", textwrap.dedent(loop.group())], cwd=self.root,
@@ -157,7 +157,7 @@ package = pathlib.Path.cwd() / ".pi/npm/node_modules" / name
             capture_output=True, text=True,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        for role in ("pm-bot", "tl-bot"):
+        for role in ("cos-bot", "manager-bot"):
             packages = stage / role / ".pi/npm/node_modules"
             for package in expected_packages[role]:
                 self.assertTrue((packages / package).is_dir())

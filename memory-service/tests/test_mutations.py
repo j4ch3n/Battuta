@@ -111,8 +111,8 @@ class MutationTests(StorageFixture):
 
     async def test_update_unions_sources_and_forget_lineage_survives_restart(self):
         from battuta_memory.contracts import InventoryRequest
-        a = {"agent_id": "pm", "session_id": "a", "entry_id": "1"}
-        b = {"agent_id": "pm", "session_id": "b", "entry_id": "2"}
+        a = {"agent_id": "cos", "session_id": "a", "entry_id": "1"}
+        b = {"agent_id": "cos", "session_id": "b", "entry_id": "2"}
         first = await self.service.remember(RememberRequest(**{**self.note().model_dump(by_alias=True), "sources": [a]}))
         second = await self.service.remember(RememberRequest(**{**self.note("Second").model_dump(by_alias=True), "sources": [b]}))
         updated = await self.service.update(UpdateRequest(ref=first["ref"], content="Combined", reason="merge", sources=[b]))

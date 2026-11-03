@@ -46,13 +46,14 @@ class ConfigFixture(unittest.TestCase):
 class LauncherFixture(ConfigFixture):
     def setUp(self):
         super().setUp()
-        for role in ("pm", "tl"):
+        for role in ("cos", "manager"):
             bot = self.root / f"bots/{role}-bot"
             (bot / "node_modules/.bin").mkdir(parents=True)
             (bot / ".pi").mkdir()
             (bot / "AGENTS.md").touch()
             (bot / ".pi/mcp.json").write_text("{}")
-            (bot / ".pi/telegram.json").write_text("{}")
+            if role == "cos":
+                (bot / ".pi/telegram.json").write_text("{}")
         for name in ("agent-mail", "project-spec"):
             (self.root / name / "node_modules").mkdir(parents=True)
         (self.root / "scripts").mkdir()

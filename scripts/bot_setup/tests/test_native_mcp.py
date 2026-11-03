@@ -8,7 +8,7 @@ import pytest
 from bot_setup.mcp import configure_mcp
 
 
-@pytest.mark.parametrize("role", ["pm", "tl"])
+@pytest.mark.parametrize("role", ["cos", "manager"])
 def test_native_configuration_preserves_custom_and_private_state(tmp_path, role):
     pi = tmp_path / ".pi"
     pi.mkdir()
@@ -21,7 +21,7 @@ def test_native_configuration_preserves_custom_and_private_state(tmp_path, role)
         config = json.loads((pi / "mcp.json").read_text())
         assert config["custom"] is True
         assert config["mcpServers"]["other"] == {"command": "custom"}
-        assert ("luma" in config["mcpServers"]) == (role == "pm")
+        assert ("luma" in config["mcpServers"]) == (role == "cos")
         assert json.loads((pi / "settings.json").read_text()) == {"theme": "dark", "packages": ["npm:custom@1"]}
         assert auth.read_bytes() == b'{"private":"oauth"}\n'
         assert (pi / "mcp.json").stat().st_mode & 0o777 == 0o600
@@ -30,7 +30,7 @@ def test_native_configuration_preserves_custom_and_private_state(tmp_path, role)
 @pytest.mark.parametrize("url", ["https://localhost/mcp", "http://example.com/mcp", "http://user:private-password@localhost/mcp", "invalid", ""])
 def test_invalid_endpoint_has_no_writes_or_secret_in_error(tmp_path, url):
     with pytest.raises(click.ClickException, match="loopback HTTP") as error:
-        configure_mcp(tmp_path, role="pm", memory_url=url)
+        configure_mcp(tmp_path, role="cos", memory_url=url)
     assert "private-password" not in str(error.value)
     assert not (tmp_path / ".pi").exists()
 
@@ -43,14 +43,14 @@ def test_invalid_json_config_does_not_modify_either_file(tmp_path, name, value):
     for file, text in before.items():
         (pi / file).write_text(text)
     with pytest.raises(click.ClickException) as error:
-        configure_mcp(tmp_path, role="pm")
+        configure_mcp(tmp_path, role="cos")
     assert "secret-value" not in str(error.value)
     assert {file: (pi / file).read_text() for file in before} == before
 
 
 @pytest.mark.parametrize("url", [None, "http://127.0.0.1:8901/mcp", "http://localhost:8901/mcp", "http://[::1]:8901/mcp"])
 def test_loopback_endpoints_are_supported(tmp_path, url):
-    configure_mcp(tmp_path, role="pm", memory_url=url)
+    configure_mcp(tmp_path, role="cos", memory_url=url)
     assert (tmp_path / ".pi/mcp.json").is_file()
 
 
@@ -69,7 +69,7 @@ def test_nonfinite_json_rejected_before_any_configuration_write(tmp_path, number
     (pi / "mcp.json").write_text(original)
     (pi / "settings.json").write_text(settings)
     with pytest.raises(click.ClickException, match="Invalid JSON"):
-        configure_mcp(tmp_path, role="pm")
+        configure_mcp(tmp_path, role="cos")
     assert (pi / "mcp.json").read_text() == original
     assert (pi / "settings.json").read_text() == settings
 

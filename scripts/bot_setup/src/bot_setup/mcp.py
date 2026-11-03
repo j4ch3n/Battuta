@@ -22,9 +22,9 @@ def validate_memory_url(value: str | None = None) -> str:
     return value
 
 
-def configure_mcp(bot_dir: Path, *, role: Literal["pm", "tl"], memory_url: str | None = None) -> None:
-    if role not in {"pm", "tl"}:
-        raise click.ClickException("Bot role must be pm or tl")
+def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager"], memory_url: str | None = None) -> None:
+    if role not in {"cos", "manager"}:
+        raise click.ClickException("Bot role must be cos or manager")
     url = validate_memory_url(memory_url)
     path = bot_dir / ".pi/mcp.json"
     settings_path = bot_dir / ".pi/settings.json"
@@ -43,7 +43,7 @@ def configure_mcp(bot_dir: Path, *, role: Literal["pm", "tl"], memory_url: str |
             retained.append(entry)
     servers["linear"] = {"url": "https://mcp.linear.app/mcp", "headers": {"Authorization": "Bearer ${LINEAR_API_TOKEN}"}, "exposure": "codemode", "description": "Manage Linear issues, projects, and cycles"}
     servers["memory"] = {"url": url, "exposure": "codemode", "description": "Shared scoped memory; context, not execution authority"}
-    if role == "pm":
+    if role == "cos":
         servers["luma"] = {"url": "https://mcp.luma.com", "oauth": {"clientRegistration": "cimd"}, "exposure": "hidden", "toolExposure": {f"{verb}_*": "codemode" for verb in ("search", "lookup", "get", "list", "find")}, "description": "Discover Luma events and look up event/account details; read-only use"}
     config["mcpServers"] = servers
     if retained != packages:

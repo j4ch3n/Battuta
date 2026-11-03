@@ -84,7 +84,7 @@ Given that feature description, do this:
 
    Use `inspect_specs` with the intended project name. If the request identifies an existing document, resolve it with `describe_spec`; if ambiguous, ask which document is intended. Otherwise select a clear display name for the new specification.
 
-   Read `template.md` beside this prompt as the active `spec-template`. Draft complete content, then PM persists it through `init_spec` or `update_spec`. The tools establish storage and return the saved reference; do not create directories or copy templates into assumed locations. Follow-up workflows resolve the same named document through spec tools.
+   Read `template.md` beside this prompt as the active `spec-template`. Draft complete content, then CoS persists it through `init_spec` or `update_spec`. The tools establish storage and return the saved reference; do not create directories or copy templates into assumed locations. Follow-up workflows resolve the same named document through spec tools.
 
    Only create one feature per request. Document naming and checkout branches are independent; branch changes are not required for authoring.
 
@@ -121,7 +121,7 @@ Given that feature description, do this:
 
 8. **Specification Quality Validation**: After writing the initial spec, validate it against quality criteria:
 
-   a. **Spec Quality Criteria**: Assess these validation items using the checklist template structure. TL owns canonical checklist authoring through `write_spec_checklist`; PM may request this assessment but does not create checklist files:
+   a. **Spec Quality Criteria**: Assess these validation items using the checklist template structure. Manager owns canonical checklist authoring through `write_spec_checklist`; CoS may request this assessment but does not create checklist files:
 
    ```markdown
    # Specification Quality Checklist: [FEATURE NAME]

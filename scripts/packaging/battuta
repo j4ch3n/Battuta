@@ -57,16 +57,20 @@ case "${1:-}" in
     exec "$tools/.venv/bin/battuta-bot-setup" configure-release --root "$root" "$@"
     ;;
   start-prod-screen)
-    exec bash "$root/bots/pm-bot/scripts/run-dev.sh" prod
+    exec bash "$root/bots/cos-bot/scripts/run-dev.sh" prod
     ;;
-  pm|tl)
+  cos|manager)
     role="$1"
     bot_dir="$root/bots/$role-bot"
     [[ -f "$root/.env.prod" ]] || { printf 'Missing %s/.env.prod\n' "$root" >&2; exit 1; }
-    [[ -x "$bot_dir/node_modules/.bin/pi" && -f "$bot_dir/AGENTS.md" && -f "$bot_dir/.pi/telegram.json" && -f "$bot_dir/.pi/mcp.json" ]] || {
+    [[ -x "$bot_dir/node_modules/.bin/pi" && -f "$bot_dir/AGENTS.md" && -f "$bot_dir/.pi/mcp.json" ]] || {
       printf 'Configure %s first with bin/battuta configure\n' "$role" >&2
       exit 1
     }
+    if [[ "$role" == cos && ! -f "$bot_dir/.pi/telegram.json" ]]; then
+      printf 'Configure CoS Telegram first with bin/battuta configure\n' >&2
+      exit 1
+    fi
     [[ -d "$root/agent-mail/node_modules" ]] || { printf 'Missing agent-mail dependencies\n' >&2; exit 1; }
     [[ -d "$root/project-spec/node_modules" ]] || { printf 'Missing project-spec dependencies\n' >&2; exit 1; }
     [[ -d "$root/memory-client/node_modules" ]] || { printf 'Missing memory client dependencies\n' >&2; exit 1; }
@@ -78,13 +82,18 @@ case "${1:-}" in
     done
     export AGENT_ROLE="$role" PI_CODING_AGENT_DIR="$bot_dir/.pi"
     export BATTUTA_MEMORY_URL="${BATTUTA_MEMORY_URL:-http://127.0.0.1:8901/mcp}"
-    if [[ "$role" == pm ]]; then
+    if [[ "$role" == cos ]]; then
       umask 077
       export PI_SCHEDULER_STATE_FILE
       PI_SCHEDULER_STATE_FILE="$("$root/bin/node" "$root/memory-client/configure-scheduler.mjs" --print-path)"
       export PI_SCHEDULER_CATCHUP_MAX
       PI_SCHEDULER_CATCHUP_MAX="$("$root/bin/node" "$root/memory-client/configure-scheduler.mjs" --print-catchup)"
       "$root/bin/node" "$root/memory-client/configure-scheduler.mjs" --check
+    else
+      for key in $(compgen -v); do
+        case "$key" in *TELEGRAM*) unset "$key";; esac
+      done
+      unset PI_SCHEDULER_STATE_FILE PI_SCHEDULER_CATCHUP_MAX
     fi
     cd "$bot_dir"
     exec "$bot_dir/node_modules/.bin/pi" --approve --continue --session-dir "$bot_dir/.pi/mail-sessions" --extension "$root/agent-mail/index.ts" --extension "$root/project-spec/index.ts" --extension "$root/memory-client/index.ts"
@@ -94,7 +103,7 @@ case "${1:-}" in
     exec "$tools/.venv/bin/battuta-packaging" install-services --root "$root"
     ;;
   *)
-    printf 'Usage: %s configure [--migrate-from OLD_BOTS_DIRECTORY]|setup-memory|memory|setup-artifacts|artifacts|artifact|start-prod-screen|pm|tl|install-services\n' "$0" >&2
+    printf 'Usage: %s configure|setup-memory|memory|setup-artifacts|artifacts|artifact|start-prod-screen|cos|manager|install-services\n' "$0" >&2
     exit 2
     ;;
 esac

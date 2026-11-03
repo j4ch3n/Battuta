@@ -144,7 +144,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - If source docs are large, generate interim summary items instead of embedding raw text
 
 6. **Generate checklist** - Use TEMPLATE_CONTENT as the structural template and create "Unit Tests for Requirements":
-   - TL persists one complete canonical checklist through `write_spec_checklist`.
+   - Manager persists one complete canonical checklist through `write_spec_checklist`.
    - Inspect the existing checklist through `describe_spec` before replacing it. Retain applicable criteria and stable identifiers; incorporate the requested focus areas into the complete replacement.
    - The tool manages its location. Do not create alternate checklist files or append fragments.
    - Leave every newly generated item unchecked (`[ ]`); checkbox state belongs to the reviewer

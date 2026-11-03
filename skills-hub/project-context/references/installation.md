@@ -46,7 +46,7 @@ Use `--reinstall` for an updated release. Python 3.12 must already be available 
 
 `uv tool dir --bin` prints the executable directory (normally `~/.local/bin`). Interactive shell initialization does not automatically apply to systemd user services.
 
-For each service, use `systemctl --user edit battuta-pm.service` or `battuta-tl.service` and set an explicit PATH, replacing the example home with the actual absolute tool directory:
+For each service, use `systemctl --user edit battuta-cos.service` or `battuta-manager.service` and set an explicit PATH, replacing the example home with the actual absolute tool directory:
 
 ```ini
 [Service]
@@ -57,7 +57,7 @@ Then reload and restart the affected services:
 
 ```sh
 systemctl --user daemon-reload
-systemctl --user restart battuta-pm.service battuta-tl.service
+systemctl --user restart battuta-cos.service battuta-manager.service
 ```
 
 Include custom `gh`/Git and `rg` locations in PATH when needed (Homebrew on Apple Silicon commonly uses `/opt/homebrew/bin`). Source/tmux launches inherit their shell environment; make the tool available before starting them. Ensure bot services also receive `LINEAR_API_TOKEN` through their runtime environment. Verify `battuta-project --help`, `rg --version`, and `gh auth status` as the bot user with each bot's intended PATH and token environment. After installation, verify `battuta-project note --scope general search --query installation-check`; an absent notebook or no matches is normal success, while a missing-rg error needs PATH repair (an absent notebook does not invoke rg).

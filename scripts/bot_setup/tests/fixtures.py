@@ -33,17 +33,17 @@ class ConfigFixture(unittest.TestCase):
         for name in ("setup-memory.sh", "setup-artifacts.sh"):
             shutil.copy2(ROOT / "scripts" / name, self.root / "scripts" / name)
         shutil.copy2(ROOT / "Makefile", self.root / "Makefile")
-        for role in ("pm", "tl"):
+        for role in ("cos", "manager"):
             bot = self.root / f"bots/{role}-bot"
             (bot / ".pi").mkdir(parents=True)
-            self.config_path(role).write_text(json.dumps({
+        self.config_path("cos").write_text(json.dumps({
                 "profiles": {"default": {
                     "botToken": "9:old", "botId": 9, "allowedUserId": 9,
                     "botUsername": "old_bot", "customSetting": True,
                 }, "other": {"preserve": True}}, "custom": True,
             }))
-        self.write_env(".env", 101, 102)
-        self.write_env(".env.prod", 201, 202)
+        self.write_env(".env", 101)
+        self.write_env(".env.prod", 201)
         self.bin = self.root / "bin"
         self.bin.mkdir()
         self.log = self.root / "tmux.jsonl"
@@ -63,12 +63,11 @@ os.execv(sys.executable, [sys.executable, "-m", "bot_setup.cli", *args[args.inde
     def config(self, role):
         return json.loads(self.config_path(role).read_text())
 
-    def write_env(self, filename, pm, tl):
+    def write_env(self, filename, cos):
         (self.root / filename).write_text(
-            f"PM_TELEGRAM_TOKEN={pm}:pm-secret\n"
-            f"TL_TELEGRAM_TOKEN={tl}:tl-secret\n"
+            f"COS_TELEGRAM_TOKEN={cos}:cos-secret\n"
             "TELEGRAM_ALLOWED_USER_ID=123\n"
-            "PM_TELEGRAM_BOT_USERNAME=new_pm_bot\n"
+            "COS_TELEGRAM_BOT_USERNAME=new_cos_bot\n"
             "LINEAR_API_TOKEN=linear-test\n"
             "SUPABASE_URL=http://localhost:54321\n"
             "SUPABASE_SECRET_KEY=supabase-test\n"
@@ -82,10 +81,10 @@ os.execv(sys.executable, [sys.executable, "-m", "bot_setup.cli", *args[args.inde
 class LauncherFixture(ConfigFixture):
     def setUp(self):
         super().setUp()
-        launcher = self.root / "bots/pm-bot/scripts/run-dev.sh"
+        launcher = self.root / "bots/cos-bot/scripts/run-dev.sh"
         launcher.parent.mkdir(parents=True)
-        shutil.copy2(ROOT / "bots/pm-bot/scripts/run-dev.sh", launcher)
-        for role in ("pm", "tl"):
+        shutil.copy2(ROOT / "bots/cos-bot/scripts/run-dev.sh", launcher)
+        for role in ("cos", "manager"):
             bot = self.root / f"bots/{role}-bot"
             (bot / "node_modules/.bin").mkdir(parents=True)
             (bot / "node_modules/.bin/pi").touch(mode=0o700)

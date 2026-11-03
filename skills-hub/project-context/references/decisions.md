@@ -1,6 +1,6 @@
 # Record a terminal product decision
 
-Use PM's `finalize_spec` tool when project-management has selected **go** or **no-go** and established the decision rationale. Budget means scope and tradeoffs. Refine an open spec through `update_spec`; refine is not a terminal outcome.
+Use CoS's `finalize_spec` tool when project-management has selected **go** or **no-go** and established the decision rationale. Budget means scope and tradeoffs. Refine an open spec through `update_spec`; refine is not a terminal outcome.
 
 ## Invocation
 

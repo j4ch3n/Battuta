@@ -58,7 +58,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-1. **Setup**: Resolve the named specification and related design documents through `inspect_specs` and `describe_spec`. Use their returned references as AVAILABLE_DOCS. Set TASKS_TEMPLATE to `template.md` beside this prompt and read it as TASKS_TEMPLATE_CONTENT. PM persists the resulting task document through spec tools.
+1. **Setup**: Resolve the named specification and related design documents through `inspect_specs` and `describe_spec`. Use their returned references as AVAILABLE_DOCS. Set TASKS_TEMPLATE to `template.md` beside this prompt and read it as TASKS_TEMPLATE_CONTENT. CoS persists the resulting task document through spec tools.
 
 2. **Load design documents**: Read the resolved named document versions:
    - **Required**: plan.md (tech stack, libraries, structure), spec.md (user stories with priorities)

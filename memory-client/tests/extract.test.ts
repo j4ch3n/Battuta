@@ -43,7 +43,7 @@ test("extracts cited facts with frozen binding and emits provider usage", async 
   expect(result.batch.items).toHaveLength(1);
   expect(result.usage).toEqual({ input: 20, output: 5 });
   expect(result.batch.items[0].sources).toEqual([
-    { agent_id: "pm", session_id: "s", entry_id: "e" },
+    { agent_id: "cos", session_id: "s", entry_id: "e" },
   ]);
 });
 test.each([
@@ -102,8 +102,8 @@ test.each(["topic,scope:global", "topic,proj:other", "topic,kind:decision"])(
 );
 test.each([
   "SUPABASE_SECRET_KEY=sb_secret_" + "s".repeat(32),
-  "PM_TELEGRAM_TOKEN=123456789:" + "A".repeat(35),
-  "TL_TELEGRAM_TOKEN=987654321:" + "B".repeat(35),
+  "COS_TELEGRAM_TOKEN=123456789:" + "A".repeat(35),
+  "MANAGER_TELEGRAM_TOKEN=987654321:" + "B".repeat(35),
 ])("accepts credential-like model output for local memory", async (content) => {
   const result = await extractMemories(
     job,

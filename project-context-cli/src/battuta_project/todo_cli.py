@@ -39,7 +39,7 @@ def render_todos(result: TodoList, operation: str, *, remain: bool = False, next
         f"Next: #{next_item.id} {next_item.description}" if next_item else "No remaining TODO items.",
     ])
     if handoff and result.related_to is None:
-        counterpart = "tl" if result.role == "pm" else "pm"
+        counterpart = "manager" if result.role == "cos" else "cos"
         lines.extend([
             "",
             f"For optional coordination, include {result.role}:{result.work_id} and scope {scope} in a bot-mail message to {counterpart.upper()}.",

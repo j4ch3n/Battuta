@@ -29,7 +29,7 @@ class Scope(Contract):
 
 
 class SourceRef(Contract):
-    agent_id: Literal["pm", "tl"]
+    agent_id: Literal["cos", "manager"]
     session_id: str = Field(min_length=1, max_length=200)
     entry_id: str = Field(min_length=1, max_length=200)
 
@@ -173,7 +173,7 @@ class CaptureItem(RememberContent):
 class CaptureBatch(Contract):
     session_id: str = Field(min_length=1, max_length=200)
     batch_id: str = Field(min_length=1, max_length=200)
-    agent_id: Literal["pm", "tl"]
+    agent_id: Literal["cos", "manager"]
     payload_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
     items: list[CaptureItem] = Field(max_length=20)
 

@@ -1,6 +1,6 @@
-# PM memory tool workflow
+# CoS memory tool workflow
 
-Discover the `memory` MCP server's tools through native tool discovery. PM may read and mutate memories; TL's role is read-only even if the server exposes writes. Calls use flat JSON arguments, not a nested `request`. Successful responses have `ok:true`, `data` and `warnings`; failures have `ok:false` and MCP `isError:true`. Read those results before claiming a write succeeded. Report actual confirmed scope and returned references, warnings, and partial failures. Do not retry a conflict by overwriting unrelated records.
+Discover the `memory` MCP server's tools through native tool discovery. CoS may read and mutate memories; Manager's role is read-only even if the server exposes writes. Calls use flat JSON arguments, not a nested `request`. Successful responses have `ok:true`, `data` and `warnings`; failures have `ok:false` and MCP `isError:true`. Read those results before claiming a write succeeded. Report actual confirmed scope and returned references, warnings, and partial failures. Do not retry a conflict by overwriting unrelated records.
 
 ## Remember and recall
 
@@ -44,4 +44,4 @@ Conversation tools do not directly edit the owner profile. When a request includ
 
 ## Approved private dream
 
-When an enabled, explicitly configured nightly dream requests it, call the PM-only `memory_dream({})` tool once. It accepts no custom prompt or model. On `complete`, report that the tool ran successfully and convey its public `summary` of memory operations (including when no memory changes were needed); keep the report concise. This summary does not describe the later owner-profile refresh. For `partial`, `already_completed` (an older completed run without a public summary), cancellation, timeout, unavailability, or failure, report the actual status honestly without inventing a summary or claiming full success. Never request or repeat private reflections. Disabled or unconfigured dreams fail closed. A scheduler delivery marker does not prove the dream ran or the profile changed.
+When an enabled, explicitly configured nightly dream requests it, call the CoS-only `memory_dream({})` tool once. It accepts no custom prompt or model. On `complete`, report that the tool ran successfully and convey its public `summary` of memory operations (including when no memory changes were needed); keep the report concise. This summary does not describe the later owner-profile refresh. For `partial`, `already_completed` (an older completed run without a public summary), cancellation, timeout, unavailability, or failure, report the actual status honestly without inventing a summary or claiming full success. Never request or repeat private reflections. Disabled or unconfigured dreams fail closed. A scheduler delivery marker does not prove the dream ran or the profile changed.

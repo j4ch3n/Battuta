@@ -31,11 +31,13 @@ class BattutaLauncherTests(LauncherFixture):
     def setUp(self):
         super().setUp()
         shutil.copy2(ROOT / "scripts/packaging/battuta", self.bin / "battuta")
+        (self.bin / "battuta").chmod(0o700)
         (self.bin / "node").symlink_to(shutil.which("node"))
-        for role in ("pm", "tl"):
+        for role in ("cos", "manager"):
             pi = self.root / f"bots/{role}-bot/node_modules/.bin/pi"
             pi.write_text(f"#!{sys.executable}\n" + '''import json, os, sys
 print(json.dumps({"role": os.environ["AGENT_ROLE"],
+                   "telegram": any("TELEGRAM" in key for key in os.environ),
                    "token": os.environ.get("LINEAR_API_TOKEN"),
                     "memory": os.environ.get("BATTUTA_MEMORY_URL"), "scheduler": os.environ.get("PI_SCHEDULER_STATE_FILE"), "catchup": os.environ.get("PI_SCHEDULER_CATCHUP_MAX"), "args": sys.argv[1:]}))
 ''')
@@ -48,7 +50,7 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"],
                               env=env, capture_output=True, text=True)
 
     def test_both_roles_receive_token_from_production_file(self):
-        for role in ("pm", "tl"):
+        for role in ("cos", "manager"):
             with self.subTest(role=role):
                 result = self.launch(role)
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -56,7 +58,7 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"],
                 self.assertEqual(response["role"], role)
                 self.assertEqual(response["token"], "linear-test")
                 self.assertEqual(response["memory"], "http://127.0.0.1:8901/mcp")
-                if role == "pm":
+                if role == "cos":
                     self.assertEqual(response["scheduler"], str(self.scheduler))
                     self.assertEqual(response["catchup"], "0")
                 self.assertIn(str(self.root / "project-spec/index.ts"), response["args"])
@@ -66,7 +68,7 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"],
         path = "http://127.0.0.1:8989/mcp"
         with (self.root / ".env.prod").open("a") as output:
             output.write(f'BATTUTA_MEMORY_URL="{path}"\n')
-        for role in ("pm", "tl"):
+        for role in ("cos", "manager"):
             response = self.launch(role)
             self.assertEqual(response.returncode, 0, response.stderr)
             self.assertEqual(json.loads(response.stdout)["memory"], str(path))
@@ -74,7 +76,28 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"],
     def test_missing_token_stops_before_launch(self):
         path = self.root / ".env.prod"
         path.write_text(path.read_text().replace("LINEAR_API_TOKEN=linear-test\n", ""))
-        result = self.launch("pm")
+        result = self.launch("cos")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Set LINEAR_API_TOKEN in .env.prod", result.stderr)
         self.assertEqual(result.stdout, "")
+
+    def test_manager_launch_and_service_command_exclude_telegram_environment(self):
+        from battuta_packaging.services import install_services
+        from unittest.mock import patch
+        import shlex
+        for root in ("COS_TELEGRAM_TOKEN", "TELEGRAM_BOT_TOKEN", "PI_TELEGRAM_PROFILE", "TELEGRAM_ALLOWED_USER_ID"):
+            with (self.root / ".env.prod").open("a") as output:
+                output.write(f"{root}=private-test\n")
+        with patch.dict(os.environ, {"COS_TELEGRAM_TOKEN": "private-parent", "XDG_CONFIG_HOME": str(self.root / "config")}):
+            result = self.launch("manager")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(json.loads(result.stdout)["telegram"])
+            self.assertIsNone(json.loads(result.stdout)["scheduler"])
+            self.assertTrue(json.loads(self.launch("cos").stdout)["telegram"])
+            install_services(self.root)
+            unit = (self.root / "config/systemd/user/battuta-manager.service").read_text()
+            command = next(line for line in unit.splitlines() if line.startswith("ExecStart="))
+            args = shlex.split(command.removeprefix("ExecStart="))
+            result = subprocess.run(shlex.split(args[args.index("-c") + 1]), capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(json.loads(result.stdout)["telegram"])

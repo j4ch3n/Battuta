@@ -27,7 +27,7 @@ class LinearProject(Model):
 
 
 WorkId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]{5}$")]
-WorkReference = Annotated[str, StringConstraints(pattern=r"^(pm|tl):[a-z0-9]{5}$")]
+WorkReference = Annotated[str, StringConstraints(pattern=r"^(cos|manager):[a-z0-9]{5}$")]
 
 
 class WorkRecord(Model):
@@ -51,7 +51,7 @@ class RoleWorkConfig(Model):
 
 class WorkConfig(Model):
     model_config = ConfigDict(extra="allow")
-    roles: dict[Literal["pm", "tl"], RoleWorkConfig] = Field(default_factory=dict)
+    roles: dict[Literal["cos", "manager"], RoleWorkConfig] = Field(default_factory=dict)
 
 
 class CurrentConfig(Model):

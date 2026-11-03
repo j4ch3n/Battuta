@@ -16,14 +16,14 @@ const input = {
 test("constitution reads identify exact persisted bytes and updates preserve prior versions", async () => {
   const f = await fixture();
   try {
-    const first = await f.pm.initConstitution(input);
+    const first = await f.cos.initConstitution(input);
     assert.equal(first.name, "Constitution");
     assert.equal(first.version, "v1");
     assert.equal(first.path, join(f.projects, "atlas/specs/constitution/spec-v1.md"));
     assert.equal(first.sha256, createHash("sha256").update(input.content).digest("hex"));
     assert.equal(await readFile(first.path, "utf8"), input.content);
     assert.equal((await stat(first.path)).mode & 0o222, 0);
-    assert.deepEqual(await f.tl.readConstitution("atlas"), {
+    assert.deepEqual(await f.manager.readConstitution("atlas"), {
       name: "Constitution",
       path: first.path,
       version: "v1",
@@ -32,16 +32,16 @@ test("constitution reads identify exact persisted bytes and updates preserve pri
       sha256: first.sha256,
       decision: null,
     });
-    const next = await f.pm.updateConstitution({
+    const next = await f.cos.updateConstitution({
       ...input,
       summary: "Amend principles",
       content: "# Revised Constitution\n",
     });
     assert.equal(next.version, "v2");
     assert.equal(await readFile(first.path, "utf8"), input.content);
-    assert.equal((await f.pm.readConstitution("atlas")).content, "# Revised Constitution\n");
-    assert.equal((await f.pm.readConstitution("atlas")).sha256, next.sha256);
-    assert.equal((await f.pm.describeSpec("atlas", "Constitution")).latest_version, "v2");
+    assert.equal((await f.cos.readConstitution("atlas")).content, "# Revised Constitution\n");
+    assert.equal((await f.cos.readConstitution("atlas")).sha256, next.sha256);
+    assert.equal((await f.cos.describeSpec("atlas", "Constitution")).latest_version, "v2");
   } finally {
     await f.cleanup();
   }
@@ -52,20 +52,20 @@ test.each(["go", "no-go"] as const)(
   async (decision) => {
     const f = await fixture();
     try {
-      await f.pm.initConstitution(input);
-      await f.pm.finalizeSpec({
+      await f.cos.initConstitution(input);
+      await f.cos.finalizeSpec({
         project: "atlas",
         name: "Constitution",
         decision,
         rationale: "Resolved governance",
       });
-      const before = await f.pm.readConstitution("atlas");
+      const before = await f.cos.readConstitution("atlas");
       const index = await readFile(join(f.projects, "atlas/specs/index.json"));
       await assert.rejects(
-        f.pm.updateConstitution({ ...input, content: "Changed" }),
+        f.cos.updateConstitution({ ...input, content: "Changed" }),
         /finalized.*v1/,
       );
-      assert.deepEqual(await f.tl.readConstitution("atlas"), before);
+      assert.deepEqual(await f.manager.readConstitution("atlas"), before);
       assert.equal(before.decision?.outcome, decision);
       assert.deepEqual(await readFile(join(f.projects, "atlas/specs/index.json")), index);
       await assert.rejects(stat(join(f.projects, "atlas/specs/constitution/spec-v2.md")), /ENOENT/);
@@ -78,26 +78,26 @@ test.each(["go", "no-go"] as const)(
 test("missing constitutions do not create storage; duplicate creation and missing version files fail", async () => {
   const f = await fixture();
   try {
-    await assert.rejects(f.pm.readConstitution("atlas"), /not found/);
-    await assert.rejects(f.pm.updateConstitution(input), /not found/);
+    await assert.rejects(f.cos.readConstitution("atlas"), /not found/);
+    await assert.rejects(f.cos.updateConstitution(input), /not found/);
     await assert.rejects(stat(join(f.projects, "atlas/specs/index.json")), /ENOENT/);
-    const saved = await f.pm.initConstitution(input);
-    await assert.rejects(f.pm.initConstitution(input), /already exists.*update_constitution/);
+    const saved = await f.cos.initConstitution(input);
+    await assert.rejects(f.cos.initConstitution(input), /already exists.*update_constitution/);
     await rm(saved.path);
-    await assert.rejects(f.pm.readConstitution("atlas"), /missing/);
-    await assert.rejects(f.pm.updateConstitution(input), /missing/);
+    await assert.rejects(f.cos.readConstitution("atlas"), /missing/);
+    await assert.rejects(f.cos.updateConstitution(input), /missing/);
   } finally {
     await f.cleanup();
   }
 });
 
-test("TL cannot write constitutions through the store", async () => {
+test("Manager cannot write constitutions through the store", async () => {
   const f = await fixture();
   try {
-    await assert.rejects(f.tl.initConstitution(input), /PM/);
-    await f.pm.initConstitution(input);
-    await assert.rejects(f.tl.updateConstitution(input), /PM/);
-    assert.equal((await f.pm.readConstitution("atlas")).version, "v1");
+    await assert.rejects(f.manager.initConstitution(input), /COS/);
+    await f.cos.initConstitution(input);
+    await assert.rejects(f.manager.updateConstitution(input), /COS/);
+    assert.equal((await f.cos.readConstitution("atlas")).version, "v1");
   } finally {
     await f.cleanup();
   }
@@ -107,7 +107,7 @@ test("dedicated tool handlers persist full documents and enforce their schemas",
   const f = await fixture();
   try {
     const fake = fakePi();
-    register(fake.pi, { role: "pm", projectsRoot: f.projects });
+    register(fake.pi, { role: "cos", projectsRoot: f.projects });
     const call = (name: string, args: unknown) => {
       const tool = fake.tools.get(name)!;
       return tool.execute(
@@ -123,7 +123,7 @@ test("dedicated tool handlers persist full documents and enforce their schemas",
     const read = await call("read_constitution", { project: "atlas" });
     assert.equal((read.details as { content: string }).content, input.content);
     await call("update_constitution", { ...input, content: "# Revised" });
-    assert.equal((await f.tl.readConstitution("atlas")).content, "# Revised");
+    assert.equal((await f.manager.readConstitution("atlas")).content, "# Revised");
     for (const args of [
       { ...input, content: " " },
       { ...input, summary: "" },
@@ -140,7 +140,7 @@ test("dedicated tool handlers persist full documents and enforce their schemas",
       event: ToolCallEvent,
       context: ExtensionContext,
     ) => Promise<{ block: boolean } | undefined>;
-    const saved = await f.pm.readConstitution("atlas");
+    const saved = await f.cos.readConstitution("atlas");
     for (const toolName of ["write", "edit"]) {
       const event = {
         type: "tool_call" as const,

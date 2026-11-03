@@ -14,7 +14,7 @@ from bot_setup.install import install_packages  # noqa: E402
 
 class InstallTests(ConfigFixture):
     def test_installs_additional_packages_before_listing(self):
-        bot = self.root / "bots/custom-pm"
+        bot = self.root / "bots/custom-cos"
         with patch("bot_setup.install.shutil.which", return_value="pnpm"), patch("bot_setup.install.subprocess.run") as run:
             install_packages(bot, "npm:telegram", extra_packages=("npm:@jl1990/pi-scheduler@0.5.1",))
         self.assertEqual([call.args[0] for call in run.call_args_list], [
@@ -28,7 +28,7 @@ class InstallTests(ConfigFixture):
             self.assertEqual(call.kwargs["env"]["PI_CODING_AGENT_DIR"], str(bot / ".pi"))
 
     def test_installs_only_telegram_with_bot_local_state(self):
-        bot = self.root / "bots/pm-bot"
+        bot = self.root / "bots/cos-bot"
         with patch("bot_setup.install.shutil.which", return_value="pnpm"), patch("bot_setup.install.subprocess.run") as run:
             install_packages(bot, "npm:@llblab/pi-telegram@0.57.3")
         self.assertEqual([call.args[0] for call in run.call_args_list], [
@@ -44,4 +44,4 @@ class InstallTests(ConfigFixture):
     def test_missing_pnpm_reports_prerequisite(self):
         with patch("bot_setup.install.shutil.which", return_value=None):
             with self.assertRaisesRegex(click.ClickException, "pnpm is required"):
-                install_packages(self.root / "bots/pm-bot", "npm:telegram")
+                install_packages(self.root / "bots/cos-bot", "npm:telegram")

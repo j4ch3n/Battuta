@@ -31,7 +31,7 @@ export function reconcileDreamSchedule(store: SchedulerStore, now: string): Sche
     throw new Error("Dream job ownership conflict");
   if (matching.length) {
     if (matching[0].prompt === DREAM_PROMPT) return store;
-    // Setup runs with PM stopped: upgrade only our exact previous instruction,
+    // Setup runs with CoS stopped: upgrade only our exact previous instruction,
     // preserving owner disablement and native scheduler history.
     return {
       ...store,

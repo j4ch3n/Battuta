@@ -86,7 +86,7 @@ jobs:
           chmod +x dist/stage/battuta/bin/*
           test -d dist/stage/battuta/skills-hub
           uv run --project scripts/packaging --locked battuta-packaging validate-skills dist/stage/battuta
-          for bot in pm-bot tl-bot; do
+          for bot in cos-bot manager-bot; do
             test ! -e "dist/stage/battuta/bots/$bot/.pi/ME.md"
           done
           bash -n dist/stage/battuta/bin/battuta
@@ -123,7 +123,7 @@ jobs:
           assert "{{" not in summary
           PY
           rm -rf "$smoke_home"
-          for bot in pm-bot tl-bot; do
+          for bot in cos-bot manager-bot; do
             bot_dir="$PWD/dist/stage/battuta/bots/$bot"
             pnpm --dir "$bot_dir" install --frozen-lockfile --prod
             while IFS=$'\t' read -r source package; do
@@ -146,7 +146,7 @@ jobs:
           pnpm --dir dist/stage/battuta/memory-client install --frozen-lockfile --prod
           memory_smoke_home="$(mktemp -d)"
           mkdir -p "$memory_smoke_home/agent"
-          HOME="$memory_smoke_home" node dist/stage/battuta/memory-client/tests/loader-worker.mjs "$memory_smoke_home/agent" "$PWD/dist/stage/battuta/bots/pm-bot/node_modules/@earendil-works/pi-coding-agent/dist/index.js" "$PWD/dist/stage/battuta/bots/pm-bot/.pi/npm/node_modules/@jl1990/pi-scheduler/extensions/scheduler/index.ts"
+          HOME="$memory_smoke_home" node dist/stage/battuta/memory-client/tests/loader-worker.mjs "$memory_smoke_home/agent" "$PWD/dist/stage/battuta/bots/cos-bot/node_modules/@earendil-works/pi-coding-agent/dist/index.js" "$PWD/dist/stage/battuta/bots/cos-bot/.pi/npm/node_modules/@jl1990/pi-scheduler/extensions/scheduler/index.ts"
           uv venv --python 3.12 "$RUNNER_TEMP/memory-smoke"
           uv pip install --python "$RUNNER_TEMP/memory-smoke/bin/python" --offline --no-index --find-links "$memory_dir/wheels" battuta-memory
           "$RUNNER_TEMP/memory-smoke/bin/battuta-memory" --help
@@ -165,23 +165,23 @@ jobs:
             test ! -e "$RUNNER_TEMP/artifact-smoke/.battuta/projects/release-smoke/artifacts/$template/file-meta.json"
           done
           rm -rf "$memory_smoke_home"
-          test -x dist/stage/battuta/bots/pm-bot/node_modules/.bin/pi
-          test -x dist/stage/battuta/bots/tl-bot/node_modules/.bin/pi
-          test -f dist/stage/battuta/bots/tl-bot/.pi/npm/node_modules/pi-subagents/bundle/index.js
-          test -f dist/stage/battuta/bots/tl-bot/.pi/npm/node_modules/pi-subagents/skills/pi-subagents/SKILL.md
-          test ! -e dist/stage/battuta/bots/pm-bot/node_modules/pi-subagents
-          test ! -e dist/stage/battuta/bots/tl-bot/.pi/subagents.json
-          pnpm --dir dist/stage/battuta/bots/tl-bot exec node --input-type=module -e 'import upstream from "pi-subagents"; import { SUBAGENT_DELEGATION_REQUEST_EVENT } from "pi-subagents/delegation"; if (typeof upstream !== "function" || !SUBAGENT_DELEGATION_REQUEST_EVENT) process.exit(1)'
+          test -x dist/stage/battuta/bots/cos-bot/node_modules/.bin/pi
+          test -x dist/stage/battuta/bots/manager-bot/node_modules/.bin/pi
+          test -f dist/stage/battuta/bots/manager-bot/.pi/npm/node_modules/pi-subagents/bundle/index.js
+          test -f dist/stage/battuta/bots/manager-bot/.pi/npm/node_modules/pi-subagents/skills/pi-subagents/SKILL.md
+          test ! -e dist/stage/battuta/bots/cos-bot/node_modules/pi-subagents
+          test ! -e dist/stage/battuta/bots/manager-bot/.pi/subagents.json
+          pnpm --dir dist/stage/battuta/bots/manager-bot exec node --input-type=module -e 'import upstream from "pi-subagents"; import { SUBAGENT_DELEGATION_REQUEST_EVENT } from "pi-subagents/delegation"; if (typeof upstream !== "function" || !SUBAGENT_DELEGATION_REQUEST_EVENT) process.exit(1)'
           test -d dist/stage/battuta/agent-mail/node_modules
           test -d dist/stage/battuta/project-spec/node_modules
           test -d dist/stage/battuta/memory-client/node_modules
           test ! -e dist/stage/battuta/.env
-          test ! -e dist/stage/battuta/bots/pm-bot/.pi/auth.json
-          test ! -e dist/stage/battuta/bots/tl-bot/.pi/auth.json
-          test ! -e dist/stage/battuta/bots/pm-bot/.pi/mcp-auth.json
-          test ! -e dist/stage/battuta/bots/tl-bot/.pi/mcp-auth.json
-          test ! -e dist/stage/battuta/bots/pm-bot/.pi/telegram.json
-          test ! -e dist/stage/battuta/bots/tl-bot/.pi/telegram.json
+          test ! -e dist/stage/battuta/bots/cos-bot/.pi/auth.json
+          test ! -e dist/stage/battuta/bots/manager-bot/.pi/auth.json
+          test ! -e dist/stage/battuta/bots/cos-bot/.pi/mcp-auth.json
+          test ! -e dist/stage/battuta/bots/manager-bot/.pi/mcp-auth.json
+          test ! -e dist/stage/battuta/bots/cos-bot/.pi/telegram.json
+          test ! -e dist/stage/battuta/bots/manager-bot/.pi/telegram.json
           tar -C dist/stage --exclude='battuta/memory-service/.venv' --exclude='battuta/artifact-service/.venv' -czf "dist/battuta-$TAG-linux-arm64.tar.gz" battuta
           (cd dist && sha256sum "battuta-$TAG-linux-arm64.tar.gz" > "battuta-$TAG-linux-arm64.tar.gz.sha256")
 

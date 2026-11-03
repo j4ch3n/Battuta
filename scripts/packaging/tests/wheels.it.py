@@ -37,11 +37,11 @@ class OfflineToolingTests(unittest.TestCase):
             launcher = release / "bin/battuta"
             shutil.copyfile(ROOT / "scripts/packaging/battuta", launcher)
             copy_scheduler_runtime(release)
-            for role in ("pm", "tl"):
+            for role in ("cos", "manager"):
                 skill_catalog(release, role)
                 (release / f"bots/{role}-bot/AGENTS_dedicated.md").write_text(role)
             (release / "bots/AGENTS_shared.md").write_text("Shared")
-            (release / ".env.prod").write_text(f"LINEAR_API_TOKEN=private-linear\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=private-supabase\nTELEGRAM_ALLOWED_USER_ID=123\nPM_TELEGRAM_TOKEN=101:private-pm\nTL_TELEGRAM_TOKEN=102:private-tl\nPI_SCHEDULER_STATE_FILE={work / 'schedule.json'}\n")
+            (release / ".env.prod").write_text(f"LINEAR_API_TOKEN=private-linear\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=private-supabase\nTELEGRAM_ALLOWED_USER_ID=123\nCOS_TELEGRAM_TOKEN=101:private-cos\nMANAGER_TELEGRAM_TOKEN=102:private-manager\nPI_SCHEDULER_STATE_FILE={work / 'schedule.json'}\n")
             env.update(PYTHONPATH="", HTTP_PROXY="http://127.0.0.1:9", HTTPS_PROXY="http://127.0.0.1:9", XDG_CONFIG_HOME=str(work / "config"))
             env.pop("VIRTUAL_ENV", None)
             result = run("bash", str(launcher), "configure")
@@ -54,10 +54,10 @@ class OfflineToolingTests(unittest.TestCase):
             self.assertEqual(len(list((work / "config/systemd/user").glob("*.service"))), 4)
             self.assertFalse((release / "pyproject.toml").exists())
             self.assertTrue((release / "skills-hub").is_dir())
-            self.assertTrue(all(not (release / f"bots/{role}-bot/.pi/skills").exists() for role in ("pm", "tl")))
-            for role in ("pm", "tl"):
+            self.assertTrue(all(not (release / f"bots/{role}-bot/.pi/skills").exists() for role in ("cos", "manager")))
+            for role in ("cos", "manager"):
                 config = json.loads((release / f"bots/{role}-bot/.pi/mcp.json").read_text())
-                self.assertEqual("luma" in config["mcpServers"], role == "pm")
+                self.assertEqual("luma" in config["mcpServers"], role == "cos")
             shutil.rmtree(binary.parent)
             next(wheels.glob("battuta_packaging-*.whl")).write_bytes(b"tampered")
             failed = subprocess.run(["bash", str(launcher), "configure"], cwd=work, env=env, capture_output=True, text=True)

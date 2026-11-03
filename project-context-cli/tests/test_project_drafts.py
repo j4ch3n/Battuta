@@ -19,9 +19,9 @@ class DraftTests(unittest.TestCase):
         home = patch("pathlib.Path.home", return_value=self.home)
         home.start()
         self.addCleanup(home.stop)
-        self.notes = NoteStore("general", "pm")
+        self.notes = NoteStore("general", "cos")
 
-    def drafts(self, role="pm"):
+    def drafts(self, role="cos"):
         from battuta_project.drafts import DraftStore
         return DraftStore(NoteStore("general", role))
 
@@ -41,7 +41,7 @@ class DraftTests(unittest.TestCase):
         self.notes.append("Separate item")
         self.assertEqual(self.notes.read().lines[0].text, "Separate item")
         self.assertEqual(drafts.create("Research", "Second")[1]["id"], 2)
-        self.assertEqual(self.drafts("tl").create("Research", "TL")[1]["id"], 1)
+        self.assertEqual(self.drafts("manager").create("Research", "Manager")[1]["id"], 1)
 
     def test_absent_discovery_and_invalid_inputs_do_not_create_storage(self):
         drafts = self.drafts()

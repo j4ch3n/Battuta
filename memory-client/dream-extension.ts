@@ -9,7 +9,7 @@ import { abortable } from "./abortable.ts";
 import type { DreamOutcome } from "./dream-result.ts";
 
 export default function dreamExtension(pi: ExtensionAPI) {
-  if (process.env.AGENT_ROLE !== "pm") return;
+  if (process.env.AGENT_ROLE !== "cos") return;
   const shutdown = new AbortController();
   let started = false;
   let active: Promise<DreamOutcome> | undefined;

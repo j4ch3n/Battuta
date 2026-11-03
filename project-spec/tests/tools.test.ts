@@ -6,12 +6,12 @@ import { fixture, input, fakePi } from "./fixtures.ts";
 test("each runtime exposes shared reads and only its own authoring tools", async () => {
   const f = await fixture();
   try {
-    for (const role of ["pm", "tl"] as const) {
+    for (const role of ["cos", "manager"] as const) {
       const fake = fakePi();
       register(fake.pi, { role, projectsRoot: f.projects });
       const common = ["inspect_specs", "describe_spec", "read_constitution"];
       const own =
-        role === "pm"
+        role === "cos"
           ? [
               "init_spec",
               "update_spec",
@@ -31,11 +31,11 @@ test("each runtime exposes shared reads and only its own authoring tools", async
 test("all registered tool groups exercise the actual shared store", async () => {
   const f = await fixture();
   try {
-    const pm = fakePi();
-    const tl = fakePi();
-    register(pm.pi, { role: "pm", projectsRoot: f.projects });
-    register(tl.pi, { role: "tl", projectsRoot: f.projects });
-    const call = async (tools: typeof pm.tools, name: string, args: unknown) => {
+    const cos = fakePi();
+    const manager = fakePi();
+    register(cos.pi, { role: "cos", projectsRoot: f.projects });
+    register(manager.pi, { role: "manager", projectsRoot: f.projects });
+    const call = async (tools: typeof cos.tools, name: string, args: unknown) => {
       const tool = tools.get(name)!;
       return tool.execute(
         "call",
@@ -45,30 +45,30 @@ test("all registered tool groups exercise the actual shared store", async () => 
         {} as Parameters<typeof tool.execute>[4],
       );
     };
-    const inventory = await call(tl.tools, "inspect_specs", { project: "atlas" });
+    const inventory = await call(manager.tools, "inspect_specs", { project: "atlas" });
     assert.deepEqual(inventory.details, { schema_version: 1, specs: [] });
-    await call(pm.tools, "init_spec", input);
-    await call(pm.tools, "update_spec", { ...input, content: "# New spec" });
-    await call(tl.tools, "write_spec_checklist", input);
-    const description = await f.tl.describeSpec("atlas", input.name, true);
+    await call(cos.tools, "init_spec", input);
+    await call(cos.tools, "update_spec", { ...input, content: "# New spec" });
+    await call(manager.tools, "write_spec_checklist", input);
+    const description = await f.manager.describeSpec("atlas", input.name, true);
     assert.equal(description.contents?.spec, "# New spec");
-    await call(tl.tools, "write_spec_review", {
+    await call(manager.tools, "write_spec_review", {
       ...input,
       spec_version: "v2",
       checklist_sha256: description.fingerprints.checklist,
     });
-    await call(pm.tools, "describe_spec", {
+    await call(cos.tools, "describe_spec", {
       project: "atlas",
       name: input.name,
       include_content: true,
     });
-    await call(pm.tools, "finalize_spec", {
+    await call(cos.tools, "finalize_spec", {
       project: "atlas",
       name: input.name,
       decision: "go",
       rationale: "Proceed within selected scope.",
     });
-    await assert.rejects(call(tl.tools, "write_spec_checklist", input), /finalized/);
+    await assert.rejects(call(manager.tools, "write_spec_checklist", input), /finalized/);
   } finally {
     await f.cleanup();
   }
@@ -78,7 +78,7 @@ test("tool handlers save full text and return errors rather than a false success
   const f = await fixture();
   try {
     const fake = fakePi();
-    register(fake.pi, { role: "pm", projectsRoot: f.projects });
+    register(fake.pi, { role: "cos", projectsRoot: f.projects });
     const tool = fake.tools.get("init_spec")!;
     const context = {} as Parameters<typeof tool.execute>[4];
     const result = await tool.execute("call-1", input, undefined, undefined, context);

@@ -33,7 +33,7 @@ class NoteCliTests(unittest.TestCase):
                      ("item", "--text", "new", "--limit", "1")):
             with self.subTest(args=args):
                 self.assertNotEqual(self.invoke(*args).exit_code, 0)
-        self.assertIsNone(NoteStore("general", "pm").read())
+        self.assertIsNone(NoteStore("general", "cos").read())
 
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
@@ -47,7 +47,7 @@ class NoteCliTests(unittest.TestCase):
         self.addCleanup(env.stop)
         self.runner = CliRunner()
 
-    def invoke(self, *args, scope="general", role="pm"):
+    def invoke(self, *args, scope="general", role="cos"):
         with patch.dict(os.environ, {"AGENT_ROLE": role}):
             return self.runner.invoke(main, ["note", "--scope", scope, *args])
 
@@ -59,7 +59,7 @@ class NoteCliTests(unittest.TestCase):
     def test_missing_empty_range_and_invalid_invocations(self):
         self.assertIn("No notebook", self.success("read"))
         self.success("append", "--text", "first")
-        note = NoteStore("general", "pm").read()
+        note = NoteStore("general", "cos").read()
         before = note.path.read_bytes()
         for args in (("append", "--text", " "), ("read", "--from-line", "0"),
                      ("read", "--from-line", "3", "--to-line", "2"), ("read", "--limit", "0")):

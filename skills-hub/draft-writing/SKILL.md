@@ -11,7 +11,7 @@ published artifacts. Research and editorial judgement belong to the task at hand
 
 ## Workflow
 
-1. Choose project or general scope explicitly; use PM's notebook.
+1. Choose project or general scope explicitly; use CoS's notebook.
 2. Pipe the complete document to creation with a descriptive title. The CLI assigns
    its ID and registers the file automatically; do not fabricate bookkeeping.
 3. Creation returns the absolute path and full content. Read/edit that path with
@@ -27,10 +27,10 @@ Publication or canonical-document authoring remains a separate authorised action
 
 ## Scope
 
-PM invokes `battuta-project note` through the shell with `AGENT_ROLE=pm`.
+CoS invokes `battuta-project note` through the shell with `AGENT_ROLE=cos`.
 Project scope uses the selected registered project: confirm `battuta-project current`
 and switch if necessary. General scope needs no project and does not change selection.
-PM has independent project/general notebooks; scope is always explicit.
+CoS has independent project/general notebooks; scope is always explicit.
 
 ## Create a complete document
 

@@ -22,7 +22,7 @@ def catalog(tmp_path):
     return hub, manifest
 
 
-@pytest.mark.parametrize("text", ["{", "null", "[]", "{}", '{"skills":[],"role":"pm"}', '{"skills":"memory"}', '{"skills":[1]}', '{"skills":["memory","memory"]}', '{"skills":["missing"]}', '{"skills":["../memory"]}', '{"skills":["/memory"]}', '{"skills":["Memory"]}'])
+@pytest.mark.parametrize("text", ["{", "null", "[]", "{}", '{"skills":[],"role":"cos"}', '{"skills":"memory"}', '{"skills":[1]}', '{"skills":["memory","memory"]}', '{"skills":["missing"]}', '{"skills":["../memory"]}', '{"skills":["/memory"]}', '{"skills":["Memory"]}'])
 def test_invalid_manifest_is_rejected(tmp_path, text):
     hub, manifest = catalog(tmp_path)
     manifest.write_text(text)

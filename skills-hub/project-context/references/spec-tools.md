@@ -20,11 +20,11 @@ Call `inspect_specs` with an exact registered project name:
 
 The result contains only `schema_version` and `specs`. Each spec entry includes its name, versions, version summaries, and recorded checklist/review/decision metadata. An existing project with no index returns `{ "schema_version": 1, "specs": [] }` without creating storage. Project paths, checkout details, and configuration are not returned. Use `describe_spec` for actual artifact presence, resolved paths, review coverage, and full document content.
 
-## PM: versioned document authoring
+## CoS: versioned document authoring
 
 `init_spec(project, name, summary, content)` creates the first immutable version and returns its location. The tools derive storage from the document's display name. An existing name requires `update_spec`; collisions between different names with the same normalized storage name are rejected.
 
-`update_spec(project, name, summary, content)` saves the next complete immutable version. Existing versions are never rewritten. All managed versioned documents—including product specifications, planning, task, and research artifacts—are persisted by PM; TL supplies technical content and evidence through the originating exchange.
+`update_spec(project, name, summary, content)` saves the next complete immutable version. Existing versions are never rewritten. All managed versioned documents—including product specifications, planning, task, and research artifacts—are persisted by CoS; Manager supplies technical content and evidence through the originating exchange.
 
 ```json
 {
@@ -41,11 +41,11 @@ This fictional input illustrates `init_spec`/`update_spec`. Use real project nam
 
 Each project has one canonical managed document named `Constitution`. Use constitution tools when establishing or amending project-wide principles; ordinary Markdown files continue to use generic file tools outside managed storage.
 
-- `read_constitution(project)` is available to PM and TL. It returns full current Markdown with `name`, `path`, managed `version`, `summary`, `sha256`, and `decision` in one locked snapshot. A missing constitution or latest file is an error, not an adopted empty scaffold.
-- `init_constitution(project, summary, content)` is PM-only and creates the first immutable version. An existing constitution requires `update_constitution`.
-- `update_constitution(project, summary, content)` is PM-only and saves the next complete immutable version. It rejects missing or finalized constitutions and reports the lock reason.
+- `read_constitution(project)` is available to CoS and Manager. It returns full current Markdown with `name`, `path`, managed `version`, `summary`, `sha256`, and `decision` in one locked snapshot. A missing constitution or latest file is an error, not an adopted empty scaffold.
+- `init_constitution(project, summary, content)` is CoS-only and creates the first immutable version. An existing constitution requires `update_constitution`.
+- `update_constitution(project, summary, content)` is CoS-only and saves the next complete immutable version. It rejects missing or finalized constitutions and reports the lock reason.
 
-For example, PM submits a complete initial document through `init_constitution`:
+For example, CoS submits a complete initial document through `init_constitution`:
 
 ```json
 {
@@ -55,11 +55,11 @@ For example, PM submits a complete initial document through `init_constitution`:
 }
 ```
 
-This fictional input illustrates invocation; use the [constitution prompt and template](constitution/prompt.md) to author actual policy. Successful writes return `name`, `path`, `version`, `summary`, and `sha256`; report that exact saved reference to TL. Managed versions (`v1`, `v2`) are separate from semantic governance versions inside the Markdown. There is no follow-up file edit or publish step.
+This fictional input illustrates invocation; use the [constitution prompt and template](constitution/prompt.md) to author actual policy. Successful writes return `name`, `path`, `version`, `summary`, and `sha256`; report that exact saved reference to Manager. Managed versions (`v1`, `v2`) are separate from semantic governance versions inside the Markdown. There is no follow-up file edit or publish step.
 
 Use `describe_spec` with `name: "Constitution"` for history and checklist/review coverage, and existing checklist/review/decision tools with that name for coordination. Both go and no-go decisions permanently lock constitution writes; `read_constitution` remains available. Do not bypass a lock or silently create a successor. Previously named principles documents are not automatically renamed or imported; resolve and discuss them explicitly before establishing the canonical document.
 
-## TL: canonical checklist and review
+## Manager: canonical checklist and review
 
 `write_spec_checklist(project, name, summary, content)` fully replaces the single `checklist.md` shared across the named spec's versions. Use stable criteria identifiers; this is the sole review-criteria source. Do not create alternate checklist files or amend individual items using edit tools.
 
@@ -76,9 +76,9 @@ Use `describe_spec` with `name: "Constitution"` for history and checklist/review
 }
 ```
 
-The hash and findings above are illustrative. Use the inspected checklist fingerprint and actual criteria/evidence. PM can read these artifacts but cannot write them. Replacing the checklist does not rewrite the review; existing coverage becomes stale until TL replaces the review against its chosen inputs.
+The hash and findings above are illustrative. Use the inspected checklist fingerprint and actual criteria/evidence. CoS can read these artifacts but cannot write them. Replacing the checklist does not rewrite the review; existing coverage becomes stale until Manager replaces the review against its chosen inputs.
 
-## PM: terminal decision
+## CoS: terminal decision
 
 Use [decision recording](decisions.md) after project-management selects go/no-go and establishes a rationale. Refinement happens through new versions while the spec is open. No-go and go both close the named spec permanently to artifact changes; read tools remain available.
 

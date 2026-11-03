@@ -74,7 +74,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
     }
     try {
       await start();
-      const queue = await CaptureQueue.open(join(directory, "queue"), "pm");
+      const queue = await CaptureQueue.open(join(directory, "queue"), "cos");
       const client = new MemoryMcpClient(`http://127.0.0.1:${address.port}/mcp`);
       const complete = vi.fn(() =>
         Promise.resolve({
@@ -131,7 +131,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       await stop();
       await start();
       now = 2000;
-      const restored = await CaptureQueue.open(join(directory, "queue"), "pm");
+      const restored = await CaptureQueue.open(join(directory, "queue"), "cos");
       await new CaptureRuntime(restored, worker).recover();
       expect(restored.jobs()).toEqual([]);
       expect(complete).toHaveBeenCalledTimes(1);
