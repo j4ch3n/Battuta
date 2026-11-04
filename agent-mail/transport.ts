@@ -14,9 +14,10 @@ import {
 
 export class UncertainWriteError extends Error {}
 export class MailSendError extends Error {}
+export type MailClient = { functions: Pick<SupabaseClient["functions"], "invoke"> };
 
 export async function invokeMail(
-  client: SupabaseClient,
+  client: MailClient,
   body: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<unknown> {
@@ -45,7 +46,7 @@ export async function invokeMail(
 }
 
 export async function sendProgrammaticMail(
-  client: SupabaseClient,
+  client: MailClient,
   input: {
     senderRole: "cos" | "manager" | "worker";
     recipientRole: "cos" | "manager";
