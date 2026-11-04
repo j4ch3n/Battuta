@@ -130,6 +130,9 @@ try {
       SUPABASE_TEST_JWT_SECRET: status.JWT_SECRET,
     },
   });
+  run("pnpm", ["--dir", "assignment-worker", "test:integration"], {
+    env: { ...process.env, SUPABASE_URL: status.API_URL, SUPABASE_SECRET_KEY: status.SECRET_KEY },
+  });
 } finally {
   shutdown();
 }

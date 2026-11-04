@@ -85,6 +85,14 @@ Deno.test(
           Number(
             (await sql`select revision::text from public.assignment_availability`)[0].revision,
           );
+        // Channel acknowledgement can precede the initial WAL reader; establish the stream first.
+        const deadline = Date.now() + 5000;
+        while (received[0].length === 0) {
+          if (Date.now() > deadline)
+            throw new Error("Authorized Realtime stream never became ready");
+          await sql`update public.assignment_availability set revision=revision+1 where singleton`;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
         const created = await rpc(sql, "assignment_create", [project, "Signal", ["Step"], "", []]);
         const published = await revision();
         await observed(() => received[0].includes(published));
@@ -139,7 +147,10 @@ Deno.test(
         ]);
         const finished = await revision();
         await observed(() => received[0].includes(finished));
-        assert.deepEqual(received[0], [published, reactivated, finished]);
+        assert.deepEqual(
+          received[0].filter((revision) => revision >= published),
+          [published, reactivated, finished],
+        );
         assert.deepEqual(received[1], []);
         assert.deepEqual(received[2], []);
         for (const row of deniedRows) assert.deepEqual(row, {});
