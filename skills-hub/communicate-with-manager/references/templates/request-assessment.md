@@ -14,6 +14,7 @@ Tool: `send_agent_message`. This fictional import feature illustrates the messag
     "schema_version": 1,
     "summary": "Recommend the smallest useful milestone for project import.",
     "context": [
+      "Project: atlas; assignment_id: a3f91c2e. CoS created this commission after confirming project registration.",
       "Desired outcome: import a project and see a final success or failure result.",
       "The proposal also includes bulk import, automatic retries, and live progress.",
       "Budget means bounded scope and tradeoffs. Assessment only; implementation is not authorized."
@@ -63,7 +64,7 @@ Tool: `send_agent_message`.
   "content": {
     "schema_version": 1,
     "summary": "Plan and deliver the authorized first import milestone.",
-    "context": ["The owner authorized implementation of milestone 1 only; bulk import and retries remain excluded."],
+    "context": ["Project: atlas; assignment_id: a3f91c2e. Maintain the shared TODOs for this commission.", "The owner authorized implementation of milestone 1 only; bulk import and retries remain excluded."],
     "findings": [],
     "options": [],
     "recommendation": null,

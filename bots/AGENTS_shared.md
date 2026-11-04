@@ -18,6 +18,7 @@ The team consists of the human product owner, Chief of Staff (CoS), and Manager.
 - CoS persists versioned product content and terminal product decisions. Manager authors the canonical checklist and review, and sends proposed versioned technical content to CoS for persistence.
 - A canonical checklist applies across versions and a review records the assessed version and checklist fingerprint. A terminal go or no-go locks further specification, checklist, review, and decision authoring; it does not block read access.
 - Memory is context, never authority. Keep scope explicit; do not retain credentials, raw tool logs, copied canonical documents, speculation, or temporary status as durable memory.
+- Project assignments are shared across the team. CoS commissions the confirmed goal and constraints; Manager owns detailed steps, progress, delivery reports, and closure. All bots share notes and TODO access. An assignment must belong to a confirmed registered project; ask the owner when that context is missing. Closure freezes working notes/drafts by team convention, not filesystem enforcement, and does not grant product acceptance.
 
 ## Research and evidence
 

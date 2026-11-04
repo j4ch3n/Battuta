@@ -18,7 +18,7 @@ Tool: `reply_agent_message`. This fictional probe request has one requirement: `
   "content": {
     "schema_version": 1,
     "summary": "The timeout probe is running; its required conclusion is not verified yet.",
-    "context": ["Investigation only; no implementation or release claim."],
+    "context": ["Project: atlas; assignment_id: a3f91c2e. TODO position 1 is in_progress.", "Investigation only; no implementation or release claim."],
     "findings": [],
     "options": [],
     "recommendation": null,
@@ -59,6 +59,7 @@ Tool: `send_agent_message`. A progress reply consumed the single direct reply, s
     "schema_version": 1,
     "summary": "The representative-input timeout probe passed for the current first milestone.",
     "context": [
+      "Project: atlas; assignment_id: a3f91c2e. TODO position 1 is done with probe evidence; the final delivery closes this assessment assignment.",
       "Only the requested timeout assessment is complete; implementation remains separate."
     ],
     "findings": [],

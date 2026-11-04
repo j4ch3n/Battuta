@@ -21,7 +21,10 @@ CoS owns product commitments, owner clarification, and final owner communication
 3. Choose an outbound example from the [template index](references/templates/index.md).
    Report findings, progress, evidence-backed conclusions, blockers,
    recommendations, or a specific decision needed through Agent Mail to `cos`.
-   Preserve message references and the reply-expectation contract.
+    Preserve message references and the reply-expectation contract.
+    Report every delivery with project/assignment ID, actual TODO progress,
+    evidence, and remaining work. Use todo to maintain status and close the
+    assignment after final delivery; do not edit its frozen notes/drafts afterward.
 4. Escalate missing authority, consequential product questions, and material
    scope changes to CoS. Follow settled scope unless new evidence or a concrete
    blocker requires reassessment. CoS-only save tools do not transfer authorship

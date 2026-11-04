@@ -9,7 +9,7 @@ from jinja2 import TemplateError
 from pydantic import ValidationError
 import yaml
 
-from .models import CurrentConfig, GithubConfig, LinearConfig, ProjectConfig, ProjectContext, ProjectMetadata, Repository, RoleWorkConfig, WorkConfig, WorkRecord, project_name
+from .models import CurrentConfig, GithubConfig, LinearConfig, ProjectConfig, ProjectContext, ProjectMetadata, Repository, project_name
 from .discovery import ProjectDiscovery
 from .presentation import render
 from .storage import atomic_write, check_registry_root, file_errors, file_lock, regular_file
@@ -63,42 +63,6 @@ class ProjectRegistry:
 
     def locked(self, *, create: bool = False):
         return file_lock(self.root / ".config.lock", create=create)
-
-    def _work_config(self, project: str | None) -> WorkConfig:
-        state = self.state()
-        return state.general if project is None else state.projects.get(project, WorkConfig())
-
-    def current_work_id(self, project: str | None, role: str) -> str | None:
-        return self._work_config(project).roles.get(role, RoleWorkConfig()).current_work_id
-
-    def current_note_work_id(self, project: str | None, role: str) -> str | None:
-        return self._work_config(project).roles.get(role, RoleWorkConfig()).current_note_work_id
-
-    def work_record(self, project: str | None, role: str, work_id: str) -> WorkRecord | None:
-        return self._work_config(project).roles.get(role, RoleWorkConfig()).works.get(work_id)
-
-    def set_work_id(self, project: str | None, role: str, work_id: str, *, related_to: str | None = None) -> None:
-        """Publish new work while the caller holds the registry lock."""
-        self._publish_work(project, role, work_id, "currentWorkId", related_to)
-
-    def set_note_work_id(self, project: str | None, role: str, work_id: str) -> None:
-        """Publish a notebook without changing the TODO selection; caller holds the lock."""
-        self._publish_work(project, role, work_id, "currentNoteWorkId")
-
-    def _publish_work(self, project: str | None, role: str, work_id: str, selection: str, related_to: str | None = None) -> None:
-        state = self.state().model_dump(by_alias=True)
-        boundary = state["general"] if project is None else state["projects"].setdefault(project, {})
-        entry = boundary.setdefault("roles", {}).setdefault(role, {})
-        works = entry.setdefault("works", {})
-        if work_id in works:
-            raise click.ClickException(f"Work already exists: {role}:{work_id}")
-        works[work_id] = {"relatedTo": related_to}
-        entry[selection] = work_id
-        try:
-            validated = CurrentConfig.model_validate(state)
-        except ValidationError as error:
-            raise click.ClickException(str(error)) from error
-        self._write_state(validated)
 
     def load(self, name: str) -> ProjectContext:
         with file_errors():

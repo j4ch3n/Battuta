@@ -1,156 +1,56 @@
 ---
 name: note-taking
-description: Use when retaining short findings, learnings, or thoughts across context changes, or searching and retrieving numbered working notes, with or without a project.
+description: Use when retaining, finding, reading, or revising shared findings and working notes for a project assignment.
 ---
 
-# Working notes
+# Shared working notes
 
-Retain short findings and their provenance so they can be recovered without
-reconstructing the investigation. Notes are optional private working material,
-not canonical specifications, commitments, approvals, or automatic durable memory.
+Keep findings and provenance that would be costly to reconstruct. Notes are
+provisional working material, not canonical specifications, commitments,
+publication approval, or automatic durable memory. All bots use the same file
+for a project assignment, not separate role notebooks. Use todo for assignment
+discovery and progress; use draft-writing for complete long-form documents.
 
-## What is worth keeping
+## Prepare or locate notes
 
-Keep findings that help future work: specific, relevant to the task or owner,
-grounded in evidence, and concise enough to reuse without reconstructing the
-investigation. Prefer information costly to rediscover over generic knowledge.
-Record what was learned, not merely what happened. Novelty alone is not enough.
+Use the `assignments` MCP service. Both tools require exact `project` and
+eight-character `assignment_id`; verify registration with `battuta-project list`.
+Every note requires an assignment; do not create general/unbound notebooks.
 
-These examples are hypothetical; their measurements, sources, and API behaviour
-illustrate note quality, not verified facts. Use actual evidence in real notes.
+| Tool | Additional input | Result |
+| --- | --- | --- |
+| `prepare_notes` | `root`: absolute local Battuta root, with home directory expanded | Establish/reuse the shared path and return initialization/editing guidance |
+| `locate_notes` | None | Return the existing path and current editable/frozen guidance |
 
-### 1. A measured finding, not a sweeping claim
+The root is normally the expanded `~/.battuta`, not its projects subdirectory.
+Use the returned `notes_path`; do not invent another location or role suffix.
+Preparation returns a plan, not proof that a file exists locally. A conflicting
+root fails rather than relocating existing material. If notes are unprepared,
+prepare them for the active assignment first.
 
-**Bad:** “Researched performance. Rust is about 100× faster than Python.”
+Inspect local path safety, create directories/file only if absent, and preserve
+existing contents. Use Pi's built-in read/edit/write/search tools at that path;
+no note-update CLI or custom editing tool is needed. Freely revise Markdown and
+keep sources distinct from inference. Coordinate shared edits to avoid clobbering
+another bot's changes; there is no note revision history or automatic undo.
 
-**Good:** “For our 1-million-row import fixture, the Rust prototype took 0.8 s
-versus Python's 80 s on the same machine; this measures parsing only, not database
-writes. Source: benchmark run and script.”
+Call `locate_notes` before later edits. When `editable` is false, the assignment
+is done/cancelled: read existing material only. Do not create or edit its notes
+or adjacent drafts. The freeze is a prompt rule, not a filesystem security lock.
+On missing files or storage errors, retain existing content and report the
+problem; do not silently replace or repair another file.
 
-**Why:** Preserves the workload, measurement, source, and limit. Useful for this
-project without turning one benchmark into a universal language claim.
+## Worth keeping
 
-### 2. A relevant discovery, not a search log
+- **Measured finding:** retain workload, measurement, source, and limit. “Our
+  million-row parsing fixture took 0.8 s versus 80 s; this measures parsing only”
+  is useful; “Rust is 100 times faster” is not. These numbers are hypothetical.
+- **Decision-changing discovery:** record that a vendor's entry tier excludes
+  required audit export, with the checked pricing/documentation source—not a
+  diary of searches and page visits.
+- **Reusable lesson:** record an observed API permission requirement and the
+  evidence that established it—not a troubleshooting transcript or credentials.
 
-**Bad:** “Searched three vendors, read their pricing pages, and updated the
-comparison.”
-
-**Good:** “Vendor A's entry plan excludes audit-log export, which our compliance
-requirement needs; the apparent lowest-price option therefore requires a higher
-tier. Source: pricing page and export documentation, checked today.”
-
-**Why:** Retains the decision-changing discovery and its evidence, rather than
-the actions taken. Someone resuming the comparison knows what matters.
-
-### 3. A reusable lesson, not a troubleshooting diary
-
-**Bad:** “The request failed. Retried twice, changed the token, and got it working.”
-
-**Good:** “This API returns 403 when the token lacks `events:read`, even with a
-valid login; verify that scope before rotating credentials. Source: failed
-response and successful retry after adding the scope.”
-
-**Why:** Captures the symptom, established cause, and useful next-time check.
-Avoids preserving credentials or unnecessary debugging chronology.
-
-## Workflow
-
-1. Select project or general scope explicitly; CoS and Manager have independent notebooks.
-2. Append one physical line per finding, including its source and material limits
-   where relevant. Preserve the distinction between evidence and inference.
-3. Search for relevant terms, then read surrounding numbered lines when useful.
-   Full reads are also available; use limits and returned continuation commands
-   for large notebooks. Use `--meta` to discover notebook identity and registered
-   drafts without loading their bodies; CoS uses draft-writing for complete documents.
-4. On a storage error, retain existing content and follow the reported recovery
-   guidance rather than replacing or silently repairing it.
-
-Use the memory skill for confirmed enduring context, not temporary research state.
-A notebook needs no TODO list. Keep credentials and unrelated private data out.
-
-## Scope and identity
-
-CoS and Manager invoke `battuta-project note` through the shell. `AGENT_ROLE` selects
-`cos` or `manager`; `--scope` is always explicit:
-
-- `project`: the selected registered project. Check `battuta-project current` and
-  select the intended project with `switch` if needed.
-- `general`: no project ownership; needs no selected project and does not change
-  project selection.
-
-Each role/scope has an independent notebook. The first item or draft creates its
-work ID; later appends and session restarts reuse it. TODO creation/rotation never
-changes the notebook, and notes never change TODO work. Commands target only the
-current notebook; there is no rotation or historical selector.
-
-## Append a learning, finding, or thought
-
-```sh
-battuta-project note --scope general item \
-  --text "Finding: Retry-After is expressed in seconds, not milliseconds."
-```
-
-`--text` preserves Markdown, Unicode and surrounding whitespace. Blank input, NUL
-and line separators are rejected: each note is one physical line. Appending reports
-the work reference, file and new line number. There are no note edit/delete commands.
-
-## Search and retrieve
-
-```sh
-battuta-project note --scope general item --search "Retry-After"
-battuta-project note --scope general item --list --from-line 2 --to-line 4
-battuta-project note --scope general item --list --from-line 3 --to-line 3
-battuta-project note --scope general item --list
-```
-
-Search is literal and case-insensitive, not a regular expression. Quote queries
-as ordinary shell data. Results include source line numbers:
-
-```text
-2. Finding: Retry-After is expressed in seconds, not milliseconds.
-```
-
-Search-then-read and full reads are both available; neither is mandatory. Line
-numbers start at 1, and ranges include both endpoints. Omitting `--to-line` reads
-through the end. Invalid/reversed ranges fail; a start beyond EOF returns no notes,
-and an end beyond EOF returns the available suffix. No search matches is success.
-
-## Optional output limits
-
-```sh
-battuta-project note --scope general item --search "retry" --limit 5
-battuta-project note --scope general item --list --limit 20
-```
-
-Without `--limit`, results have no application-level truncation. Limits count
-complete notes/matches, never characters. If more results exist, output says
-`Truncated` and provides the next source line and a continuation command preserving
-the query, range endpoint and limit. `--from-line` resumes reading/search without
-repeating notes. Line numbers and limits must be positive.
-
-Continuation targets the current project/role notebook: verify selection has not
-changed before resuming. External shell/agent output limits may still clip results;
-choose a smaller limit and resume by source line.
-
-## Outcomes and recovery
-
-`item` requires exactly one of `--text`, `--list` or `--search`. Ranges/limits are
-for reads; `--to-line` applies only to listing. Existing `append`, `read` and
-`search --query` commands remain compatible aliases using the same notebook.
-
-```sh
-battuta-project note --scope general --meta
-```
-
-Metadata shows notebook identity, item count and draft IDs/titles/paths without
-loading bodies. Results identify scope/project, role, work reference, file and
-numbered text. Missing notebooks are successful discovery and create nothing.
-Empty notebooks/ranges return no notes; searches report no matches. Neither falls
-back to another role, scope or older file.
-
-Commands fail noninteractively for missing roles/projects, malformed text, unsafe
-paths, incomplete files or storage errors. Search requires `rg` on PATH; append
-and read do not. Follow the reported error before retrying. A published notebook
-whose file is missing is an inconsistency, not a new empty notebook. Retain files
-after interrupted writes and ask the owner for recovery rather than deleting,
-replacing or silently repairing notes.
+Prefer specific findings, sources, decisions, and material limits over generic
+knowledge or tool-call logs. Use memory for confirmed enduring context. Notes
+must never contain credentials or unrelated private data.
