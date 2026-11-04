@@ -1,6 +1,23 @@
 import assert from "node:assert/strict";
 import { createAssignmentHandler, type Rpc } from "./server.ts";
 
+const assignment = {
+  id: "a3f91c2e",
+  project: "Atlas",
+  goal: "Goal",
+  constraints: "",
+  status: "active",
+  notes_path: null,
+  created_at: "2026-11-04T12:00:00+00:00",
+  updated_at: "2026-11-04T12:00:00+00:00",
+  closed_at: null,
+  claimed_at: null,
+  lease_expired_at: null,
+  blocker: null,
+  dependencies: [],
+  ready: true,
+};
+
 async function call(rpc: Rpc, name: string, args: Record<string, unknown>) {
   const handler = createAssignmentHandler(rpc);
   const response = await handler(
@@ -40,9 +57,22 @@ Deno.test(
           p_assignment_id: "a3f91c2e",
           p_position: 2,
           p_expected_updated_at: token,
-          p_status: "done",
+          p_status: "cancelled",
         });
-        return Promise.resolve({ data: { ok: false, code: "assignment_closed" }, error: null });
+        return Promise.resolve({
+          data: {
+            ok: false,
+            code: "assignment_closed",
+            message: "Closed",
+            assignment: {
+              ...assignment,
+              status: "cancelled",
+              closed_at: assignment.updated_at,
+              ready: false,
+            },
+          },
+          error: null,
+        });
       },
       "update_todo",
       {
@@ -50,7 +80,7 @@ Deno.test(
         assignment_id: "a3f91c2e",
         position: 2,
         expected_updated_at: token,
-        status: "done",
+        status: "cancelled",
       },
     );
     assert.equal(result.isError, true);
@@ -72,7 +102,7 @@ Deno.test("MCP sanitizes backend errors, throws, and malformed output", async ()
 });
 
 Deno.test("note tools return existing path and editability with user-facing guidance", async () => {
-  for (const status of ["active", "done", "cancelled"]) {
+  for (const status of ["active", "in_process", "blocked", "done", "cancelled"]) {
     for (const tool of ["prepare_notes", "locate_notes"]) {
       const notes_path = "/home/bot/.battuta/projects/Atlas/work/a3f91c2e/note.md";
       const result = await call(
@@ -81,17 +111,28 @@ Deno.test("note tools return existing path and editability with user-facing guid
             data: {
               ok: true,
               notes_path,
-              editable: status === "active",
+              editable: !["done", "cancelled"].includes(status),
               assignment: {
+                ...assignment,
                 id: "a3f91c2e",
                 project: "Atlas",
                 goal: "Goal",
                 constraints: "",
                 status,
+                claimed_at: ["in_process", "blocked"].includes(status)
+                  ? assignment.created_at
+                  : null,
+                lease_expired_at: ["in_process", "blocked"].includes(status)
+                  ? "2026-11-04T12:45:00+00:00"
+                  : null,
+                blocker: status === "blocked" ? "Missing input" : null,
+                ready: status === "active",
                 notes_path,
                 created_at: "2026-11-04T12:00:00+00:00",
                 updated_at: "2026-11-04T12:00:00+00:00",
-                closed_at: status === "active" ? null : "2026-11-04T12:00:00+00:00",
+                closed_at: ["done", "cancelled"].includes(status)
+                  ? "2026-11-04T12:00:00+00:00"
+                  : null,
               },
             },
             error: null,
@@ -104,9 +145,39 @@ Deno.test("note tools return existing path and editability with user-facing guid
         },
       );
       assert.equal(result.structuredContent.notes_path, notes_path);
-      assert.equal(result.structuredContent.editable, status === "active");
+      assert.equal(result.structuredContent.editable, !["done", "cancelled"].includes(status));
       assert.equal(typeof result.structuredContent.guidance, "string");
       assert.ok(result.structuredContent.guidance.trim().length > 0);
     }
   }
 });
+
+Deno.test(
+  "claim-bound writes preserve exact claim tokens and incomplete recovery data is rejected",
+  async () => {
+    const claimed_at = "2026-11-04T12:00:00.123456+00:00";
+    const result = await call(
+      (name, args) => {
+        assert.equal(name, "assignment_block");
+        assert.equal(args.p_claimed_at, claimed_at);
+        return Promise.resolve({
+          data: { ok: false, code: "stale_claim", message: "Inspect", assignment },
+          error: null,
+        });
+      },
+      "block_assignment",
+      { project: "Atlas", assignment_id: "a3f91c2e", claimed_at, blocker: "Provider unavailable" },
+    );
+    assert.equal(result.structuredContent.code, "stale_claim");
+    const malformed = await call(
+      () =>
+        Promise.resolve({
+          data: { ok: false, code: "missing_dependencies", message: "Inspect" },
+          error: null,
+        }),
+      "create_assignment",
+      { project: "Atlas", goal: "Goal", initial_todos: ["Step"] },
+    );
+    assert.equal(malformed.structuredContent.code, "backend_error");
+  },
+);

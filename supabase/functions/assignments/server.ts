@@ -13,11 +13,12 @@ const operations: Record<ToolName, { rpc: string; description: string }> = {
   create_assignment: {
     rpc: "assignment_create",
     description:
-      "Commission work for an explicit registered project; at most one active assignment per project. Inspect before repeating an uncertain write.",
+      "Atomically commission a complete initial TODO plan with existing immutable prerequisite IDs. Inspect before repeating an uncertain write.",
   },
   list_assignments: {
     rpc: "assignment_list",
-    description: "List active or historical assignments for an explicit project, newest first.",
+    description:
+      "List active or historical assignments, optionally filtered by project, newest first with dependency readiness.",
   },
   get_assignment: {
     rpc: "assignment_get",
@@ -32,12 +33,12 @@ const operations: Record<ToolName, { rpc: string; description: string }> = {
   update_todo: {
     rpc: "assignment_update_todo",
     description:
-      "Edit any item in place using its position and unchanged expected_updated_at token. Inspect and reconcile stale conflicts.",
+      "Edit unfinished descriptions or cancel unfinished TODOs on active/blocked assignments using exact update tokens. Execution progress requires a claim.",
   },
   close_assignment: {
     rpc: "assignment_close",
     description:
-      "Finish only when every TODO is done/cancelled, or cancel without changing item outcomes. Does not send Agent Mail or grant product acceptance.",
+      "Cancel a nonterminal assignment without changing TODO evidence. Completion uses claim-bound finish_assignment.",
   },
   prepare_notes: {
     rpc: "assignment_prepare_notes",
@@ -48,6 +49,36 @@ const operations: Record<ToolName, { rpc: string; description: string }> = {
     rpc: "assignment_locate_notes",
     description:
       "Get the shared local note path before editing; closed assignments return frozen/read-only guidance.",
+  },
+  claim_assignment: {
+    rpc: "assignment_claim",
+    description:
+      "Atomically claim a ready active assignment. Lease timestamp is informational only; no expiry reclaim.",
+  },
+  start_todo: {
+    rpc: "assignment_start_todo",
+    description:
+      "Code-owned execution: start the first unfinished TODO using the current claim and exact item token.",
+  },
+  record_todo_result: {
+    rpc: "assignment_record_todo_result",
+    description:
+      "Code-owned execution: record a completed/blocked result; blocked result also blocks the assignment atomically.",
+  },
+  block_assignment: {
+    rpc: "assignment_block",
+    description:
+      "Code-owned execution: record an honest runtime blocker against the current claim.",
+  },
+  finish_assignment: {
+    rpc: "assignment_finish",
+    description:
+      "Code-owned execution: complete a nonempty assignment only when all TODOs are done/cancelled, using the current claim regardless of its age.",
+  },
+  reactivate_assignment: {
+    rpc: "assignment_reactivate",
+    description:
+      "Reactivate blocked work after resolving/cancelling unfinished blockers and adding remaining TODOs; invalidates the former claim.",
   },
 };
 
@@ -69,10 +100,24 @@ export function createAssignmentHandler(rpc: Rpc): (request: Request) => Promise
         },
         async (args: Record<string, unknown>) => {
           let result: Record<string, unknown>;
+          const input = contract.input.safeParse(args);
+          if (!input.success) {
+            const result = {
+              ok: false,
+              code: "invalid_input",
+              message: input.error.issues
+                .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+                .join("; "),
+            };
+            return {
+              structuredContent: result,
+              content: [{ type: "text" as const, text: JSON.stringify(result) }],
+              isError: true,
+            };
+          }
           try {
-            const parsed = contract.input.parse(args);
             const params = Object.fromEntries(
-              Object.entries(parsed).map(([field, value]) => [`p_${field}`, value]),
+              Object.entries(input.data).map(([field, value]) => [`p_${field}`, value]),
             );
             const { data, error } = await rpc(operations[name].rpc, params);
             if (error) throw new Error("RPC failed");

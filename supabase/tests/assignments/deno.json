@@ -6,6 +6,7 @@
   },
   "imports": {
     "postgres": "npm:postgres@3.4.7",
-    "@modelcontextprotocol/client": "npm:@modelcontextprotocol/client@2.4.0"
+    "@modelcontextprotocol/client": "npm:@modelcontextprotocol/client@2.4.0",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.117.2"
   }
 }

@@ -126,6 +126,8 @@ try {
       SUPABASE_URL: status.API_URL,
       SUPABASE_SECRET_KEY: status.SECRET_KEY,
       SUPABASE_DB_URL: status.DB_URL,
+      SUPABASE_ANON_KEY: status.ANON_KEY,
+      SUPABASE_TEST_JWT_SECRET: status.JWT_SECRET,
     },
   });
 } finally {
