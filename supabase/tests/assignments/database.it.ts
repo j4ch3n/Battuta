@@ -1,6 +1,184 @@
 import assert from "node:assert/strict";
 import { rpc, withDatabaseTest } from "./helpers.ts";
 
+const blankText = [
+  "\t",
+  "\n",
+  "\r\n",
+  "\v",
+  "\f",
+  "\u00a0",
+  "\u1680",
+  "\u2000",
+  "\u2001",
+  "\u2002",
+  "\u2003",
+  "\u2004",
+  "\u2005",
+  "\u2006",
+  "\u2007",
+  "\u2008",
+  "\u2009",
+  "\u200a",
+  "\u2028",
+  "\u2029",
+  "\u202f",
+  "\u205f",
+  "\u3000",
+  "\ufeff",
+];
+
+Deno.test("completion versus resurrection and append obey both serialized orderings", () =>
+  withDatabaseTest(async (sql, project) => {
+    for (const order of ["close-first-update", "update-first-close", "close-first-append"]) {
+      const a = (await rpc(sql, "assignment_create", [project, "Race", ""])).assignment;
+      const original = (await rpc(sql, "assignment_append_todos", [project, a.id, ["Step"]]))
+        .todos[0];
+      const item = (
+        await rpc(sql, "assignment_update_todo", [
+          project,
+          a.id,
+          1,
+          original.updated_at,
+          null,
+          "done",
+          null,
+        ])
+      ).todo;
+      let pending: ReturnType<typeof rpc> | undefined;
+      await sql.begin(async (tx) => {
+        if (order === "update-first-close") {
+          assert.equal(
+            (
+              await rpc(tx, "assignment_update_todo", [
+                project,
+                a.id,
+                1,
+                item.updated_at,
+                null,
+                "todo",
+                null,
+              ])
+            ).ok,
+            true,
+          );
+          pending = rpc(sql, "assignment_close", [project, a.id, "done"]);
+        } else {
+          assert.equal((await rpc(tx, "assignment_close", [project, a.id, "done"])).ok, true);
+          pending =
+            order === "close-first-append"
+              ? rpc(sql, "assignment_append_todos", [project, a.id, ["Late"]])
+              : rpc(sql, "assignment_update_todo", [
+                  project,
+                  a.id,
+                  1,
+                  item.updated_at,
+                  null,
+                  "todo",
+                  null,
+                ]);
+        }
+        const [{ pid }] = await tx`select pg_backend_pid() as pid`;
+        for (let n = 0; n < 1000; n++) {
+          const [{ blocked }] =
+            await sql`select exists(select 1 from pg_stat_activity where ${pid} = any(pg_blocking_pids(pid))) as blocked`;
+          if (blocked) return;
+        }
+        throw new Error("Competing operation did not wait for the parent lock");
+      });
+      const result = await pending;
+      const read = await rpc(sql, "assignment_get", [project, a.id]);
+      if (order === "update-first-close") {
+        assert.equal(result!.code, "unfinished_todos");
+        assert.equal(read.assignment.status, "active");
+        assert.equal(read.todos[0].status, "todo");
+        await rpc(sql, "assignment_close", [project, a.id, "cancelled"]);
+      } else {
+        assert.equal(result!.code, "assignment_closed");
+        assert.equal(read.assignment.status, "done");
+        assert.equal(read.todos[0].status, "done");
+      }
+      assert.equal(read.todos.length, 1);
+    }
+  }),
+);
+Deno.test("direct RPC rejects every ECMAScript whitespace-only goal without creating records", () =>
+  withDatabaseTest(async (sql, project) => {
+    for (const goal of blankText) {
+      assert.equal(
+        (await rpc(sql, "assignment_create", [project, goal, ""])).code,
+        "invalid_input",
+      );
+      assert.deepEqual((await rpc(sql, "assignment_list", [project, null])).assignments, []);
+    }
+  }),
+);
+Deno.test("direct RPC rejects whitespace-only project names consistently with MCP", () =>
+  withDatabaseTest(async (sql) => {
+    const rollback = new Error("test rollback");
+    await assert.rejects(
+      sql.begin(async (tx) => {
+        for (const project of blankText) {
+          assert.equal(
+            (await rpc(tx, "assignment_create", [project, "Goal", ""])).code,
+            "invalid_input",
+          );
+        }
+        throw rollback;
+      }),
+      (error) => error === rollback,
+    );
+  }),
+);
+Deno.test("direct RPC rejects whitespace-only append batches atomically", () =>
+  withDatabaseTest(async (sql, project) => {
+    const a = (await rpc(sql, "assignment_create", [project, "Goal", ""])).assignment;
+    for (const description of blankText) {
+      assert.equal(
+        (
+          await rpc(sql, "assignment_append_todos", [
+            project,
+            a.id,
+            ["Must not persist", description],
+          ])
+        ).code,
+        "invalid_input",
+      );
+      assert.deepEqual((await rpc(sql, "assignment_get", [project, a.id])).todos, []);
+    }
+  }),
+);
+Deno.test("direct RPC rejects whitespace-only updates and table constraints protect reads", () =>
+  withDatabaseTest(async (sql, project) => {
+    const a = (await rpc(sql, "assignment_create", [project, "Goal", ""])).assignment;
+    const before = (await rpc(sql, "assignment_append_todos", [project, a.id, ["Keep"]])).todos[0];
+    for (const description of blankText) {
+      assert.equal(
+        (
+          await rpc(sql, "assignment_update_todo", [
+            project,
+            a.id,
+            1,
+            before.updated_at,
+            description,
+            null,
+            null,
+          ])
+        ).code,
+        "invalid_input",
+      );
+      assert.deepEqual((await rpc(sql, "assignment_get", [project, a.id])).todos, [before]);
+    }
+    await assert.rejects(sql`update public.assignments set goal = ${"\t\n"} where id = ${a.id}`, {
+      code: "23514",
+    });
+    await assert.rejects(
+      sql`update public.todos set description = ${"\ufeff"} where assignment_id = ${a.id}`,
+      { code: "23514" },
+    );
+  }),
+);
+
 Deno.test(
   "two registered project names keep independent active assignments and shared access",
   () =>

@@ -66,3 +66,15 @@ def test_missing_assignment_credentials_prevents_source_writes(tmp_path, missing
         configure_source(tmp_path, role="manager")
     assert "private-" not in str(error.value)
     assert not (bot / ".pi").exists()
+
+
+@pytest.mark.parametrize("url", ["https://exa mple.com", "https://example.com\\path", "https://bad_host.example"])
+def test_bad_assignment_origin_prevents_source_writes(tmp_path, url):
+    skill_catalog(tmp_path, "manager")
+    bot = tmp_path / "bots/manager-bot"
+    (bot / "package.json").write_text("{}")
+    (tmp_path / ".env").write_text(f"LINEAR_API_TOKEN=private-linear\nSUPABASE_URL='{url}'\nSUPABASE_SECRET_KEY=private-supabase\n")
+    with pytest.raises(click.ClickException, match="SUPABASE_URL") as error:
+        configure_source(tmp_path, role="manager")
+    assert "private-" not in str(error.value)
+    assert not (bot / ".pi").exists()

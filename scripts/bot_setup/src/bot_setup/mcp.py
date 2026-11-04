@@ -1,6 +1,8 @@
 """Configure native MCP connections without touching OAuth grants."""
 
 from pathlib import Path
+from ipaddress import ip_address
+import re
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -27,8 +29,15 @@ def assignment_server(supabase_url: str) -> dict:
         endpoint = urlsplit(supabase_url)
         valid = bool(endpoint.hostname) and (endpoint.scheme == "https" or endpoint.scheme == "http" and endpoint.hostname in {"127.0.0.1", "localhost", "::1"})
         valid = valid and not endpoint.username and not endpoint.password and not endpoint.query and not endpoint.fragment and endpoint.path in {"", "/"}
+        valid = valid and "\\" not in supabase_url and not any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in supabase_url)
+        host = endpoint.hostname or ""
+        try:
+            ip_address(host)
+        except ValueError:
+            host = host.encode("idna").decode("ascii").rstrip(".")
+            valid = valid and len(host) <= 253 and all(re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", label) for label in host.split("."))
         endpoint.port
-    except ValueError:
+    except (ValueError, UnicodeError):
         valid = False
     if not valid:
         raise click.ClickException("SUPABASE_URL must be an HTTPS origin or loopback HTTP origin without credentials, query, or fragment")

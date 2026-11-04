@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(29);
+select plan(30);
 select ok((select relrowsecurity from pg_class where oid = 'public.assignments'::regclass), 'assignments RLS enabled');
 select ok((select relrowsecurity from pg_class where oid = 'public.todos'::regclass), 'todos RLS enabled');
 select ok(not has_table_privilege('anon','public.assignments','SELECT'), 'no anonymous reads');
@@ -16,6 +16,7 @@ select is((select pg_get_constraintdef(oid) from pg_constraint where conrelid='p
 select is((select count(*)::integer from pg_indexes where schemaname='public' and tablename='todos'), 1, 'no redundant item index');
 select is((select data_type from information_schema.columns where table_schema='public' and table_name='todos' and column_name='assignment_id'), 'text', 'short assignment foreign key');
 select ok(not has_function_privilege('service_role','public.assignment_notes(text,text,text)','EXECUTE'), 'notes helper private');
+select ok(not has_function_privilege('service_role','public.assignment_nonblank(text)','EXECUTE'), 'nonblank helper private');
 select ok(case when role_name = 'service_role' then has_function_privilege(role_name, signature, 'EXECUTE')
   else not has_function_privilege(role_name, signature, 'EXECUTE') end, role_name || ' operation privilege: ' || signature)
 from unnest(array['anon','authenticated','service_role']) role_name

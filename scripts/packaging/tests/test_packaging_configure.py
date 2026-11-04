@@ -71,10 +71,10 @@ def test_unsafe_telegram_id_prevents_any_writes(release, monkeypatch, field):
     assert not any((release / f"bots/{role}-bot/.pi").exists() for role in ("cos", "manager"))
 
 
-@pytest.mark.parametrize("value", ["http://remote.example.com", "https://user:private-password@example.com"])
+@pytest.mark.parametrize("value", ["http://remote.example.com", "https://user:private-password@example.com", "https://exa mple.com", "https://example.com\\path", "https://example.com/\n", "https://bad_host.example"])
 def test_bad_assignment_url_prevents_release_writes(release, monkeypatch, value):
     monkeypatch.setenv("SUPABASE_URL", value)
-    with pytest.raises(click.ClickException) as error:
+    with patch("bot_setup.configure.run"), pytest.raises(click.ClickException, match="SUPABASE_URL") as error:
         configure_release(release)
     assert "private-password" not in str(error.value)
     assert not any((release / f"bots/{role}-bot/.pi").exists() for role in ("cos", "manager"))

@@ -34,7 +34,7 @@ def test_assignment_mcp_preserves_custom_auth_and_has_equal_access(tmp_path, rol
         assert not (pi / "settings.json").exists()
 
 
-@pytest.mark.parametrize("url", ["", "invalid", "http://example.com", "https://user:private-password@example.com", "https://example.com?secret=private-password", "https://example.com/#fragment", "https://example.com/path"])
+@pytest.mark.parametrize("url", ["", "invalid", "http://example.com", "https://user:private-password@example.com", "https://example.com?secret=private-password", "https://example.com/#fragment", "https://example.com/path", "https://exa mple.com", "https://example.com\\path", "https://example.com/\n", "https://bad_host.example", "https://-bad.example"])
 def test_bad_assignment_endpoint_fails_before_writes(tmp_path, url):
     with pytest.raises(click.ClickException) as error:
         configure_assignment_mcp(tmp_path, supabase_url=url)
