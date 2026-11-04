@@ -68,7 +68,13 @@ export async function rpc(
   args: unknown[],
 ): Promise<Result> {
   if (!/^assignment_[a-z_]+$/.test(name)) throw new Error("Invalid test RPC name");
-  const placeholders = args.map((_, i) => `$${i + 1}`).join(",");
+  // postgres.js serializes inferred timestamptz parameters through Date (milliseconds).
+  const placeholders = args
+    .map(
+      (_, i) =>
+        `$${i + 1}${name === "assignment_update_todo" && i === 3 ? "::text::timestamptz" : ""}`,
+    )
+    .join(",");
   const rows = await sql.unsafe(
     `select public.${name}(${placeholders}) as result`,
     args as postgres.ParameterOrJSON<never>[],
