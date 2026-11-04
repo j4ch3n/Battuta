@@ -26,7 +26,7 @@ The root is normally the expanded `~/.battuta`, not its projects subdirectory.
 Use the returned `notes_path`; do not invent another location or role suffix.
 Preparation returns a plan, not proof that a file exists locally. A conflicting
 root fails rather than relocating existing material. If notes are unprepared,
-prepare them for the active assignment first.
+prepare them for the nonterminal assignment first, including blocked work.
 
 Inspect local path safety, create directories/file only if absent, and preserve
 existing contents. Use Pi's built-in read/edit/write/search tools at that path;

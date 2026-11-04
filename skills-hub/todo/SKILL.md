@@ -1,79 +1,59 @@
 ---
 name: todo
-description: Use when commissioning project work, maintaining shared ordered TODOs, inspecting assignment progress, or recording delivery and cancellation outcomes.
+description: Use when Manager plans complete project assignments, inspects shared progress, or recovers blocked work through cancellation and replanning.
 ---
 
 # Shared assignments and TODOs
 
-Use the `assignments` MCP service. CoS creates the commission; Manager develops
-the detailed steps, updates their actual status, reports each delivery through
-Agent Mail, and closes the assignment after final delivery. All bots share access.
-Records do not grant execution, publication, or product-acceptance authority.
+Use the assignments MCP service. CoS supplies the problem and authority; Manager
+creates the complete plan. Worker extension code owns execution progress,
+completion/blockers, and mandatory Manager summaries. Manager judges evidence
+and reports to CoS. A recorded result is not product acceptance.
 
-## Project and assignment identity
+## Identity and creation
 
-Ask the owner which project to use when none is provided; confirm it before
-creation. Use `battuta-project list` to verify the exact registered project name.
-Do not silently infer the project from current selection. Every assignment,
-TODO, and note must belong to a project assignment; there is no general scope.
+Keep explicit project and returned eight-character assignment ID on targeted
+calls. Use project-context and existing battuta-project commands to inspect
+registered context; ask the responsible requester when the commission lacks its
+project. Do not silently substitute global selection. Workers currently stay on
+the same project; this workflow does not change global project configuration.
 
-Keep the returned eight-character `assignment_id` and exact project name in
-handoffs and subsequent calls. At most one assignment is active per project.
-Inspect existing work before creating another; an active conflict is not
-permission to cancel it. Use note-taking for shared findings and draft-writing
-for longer documents; do not duplicate those bodies into TODO outcomes.
+Inspect related work before creating duplicates. Multiple assignments may be open
+per project. Create the entire initial TODO list atomically, with goal, authority,
+constraints, acceptance/input references, and existing prerequisite IDs. Dependencies
+may cross projects but remain immutable; only prerequisites done unlock execution.
+Duplicate prerequisite IDs mean one dependency. Cancelled prerequisites do not
+satisfy dependents. Choose non-conflicting workspace boundaries or dependencies.
 
-## MCP tools
+## Manager and inspection tools
 
-All assignment-targeting calls require `project` and `assignment_id`.
-
-| Tool | Additional inputs | Effect |
+| Tool | Inputs beyond project/assignment ID | Use |
 | --- | --- | --- |
-| `create_assignment` | `project`, `goal`, optional `constraints` | Create the active commission; include authority, boundaries, acceptance and input references |
-| `list_assignments` | `project`, optional `status`: `active`, `done`, `cancelled` | Discover current or historical assignments, newest first |
-| `get_assignment` | None | Read details and all items in stored position order |
-| `append_todos` | `descriptions`: nonempty array of nonblank strings | Append steps with consecutive immutable positions |
-| `update_todo` | `position`, `expected_updated_at`, at least one of `description`, `status`, `outcome` | Update that item in place; omitted fields stay unchanged |
-| `close_assignment` | `status`: `done` or `cancelled` | Finish after item checks, or cancel without rewriting item outcomes |
+| create_assignment | goal, nonempty initial_todos, optional constraints and depends_on_assignment_ids | Publish one complete initial plan; requires project, not an existing assignment ID |
+| list_assignments | optional project and status | Inspect global or project work, readiness, and claim timestamps; no assignment ID |
+| get_assignment | None | Read authoritative detail, evidence, dependencies, and ordered TODOs |
+| append_todos | nonempty descriptions array | Append consecutive positions to active/blocked work |
+| update_todo | position, exact expected_updated_at, description and/or status: cancelled | Edit/cancel unfinished active/blocked work, not execution outcomes |
+| close_assignment | status: cancelled | Cancel nonterminal work without rewriting TODO evidence |
+| reactivate_assignment | None | Return blocked work to active after resolving/cancelling blocked/in-progress TODOs and leaving executable work |
 
-Creation/listing take project but no existing assignment ID. There is no role
-argument. Item statuses are `todo`, `in_progress`, `done`, and `cancelled`.
-Follow the planned sequence, but any item can be updated/completed by position
-without first completing earlier items. Positions never shift: append or edit
-in place, cancel unwanted work, and retain its explanation. No reorder or delete.
+Assignment states: active, in_process, blocked, done, cancelled. TODO states:
+todo, in_progress, blocked, done, cancelled. Positions never shift; no reorder,
+deletion, TODO dependency graph, or per-TODO claims. Execution APIs are code-owned;
+workers use execute-assignment rather than directly maintaining status.
 
-Example update (use the actual token returned by `get_assignment`):
+## Recovery and uncertainty
 
-```json
-{
-  "project": "atlas",
-  "assignment_id": "a3f91c2e",
-  "position": 2,
-  "expected_updated_at": "2026-11-04T12:00:00.123456+00:00",
-  "status": "done",
-  "outcome": "Verified the export with the supplied fixture; evidence: returned report path."
-}
-```
+Manager may cancel blocked work and create replacements, or cancel unfinished
+TODOs, append revised steps, and explicitly reactivate. Retain completed evidence.
+Reactivation invalidates the former claim. If dependencies must change, replace
+the assignment and inspect downstream work; terminal assignments cannot reopen.
 
-Pass `expected_updated_at` unchanged; do not parse/reformat it through a clock or
-Date object. Null is not an edit value; omit unchanged fields. Empty `outcome`
-clears it, but descriptions cannot be blank. Keep outcomes truthful and concise,
-including sources/verification or cancellation reasons where relevant.
+Pass update tokens unchanged, never through Date/clock conversion. On stale_update,
+inspect/reconcile the returned item. On missing_dependencies, use list_assignments
+to find the correct IDs. After uncertain creation/appending, inspect before
+repeating; a lost response does not prove nothing was saved. No local TODO fallback.
 
-## Closure and errors
-
-`done` refuses while any item is `todo`/`in_progress` and returns the unfinished
-positions/statuses in order. Report those honestly and resolve them before
-claiming completion. An empty assignment may finish. Cancellation skips that
-check and preserves unfinished item statuses/evidence. Neither state means owner
-acceptance. Closed assignments cannot receive new/edited TODOs or be reopened.
-
-On `stale_update`, inspect the returned current item and reconcile before retrying;
-never overwrite with an old token. Wrong-project/not-found/closed requests fail
-without falling back to another record. After a network error or uncertain write,
-inspect the assignment before repeating creation/appending: a lost response does
-not mean nothing was saved. Do not silently fall back to local TODO files.
-
-Mail is not automatic. Manager reports each delivery to CoS through Agent Mail
-with project/assignment identity, outcome/evidence and remaining work, then marks
-the assignment done after final delivery. Notes and drafts freeze on closure.
+Only done/cancelled freezes notes/drafts; blocked material remains editable.
+Manager reports meaningful outcomes, evidence, blockers, and decisions through
+communicate-with-cos asynchronously, without routinely marking worker execution done.

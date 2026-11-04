@@ -1,3 +1,15 @@
 {
-  "skills": ["project-context", "todo", "note-taking", "draft-writing"]
+  "skills": [
+    "project-context",
+    "todo",
+    "note-taking",
+    "draft-writing",
+    "execute-assignment",
+    "research",
+    "memory",
+    "artifacts",
+    "prd",
+    "user-story",
+    "presentation-production"
+  ]
 }

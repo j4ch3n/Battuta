@@ -59,7 +59,7 @@ Tool: `send_agent_message`. A progress reply consumed the single direct reply, s
     "schema_version": 1,
     "summary": "The representative-input timeout probe passed for the current first milestone.",
     "context": [
-      "Project: atlas; assignment_id: a3f91c2e. TODO position 1 is done with probe evidence; the final delivery closes this assessment assignment.",
+      "Project: atlas; assignment_id: a3f91c2e. Worker execution recorded TODO position 1 and the assessment assignment done; Manager inspected the probe evidence. This is not owner acceptance.",
       "Only the requested timeout assessment is complete; implementation remains separate."
     ],
     "findings": [],

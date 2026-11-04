@@ -16,8 +16,8 @@ to the owner and owns product/authority decisions and final communication.
    and result needed. A quick factual check may be answered directly; delegate
    deeper research, analysis, planning, and execution primarily to Manager.
 2. Distinguish an investigation request from confirmed execution authorization.
-   Use todo to create the assignment for the confirmed registered project before
-   delegation. Include that project and assignment ID in the commission.
+    Include the confirmed project in the commission; Manager determines the
+    solution and creates complete assignments/TODOs before workers can claim them.
    Give Manager the brief and decision boundaries, not a detailed execution
    plan you have already produced. Share only authorized owner/account context.
 3. Choose an outbound example from the [template index](references/templates/index.md).

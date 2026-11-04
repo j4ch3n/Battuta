@@ -36,3 +36,8 @@ Research owns investigation and synthesis, not delivery commitments, requirement
 approval, rendering or publication. Use problem-framing for product-problem
 definition and communicate-with-manager for a technical assessment. Learning can be the
 outcome; do not manufacture a recommendation or owner action.
+
+For a bound worker assignment, investigate within the supplied question/authority
+and report through execute-assignment. Use presentation-production for requested
+deliverables; do not take over owner-facing editorial judgment or send mandatory
+Manager mail yourself. Missing essential evidence becomes an honest blocker.

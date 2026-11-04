@@ -9,7 +9,7 @@ Use note-taking to prepare/locate the shared assignment note file and check whet
 editing is allowed. Every draft belongs to that project assignment. CoS, Manager,
 and workers have equal access; there is no role-owned notebook or draft registry.
 
-For an active assignment, save the complete UTF-8 document beside its returned
+For an active/in_process/blocked assignment, save the complete UTF-8 document beside its returned
 note file using Pi's built-in file tools. Choose a descriptive filename, inspect
 it before writing, preserve existing content, and record its path/title in the
 notes for discovery. Read/edit that same path for revisions, rather than creating

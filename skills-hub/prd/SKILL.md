@@ -8,6 +8,13 @@ metadata:
 
 ## Context
 
+For a bound worker assignment, author from the confirmed requirements and supplied
+template or fallback below. Use the commission's approved authoring scope rather
+than opening an owner conversation or inventing approvals. Complete the requested
+sections without interactive gates; unresolved consequential requirements are
+reported through execute-assignment as blockers. CoS retains product decisions
+and managed-document persistence authority.
+
 Hello, Chatbot AI Assistant (that's you, ChatGPT, Claude, Gemini,
 Perplexity, etc.). Act as a **PRD co-author** for product managers.
 
