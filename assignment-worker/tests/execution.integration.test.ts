@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createWorkerRuntime } from "../host.ts";
 import type { AssignmentClientConfig, Detail } from "../types.ts";
+import { AgentSession } from "@earendil-works/pi-coding-agent";
 
 const scope = vi.hoisted(() => ({
   project: "",
@@ -378,3 +379,38 @@ test.each(["failed", "uncertain"])(
     }
   },
 );
+
+test("actual asynchronous Pi prompt failure records a blocker and sends Manager mail", async () => {
+  scope.mailMode = "sent";
+  const h = await fixture();
+  const send = vi
+    .spyOn(AgentSession.prototype, "sendCustomMessage")
+    .mockRejectedValueOnce(new Error("Injected preparation failure"));
+  try {
+    const created = await h.rpc("assignment_create", {
+      p_project: scope.project,
+      p_goal: "Runtime failure",
+      p_initial_todos: ["Step"],
+    });
+    await h.launch(1);
+    await h.wake();
+    await vi.waitFor(
+      async () =>
+        expect(
+          (
+            await h.rpc("assignment_get", {
+              p_project: scope.project,
+              p_assignment_id: created.assignment.id,
+            })
+          ).assignment.status,
+        ).toBe("blocked"),
+      { timeout: 3000 },
+    );
+    await vi.waitFor(async () => expect((await h.mail()).length).toBe(1));
+    expect(h.reports).toBe(0);
+    expect(scope.events.filter((event) => event.kind === "start")).toHaveLength(1);
+  } finally {
+    send.mockRestore();
+    await h.close();
+  }
+});

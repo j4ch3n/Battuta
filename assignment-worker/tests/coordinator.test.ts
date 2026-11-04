@@ -335,6 +335,38 @@ test("backend outage while blocking keeps owned work paused and never fabricates
   expect(h.opened).toHaveLength(1);
 });
 
+test.each([true, false])(
+  "uncertain blocker acknowledgement is inspected, never rewritten (committed=%s)",
+  async (committed) => {
+    const h = harness(1);
+    await h.begin();
+    const original = h.assignments.block.getMockImplementation()!;
+    h.assignments.block.mockImplementation(async (input) => {
+      if (committed) await original(input);
+      throw new UncertainAssignmentWriteError("Lost blocker acknowledgement");
+    });
+    h.coordinator.observeBoundary("error");
+    await h.coordinator.settle({ aborted: false });
+    expect(h.notifications).toHaveLength(committed ? 1 : 0);
+    expect(h.assignments.block).toHaveBeenCalledTimes(1);
+    expect(h.state.assignment.status).toBe(committed ? "blocked" : "in_process");
+  },
+);
+
+test("uncertain blocker does not report a different authoritative claim's outcome", async () => {
+  const h = harness(1);
+  await h.begin();
+  h.assignments.block.mockImplementation(() => {
+    h.state.assignment.claimed_at = "2026-11-04T13:00:00.000001Z";
+    h.state.assignment.status = "blocked";
+    h.state.assignment.blocker = "Execution ended with an unrecoverable error";
+    return Promise.reject(new UncertainAssignmentWriteError("Old claim reply lost"));
+  });
+  h.coordinator.observeBoundary("error");
+  await h.coordinator.settle({ aborted: false });
+  expect(h.notifications).toEqual([]);
+});
+
 test("late current claims ignore informational lease age and skip terminal TODOs", async () => {
   const h = harness(3);
   h.state.todos[0].status = "done";

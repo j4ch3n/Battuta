@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { createWorkerRuntime, runWorker, WORKER_TOOLS } from "../host.ts";
 import { createServer } from "node:http";
 import { detail } from "./fixtures.ts";
+import { UncertainAssignmentWriteError } from "../client.ts";
 const backend = vi.hoisted(() => ({
   list: vi.fn().mockResolvedValue({ ok: true, assignments: [] }),
   close: vi.fn(),
@@ -16,7 +17,10 @@ const backend = vi.hoisted(() => ({
   block: vi.fn(),
   mail: vi.fn(),
 }));
-vi.mock("../client.ts", () => ({ createAssignmentClient: () => Promise.resolve(backend) }));
+vi.mock("../client.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../client.ts")>()),
+  createAssignmentClient: () => Promise.resolve(backend),
+}));
 vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({
     functions: { invoke: backend.mail },
@@ -290,43 +294,53 @@ test("real Pi executes ordered reporting-tool calls in one fresh assignment conv
   }
 });
 
-test("replacement failure after old session disposal still records the acquired claim's blocker", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "battuta-worker-failed-handoff-"));
-  const state = detail();
-  backend.list.mockResolvedValue({ ok: true, assignments: [] });
-  backend.claim.mockImplementation(() => {
-    state.assignment.status = "in_process";
-    state.assignment.claimed_at = state.assignment.created_at;
-    return Promise.resolve(structuredClone(state));
-  });
-  backend.get.mockImplementation(() => Promise.resolve(structuredClone(state)));
-  backend.block.mockImplementation(() => {
-    state.assignment.status = "blocked";
-    state.assignment.blocker = "Runtime replacement failed";
-    return Promise.resolve({ ok: true, assignment: state.assignment });
-  });
-  vi.stubEnv("SUPABASE_URL", "http://127.0.0.1:54321");
-  vi.stubEnv("SUPABASE_SECRET_KEY", "stub-only");
-  await mkdir(join(dir, ".pi"), { recursive: true });
-  await writeFile(join(dir, ".pi/settings.json"), JSON.stringify({ packages: [], extensions: [] }));
-  const runtime = await createWorkerRuntime(dir);
-  vi.spyOn(runtime, "newSession").mockImplementation(async () => {
-    await runtime.dispose();
-    throw new Error("Injected runtime factory failure");
-  });
-  await runtime.session.sendUserMessage("/worker-next", { expandPromptTemplates: true });
-  backend.list.mockResolvedValue({ ok: true, assignments: [state.assignment] });
-  try {
-    await runtime.session
-      .sendUserMessage("/worker-next", { expandPromptTemplates: true })
-      .catch(() => {});
-    await vi.waitFor(() => expect(state.assignment.status).toBe("blocked"));
-  } finally {
-    await runtime.dispose();
-    vi.unstubAllEnvs();
-    await rm(dir, { recursive: true, force: true });
-  }
-});
+test.each([false, true])(
+  "replacement failure after old session disposal reports the acquired blocker (uncertain=%s)",
+  async (uncertain) => {
+    const priorMail = backend.mail.mock.calls.length;
+    const dir = await mkdtemp(join(tmpdir(), "battuta-worker-failed-handoff-"));
+    const state = detail();
+    backend.list.mockResolvedValue({ ok: true, assignments: [] });
+    backend.claim.mockImplementation(() => {
+      state.assignment.status = "in_process";
+      state.assignment.claimed_at = state.assignment.created_at;
+      return Promise.resolve(structuredClone(state));
+    });
+    backend.get.mockImplementation(() => Promise.resolve(structuredClone(state)));
+    backend.block.mockImplementation((input: { blocker: string }) => {
+      state.assignment.status = "blocked";
+      state.assignment.blocker = input.blocker;
+      if (uncertain)
+        return Promise.reject(new UncertainAssignmentWriteError("Acknowledgement lost"));
+      return Promise.resolve({ ok: true, assignment: state.assignment });
+    });
+    vi.stubEnv("SUPABASE_URL", "http://127.0.0.1:54321");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "stub-only");
+    await mkdir(join(dir, ".pi"), { recursive: true });
+    await writeFile(
+      join(dir, ".pi/settings.json"),
+      JSON.stringify({ packages: [], extensions: [] }),
+    );
+    const runtime = await createWorkerRuntime(dir);
+    vi.spyOn(runtime, "newSession").mockImplementation(async () => {
+      await runtime.dispose();
+      throw new Error("Injected runtime factory failure");
+    });
+    await runtime.session.sendUserMessage("/worker-next", { expandPromptTemplates: true });
+    backend.list.mockResolvedValue({ ok: true, assignments: [state.assignment] });
+    try {
+      await runtime.session
+        .sendUserMessage("/worker-next", { expandPromptTemplates: true })
+        .catch(() => {});
+      await vi.waitFor(() => expect(state.assignment.status).toBe("blocked"));
+      await vi.waitFor(() => expect(backend.mail).toHaveBeenCalledTimes(priorMail + 1));
+    } finally {
+      await runtime.dispose();
+      vi.unstubAllEnvs();
+      await rm(dir, { recursive: true, force: true });
+    }
+  },
+);
 
 test("idle host remains alive until its shutdown signal", async () => {
   const dir = await mkdtemp(join(tmpdir(), "battuta-worker-idle-"));

@@ -1,5 +1,9 @@
 import { isDeepStrictEqual } from "node:util";
-import { AssignmentRefusalError, UncertainAssignmentWriteError } from "./client.ts";
+import {
+  AssignmentRefusalError,
+  UncertainAssignmentWriteError,
+  blockAndInspect,
+} from "./client.ts";
 import { parseExecutionResult } from "./contracts.ts";
 import type {
   Coordinator,
@@ -79,9 +83,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     phase = "persisting";
     runGeneration++;
     try {
-      await assignments.block({ ...binding, blocker: explanation });
-      if (stopped) return;
-      const detail = await assignments.get(binding);
+      const detail = await blockAndInspect(assignments, binding, explanation);
       if (!stopped) await deliver(detail);
     } catch (error) {
       pause("Could not confirm the execution blocker; keep the claim for inspection", error);

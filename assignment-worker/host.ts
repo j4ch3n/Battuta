@@ -9,7 +9,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import worker from "./index.ts";
 import { createClient } from "@supabase/supabase-js";
-import { createAssignmentClient } from "./client.ts";
+import { createAssignmentClient, blockAndInspect } from "./client.ts";
 import { createNotifier } from "./notify.ts";
 import type { Binding } from "./types.ts";
 
@@ -44,7 +44,14 @@ export async function createWorkerRuntime(botDir: string) {
       const services = await createAgentSessionServices({
         cwd: options.cwd,
         agentDir,
-        resourceLoaderOptions: { extensionFactories: [worker] },
+        resourceLoaderOptions: {
+          extensionFactories: [
+            (pi) =>
+              worker(pi, (message) => {
+                return session.sendCustomMessage(message, { triggerTurn: true });
+              }),
+          ],
+        },
       });
       const result = await createAgentSessionFromServices({
         services,
@@ -52,6 +59,7 @@ export async function createWorkerRuntime(botDir: string) {
         sessionStartEvent: options.sessionStartEvent,
         tools: WORKER_TOOLS,
       });
+      const session: AgentSession = result.session;
       return { ...result, services, diagnostics: services.diagnostics };
     },
     { cwd, agentDir, sessionManager: SessionManager.create(cwd, join(agentDir, "sessions")) },
@@ -82,11 +90,11 @@ export async function createWorkerRuntime(botDir: string) {
                 secretKey = process.env.SUPABASE_SECRET_KEY ?? "";
               const client = await createAssignmentClient({ supabaseUrl, secretKey });
               try {
-                await client.block({
-                  ...binding,
-                  blocker: "Fresh assignment runtime failed during session replacement",
-                });
-                const detail = await client.get(binding);
+                const detail = await blockAndInspect(
+                  client,
+                  binding,
+                  "Fresh assignment runtime failed during session replacement",
+                );
                 const db = createClient(supabaseUrl, secretKey, {
                   auth: { persistSession: false, autoRefreshToken: false },
                 });

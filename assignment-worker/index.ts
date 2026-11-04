@@ -1,4 +1,5 @@
 import type {
+  AgentSession,
   ExtensionAPI,
   ExtensionCommandContext,
   ExtensionContext,
@@ -10,7 +11,10 @@ import { ExecutionResultSchema } from "./contracts.ts";
 import { createNotifier } from "./notify.ts";
 import type { AssignmentClient, Binding, Coordinator, Detail } from "./types.ts";
 
-export default function worker(pi: ExtensionAPI) {
+export default function worker(
+  pi: ExtensionAPI,
+  sendMessage?: (message: Parameters<AgentSession["sendCustomMessage"]>[0]) => Promise<void>,
+) {
   let coordinator: Coordinator | undefined, client: AssignmentClient | undefined;
   let db: ReturnType<typeof createClient> | undefined,
     timer: ReturnType<typeof setInterval> | undefined;
@@ -118,19 +122,16 @@ export default function worker(pi: ExtensionAPI) {
         },
         runTodo(_binding, todo, detail) {
           if (stopped) throw new Error("Worker session was disposed");
-          pi.sendMessage(
-            {
-              customType: "assignment-todo",
-              content: JSON.stringify({
-                assignment: detail.assignment,
-                todos: detail.todos,
-                current_todo: todo,
-              }),
-              display: true,
-            },
-            { triggerTurn: true },
-          );
-          return Promise.resolve();
+          if (!sendMessage) throw new Error("Execution requires the persistent worker host");
+          return sendMessage({
+            customType: "assignment-todo",
+            content: JSON.stringify({
+              assignment: detail.assignment,
+              todos: detail.todos,
+              current_todo: todo,
+            }),
+            display: true,
+          });
         },
       },
     });

@@ -17,17 +17,47 @@ import type {
   Claim,
   ExecutionResult,
   AssignmentView,
+  Detail,
 } from "./types.ts";
 
 export class AssignmentRefusalError extends Error {
-  constructor(readonly refusal: AssignmentFailure) {
+  readonly refusal: AssignmentFailure;
+  constructor(refusal: AssignmentFailure) {
     super(refusal.message);
+    this.refusal = refusal;
   }
 }
 export class UncertainAssignmentWriteError extends Error {}
 
+export async function blockAndInspect(
+  client: Pick<AssignmentClient, "block" | "get">,
+  claim: Claim,
+  blocker: string,
+): Promise<Detail> {
+  try {
+    await client.block({ ...claim, blocker });
+  } catch (error) {
+    if (!(error instanceof UncertainAssignmentWriteError)) throw error;
+  }
+  const detail = await client.get(claim),
+    row = detail.assignment;
+  if (
+    row.project !== claim.project ||
+    row.id !== claim.assignment_id ||
+    row.claimed_at !== claim.claimed_at ||
+    row.status !== "blocked" ||
+    row.blocker !== blocker
+  ) {
+    throw new Error("Execution blocker remains unconfirmed; inspect before repeating");
+  }
+  return detail;
+}
+
 export class AssignmentService implements AssignmentClient {
-  constructor(private readonly client: Pick<Client, "callTool" | "close">) {}
+  private readonly client: Pick<Client, "callTool" | "close">;
+  constructor(client: Pick<Client, "callTool" | "close">) {
+    this.client = client;
+  }
   private async call<T extends TSchema>(
     name: string,
     args: object,
