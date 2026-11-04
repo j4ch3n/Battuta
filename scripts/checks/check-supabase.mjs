@@ -131,7 +131,12 @@ try {
     },
   });
   run("pnpm", ["--dir", "assignment-worker", "test:integration"], {
-    env: { ...process.env, SUPABASE_URL: status.API_URL, SUPABASE_SECRET_KEY: status.SECRET_KEY },
+    env: {
+      ...process.env,
+      SUPABASE_URL: status.API_URL,
+      SUPABASE_SECRET_KEY: status.SECRET_KEY,
+      SUPABASE_DB_URL: status.DB_URL,
+    },
   });
 } finally {
   shutdown();

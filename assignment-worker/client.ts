@@ -60,23 +60,55 @@ export class AssignmentService implements AssignmentClient {
   list(input: { project?: string; status?: AssignmentView["status"] }) {
     return this.call("list_assignments", input, ListSchema, false);
   }
-  get(target: Target) {
-    return this.call("get_assignment", target, DetailSchema, false);
+  get({ project, assignment_id }: Target) {
+    return this.call("get_assignment", { project, assignment_id }, DetailSchema, false);
   }
-  claim(target: Target) {
-    return this.call("claim_assignment", target, DetailSchema);
+  claim({ project, assignment_id }: Target) {
+    return this.call("claim_assignment", { project, assignment_id }, DetailSchema);
   }
-  start(target: TodoTarget) {
-    return this.call("start_todo", target, ProgressSchema);
+  start({ project, assignment_id, claimed_at, position, expected_updated_at }: TodoTarget) {
+    return this.call(
+      "start_todo",
+      { project, assignment_id, claimed_at, position, expected_updated_at },
+      ProgressSchema,
+    );
   }
   record(input: TodoTarget & ExecutionResult) {
-    return this.call("record_todo_result", input, ProgressSchema);
+    const {
+      project,
+      assignment_id,
+      claimed_at,
+      position,
+      expected_updated_at,
+      outcome,
+      summary,
+      evidence,
+    } = input;
+    return this.call(
+      "record_todo_result",
+      {
+        project,
+        assignment_id,
+        claimed_at,
+        position,
+        expected_updated_at,
+        outcome,
+        summary,
+        evidence,
+        ...(input.outcome === "blocked" ? { blocker: input.blocker } : {}),
+      },
+      ProgressSchema,
+    );
   }
-  block(input: Claim & { blocker: string }) {
-    return this.call("block_assignment", input, AssignedSchema);
+  block({ project, assignment_id, claimed_at, blocker }: Claim & { blocker: string }) {
+    return this.call(
+      "block_assignment",
+      { project, assignment_id, claimed_at, blocker },
+      AssignedSchema,
+    );
   }
-  finish(input: Claim) {
-    return this.call("finish_assignment", input, AssignedSchema);
+  finish({ project, assignment_id, claimed_at }: Claim) {
+    return this.call("finish_assignment", { project, assignment_id, claimed_at }, AssignedSchema);
   }
   close() {
     return this.client.close();

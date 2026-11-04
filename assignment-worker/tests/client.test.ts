@@ -1,4 +1,5 @@
 import { expect, test, vi } from "vitest";
+import type { Client } from "@modelcontextprotocol/client";
 import {
   AssignmentService,
   AssignmentRefusalError,
@@ -23,6 +24,42 @@ test("code-owned client preserves exact execution targets and timestamp strings"
   };
   expect((await client.start(target)).todo.updated_at).toBe(d.todos[0].updated_at);
   expect(callTool).toHaveBeenCalledWith({ name: "start_todo", arguments: target });
+});
+
+test("local session bindings never leak into strict remote MCP arguments", async () => {
+  const d = detail();
+  const callTool = vi
+    .fn<Client["callTool"]>()
+    .mockResolvedValue({ content: [], structuredContent: d });
+  const client = new AssignmentService({ callTool, close: vi.fn() });
+  const binding = {
+    project: "atlas",
+    assignment_id: "1234abcd",
+    claimed_at: "2026-11-04T12:00:00.123456+00:00",
+    session_file: "private-session",
+  };
+  await client.get(binding);
+  expect(callTool).toHaveBeenLastCalledWith({
+    name: "get_assignment",
+    arguments: { project: "atlas", assignment_id: "1234abcd" },
+  });
+  callTool.mockResolvedValue({
+    content: [],
+    structuredContent: { ok: true, assignment: d.assignment, todo: d.todos[0] },
+  });
+  const target = { ...binding, position: 1, expected_updated_at: d.todos[0].updated_at };
+  await client.start(target);
+  expect(callTool.mock.calls[1][0].arguments).not.toHaveProperty("session_file");
+  await client.record({ ...target, outcome: "completed", summary: "Done", evidence: [] });
+  expect(callTool.mock.calls[2][0].arguments).not.toHaveProperty("session_file");
+  callTool.mockResolvedValue({
+    content: [],
+    structuredContent: { ok: true, assignment: d.assignment },
+  });
+  await client.block({ ...binding, blocker: "Missing input" });
+  await client.finish(binding);
+  for (const [call] of callTool.mock.calls)
+    expect(call.arguments).not.toHaveProperty("session_file");
 });
 test("business refusals retain authoritative recovery metadata", async () => {
   const d = detail();
