@@ -22,10 +22,36 @@ def validate_memory_url(value: str | None = None) -> str:
     return value
 
 
-def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager"], memory_url: str | None = None) -> None:
+def assignment_server(supabase_url: str) -> dict:
+    try:
+        endpoint = urlsplit(supabase_url)
+        valid = bool(endpoint.hostname) and (endpoint.scheme == "https" or endpoint.scheme == "http" and endpoint.hostname in {"127.0.0.1", "localhost", "::1"})
+        valid = valid and not endpoint.username and not endpoint.password and not endpoint.query and not endpoint.fragment and endpoint.path in {"", "/"}
+        endpoint.port
+    except ValueError:
+        valid = False
+    if not valid:
+        raise click.ClickException("SUPABASE_URL must be an HTTPS origin or loopback HTTP origin without credentials, query, or fragment")
+    return {"url": supabase_url.rstrip("/") + "/functions/v1/assignments", "headers": {"apikey": "${SUPABASE_SECRET_KEY}"}, "exposure": "codemode", "description": "Shared project assignments, ordered TODOs, and local note paths"}
+
+
+def configure_assignment_mcp(bot_dir: Path, *, supabase_url: str) -> None:
+    server = assignment_server(supabase_url)
+    path = bot_dir / ".pi/mcp.json"
+    config = read_config(path)
+    servers = config.get("mcpServers", {})
+    if not isinstance(servers, dict):
+        raise click.ClickException("mcpServers must be a JSON object")
+    servers["assignments"] = server
+    config["mcpServers"] = servers
+    write_config(path, config, ".mcp-")
+
+
+def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager"], supabase_url: str, memory_url: str | None = None) -> None:
     if role not in {"cos", "manager"}:
         raise click.ClickException("Bot role must be cos or manager")
     url = validate_memory_url(memory_url)
+    assignment = assignment_server(supabase_url)
     path = bot_dir / ".pi/mcp.json"
     settings_path = bot_dir / ".pi/settings.json"
     config = read_config(path)
@@ -43,6 +69,7 @@ def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager"], memory_url:
             retained.append(entry)
     servers["linear"] = {"url": "https://mcp.linear.app/mcp", "headers": {"Authorization": "Bearer ${LINEAR_API_TOKEN}"}, "exposure": "codemode", "description": "Manage Linear issues, projects, and cycles"}
     servers["memory"] = {"url": url, "exposure": "codemode", "description": "Shared scoped memory; context, not execution authority"}
+    servers["assignments"] = assignment
     if role == "cos":
         servers["luma"] = {"url": "https://mcp.luma.com", "oauth": {"clientRegistration": "cimd"}, "exposure": "hidden", "toolExposure": {f"{verb}_*": "codemode" for verb in ("search", "lookup", "get", "list", "find")}, "description": "Discover Luma events and look up event/account details; read-only use"}
     config["mcpServers"] = servers

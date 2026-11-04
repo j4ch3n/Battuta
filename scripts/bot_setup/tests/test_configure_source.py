@@ -18,7 +18,7 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
     (bot / "AGENTS_dedicated.md").write_text("Dedicated")
     (bot / "package.json").write_text("{}")
     env = tmp_path / ".env"
-    env.write_text("LINEAR_API_TOKEN=private-linear\n" + ("COS_TELEGRAM_TOKEN=101:private-token\nTELEGRAM_ALLOWED_USER_ID=123\n" if role == "cos" else ""))
+    env.write_text("LINEAR_API_TOKEN=private-linear\nSUPABASE_URL=http://localhost:54321\nSUPABASE_SECRET_KEY=private-supabase\n" + ("COS_TELEGRAM_TOKEN=101:private-token\nTELEGRAM_ALLOWED_USER_ID=123\n" if role == "cos" else ""))
     with patch("bot_setup.configure.run") as runtime, patch("bot_setup.install.run") as install:
         for _ in range(2):
             configure_source(tmp_path, role=role)
@@ -35,6 +35,8 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
     assert (pi / "telegram.json").exists() == (role == "cos")
     assert (pi / "skills/memory").is_symlink()
     assert json.loads((pi / "settings.json").read_text())["battutaMemoryCapture"]["enabled"] == (role == "cos")
+    assert "assignments" in json.loads((pi / "mcp.json").read_text())["mcpServers"]
+    assert "assignments" in json.loads((tmp_path / "bots/worker/.pi/mcp.json").read_text())["mcpServers"]
 
 
 @pytest.mark.parametrize("values", ["", "COS_TELEGRAM_TOKEN=101:private-token\n", "COS_TELEGRAM_TOKEN=9007199254740993:private-token\nTELEGRAM_ALLOWED_USER_ID=123\n"])
@@ -44,9 +46,23 @@ def test_invalid_cos_input_has_no_configuration_writes(tmp_path, values):
     (bot / "package.json").write_text("{}")
     (bot / "AGENTS_dedicated.md").write_text("Dedicated")
     (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
-    (tmp_path / ".env").write_text("LINEAR_API_TOKEN=private-linear\n" + values)
+    (tmp_path / ".env").write_text("LINEAR_API_TOKEN=private-linear\nSUPABASE_URL=http://localhost:54321\nSUPABASE_SECRET_KEY=private-supabase\n" + values)
     with patch("bot_setup.configure.run") as run, pytest.raises(click.ClickException):
         configure_source(tmp_path, role="cos")
     run.assert_not_called()
     assert not (bot / "AGENTS.md").exists()
+    assert not (bot / ".pi").exists()
+
+
+@pytest.mark.parametrize("missing", ["SUPABASE_URL", "SUPABASE_SECRET_KEY"])
+def test_missing_assignment_credentials_prevents_source_writes(tmp_path, missing):
+    skill_catalog(tmp_path, "manager")
+    bot = tmp_path / "bots/manager-bot"
+    (bot / "package.json").write_text("{}")
+    values = {"LINEAR_API_TOKEN": "private-linear", "SUPABASE_URL": "https://example.com", "SUPABASE_SECRET_KEY": "private-supabase"}
+    values.pop(missing)
+    (tmp_path / ".env").write_text("".join(f"{key}={value}\n" for key, value in values.items()))
+    with pytest.raises(click.ClickException) as error:
+        configure_source(tmp_path, role="manager")
+    assert "private-" not in str(error.value)
     assert not (bot / ".pi").exists()

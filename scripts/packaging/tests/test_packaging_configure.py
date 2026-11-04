@@ -55,6 +55,7 @@ def test_release_setup_is_repeatable_without_skill_output(release, capsys):
         assert settings["battutaMemoryCapture"]["enabled"] == (role == "cos")
         servers = json.loads((pi / "mcp.json").read_text())["mcpServers"]
         assert ("luma" in servers) == (role == "cos")
+        assert servers["assignments"]["headers"] == {"apikey": "${SUPABASE_SECRET_KEY}"}
         assert (pi / "settings.json").stat().st_mode & 0o777 == 0o600
     output = capsys.readouterr()
     assert "private-" not in output.out + output.err
@@ -67,4 +68,13 @@ def test_unsafe_telegram_id_prevents_any_writes(release, monkeypatch, field):
         with pytest.raises(click.ClickException):
             configure_release(release)
     run.assert_not_called()
+    assert not any((release / f"bots/{role}-bot/.pi").exists() for role in ("cos", "manager"))
+
+
+@pytest.mark.parametrize("value", ["http://remote.example.com", "https://user:private-password@example.com"])
+def test_bad_assignment_url_prevents_release_writes(release, monkeypatch, value):
+    monkeypatch.setenv("SUPABASE_URL", value)
+    with pytest.raises(click.ClickException) as error:
+        configure_release(release)
+    assert "private-password" not in str(error.value)
     assert not any((release / f"bots/{role}-bot/.pi").exists() for role in ("cos", "manager"))

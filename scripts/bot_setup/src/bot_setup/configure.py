@@ -10,7 +10,7 @@ from .env import read_env, required
 from .install import SCHEDULE_PACKAGE, TELEGRAM_PACKAGE, install_packages, run, warn_running_session
 from .instructions import configure_instructions, write_instructions
 from .json_config import read_config, write_config
-from .mcp import configure_mcp, validate_memory_url
+from .mcp import assignment_server, configure_assignment_mcp, configure_mcp, validate_memory_url
 from .memory import configure_memory_settings
 from .subagents import SUBAGENT_PACKAGE, WEB_PACKAGE, configure_subagents
 from .telegram import prepare_telegram_config
@@ -29,6 +29,9 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
         raise click.ClickException(f"Missing {bot_dir / 'package.json'}")
     values = read_env(env_file)
     required(values, "LINEAR_API_TOKEN", env_file)
+    supabase_url = required(values, "SUPABASE_URL", env_file)
+    required(values, "SUPABASE_SECRET_KEY", env_file)
+    assignment_server(supabase_url)
     telegram = prepare_telegram_config(bot_dir, env_file, prefix, values) if role == "cos" else None
     url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
     configure_instructions(bot_dir, role=role, root=root)
@@ -36,7 +39,8 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
         path, data, changed = telegram
         if changed:
             write_config(path, data, ".telegram-")
-    configure_mcp(bot_dir, role=role, memory_url=url)
+    configure_mcp(bot_dir, role=role, memory_url=url, supabase_url=supabase_url)
+    configure_assignment_mcp(root / "bots/worker", supabase_url=supabase_url)
     configure_memory_settings(bot_dir, role=role)
     if role == "cos":
         run("pnpm", "--dir", str(root / "memory-client"), "install", "--frozen-lockfile")
@@ -58,13 +62,14 @@ def configure_release(root: Path) -> None:
     for key in ("LINEAR_API_TOKEN", "SUPABASE_URL", "SUPABASE_SECRET_KEY"):
         required(values, key, env_file)
     url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
+    assignment_server(values["SUPABASE_URL"])
     bots = [(role, root / f"bots/{role}-bot") for role in ("cos", "manager")]
     check_manifests(root)
     telegram = prepare_telegram_config(root / "bots/cos-bot", env_file, "COS", values)
     run("node", str(root / "memory-client/configure-scheduler.mjs"), "--initialize")
     for role, bot in bots:
         write_instructions(bot, root=root)
-        configure_mcp(bot, role=role, memory_url=url)
+        configure_mcp(bot, role=role, memory_url=url, supabase_url=values["SUPABASE_URL"])
         configure_memory_settings(bot, role=role)
         settings_path = bot / ".pi/settings.json"
         settings = read_config(settings_path)
@@ -77,6 +82,7 @@ def configure_release(root: Path) -> None:
         else:
             configure_subagents(settings, bot)
         write_config(settings_path, settings, ".settings-")
+    configure_assignment_mcp(root / "bots/worker", supabase_url=values["SUPABASE_URL"])
     path, data, changed = telegram
     if changed:
         write_config(path, data, ".telegram-")

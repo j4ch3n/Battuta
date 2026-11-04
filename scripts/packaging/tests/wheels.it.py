@@ -58,6 +58,7 @@ class OfflineToolingTests(unittest.TestCase):
             for role in ("cos", "manager"):
                 config = json.loads((release / f"bots/{role}-bot/.pi/mcp.json").read_text())
                 self.assertEqual("luma" in config["mcpServers"], role == "cos")
+                self.assertEqual(config["mcpServers"]["assignments"]["headers"], {"apikey": "${SUPABASE_SECRET_KEY}"})
             shutil.rmtree(binary.parent)
             next(wheels.glob("battuta_packaging-*.whl")).write_bytes(b"tampered")
             failed = subprocess.run(["bash", str(launcher), "configure"], cwd=work, env=env, capture_output=True, text=True)
