@@ -19,7 +19,7 @@ class SupportChecksTests(unittest.TestCase):
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name).resolve()
         for name in ("scripts/checks/check-support.mjs", "scripts/packaging/battuta", "bots/cos-bot/scripts/run-dev.sh",
-                     "scripts/setup-memory.sh", "scripts/setup-artifacts.sh"):
+                     "scripts/setup-memory.sh", "scripts/setup-artifacts.sh", "scripts/bot_setup/run-worker.sh"):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             if name == "scripts/checks/check-support.mjs":

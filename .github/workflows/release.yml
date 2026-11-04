@@ -53,7 +53,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots scripts/bot_setup scripts/packaging skills-hub project-context-cli agent-mail project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/skill-management.md docs/gogcli-setup.md docs/luma-setup.md docs/luma.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md | tar -x -C dist/stage/battuta
+          git archive HEAD bots scripts/bot_setup scripts/packaging skills-hub project-context-cli agent-mail assignment-worker project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/skill-management.md docs/gogcli-setup.md docs/luma-setup.md docs/luma.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md docs/assignments.md | tar -x -C dist/stage/battuta
           test -s dist/stage/battuta/RELEASE.md
           test -s dist/stage/battuta/docs/gogcli-setup.md
           test -s dist/stage/battuta/docs/luma-setup.md
@@ -144,6 +144,14 @@ jobs:
           pnpm --dir dist/stage/battuta/agent-mail install --frozen-lockfile --prod
           pnpm --dir dist/stage/battuta/project-spec install --frozen-lockfile --prod
           pnpm --dir dist/stage/battuta/memory-client install --frozen-lockfile --prod
+          pnpm --dir dist/stage/battuta/assignment-worker install --frozen-lockfile --prod
+          worker_runtime="$PWD/dist/stage/battuta/assignment-worker"
+          PI_CODING_AGENT_DIR="$worker_runtime/.pi" pnpm --dir "$worker_runtime" exec pi install -l --approve npm:pi-web-access@0.43.0
+          test -f "$worker_runtime/.pi/npm/node_modules/pi-web-access/package.json"
+          test -f dist/stage/battuta/assignment-worker/host.ts
+          test -f dist/stage/battuta/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/extensions/mcp/index.js
+          test -f dist/stage/battuta/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/extensions/codemode/index.js
+          bash -n dist/stage/battuta/scripts/bot_setup/run-worker.sh
           memory_smoke_home="$(mktemp -d)"
           mkdir -p "$memory_smoke_home/agent"
           HOME="$memory_smoke_home" node dist/stage/battuta/memory-client/tests/loader-worker.mjs "$memory_smoke_home/agent" "$PWD/dist/stage/battuta/bots/cos-bot/node_modules/@earendil-works/pi-coding-agent/dist/index.js" "$PWD/dist/stage/battuta/bots/cos-bot/.pi/npm/node_modules/@jl1990/pi-scheduler/extensions/scheduler/index.ts"

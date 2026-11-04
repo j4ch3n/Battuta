@@ -15,9 +15,13 @@ from .memory import configure_memory_settings
 from .subagents import SUBAGENT_PACKAGE, WEB_PACKAGE, configure_subagents
 from .telegram import prepare_telegram_config
 from .skills import check_manifests
+from .skills import load_selection, link_selected_skills
 
 
 def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_file: Path | None = None, env_prefix: str | None = None, telegram_package: str = TELEGRAM_PACKAGE) -> None:
+    if role == "worker":
+        configure_worker(root, bot_dir=bot_dir, env_file=env_file)
+        return
     if role not in {"cos", "manager"}:
         raise click.ClickException("Bot role must be cos or manager")
     prefix = env_prefix or role.upper()
@@ -54,6 +58,61 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
         extra = (WEB_PACKAGE, SUBAGENT_PACKAGE)
     install_packages(bot_dir, telegram_package if role == "cos" else None, extra_packages=extra)
     warn_running_session(bot_dir)
+
+
+def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path | None = None, shared_catalog: bool = False) -> None:
+    bot_dir = (bot_dir or root / "bots/worker").resolve()
+    env_file = (env_file or root / ".env").resolve()
+    values = read_env(env_file)
+    supabase_url = required(values, "SUPABASE_URL", env_file)
+    required(values, "SUPABASE_SECRET_KEY", env_file)
+    assignment_server(supabase_url)
+    memory_url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
+    names = load_selection(root / "bots/worker/skills.json", root / "skills-hub")
+    shared = root / "bots/AGENTS_shared.md"
+    dedicated = bot_dir / "AGENTS_dedicated.md"
+    if not dedicated.exists():
+        dedicated = root / "bots/worker/AGENTS_dedicated.md"
+    content = "\n".join(path.read_text() for path in (shared, dedicated))
+    path = bot_dir / ".pi/settings.json"
+    settings = read_config(path)
+    for key in ("packages", "extensions", "skills"):
+        if not isinstance(settings.get(key, []), list):
+            raise click.ClickException(f"{key} must be a JSON array")
+    runtime = root / "assignment-worker"
+    if not shared_catalog:
+        run("pnpm", "--dir", str(runtime), "install", "--frozen-lockfile")
+        run("pnpm", "--dir", str(root / "agent-mail"), "install", "--frozen-lockfile")
+    extensions = settings.get("extensions", [])
+    for name in ("mcp", "codemode"):
+        extension = runtime / f"node_modules/@earendil-works/pi-coding-agent/dist/extensions/{name}/index.js"
+        if not extension.is_file():
+            raise click.ClickException(f"Missing worker runtime extension: {name}")
+        value = str(extension)
+        if value not in extensions:
+            extensions.append(value)
+    settings["extensions"] = extensions
+    settings["battutaMemoryCapture"] = {"enabled": False}
+    if "research" in names:
+        web = runtime / ".pi/npm/node_modules/pi-web-access"
+        if not shared_catalog:
+            run("node", str(runtime / "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"), "install", "-l", "--approve", WEB_PACKAGE, cwd=runtime, env={**os.environ, "PI_CODING_AGENT_DIR": str(runtime / ".pi")})
+        if not (web / "package.json").is_file():
+            raise click.ClickException("Missing shared worker research tools")
+        packages = settings.get("packages", [])
+        if str(web) not in packages:
+            packages.append(str(web))
+        settings["packages"] = packages
+    if shared_catalog:
+        from os.path import relpath
+        selected = [relpath(root / "skills-hub" / name, bot_dir / ".pi") for name in names]
+        settings["skills"] = list(dict.fromkeys([*settings.get("skills", []), *selected]))
+    else:
+        link_selected_skills(bot_dir, root / "skills-hub", names)
+    bot_dir.mkdir(parents=True, exist_ok=True)
+    (bot_dir / "AGENTS.md").write_text(content)
+    write_config(path, settings, ".settings-")
+    configure_mcp(bot_dir, role="worker", memory_url=memory_url, supabase_url=supabase_url)
 
 
 def configure_release(root: Path) -> None:

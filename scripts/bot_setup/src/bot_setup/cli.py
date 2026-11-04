@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 
 from . import skills
-from .configure import configure_source, configure_release
+from .configure import configure_source, configure_release, configure_worker
 from .env import read_env
 from .install import TELEGRAM_PACKAGE
 from .json_config import write_config
@@ -22,7 +22,7 @@ def main():
 
 @main.command()
 @click.option("--root", type=DIRECTORY, required=True)
-@click.option("--role", type=click.Choice(["cos", "manager"]), required=True)
+@click.option("--role", type=click.Choice(["cos", "manager", "worker"]), required=True)
 @click.option("--bot-dir", type=DIRECTORY)
 @click.option("--env-file", type=FILE)
 @click.option("--env-prefix")
@@ -49,6 +49,15 @@ def refresh_telegram(root, env_file):
 def release(root):
     """Configure a clean installed release."""
     configure_release(root)
+
+
+@main.command("configure-worker")
+@click.option("--root", type=DIRECTORY, required=True)
+@click.option("--bot-dir", type=DIRECTORY, required=True)
+@click.option("--env-file", type=FILE)
+def worker(root, bot_dir, env_file):
+    """Prepare a private worker instance from an installed shared catalog."""
+    configure_worker(root, bot_dir=bot_dir, env_file=env_file or root / ".env.prod", shared_catalog=True)
 
 
 @main.group("skills")

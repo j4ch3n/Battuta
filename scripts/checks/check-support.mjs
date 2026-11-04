@@ -31,6 +31,7 @@ function pythonTests(directory, project) {
 }
 run("bash", ["-n", "scripts/packaging/battuta", "bots/cos-bot/scripts/run-dev.sh"]);
 run("bash", ["-n", "scripts/setup-memory.sh", "scripts/setup-artifacts.sh"]);
+run("bash", ["-n", "scripts/bot_setup/run-worker.sh"]);
 pythonTests("scripts/bot_setup/tests", "scripts/bot_setup");
 pythonTests("scripts/packaging/tests", "scripts/packaging");
 pythonTests("memory-service/tests", "memory-service");

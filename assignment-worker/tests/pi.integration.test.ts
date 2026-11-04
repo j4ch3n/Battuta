@@ -36,6 +36,15 @@ test("native Pi discovers prepared skills and replaces sessions at identical cwd
   vi.stubEnv("SUPABASE_URL", "http://127.0.0.1:54321");
   vi.stubEnv("SUPABASE_SECRET_KEY", "test-private");
   await mkdir(join(dir, ".pi/skills"), { recursive: true });
+  await mkdir(join(dir, ".pi/extensions"));
+  await writeFile(
+    join(dir, ".pi/extensions/visibility.js"),
+    `export default function(pi) {
+    for (const name of ["web_search", "mcp__assignments__get_assignment", "mcp__assignments__claim_assignment", "mcp__memory__memory_remember"]) {
+      pi.registerTool({name,label:name,description:"Fixture capability",parameters:{type:"object",properties:{}},execute:async()=>({content:[],details:{}})});
+    }
+  }`,
+  );
   await writeFile(
     join(dir, ".pi/settings.json"),
     JSON.stringify({
@@ -67,6 +76,11 @@ test("native Pi discovers prepared skills and replaces sessions at identical cwd
     );
     expect(WORKER_TOOLS).not.toContain("mcp__assignments__claim_assignment");
     expect(runtime.session.getActiveToolNames()).toContain("codemode");
+    expect(runtime.session.getActiveToolNames()).toContain("web_search");
+    const visible = runtime.session.getAllTools().map((tool) => tool.name);
+    expect(visible).toContain("mcp__assignments__get_assignment");
+    expect(visible).not.toContain("mcp__assignments__claim_assignment");
+    expect(visible).not.toContain("mcp__memory__memory_remember");
   } finally {
     await runtime.dispose();
     vi.unstubAllEnvs();

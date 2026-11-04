@@ -15,6 +15,8 @@ import type { Binding } from "./types.ts";
 
 export const WORKER_TOOLS = [
   "codemode",
+  "web_search",
+  "web_fetch",
   "read",
   "bash",
   "edit",

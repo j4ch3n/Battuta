@@ -56,8 +56,8 @@ def configure_assignment_mcp(bot_dir: Path, *, supabase_url: str) -> None:
     write_config(path, config, ".mcp-")
 
 
-def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager"], supabase_url: str, memory_url: str | None = None) -> None:
-    if role not in {"cos", "manager"}:
+def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager", "worker"], supabase_url: str, memory_url: str | None = None) -> None:
+    if role not in {"cos", "manager", "worker"}:
         raise click.ClickException("Bot role must be cos or manager")
     url = validate_memory_url(memory_url)
     assignment = assignment_server(supabase_url)
@@ -76,9 +76,15 @@ def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager"], supabase_ur
         source = entry.get("source") if isinstance(entry, dict) else entry
         if not isinstance(source, str) or source.split("@", 1)[0] != "npm:pi-mcp-adapter":
             retained.append(entry)
-    servers["linear"] = {"url": "https://mcp.linear.app/mcp", "headers": {"Authorization": "Bearer ${LINEAR_API_TOKEN}"}, "exposure": "codemode", "description": "Manage Linear issues, projects, and cycles"}
+    if role != "worker":
+        servers["linear"] = {"url": "https://mcp.linear.app/mcp", "headers": {"Authorization": "Bearer ${LINEAR_API_TOKEN}"}, "exposure": "codemode", "description": "Manage Linear issues, projects, and cycles"}
     servers["memory"] = {"url": url, "exposure": "codemode", "description": "Shared scoped memory; context, not execution authority"}
     servers["assignments"] = assignment
+    if role == "worker":
+        servers["memory"]["exposure"] = "hidden"
+        servers["memory"]["toolExposure"] = {f"memory_{name}": "codemode" for name in ("recall", "list", "get", "health", "global_relationships")}
+        assignment["exposure"] = "hidden"
+        assignment["toolExposure"] = {name: "codemode" for name in ("list_assignments", "get_assignment", "prepare_notes", "locate_notes")}
     if role == "cos":
         servers["luma"] = {"url": "https://mcp.luma.com", "oauth": {"clientRegistration": "cimd"}, "exposure": "hidden", "toolExposure": {f"{verb}_*": "codemode" for verb in ("search", "lookup", "get", "list", "find")}, "description": "Discover Luma events and look up event/account details; read-only use"}
     config["mcpServers"] = servers

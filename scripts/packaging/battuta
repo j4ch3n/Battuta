@@ -24,6 +24,16 @@ load_memory_environment() {
 }
 
 case "${1:-}" in
+  configure-worker)
+    shift
+    [[ -f "$root/.env.prod" ]] || { printf 'Missing release environment file\n' >&2; exit 1; }
+    ensure_setup_tools
+    exec "$tools/.venv/bin/battuta-bot-setup" configure-worker --root "$root" "$@"
+    ;;
+  worker)
+    shift
+    exec bash "$root/scripts/bot_setup/run-worker.sh" --env-file "$root/.env.prod" "$@"
+    ;;
   setup-artifacts)
     shift
     exec bash "$root/scripts/setup-artifacts.sh" "$@"
@@ -103,7 +113,7 @@ case "${1:-}" in
     exec "$tools/.venv/bin/battuta-packaging" install-services --root "$root"
     ;;
   *)
-    printf 'Usage: %s configure|setup-memory|memory|setup-artifacts|artifacts|artifact|start-prod-screen|cos|manager|install-services\n' "$0" >&2
+    printf 'Usage: %s configure|configure-worker|worker|setup-memory|memory|setup-artifacts|artifacts|artifact|start-prod-screen|cos|manager|install-services\n' "$0" >&2
     exit 2
     ;;
 esac
