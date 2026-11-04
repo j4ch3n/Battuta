@@ -1,0 +1,12 @@
+{
+  "tasks": {
+    "lint": "deno lint .",
+    "check": "deno check --frozen .",
+    "test": "deno test --frozen ."
+  },
+  "imports": {
+    "@supabase/server": "npm:@supabase/server@1.9.0",
+    "@modelcontextprotocol/server": "npm:@modelcontextprotocol/server@2.4.0",
+    "zod": "npm:zod@4.3.6"
+  }
+}
