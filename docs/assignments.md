@@ -1,119 +1,116 @@
 # Shared assignment runtime
 
-Supabase is authoritative for assignments and ordered TODOs. The custom
-`assignments` Edge Function exposes the MCP service over stateless Streamable
-HTTP. Bot usage is maintained in the todo and note-taking runtime skills.
+Supabase owns assignments, immutable prerequisites, and ordered TODOs. The
+`assignments` Edge Function exposes strict MCP tools over stateless Streamable
+HTTP. CoS defines the problem/authority; Manager publishes complete plans and
+judges results; [persistent workers](workers.md) execute assignments.
 
-## Storage contract
+## Storage and identity
 
-`public.assignments`:
+All targeted calls require exact `project` and eight-lowercase-hex `assignment_id`.
+IDs are real short primary keys, with collision retries, not truncated aliases.
+The server validates name/key shape and matching ownership, not local project
+registration. Unknown or mismatched project/ID returns `not_found`.
 
-| Column                     | PostgreSQL type                      | Meaning                                                    |
-| -------------------------- | ------------------------------------ | ---------------------------------------------------------- |
-| `id`                       | `text primary key`                   | First eight lowercase UUID hex characters; `^[0-9a-f]{8}$` |
-| `project`                  | `text not null`                      | Explicit exact registered-project name                     |
-| `goal`                     | `text not null`                      | Nonblank commission                                        |
-| `constraints`              | `text not null default ''`           | Authority, boundaries, acceptance/input references         |
-| `status`                   | `text not null default 'active'`     | `active`, `done`, `cancelled`                              |
-| `notes_path`               | `text null`                          | Shared absolute local path, established once               |
-| `created_at`, `updated_at` | `timestamptz not null default now()` | Assignment timestamps                                      |
-| `closed_at`                | `timestamptz null`                   | Present exactly when terminal                              |
+| Table                     | Fields and constraints                                                                                                                                                 |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `assignments`             | ID, explicit project, nonblank goal, constraints, status, optional notes_path/blocker, created_at/updated_at/closed_at, claimed_at/lease_expired_at                    |
+| `todos`                   | Composite key assignment_id + positive immutable position, nonblank description, status, outcome summary, evidence text array, optional blocker, created_at/updated_at |
+| `assignment_dependencies` | Unique assignment_id + prerequisite_assignment_id; existing assignments only, no self-edge, immutable after creation                                                   |
+| `assignment_availability` | One singleton row containing a monotonically increasing revision; no assignment payload or delivery ledger                                                             |
 
-A partial unique index on `project WHERE status = 'active'` permits only one
-active assignment per project. ID generation retries collisions up to 100 times,
-without overwriting records. It distinguishes key collisions from active-project
-conflicts. IDs are actual short keys, not aliases for stored full UUIDs.
+Multiple assignments may be open in one project. Creation atomically saves a
+nonempty initial TODO batch and deduplicated prerequisite IDs, then signals
+availability. Missing IDs reject the entire plan and return all missing IDs.
+Prerequisites may cross projects; only `done` satisfies them. Cancelling a
+prerequisite does not unlock its dependents. Existing-only, creation-time edges
+avoid cycles without a mutable dependency graph API.
 
-`public.todos`:
+TODOs stay in ascending position. Appending atomically allocates consecutive
+positions. There is no renumbering, deletion, per-TODO ownership, or TODO graph.
+Complete JSON aggregates avoid PostgREST row-limit truncation; assignment lists
+order by creation time then ID, descending.
 
-| Column                     | PostgreSQL type                            | Meaning                                             |
-| -------------------------- | ------------------------------------------ | --------------------------------------------------- |
-| `assignment_id`            | `text not null references assignments(id)` | Assignment owner                                    |
-| `position`                 | `integer not null`, positive               | Immutable identity and order within assignment      |
-| `description`              | `text not null`                            | Nonblank intended work                              |
-| `status`                   | `text not null default 'todo'`             | `todo`, `in_progress`, `done`, `cancelled`          |
-| `outcome`                  | `text not null default ''`                 | Actual outcome and evidence references              |
-| `created_at`, `updated_at` | `timestamptz not null default now()`       | Item timestamps; updated time is the conflict token |
+## State and execution
 
-`PRIMARY KEY (assignment_id, position)` creates the only required item B-tree
-index. No duplicate index or per-item UUID. Appends allocate consecutive positions;
-updates preserve identity. No deletion, shifting, renumbering, group, or chain.
-All lists explicitly order by position, regardless of execution order.
+Assignment states are `active`, `in_process`, `blocked`, `done`, `cancelled`.
+TODO states are `todo`, `in_progress`, `blocked`, `done`, `cancelled`.
 
-JSONB is used for RPC response envelopes only; neither table stores JSONB arrays.
-Ordered aggregates return complete reads rather than relying on PostgREST's
-default row limit. Historical assignment lists order by creation time then ID,
-both descending.
+An atomic claim locks a ready active assignment and returns the full plan with
+an exact `claimed_at` version and server-computed `lease_expired_at` 45 minutes
+later. Exactly one contender wins. Readiness requires satisfied prerequisites,
+no blocked/in-progress TODO, and at least one `todo` item.
 
-## Transactions and permissions
+**The lease is informational, not a deadline.** Age never renews, releases,
+reclaims, stops, filters, or rejects a claim. Keep claim and item-version strings
+unchanged: JavaScript Date conversion loses PostgreSQL microseconds.
 
-The public RPCs are `assignment_create`, `assignment_list`, `assignment_get`,
-`assignment_append_todos`, `assignment_update_todo`, `assignment_close`,
-`assignment_prepare_notes`, and `assignment_locate_notes`. The Edge Function maps
-the eight MCP tool inputs to these RPCs, without another local state machine.
-Internal project/path helpers are not callable by API roles.
+| MCP tool                              | Authority and effect                                                                                                                           |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create_assignment`                   | Manager publishes goal, complete initial_todos, optional constraints and depends_on_assignment_ids                                             |
+| `list_assignments` / `get_assignment` | Inspect global/project/status work or scoped detail, including dependency status/readiness                                                     |
+| `append_todos` / `update_todo`        | Manager appends or edits/cancels unfinished active/blocked work; exact expected_updated_at required for updates                                |
+| `close_assignment`                    | Cancel nonterminal work without rewriting TODO results                                                                                         |
+| `reactivate_assignment`               | Explicitly return blocked work to active after resolving/cancelling blocked/in-progress TODOs and leaving executable TODOs; clear former claim |
+| `claim_assignment`                    | Code-owned whole-assignment claim                                                                                                              |
+| `start_todo`                          | Code-owned current-claim operation; exact item token, first unfinished position, no parallel TODO                                              |
+| `record_todo_result`                  | Code-owned completed/blocked report, summary/evidence and required blocker for blocked; block assignment and TODO atomically                   |
+| `block_assignment`                    | Code-owned claim-bound runtime blocker, also blocking a running TODO                                                                           |
+| `finish_assignment`                   | Code-owned current-claim completion only for a nonempty all-done/cancelled TODO set                                                            |
+| `prepare_notes` / `locate_notes`      | Establish/locate the shared local note path and current editability                                                                            |
 
-RLS is enabled; anonymous/authenticated roles have no table/RPC access. The shared
-secret-authenticated backend may execute public RPCs but cannot directly mutate
-the tables. Functions use a fixed empty search path and qualified names. All bots
-have equal access. This is trusted same-owner access, not per-bot authentication
-or a multi-tenant boundary. The secret key also carries broader Supabase authority;
-keep it private and expose no unauthenticated endpoint.
+Mutations serialize on the parent assignment row. Claims fence execution; TODO
+writes also compare exact `expected_updated_at`. Terminal work cannot reopen.
+Repeated confirmed same-claim completion/blocking and same-state cancellation
+are idempotent where supported; this is not blanket write-retry permission.
+Completed evidence survives cancellation and blocked-work recovery. Manager must
+replace an assignment to change immutable dependencies and inspect downstream plans.
 
-Every targeted operation checks explicit project + assignment ID. Bots check local
-registration; the server trusts that assertion, validates name/key shape and
-ownership matching, and stores no duplicate project registry. A mismatched project
-returns the same not-found response as an absent record.
+## Permissions, availability, and uncertainty
 
-Append, item update, close, and note preparation serialize on the parent row.
-Multi-item appends are atomic. Items may change state in any order while active;
-there is no blocked status or predecessor enforcement. Updates compare the exact
-`expected_updated_at` token under lock and advance it by at least one microsecond.
-Keep timestamp strings intact; JavaScript Date conversion loses precision.
+Assignment/TODO/dependency tables are RPC-only even for the service role. RLS is
+enabled, helpers are private, and security-definer functions use qualified names
+with an empty search path. The shared backend secret is trusted same-owner
+authority, not per-worker authentication or a tenant boundary.
 
-Completion refuses with ordered unfinished items unless all are done/cancelled;
-an empty assignment can finish. Cancellation skips that check and leaves item
-statuses/outcomes untouched. Terminal records reject subsequent item mutations or
-reopening; repeated same-state closure succeeds without timestamp changes. Either
-terminal status frees the project. Closure is delivery state, not owner acceptance.
+Only the singleton revision is published through Realtime Postgres Changes;
+service-role subscribers can read it. Anonymous/authenticated users cannot read
+its row. Revision events are coalescible hints, not ownership, payloads, or queues.
+Workers reconcile on startup/reconnect/idle and through one fallback timer.
 
-MCP returns structured results and signals expected business refusals with
-`isError`. Unexpected backend errors are sanitized. After uncertain creation or
-append, inspect before repeating: there is no exactly-once/recovery engine.
-Manager updates progress and explicitly sends Agent Mail after each delivery;
-database mutations never send mail automatically.
+Expected refusals carry structured recovery data and `isError`. Unexpected
+errors are sanitized. After uncertain writes, inspect exact authoritative state
+before repeating; never infer ownership from a lost claim response. Database
+mutations do not send mail: worker extension code persists outcomes first, then
+attempts mandatory Manager mail once. A mail failure never rolls back execution.
 
 ## Local working material
 
-The bot expands its local home and passes an absolute Battuta root, normally
-`~/.battuta`, to preparation. The resulting path is:
+Preparation establishes one absolute path:
 
 ```text
-<root>/projects/<project>/work/<8-character-assignment-id>/note.md
+<local-Battuta-root>/projects/<project>/work/<assignment-id>/note.md
 ```
 
-Store the absolute path once; matching preparation is harmless, conflicting roots
-fail rather than relocate it. The server lexically validates roots/components,
-but cannot inspect the host filesystem, permissions, symlinks, or file existence.
-Pi file tools perform local creation/editing after safety checks and preserve
-existing contents. Longer drafts may be adjacent files referenced from notes.
+Matching preparation is harmless; conflicting roots fail rather than relocate.
+The server checks lexical path safety, not filesystem permissions, symlinks, or
+existence. Pi file tools must inspect safe local paths and preserve content.
+Long drafts may live beside the note and be referenced from it or TODO evidence.
+No file synchronization is provided; another host may lack the referenced file.
 
-Both note tools recheck closure. Closed assignments return their existing path
-and frozen/read-only guidance and cannot initialize a new path. Freezing is
-prompt-level only: it cannot prevent direct same-user edits or a local race with
-closure. No note locks, revision history, custom editor, or filesystem security
-guarantee is provided.
+Only `done`/`cancelled` freezes notes/drafts; active/in_process/blocked remain
+editable. Freezing is a team convention, not filesystem enforcement. Terminal
+notes cannot initialize a new path. No file locks, history, or undo are promised.
 
-The project CLI no longer owns local TODO/note/draft management. Existing files
-and opaque historical registry metadata remain untouched and are not imported,
-rewritten, or assigned synthetic IDs. Project registration/context and canonical
-project-spec documents retain their existing responsibilities.
+The existing project CLI and global current-project value are unchanged.
+Historical/private material is neither imported nor rewritten. Assignment
+completion is execution state, not Manager verification or owner acceptance.
 
 ## Verification boundaries
 
-Database integration covers ordering, collision retries, large reads, concurrent
-creation/appends, lock serialization, tokens, closure, and note paths. pgTAP covers
-permissions; real SDK transport tests cover auth, discovery and lifecycle. Unit
-tests stub only the RPC boundary. Setup suites validate configuration without
-calling bots/models. See the contributor check reference for commands. None of
-these tests proves owner acceptance or hard note immutability.
+Database tests cover atomic plans, prerequisite gating, competing claims,
+ordered execution, token conflicts, parent-lock races, late results, recovery,
+large reads, collision retries, and note paths. pgTAP tests privileges; authenticated
+Realtime and real MCP tests cover transport/privacy. Actual Pi integration uses
+loopback provider stubs and test-owned records, including real local mail.
+These checks do not establish live-model compliance or product acceptance.

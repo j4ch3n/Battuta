@@ -55,6 +55,7 @@ jobs:
           mkdir -p dist/stage/battuta/bin
           git archive HEAD bots scripts/bot_setup scripts/packaging skills-hub project-context-cli agent-mail assignment-worker project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/skill-management.md docs/gogcli-setup.md docs/luma-setup.md docs/luma.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md docs/assignments.md | tar -x -C dist/stage/battuta
           test -s dist/stage/battuta/RELEASE.md
+          git archive HEAD docs/workers.md docs/workers-setup.md | tar -x -C dist/stage/battuta
           test -s dist/stage/battuta/docs/gogcli-setup.md
           test -s dist/stage/battuta/docs/luma-setup.md
           test -s dist/stage/battuta/docs/luma.md

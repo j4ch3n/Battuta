@@ -11,7 +11,7 @@ make check-all
 - `pnpm lint`: typed ESLint for Node modules and Deno lint for each function.
 - `pnpm typecheck`: TypeScript compiler checks for Node extensions and Deno checks for all function modules and tests.
 - `pnpm test:unit`: Vitest Node unit tests and Deno-native function tests.
-- `pnpm test:coverage`: Node unit coverage, including untested owned modules; reports are in `agent-mail/coverage/`, `project-spec/coverage/`, and `memory-client/coverage/`.
+- `pnpm test:coverage`: Node unit coverage, including untested owned modules; reports are in `agent-mail/coverage/`, `project-spec/coverage/`, `memory-client/coverage/`, and `assignment-worker/coverage/`. Worker Pi lifecycle/backend composition is also exercised by integration tests with loopback provider stubs, not live models.
 - `pnpm --dir agent-mail test:watch`: watch-mode Node unit tests.
 - `uv run --project memory-service --locked python -m unittest discover -s memory-service/tests -v`: offline Python memory tests. Model provisioning and Pi hardware checks are separate installation run-throughs, not default CI acceptance.
 - `pnpm check:support`: shell syntax checks and Python suites under `scripts/bot_setup/tests/`, `scripts/packaging/tests/`, service packages, and `project-context-cli/tests/`, each using its owning locked uv environment. Test workspaces and integration reports live under `/tmp` (canonicalized on macOS), not the checkout. Launcher/setup tests invoke the real Node scheduler helper, so standalone support jobs also need `pnpm --dir memory-client install --frozen-lockfile --prod` (already covered by `make setup-checks`).
