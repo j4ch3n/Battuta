@@ -22,7 +22,7 @@ import {
   type MessageReference,
 } from "./schemas.ts";
 
-class UncertainWriteError extends Error {}
+import { invokeMail, UncertainWriteError } from "./transport.ts";
 
 const required = (key: string) => {
   const value = process.env[key];
@@ -72,30 +72,7 @@ export default function (pi: ExtensionAPI) {
 
   async function invoke(body: Record<string, unknown>, signal?: AbortSignal) {
     if (!db || !live) throw new Error("Agent mail is disconnected");
-    let result;
-    try {
-      result = await db.functions.invoke("agent-mail", { body, signal });
-    } catch (error) {
-      throw new UncertainWriteError(String(error));
-    }
-    if (result.error) {
-      // Do not automatically retry writes: idempotency was intentionally removed.
-      const response = (result.error as { context?: unknown }).context;
-      if (response instanceof Response) {
-        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-        if (payload?.error)
-          throw response.status >= 500
-            ? new UncertainWriteError(payload.error)
-            : new Error(payload.error);
-      }
-      const error: unknown = result.error;
-      throw new UncertainWriteError(error instanceof Error ? error.message : JSON.stringify(error));
-    }
-    try {
-      return unwrap(result.data as { data: unknown; error: null });
-    } catch (error) {
-      throw new UncertainWriteError(String(error));
-    }
+    return invokeMail(db, body, signal);
   }
 
   async function acknowledge(ref: MessageReference, token: number) {
