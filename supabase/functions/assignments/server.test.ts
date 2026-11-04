@@ -70,3 +70,43 @@ Deno.test("MCP sanitizes backend errors, throws, and malformed output", async ()
     assert.equal(JSON.stringify(result).includes("private-sentinel"), false);
   }
 });
+
+Deno.test("note tools return existing path and editability with user-facing guidance", async () => {
+  for (const status of ["active", "done", "cancelled"]) {
+    for (const tool of ["prepare_notes", "locate_notes"]) {
+      const notes_path = "/home/bot/.battuta/projects/Atlas/work/a3f91c2e/note.md";
+      const result = await call(
+        () =>
+          Promise.resolve({
+            data: {
+              ok: true,
+              notes_path,
+              editable: status === "active",
+              assignment: {
+                id: "a3f91c2e",
+                project: "Atlas",
+                goal: "Goal",
+                constraints: "",
+                status,
+                notes_path,
+                created_at: "2026-11-04T12:00:00+00:00",
+                updated_at: "2026-11-04T12:00:00+00:00",
+                closed_at: status === "active" ? null : "2026-11-04T12:00:00+00:00",
+              },
+            },
+            error: null,
+          }),
+        tool,
+        {
+          project: "Atlas",
+          assignment_id: "a3f91c2e",
+          ...(tool === "prepare_notes" ? { root: "/home/bot/.battuta" } : {}),
+        },
+      );
+      assert.equal(result.structuredContent.notes_path, notes_path);
+      assert.equal(result.structuredContent.editable, status === "active");
+      assert.equal(typeof result.structuredContent.guidance, "string");
+      assert.ok(result.structuredContent.guidance.trim().length > 0);
+    }
+  }
+});

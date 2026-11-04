@@ -24,7 +24,7 @@ Install the recommended VS Code extensions. Deno language support is scoped to `
 
 Use a clean setup, without copying previous-release runtime files or state. For local Supabase, create `.env` from `.env.example` and `supabase/.env` from its example only if absent. Restrict both to mode `600`. Enter CoS's `COS_TELEGRAM_TOKEN`, `TELEGRAM_ALLOWED_USER_ID`, `LINEAR_API_TOKEN`, and the shared Supabase URL/secret key using a private editor; Manager needs no Telegram token. The local functions environment also needs its webhook credentials. For remote development, use `.env.prod` with the deployed project's URL and secret key. Never print secrets or overwrite an existing private environment file to retry setup.
 
-For local Supabase, start Docker and run `supabase start`, then copy its URL and server-side secret key into `.env`. For remote Supabase, ensure migrations and Edge Functions have already been deployed.
+For local Supabase, start Docker and run `supabase start`, then copy its URL and server-side secret key into `.env` using a private editor. For remote Supabase, ensure migrations and Edge Functions, including assignments, have already been deployed. Normal configuration registers assignment MCP for both bots and the worker profile; it never embeds the key value in MCP JSON.
 
 ## Run
 
@@ -47,4 +47,4 @@ uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root .
 uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role manager --env-file .env.prod
 ```
 
-Restart running bots separately to load the migration. In each pane, check `/mcp` and request a read-only Linear lookup. Linear uses native `codemode` exposure for tool discovery and calls.
+Restart running bots separately when authorized to load configuration. Validate generated MCP files and credential placeholders without messaging bots or invoking models. Linear and assignments use native `codemode` exposure for tool discovery and calls.

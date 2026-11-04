@@ -48,8 +48,9 @@ Setup writes upstream `subagents` settings inside Manager's `.pi/settings.json`:
   default through native role settings. No additional context-switch interface
   is added by Battuta.
 
-Telegram, Agent Mail, Linear/MCP, memory, notes, and todo extensions are not
-inherited. Upstream's internal child coordination hooks are not parent plugins.
+Telegram, Agent Mail, Linear/MCP, memory, and the assignment MCP connection are not
+inherited. A separately configured worker profile has assignment MCP metadata,
+but these bounded children do not automatically consume it. Upstream's internal child coordination hooks are not parent plugins.
 The package provides its own tool help and parent-only orchestration skill;
 use its native `subagent` tool rather than `bounded_subagents`.
 

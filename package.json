@@ -23,6 +23,7 @@
     "test:unit": "pnpm test:node && pnpm test:deno",
     "test:coverage": "pnpm --dir agent-mail test:coverage && pnpm --dir project-spec test:coverage && pnpm --dir memory-client test:coverage",
     "test:integration": "node scripts/checks/check-supabase.mjs",
+    "test:assignments:local": "node scripts/checks/check-assignment-local.mjs",
     "check:support": "node scripts/checks/check-support.mjs",
     "check:skills": "uv run --project scripts/bot_setup --locked battuta-bot-setup skills check --root .",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm check:support",

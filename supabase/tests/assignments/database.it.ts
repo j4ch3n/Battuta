@@ -1,6 +1,32 @@
 import assert from "node:assert/strict";
 import { rpc, withDatabaseTest } from "./helpers.ts";
 
+Deno.test(
+  "two registered project names keep independent active assignments and shared access",
+  () =>
+    withDatabaseTest(async (sql, project) => {
+      await withDatabaseTest(async (other, secondProject) => {
+        const first = (await rpc(sql, "assignment_create", [project, "First project", ""]))
+          .assignment;
+        const second = (
+          await rpc(other, "assignment_create", [secondProject, "Second project", ""])
+        ).assignment;
+        assert.equal(first.status, "active");
+        assert.equal(second.status, "active");
+        assert.notEqual(first.id, second.id);
+        assert.equal(
+          (await rpc(other, "assignment_get", [project, first.id])).assignment.goal,
+          "First project",
+        );
+        assert.equal((await rpc(sql, "assignment_get", [project, second.id])).code, "not_found");
+        assert.deepEqual(
+          (await rpc(sql, "assignment_list", [project, "active"])).assignments.map((a) => a.id),
+          [first.id],
+        );
+      });
+    }),
+);
+
 Deno.test("append/update in place, out of order, with stale-write protection", () =>
   withDatabaseTest(async (sql, project) => {
     const { assignment: a } = await rpc(sql, "assignment_create", [project, "Goal", ""]);
