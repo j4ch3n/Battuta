@@ -117,6 +117,17 @@ try {
       env: { ...process.env, SUPABASE_URL: status.API_URL, SUPABASE_SECRET_KEY: status.SECRET_KEY },
     },
   );
+  run("deno", ["task", "lint"], { cwd: resolve(root, "supabase/tests/assignments") });
+  run("deno", ["task", "check"], { cwd: resolve(root, "supabase/tests/assignments") });
+  run("deno", ["task", "integration"], {
+    cwd: resolve(root, "supabase/tests/assignments"),
+    env: {
+      ...process.env,
+      SUPABASE_URL: status.API_URL,
+      SUPABASE_SECRET_KEY: status.SECRET_KEY,
+      SUPABASE_DB_URL: status.DB_URL,
+    },
+  });
 } finally {
   shutdown();
 }
