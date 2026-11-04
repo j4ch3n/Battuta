@@ -40,8 +40,8 @@ export type ReconcileReason = "startup" | "reconnect" | "idle" | "event" | "fall
 export interface CoordinatorOptions {
   assignments: AssignmentClient;
   sessions: ExecutionSessions;
-  notify(detail: Detail): Promise<MailDelivery>;
-  diagnostics(event: string, error?: unknown): void;
+  notify: (detail: Detail) => Promise<MailDelivery>;
+  diagnostics: (event: string, error?: unknown) => void;
 }
 export interface Coordinator {
   reconcile(reason: ReconcileReason): Promise<void>;
