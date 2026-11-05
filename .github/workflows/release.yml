@@ -6,15 +6,118 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
     permissions:
       contents: read
     uses: ./.github/workflows/ci.yml
-  build:
+  prepare:
     needs: validate
+    runs-on: ubuntu-24.04-arm
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Validate release provenance and calculate tool version
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$TAG^{commit}")"
+          git merge-base --is-ancestor HEAD origin/main
+          test -z "$(git status --porcelain)"
+          echo "version=${TAG#v}+g$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+  wheels:
+    needs: prepare
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: battuta-project
+            path: project-context-cli
+          - package: battuta-artifacts
+            path: artifact-service
+          - package: battuta-memory
+            path: memory-service
+          - package: battuta-bot-setup
+            path: scripts/bot_setup
+          - package: battuta-packaging
+            path: scripts/packaging
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.11.19"
+      - name: Build wheel and export locked runtime constraints
+        env:
+          SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.prepare.outputs.version }}
+          PROJECT: ${{ matrix.path }}
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          uv build "$PROJECT" --wheel --out-dir dist
+          uv export --project "$PROJECT" --frozen --no-dev --no-emit-project \
+            --no-emit-package battuta-project --no-emit-package battuta-bot-setup \
+            --no-hashes --format requirements-txt --output-file "dist/$PACKAGE-constraints.txt"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wheel-${{ matrix.package }}
+          path: dist/*
+          if-no-files-found: error
+
+  verify-tools:
+    needs: [prepare, wheels]
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.11.19"
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: wheel-*
+          merge-multiple: true
+          path: dist
+      - name: Verify isolated tools, resources, and native memory loading
+        env:
+          BATTUTA_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          BATTUTA_RELEASE_WHEELS: ${{ github.workspace }}/dist
+          BATTUTA_NATIVE_SMOKE: "1"
+        run: uv run --project scripts/packaging --locked python scripts/packaging/tests/wheels.it.py
+      - name: Record version and checksums
+        env:
+          TOOL_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          printf '%s\n' "$TOOL_VERSION" > dist/python-tools-version.txt
+          cd dist
+          sha256sum *.whl *-constraints.txt python-tools-version.txt > python-tools-SHA256SUMS
+      - uses: actions/upload-artifact@v6
+        with:
+          name: python-tools
+          path: dist/*
+          if-no-files-found: error
+
+  build:
+    needs: prepare
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v7
@@ -29,14 +132,6 @@ jobs:
         with:
           version: "0.11.19"
 
-      - name: Require tag on main
-        env:
-          TAG: ${{ github.ref_name }}
-        run: |
-          git fetch origin main
-          test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$TAG^{commit}")"
-          git merge-base --is-ancestor HEAD origin/main
-
       - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
@@ -50,10 +145,12 @@ jobs:
       - name: Assemble release
         env:
           TAG: ${{ github.ref_name }}
+          TOOL_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots scripts/bot_setup scripts/packaging skills-hub project-context-cli agent-mail project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/skill-management.md docs/gogcli-setup.md docs/luma-setup.md docs/luma.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md docs/assignments.md docs/assignments-setup.md docs/workers.md docs/workers-setup.md | tar -x -C dist/stage/battuta
+          git archive HEAD bots scripts/bot_setup/run-dev.sh scripts/bot_setup/run-worker.sh scripts/bot_setup/wait-for-assignments.mjs skills-hub agent-mail project-spec memory-client scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/skill-management.md docs/gogcli-setup.md docs/luma-setup.md docs/luma.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md docs/assignments.md docs/assignments-setup.md docs/workers.md docs/workers-setup.md | tar -x -C dist/stage/battuta
+          printf '%s\n' "$TOOL_VERSION" > dist/stage/battuta/python-tools-version.txt
           test -s dist/stage/battuta/RELEASE.md
           git archive HEAD docs/workers.md docs/workers-setup.md docs/scheduler.md | tar -x -C dist/stage/battuta
           test -s dist/stage/battuta/docs/gogcli-setup.md
@@ -61,27 +158,6 @@ jobs:
           test -s dist/stage/battuta/docs/luma.md
           test -s dist/stage/battuta/skills-hub/memory/references/tools.md
           test ! -e dist/stage/battuta/bots/AGENTS_personal.md
-          tool_dir="$PWD/dist/stage/battuta/scripts/packaging"
-          uv export --project "$tool_dir" --locked --no-dev --no-emit-project --no-emit-package battuta-bot-setup --format requirements-txt --output-file "$RUNNER_TEMP/tool-requirements.txt"
-          uv build --project "$PWD/dist/stage/battuta/scripts/bot_setup" --wheel --out-dir "$tool_dir/wheels"
-          uv build --project "$tool_dir" --wheel --out-dir "$tool_dir/wheels"
-          python3 -m pip download --require-hashes --no-deps --only-binary=:all: --dest "$tool_dir/wheels" -r "$RUNNER_TEMP/tool-requirements.txt"
-          (cd "$tool_dir/wheels" && sha256sum *.whl > SHA256SUMS)
-          cli_dir="$PWD/dist/stage/battuta/project-context-cli"
-          uv export --project "$cli_dir" --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/project-requirements.txt"
-          uv build --project "$cli_dir" --wheel --out-dir "$cli_dir/wheels"
-          python3 -m pip download --require-hashes --no-deps --only-binary=:all: --dest "$cli_dir/wheels" -r "$RUNNER_TEMP/project-requirements.txt"
-          memory_dir="$PWD/dist/stage/battuta/memory-service"
-          uv export --project "$memory_dir" --locked --no-dev --no-emit-project --format requirements-txt --output-file "$memory_dir/requirements.txt"
-          uv build "$memory_dir" --wheel --out-dir "$memory_dir/wheels"
-          python3 -m pip download --require-hashes --no-deps --only-binary=:all: --dest "$memory_dir/wheels" -r "$memory_dir/requirements.txt"
-          (cd "$memory_dir/wheels" && sha256sum *.whl > SHA256SUMS)
-          artifact_dir="$PWD/dist/stage/battuta/artifact-service"
-          uv export --project "$artifact_dir" --locked --no-dev --no-emit-project --no-emit-package battuta-project --format requirements-txt --output-file "$artifact_dir/requirements.txt"
-          uv build "$artifact_dir" --wheel --out-dir "$artifact_dir/wheels"
-          cp "$cli_dir"/wheels/battuta_project-*.whl "$artifact_dir/wheels/"
-          python3 -m pip download --require-hashes --no-deps --only-binary=:all: --dest "$artifact_dir/wheels" -r "$artifact_dir/requirements.txt"
-          (cd "$artifact_dir/wheels" && sha256sum *.whl > SHA256SUMS)
           cp "$(command -v node)" dist/stage/battuta/bin/node
           cp scripts/packaging/battuta dist/stage/battuta/bin/battuta
           chmod +x dist/stage/battuta/bin/*
@@ -91,39 +167,6 @@ jobs:
             test ! -e "dist/stage/battuta/bots/$bot/.pi/ME.md"
           done
           bash -n dist/stage/battuta/bin/battuta
-          export UV_TOOL_DIR="$RUNNER_TEMP/project-tools"
-          export UV_TOOL_BIN_DIR="$RUNNER_TEMP/project-tool-bin"
-          uv tool install --offline --python 3.12 --no-index --find-links "$cli_dir/wheels" battuta-project
-          skill_cli="$UV_TOOL_BIN_DIR/battuta-project"
-          export LINEAR_API_TOKEN=release-smoke
-          "$skill_cli" --help
-          smoke_home="$(mktemp -d)"
-          HOME="$smoke_home" python3 - <<'PY'
-          import json
-          from pathlib import Path
-          root = Path.home() / ".battuta/projects/release-smoke"
-          code = root / "code"
-          code.mkdir(parents=True)
-          (code / "README.md").write_text("# Release smoke\n")
-          (root / "project.yaml").write_text(json.dumps({
-              "version": 1,
-              "project": {"name": "release-smoke", "path": str(code)},
-              "linear": {"project_id": None, "team_id": None},
-              "github": {"repository": None},
-          }))
-          PY
-          HOME="$smoke_home" "$skill_cli" switch release-smoke
-          HOME="$smoke_home" "$skill_cli" explain
-          HOME="$smoke_home" "$UV_TOOL_DIR/battuta-project/bin/python" - <<'PY'
-          from battuta_project.presentation import render
-          from battuta_project.registry import ProjectRegistry
-
-          summary = render("summary.md.j2", ProjectRegistry().current())
-          assert summary.startswith("# Project Summary: release-smoke\n")
-          assert "## Specifications" in summary
-          assert "{{" not in summary
-          PY
-          rm -rf "$smoke_home"
           for bot in cos-bot manager-bot; do
             bot_dir="$PWD/dist/stage/battuta/bots/$bot"
             pnpm --dir "$bot_dir" install --frozen-lockfile --prod
@@ -155,23 +198,6 @@ jobs:
           memory_smoke_home="$(mktemp -d)"
           mkdir -p "$memory_smoke_home/agent"
           HOME="$memory_smoke_home" node dist/stage/battuta/memory-client/tests/loader-worker.mjs "$memory_smoke_home/agent" "$PWD/dist/stage/battuta/bots/cos-bot/node_modules/@earendil-works/pi-coding-agent/dist/index.js" "$PWD/dist/stage/battuta/bots/cos-bot/.pi/npm/node_modules/@jl1990/pi-scheduler/extensions/scheduler/index.ts"
-          uv venv --python 3.12 "$RUNNER_TEMP/memory-smoke"
-          uv pip install --python "$RUNNER_TEMP/memory-smoke/bin/python" --offline --no-index --find-links "$memory_dir/wheels" battuta-memory
-          "$RUNNER_TEMP/memory-smoke/bin/battuta-memory" --help
-          uv venv --python 3.12 "$RUNNER_TEMP/artifact-smoke"
-          uv pip install --python "$RUNNER_TEMP/artifact-smoke/bin/python" --offline --no-index --find-links "$artifact_dir/wheels" battuta-artifacts
-          "$RUNNER_TEMP/artifact-smoke/bin/battuta-artifact" --help
-          BATTUTA_ARTIFACT_DB="$RUNNER_TEMP/artifact-smoke/registry.sqlite3" "$RUNNER_TEMP/artifact-smoke/bin/battuta-artifact" setup
-          BATTUTA_ARTIFACT_DB="$RUNNER_TEMP/artifact-smoke/registry.sqlite3" "$RUNNER_TEMP/artifact-smoke/bin/battuta-artifact" list --json
-          "$RUNNER_TEMP/artifact-smoke/bin/python" -c 'from importlib.resources import files; from battuta_artifacts.bundles import load_bundle; p = files("battuta_artifacts"); assert (p / "assets/catalog.js").is_file(); assert (p / "templates/index.html").is_file(); [load_bundle(name) for name in ("report", "slides", "live-panel")]'
-          HOME="$RUNNER_TEMP/artifact-smoke" "$RUNNER_TEMP/artifact-smoke/bin/python" - <<'PY'
-          from battuta_project.registry import ProjectRegistry
-          ProjectRegistry().init("release-smoke")
-          PY
-          for template in report slides live-panel; do
-            HOME="$RUNNER_TEMP/artifact-smoke" BATTUTA_ARTIFACT_DB="$RUNNER_TEMP/artifact-smoke/registry.sqlite3" "$RUNNER_TEMP/artifact-smoke/bin/battuta-artifact" init "$template" --project release-smoke --template "$template" --title "Release smoke" --description "Disposable offline template check" --json
-            test ! -e "$RUNNER_TEMP/artifact-smoke/.battuta/projects/release-smoke/artifacts/$template/file-meta.json"
-          done
           rm -rf "$memory_smoke_home"
           test -x dist/stage/battuta/bots/cos-bot/node_modules/.bin/pi
           test -x dist/stage/battuta/bots/manager-bot/node_modules/.bin/pi
@@ -190,11 +216,44 @@ jobs:
           test ! -e dist/stage/battuta/bots/manager-bot/.pi/mcp-auth.json
           test ! -e dist/stage/battuta/bots/cos-bot/.pi/telegram.json
           test ! -e dist/stage/battuta/bots/manager-bot/.pi/telegram.json
-          tar -C dist/stage --exclude='battuta/memory-service/.venv' --exclude='battuta/artifact-service/.venv' -czf "dist/battuta-$TAG-linux-arm64.tar.gz" battuta
+          test ! -e dist/stage/battuta/project-context-cli
+          test ! -e dist/stage/battuta/memory-service
+          test ! -e dist/stage/battuta/artifact-service
+          test ! -e dist/stage/battuta/scripts/packaging
+          test ! -e dist/stage/battuta/scripts/bot_setup/src
+          tar -C dist/stage -czf "dist/battuta-$TAG-linux-arm64.tar.gz" battuta
           (cd dist && sha256sum "battuta-$TAG-linux-arm64.tar.gz" > "battuta-$TAG-linux-arm64.tar.gz.sha256")
 
-      - name: Publish GitHub Release
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bot-archive
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+          if-no-files-found: error
+
+  publish:
+    needs: [build, verify-tools]
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          name: bot-archive
+          path: dist
+      - uses: actions/download-artifact@v7
+        with:
+          name: python-tools
+          path: dist
+      - name: Publish GitHub Release and verify downloadable assets
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" "dist/battuta-$TAG-linux-arm64.tar.gz" "dist/battuta-$TAG-linux-arm64.tar.gz.sha256" --verify-tag --generate-notes
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" dist/* --verify-tag --generate-notes
+          gh release download "$TAG" --dir "$RUNNER_TEMP/published-tools" --pattern '*.whl' --pattern '*-constraints.txt' --pattern 'python-tools-*'
+          cd "$RUNNER_TEMP/published-tools"
+          sha256sum -c python-tools-SHA256SUMS

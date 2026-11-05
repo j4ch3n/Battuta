@@ -1,10 +1,10 @@
 [project]
 name = "battuta-artifacts"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Allowlisted local artifact catalog and HTTP service"
 requires-python = ">=3.12"
 dependencies = [
-    "battuta-project",
+    "battuta-project>=0.1,<2",
     "aiosqlite>=0.21,<1",
     "alembic>=1.16,<2",
     "click>=8.1,<9",
@@ -27,8 +27,14 @@ battuta-project = { path = "../project-context-cli" }
 battuta-artifact = "battuta_artifacts.cli:main"
 
 [build-system]
-requires = ["hatchling>=1.27,<2"]
+requires = ["hatchling>=1.27,<2", "hatch-vcs>=0.4,<1"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/battuta_artifacts"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+root = ".."

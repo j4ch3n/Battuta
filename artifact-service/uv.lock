@@ -58,7 +58,6 @@ wheels = [
 
 [[package]]
 name = "battuta-artifacts"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
@@ -99,7 +98,6 @@ dev = [{ name = "httpx2" }]
 
 [[package]]
 name = "battuta-project"
-version = "0.1.0"
 source = { directory = "../project-context-cli" }
 dependencies = [
     { name = "click" },
