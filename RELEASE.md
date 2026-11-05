@@ -175,7 +175,7 @@ bin/battuta configure-worker
 ```
 
 The production worker service uses `bots/worker` as its private instance; it does
-not use or start the development worker at `~/.battuta/worker/worker-1`.
+not use or start the development worker at `~/.battuta/workers/worker-1`.
 Retained configuration must match the intended credentials/endpoints. If the
 owner changed them, update the affected configuration before starting services.
 

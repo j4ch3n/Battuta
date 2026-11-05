@@ -38,17 +38,32 @@ bin/battuta configure-worker
 This prepares `bots/worker/AGENTS.md`, `.pi/settings.json`, and `.pi/mcp.json`.
 The manifest selects native skill paths into the shared catalog. Settings register
 `bots/worker/extension/assignment-worker/index.ts`, native MCP/codemode, and shared
-research tools. Source setup installs locked shared dependencies; releases use
-their staged dependencies. No custom host or runtime manifest loader is involved.
+`npm:pi-web-access@0.43.0`. Source setup installs locked shared dependencies;
+releases use their staged dependencies. Pi manages the npm package installation.
+The profile's `web-search.json` supplies the same mobile browser user-agent as
+CoS and Manager. No custom host or runtime manifest loader is involved.
 
-## Initialize a private instance
+## Choose a private instance
 
 Choose a unique directory for each process:
 
 ```sh
-worker="$HOME/.battuta/worker/worker-1"
+worker="$HOME/.battuta/workers/worker-1"
 ```
 
+No instance pre-setup is required to open Pi. After shared profile preparation,
+the launcher creates the private `.pi` directory and copies missing `settings.json`,
+generated `mcp.json`, and `web-search.json`, resolving settings resource paths against the source
+profile. It preserves existing files and never requires or copies `AGENTS.md` or
+`auth.json`. Pi handles login and private runtime state during interactive use.
+If the instance needs MCP configuration but the shared file is missing, launch
+stops with the shared worker-configuration command; it never invents endpoints.
+
+### Optional full profile configuration
+
+For Battuta instructions and explicit configuration refreshes, configure the
+instance. The shared MCP file comes from `configure_worker()` through `mcp.py`,
+including worker-specific tool restrictions; Pi does not generate those endpoints.
 From source:
 
 ```sh
@@ -70,21 +85,20 @@ caches are never copied. Explicit reconfiguration preserves private settings and
 custom resources, merges the shared resources, and leaves existing instructions
 intact. Do not keep instance-specific changes in the shared profile.
 
-The launcher can initialize an absent instance from the prepared profile too.
-It leaves an existing complete instance unchanged and rejects a partial profile;
-configure a partial profile explicitly before launching. If the shared installation
-moves, explicitly reconfigure instances to resolve its new resource paths.
-Owned references from the previous installation are replaced, not added alongside
-the new ones; unrelated custom resources remain intact.
+The launcher never runs full profile configuration implicitly. For fully configured
+instances, explicit reconfiguration replaces tracked owned references from the
+previous installation, preserving unrelated custom resources.
 
 ## Authenticate and choose a model — operator only
 
-Before commissioning work, use Pi's normal `/login` and `/model` commands from
-the private instance. For login without assignment discovery, disable extensions
+You can launch directly and use Pi's normal `/login` and `/model` commands;
+an existing auth file is not a launch prerequisite. Before commissioning work,
+finish authentication and configure any required MCP services. For login without assignment discovery, disable extensions
 and skills for this invocation only. From source, after setting `worker` above:
 
 ```sh
 cli="$PWD/bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
+mkdir -p "$worker/.pi"
 (cd "$worker" && PI_CODING_AGENT_DIR="$worker/.pi" node "$cli" --no-extensions --no-skills)
 ```
 
@@ -95,19 +109,18 @@ files. This interactive operator step is not an agent-run setup check.
 
 ## Validate without launching Pi
 
-From the source or release root, with `worker` pointing to the private instance:
+From the source or release root, check the shared resources before first launch:
 
 ```sh
 set -eu
-test -s "$worker/AGENTS.md"
-test -s "$worker/.pi/settings.json"
-test -s "$worker/.pi/mcp.json"
+test -s bots/worker/.pi/settings.json
+test -s bots/worker/.pi/mcp.json
+test -s bots/worker/.pi/web-search.json
 runtime="$PWD/bots/worker/extension/assignment-worker"
 test -f "$runtime/index.ts"
 test -f "$runtime/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
 test -f "$runtime/node_modules/@earendil-works/pi-coding-agent/dist/extensions/mcp/index.js"
 test -f "$runtime/node_modules/@earendil-works/pi-coding-agent/dist/extensions/codemode/index.js"
-test -f "$runtime/node_modules/pi-web-access/package.json"
 bash -n scripts/bot_setup/run-worker.sh
 ```
 

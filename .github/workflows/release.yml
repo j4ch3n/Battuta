@@ -147,7 +147,7 @@ jobs:
           pnpm --dir dist/stage/battuta/memory-client install --frozen-lockfile --prod
           worker_runtime="$PWD/dist/stage/battuta/bots/worker/extension/assignment-worker"
           pnpm --dir "$worker_runtime" install --frozen-lockfile --prod
-          test -f "$worker_runtime/node_modules/pi-web-access/package.json"
+          test -f dist/stage/battuta/bots/worker/.pi/web-search.json
           test -f "$worker_runtime/index.ts"
           test -f "$worker_runtime/node_modules/@earendil-works/pi-coding-agent/dist/extensions/mcp/index.js"
           test -f "$worker_runtime/node_modules/@earendil-works/pi-coding-agent/dist/extensions/codemode/index.js"

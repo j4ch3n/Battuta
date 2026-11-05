@@ -39,10 +39,7 @@ fi
 
 if [[ "$mode" == dev ]]; then
   [[ -f "$repo_dir/supabase/.env" ]] || { printf 'Missing supabase/.env; copy supabase/.env.example\n' >&2; exit 1; }
-  worker_dir="$HOME/.battuta/worker/worker-1"
-  for file in AGENTS.md .pi/settings.json .pi/mcp.json .pi/auth.json; do
-    [[ -s "$worker_dir/$file" ]] || { printf 'Configure and authenticate the worker at %s before launch\n' "$worker_dir" >&2; exit 1; }
-  done
+  worker_dir="$HOME/.battuta/workers/worker-1"
   [[ -f "$repo_dir/bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js" ]] || { printf 'Prepare the shared worker profile and dependencies first\n' >&2; exit 1; }
 fi
 [[ -x "$bot_dir/node_modules/.bin/pi" ]] || { printf 'Pi is not installed; run make setup-cos-bot\n' >&2; exit 1; }
@@ -90,6 +87,7 @@ if [[ "$mode" == dev ]]; then
   tmux select-layout -t "$memory_pane" even-horizontal
   printf -v worker_command 'set -e; set -a; source %q; set +a; node %q; exec bash %q --bot-dir %q --env-file %q' "$env_file" "$repo_dir/scripts/bot_setup/wait-for-assignments.mjs" "$repo_dir/scripts/bot_setup/run-worker.sh" "$worker_dir" "$env_file"
   printf -v worker_command 'exec bash -c %q' "$worker_command"
+  mkdir -p "$worker_dir"
   tmux split-window -h -t "$manager_pane" -c "$worker_dir" "$worker_command"
   tmux select-layout -t "$pi_pane" even-horizontal
 fi

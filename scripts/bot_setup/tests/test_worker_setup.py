@@ -33,9 +33,8 @@ class WorkerSetupTests(unittest.TestCase):
             path = self.runtime / f"node_modules/@earendil-works/pi-coding-agent/dist/extensions/{name}/index.js"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("export default () => {};")
-        web = self.runtime / "node_modules/pi-web-access"
-        web.mkdir(parents=True)
-        (web / "package.json").write_text('{"name":"pi-web-access"}')
+        (self.profile / ".pi").mkdir()
+        (self.profile / ".pi/web-search.json").write_text('{"fetchContent":{"userAgent":"fixture mobile browser"}}')
 
     def prepare(self):
         with patch("bot_setup.configure.run") as run:
@@ -64,7 +63,8 @@ class WorkerSetupTests(unittest.TestCase):
             settings = json.loads((bot / ".pi/settings.json").read_text())
             self.assertTrue(all(Path(value).exists() for value in settings["extensions"]))
             self.assertTrue(all((Path(value) / "SKILL.md").is_file() for value in settings["skills"]))
-            self.assertIn(str(self.runtime / "node_modules/pi-web-access"), settings["packages"])
+            self.assertTrue(all(value.startswith("npm:") for value in settings["packages"]))
+            self.assertEqual(json.loads((bot / ".pi/web-search.json").read_text()), {"fetchContent": {"userAgent": "fixture mobile browser"}})
             self.assertFalse((bot / ".pi/auth.json").exists())
             self.assertFalse((bot / ".pi/models.json").exists())
             self.assertFalse((bot / ".pi/sessions").exists())
@@ -83,6 +83,7 @@ class WorkerSetupTests(unittest.TestCase):
         (self.bot / ".pi/auth.json").write_text("private-auth")
         (self.bot / ".pi/settings.json").write_text(json.dumps({"defaultModel": "private-model", "extensions": ["/private/custom.ts"]}))
         (self.bot / ".pi/mcp.json").write_text(json.dumps({"mcpServers": {"custom": {"url": "https://example.com"}}}))
+        (self.bot / ".pi/web-search.json").write_text('{"fetchContent":{"userAgent":"private browser"}}')
         for _ in range(2):
             configure_worker(self.root, bot_dir=self.bot)
         settings = json.loads((self.bot / ".pi/settings.json").read_text())
@@ -92,6 +93,7 @@ class WorkerSetupTests(unittest.TestCase):
         self.assertEqual((self.bot / ".pi/auth.json").read_text(), "private-auth")
         self.assertEqual((self.bot / ".pi/skills/custom/SKILL.md").read_text(), "private custom")
         self.assertIn("custom", json.loads((self.bot / ".pi/mcp.json").read_text())["mcpServers"])
+        self.assertEqual(json.loads((self.bot / ".pi/web-search.json").read_text()), {"fetchContent": {"userAgent": "private browser"}})
 
     def test_unprepared_profile_fails_without_writing_or_installing(self):
         with patch("bot_setup.configure.run") as run, self.assertRaises(Exception):
@@ -141,7 +143,7 @@ class WorkerSetupTests(unittest.TestCase):
         for key in ("extensions", "packages", "skills"):
             paths = [path for path in configured[key] if path != "/private/custom.ts"]
             self.assertTrue(paths)
-            self.assertTrue(all(Path(path).is_relative_to(second) for path in paths), paths)
+            self.assertTrue(all(path.startswith("npm:") or Path(path).is_relative_to(second) for path in paths), paths)
         self.assertIn("/private/custom.ts", configured["extensions"])
         configure_worker(second, bot_dir=self.bot)
         self.assertEqual(json.loads(settings_path.read_text()), configured)

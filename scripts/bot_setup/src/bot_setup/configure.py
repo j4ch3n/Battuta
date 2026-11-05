@@ -95,13 +95,9 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
     settings["extensions"] = extensions
     settings["battutaMemoryCapture"] = {"enabled": False}
     if "research" in names:
-        web = runtime / "node_modules/pi-web-access"
-        if not (web / "package.json").is_file():
-            raise click.ClickException("Missing shared worker research tools")
         packages = settings.get("packages", [])
-        value = relpath(web, path.parent)
-        if value not in packages:
-            packages.append(value)
+        if WEB_PACKAGE not in packages:
+            packages.append(WEB_PACKAGE)
         settings["packages"] = packages
     selected = [relpath(root / "skills-hub" / name, path.parent) for name in names]
     settings["skills"] = list(dict.fromkeys([*settings.get("skills", []), *selected]))

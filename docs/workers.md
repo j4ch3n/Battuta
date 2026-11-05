@@ -22,13 +22,17 @@ and privilege contracts. Assignment completion is not product acceptance.
 
 The Bash launcher sets cwd to the private worker directory and agentDir to its
 `.pi`, then execs the normal pinned Pi CLI with terminal I/O intact. There is no
-custom SDK host. Setup prepares `bots/worker` from its `skills.json`; instances
-copy prepared configuration and share extension/dependency/catalog resources.
+custom SDK host. On first launch it copies missing settings and generated MCP
+configuration plus `web-search.json` from `bots/worker`, rebasing settings resource paths. Private auth
+and instructions are not prerequisites. Missing shared MCP configuration stops
+launch with a setup command rather than synthesizing endpoints.
+Optional full setup prepares `bots/worker` from its `skills.json` and copies its
+configuration into instances. Instances share extension/dependency/catalog resources.
 Authentication and runtime state are private, never copied. Pi natively discovers the prepared
 skills, packages, extensions, and instructions. Runtime code does not parse the
 manifest or implement a custom resource loader.
 
-Instance settings retain setup-only `battutaWorkerResources` ownership metadata.
+Explicitly configured instances retain setup-only `battutaWorkerResources` ownership metadata.
 Explicit reconfiguration replaces those exact owned paths with the current
 installation's paths, preserving unrelated custom resources. Pi does not interpret
 that metadata at runtime. CoS/Manager configuration never rewrites worker MCP

@@ -21,6 +21,8 @@ class WorkerReleaseTests(ConfigFixture):
         (release / "bots/AGENTS_shared.md").write_text("shared fixture")
         (release / "bots/worker/AGENTS_dedicated.md").write_text("worker fixture")
         (release / "bots/worker/skills.json").write_text('{"skills":["execute-assignment"]}')
+        (release / "bots/worker/.pi").mkdir()
+        (release / "bots/worker/.pi/web-search.json").write_text('{"fetchContent":{"userAgent":"fixture mobile browser"}}')
         skill = release / "skills-hub/execute-assignment"
         skill.mkdir(parents=True)
         (skill / "SKILL.md").write_text("execution fixture")
@@ -49,7 +51,9 @@ class WorkerReleaseTests(ConfigFixture):
         self.assertFalse((self.root / "unexpected-install").exists(), "A staged release must not reinstall shared runtime dependencies")
         self.assertFalse((bot / ".pi/skills").exists())
         self.assertTrue(any((bot / ".pi" / value / "SKILL.md").is_file() for value in settings["skills"]))
+        (bot / ".pi/web-search.json").unlink()
         launch = subprocess.run(["bash", str(moved / "bin/battuta"), "worker", "--bot-dir", str(bot)], env=env, text=True, capture_output=True)
         self.assertEqual(launch.returncode, 0, launch.stderr)
         self.assertEqual(json.loads(launch.stdout), [str(moved / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js")])
+        self.assertEqual(json.loads((bot / ".pi/web-search.json").read_text()), {"fetchContent": {"userAgent": "fixture mobile browser"}})
         self.assertNotIn("private-sentinel", configured.stdout + configured.stderr + launch.stdout + launch.stderr)

@@ -53,9 +53,7 @@ class RunDevTests(LauncherFixture):
                 self.assertNotIn("supabase-test", pane.stdout + pane.stderr)
 
     def test_dev_missing_worker_prerequisite_fails_before_creating_session(self):
-        paths = [self.worker / name for name in (
-            "AGENTS.md", ".pi/settings.json", ".pi/mcp.json", ".pi/auth.json",
-        )] + [self.root / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"]
+        paths = [self.root / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"]
         for path in paths:
             with self.subTest(path=path):
                 backup = path.with_name(path.name + ".saved")
@@ -67,6 +65,14 @@ class RunDevTests(LauncherFixture):
                     self.assertNotIn("supabase-test", result.stdout + result.stderr)
                 finally:
                     backup.rename(path)
+
+    def test_dev_launch_accepts_worker_without_private_configuration(self):
+        shutil.rmtree(self.worker)
+        result = self.run_launcher("dev", existing=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(self.worker.is_dir(), "tmux requires its pane cwd to exist")
+        self.assertFalse((self.worker / ".pi").exists())
+        self.assertTrue(any("--bot-dir" in call[-1] for call in self.commands()))
 
     def test_manager_pane_scrubs_credentials_under_non_bash_tmux_shell(self):
         pi = self.root / "bots/manager-bot/node_modules/.bin/pi"

@@ -2,3 +2,4 @@
 AGENTS.md
 .pi/*
 !.pi/settings.json
+!.pi/web-search.json

@@ -22,17 +22,33 @@ set +a
 for key in SUPABASE_URL SUPABASE_SECRET_KEY; do
   [[ -n "${!key:-}" ]] || { printf 'Missing %s\n' "$key" >&2; exit 1; }
 done
-if [[ ! -f "$bot_dir/AGENTS.md" || ! -f "$bot_dir/.pi/settings.json" || ! -f "$bot_dir/.pi/mcp.json" ]]; then
-  for file in AGENTS.md .pi/settings.json .pi/mcp.json; do
-    [[ ! -e "$bot_dir/$file" && ! -L "$bot_dir/$file" ]] || { printf 'Incomplete worker profile; configure it explicitly before launch\n' >&2; exit 1; }
-  done
-  setup="$root/scripts/packaging/.venv/bin/battuta-bot-setup"
-  if [[ -x "$setup" ]]; then
-    "$setup" configure-worker --root "$root" --bot-dir "$bot_dir"
-  else
-    command -v uv >/dev/null || { printf 'Install uv or configure the private worker profile first\n' >&2; exit 1; }
-    uv run --project "$root/scripts/bot_setup" --locked battuta-bot-setup configure-worker --root "$root" --bot-dir "$bot_dir"
-  fi
+mcp_source="$root/bots/worker/.pi/mcp.json"
+if [[ ! -e "$bot_dir/.pi/mcp.json" && ! -L "$bot_dir/.pi/mcp.json" && ! -f "$mcp_source" ]]; then
+  printf 'Missing generated worker MCP configuration. From the source root run:\n  uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role worker --env-file %q\nFor a release, run bin/battuta configure-worker.\n' "$env_file" >&2
+  exit 1
+fi
+mkdir -p "$bot_dir/.pi"
+if [[ ! -e "$bot_dir/.pi/settings.json" && ! -L "$bot_dir/.pi/settings.json" ]]; then
+  node --input-type=module - "$root/bots/worker/.pi/settings.json" "$bot_dir/.pi/settings.json" <<'JS'
+import { readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+
+const [source, target] = process.argv.slice(2);
+const settings = JSON.parse(readFileSync(source, "utf8"));
+// Native resource paths are relative to the source settings, not the private instance.
+const rebase = (value) => /^(?:[a-z]+:|\/|~)/i.test(value) ? value : resolve(dirname(source), value);
+for (const key of ["extensions", "skills", "packages"]) {
+  if (settings[key]) settings[key] = settings[key].map((entry) =>
+    typeof entry === "string" ? rebase(entry) : { ...entry, source: rebase(entry.source) });
+}
+writeFileSync(target, JSON.stringify(settings, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+JS
+fi
+if [[ ! -e "$bot_dir/.pi/mcp.json" && ! -L "$bot_dir/.pi/mcp.json" ]]; then
+  cp -n "$mcp_source" "$bot_dir/.pi/mcp.json"
+fi
+if [[ -f "$root/bots/worker/.pi/web-search.json" && ! -e "$bot_dir/.pi/web-search.json" && ! -L "$bot_dir/.pi/web-search.json" ]]; then
+  cp -n "$root/bots/worker/.pi/web-search.json" "$bot_dir/.pi/web-search.json"
 fi
 bot_dir="$(cd "$bot_dir" && pwd)"
 for key in $(compgen -v); do
