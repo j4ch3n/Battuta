@@ -19,6 +19,62 @@ from skill_fixtures import skill_catalog
 
 
 class ReleaseInstallTests(ConfigFixture):
+    def test_archive_keeps_launch_resources_without_python_tool_payloads(self):
+        workflow = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
+        script = next(step["run"] for step in workflow["jobs"]["build"]["steps"] if step.get("name") == "Assemble release")
+        stage = self.root / "dist/stage/battuta"
+        stage.mkdir(parents=True)
+        git_dir = subprocess.check_output(["git", "rev-parse", "--absolute-git-dir"], cwd=ROOT, text=True).strip()
+        for command in (line for line in script.splitlines() if line.startswith("git archive HEAD ")):
+            result = subprocess.run(["bash", "-euo", "pipefail", "-c", command], cwd=self.root,
+                                    env={**os.environ, "GIT_DIR": git_dir}, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        for required in ("skills-hub/memory/SKILL.md", "bots/AGENTS_shared.md", "scripts/setup-memory.sh",
+                         "scripts/setup-artifacts.sh", "scripts/bot_setup/run-dev.sh", "scripts/bot_setup/run-worker.sh",
+                         "scripts/bot_setup/wait-for-assignments.mjs", "agent-mail/index.ts", "project-spec/index.ts", "memory-client/index.ts"):
+            self.assertTrue((stage / required).is_file(), required)
+        for excluded in ("project-context-cli", "artifact-service", "memory-service", "scripts/packaging", "scripts/bot_setup/src"):
+            self.assertFalse((stage / excluded).exists(), excluded)
+        self.assertEqual(list(stage.rglob("*.whl")), [])
+        self.assertEqual(list(stage.rglob(".venv")), [])
+
+    def test_release_provenance_produces_one_short_sha_version_or_fails_closed(self):
+        workflow = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
+        script = next(step["run"] for step in workflow["jobs"]["prepare"]["steps"] if step.get("id") == "version")
+        def git(*args):
+            return subprocess.check_output(["git", *args], cwd=self.root, text=True, stderr=subprocess.DEVNULL).strip()
+        git("init", "-b", "main")
+        git("config", "user.email", "test@example.com")
+        git("config", "user.name", "Release test")
+        (self.root / "source").write_text("release")
+        git("add", "source")
+        git("commit", "-m", "fixture")
+        git("tag", "v1.2.3")
+        git("remote", "add", "origin", str(self.root))
+        with tempfile.TemporaryDirectory(dir="/tmp") as directory:
+            output = Path(directory) / "outputs"
+            env = {**os.environ, "TAG": "v1.2.3", "GITHUB_OUTPUT": str(output)}
+            result = subprocess.run(["bash", "-c", script], cwd=self.root, env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(output.read_text(), f"version=1.2.3+g{git('rev-parse', '--short', 'HEAD')}\n")
+            self.assertNotIn(git("rev-parse", "HEAD"), output.read_text())
+            for dirty, tag in ((False, "vbad"), (True, "v1.2.3")):
+                with self.subTest(dirty=dirty, tag=tag):
+                    output.unlink(missing_ok=True)
+                    if dirty:
+                        (self.root / "source").write_text("dirty")
+                    result = subprocess.run(["bash", "-c", script], cwd=self.root, env={**env, "TAG": tag}, capture_output=True, text=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertFalse(output.exists())
+
+    def test_publish_waits_for_all_parallel_wheels_and_archive_validation(self):
+        jobs = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())["jobs"]
+        self.assertEqual(set(jobs["publish"]["needs"]), {"build", "verify-tools"})
+        self.assertIn("wheels", jobs["verify-tools"]["needs"])
+        self.assertEqual(jobs["wheels"]["needs"], jobs["build"]["needs"])
+        self.assertEqual({entry["path"] for entry in jobs["wheels"]["strategy"]["matrix"]["include"]},
+                         {"project-context-cli", "artifact-service", "memory-service", "scripts/bot_setup", "scripts/packaging"})
+
     def extraction_commands(self, home):
         guide = (ROOT / "RELEASE.md").read_text()
         block = next(block for block in re.findall(r"```(?:bash|sh)\n(.*?)```", guide, re.DOTALL) if "tar -xzf" in block)

@@ -80,7 +80,7 @@ jobs:
           if-no-files-found: error
 
   verify-tools:
-    needs: [prepare, wheels]
+    needs: [prepare, wheels, build]
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v7
@@ -105,10 +105,15 @@ jobs:
           pattern: wheel-*
           merge-multiple: true
           path: dist
+      - uses: actions/download-artifact@v7
+        with:
+          name: bot-archive
+          path: archive
       - name: Verify isolated tools, resources, and native memory loading
         env:
           BATTUTA_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
           BATTUTA_RELEASE_WHEELS: ${{ github.workspace }}/dist
+          BATTUTA_RELEASE_ARCHIVE: ${{ github.workspace }}/archive/battuta-${{ github.ref_name }}-linux-arm64.tar.gz
           BATTUTA_NATIVE_SMOKE: "1"
         run: uv run --project scripts/packaging --locked python scripts/packaging/tests/wheels.it.py
       - name: Record version and checksums

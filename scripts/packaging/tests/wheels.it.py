@@ -84,19 +84,27 @@ class ReleasedToolsTests(unittest.TestCase):
             self.assertEqual(run(str(work / "bin/battuta-artifact"), "list", "--json").stdout, before)
             self.assertTrue(database.is_file())
             release = work / "release"
-            (release / "bin").mkdir(parents=True)
-            shutil.copy2(ROOT / "scripts/packaging/battuta", release / "bin/battuta")
-            (release / "bin/node").symlink_to(shutil.which("node"))
-            copy_scheduler_runtime(release)
-            for role in ("cos", "manager"):
-                skill_catalog(release, role)
-                (release / f"bots/{role}-bot/AGENTS_dedicated.md").write_text(role)
-            (release / "bots/AGENTS_shared.md").write_text("Shared")
+            if archive := os.environ.get("BATTUTA_RELEASE_ARCHIVE"):
+                release.mkdir()
+                run("tar", "-xzf", archive, "--strip-components=1", "-C", str(release))
+                self.assertEqual((release / "python-tools-version.txt").read_text().strip(), version)
+                self.assertFalse(list(release.rglob("*.whl")))
+            else:
+                (release / "bin").mkdir(parents=True)
+                shutil.copy2(ROOT / "scripts/packaging/battuta", release / "bin/battuta")
+                (release / "bin/node").symlink_to(shutil.which("node"))
+                copy_scheduler_runtime(release)
+                for role in ("cos", "manager"):
+                    skill_catalog(release, role)
+                    (release / f"bots/{role}-bot/AGENTS_dedicated.md").write_text(role)
+                (release / "bots/AGENTS_shared.md").write_text("Shared")
             (release / ".env.prod").write_text(f"LINEAR_API_TOKEN=release-smoke\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=release-smoke\nTELEGRAM_ALLOWED_USER_ID=123\nCOS_TELEGRAM_TOKEN=101:release-smoke\nPI_SCHEDULER_STATE_FILE={work / 'schedule.json'}\n")
             env.update(PATH=f"{work / 'bin'}:{os.environ['PATH']}", XDG_CONFIG_HOME=str(work / "config"))
             for _ in range(2):
                 run("bash", str(release / "bin/battuta"), "configure")
                 run("bash", str(release / "bin/battuta"), "install-services")
+            if archive:
+                run("bash", str(release / "bin/battuta"), "configure-worker")
             self.assertEqual(len(list((work / "config/systemd/user").glob("*.service"))), 5)
             self.assertFalse((release / "scripts/packaging").exists())
             self.assertFalse((release / "project-context-cli").exists())

@@ -11,14 +11,24 @@ bash scripts/setup-artifacts.sh
 export PATH="$PWD/artifact-service/.venv/bin:$PATH"
 ```
 
-From an extracted release:
+For an extracted release, first install the separate `battuta-artifacts` wheel
+with `uv tool install`, supplying the same release's `battuta-project` wheel via
+`--with`, as directed by release setup. Then provision:
 
 ```sh
 bin/battuta setup-artifacts
-export PATH="$PWD/artifact-service/.venv/bin:$PATH"
+export PATH="$(uv tool dir --bin):$PATH"
 ```
 
-Source setup installs locked dependencies. Release setup verifies bundled wheel checksums, installs dependencies offline and reinstalls the bundled artifact/project packages, including template resources; Python/uv must already be available. Both call `battuta-artifact setup` to apply pending Alembic migrations, preserve registrations, and do not start/restart any service. The publication-status migration retains existing registrations as published; newly initialized presentations are drafts. For upgrades, stop the artifact service and back up the registry first, then rerun setup and restart it. `battuta-artifact setup` applies migrations when the updated package is already installed; no separate SQL step is needed.
+Source setup installs locked dependencies. Release setup uses the already
+installed tool; it does not install Python packages or need CLI sources in the
+archive. Both call `battuta-artifact setup` to apply pending Alembic migrations,
+preserve registrations, and do not start/restart any service. New presentations
+are drafts. For upgrades, stop the artifact service and back up the registry
+first, install the selected wheels and constraints, then rerun setup and restart
+it. `battuta-artifact setup` applies migrations when the updated package is
+already installed; no separate SQL step is needed. Older wheels do not undo
+database migrations.
 
 Use the same `BATTUTA_ARTIFACT_DB` value across setup, CLI, and service if overriding the default. A systemd environment override is not automatically inherited by your terminal or bots. Artifact commands do not load `.env.prod` themselves.
 
@@ -43,7 +53,10 @@ journalctl --user -u battuta-artifacts.service -n 50
 
 The unit restarts on failure and mounts the filesystem read-only within its namespace. User-service sandbox support depends on the host's namespace configuration; inspect systemd errors rather than silently disabling protection. To run while logged out/at boot, ask the operator to enable lingering for this account according to host policy. No service installation, activation, or lingering is performed automatically. For a source checkout, use the foreground command under the host's supervisor; the packaged unit targets the release's `bin/battuta` launcher. macOS development uses the foreground command or an operator-managed launchd job.
 
-Production bot launch adds the artifact virtual environment to PATH; the source tmux launcher does so for CoS. Restart existing bot sessions to pick it up. Standalone sessions need the PATH export above.
+Release user units include the uv tool directory on PATH for all bot roles; the
+source tmux launcher uses the source artifact environment. Restart existing bot
+sessions only with approval to pick up PATH changes. Standalone release sessions
+need the uv tool PATH export above.
 
 ## Verify
 

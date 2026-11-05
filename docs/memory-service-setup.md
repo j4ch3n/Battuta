@@ -14,26 +14,36 @@ Source checkout:
 bash scripts/setup-memory.sh
 ```
 
-Release archive:
+For a release, first install the separate `battuta-memory` wheel with
+`uv tool install --managed-python --python 3.12`, using the selected GitHub
+Release's checksum and dependency constraints from release setup. Then provision:
 
 ```sh
 bin/battuta setup-memory
 ```
 
-The release installs a hash-verified ARM64 wheelhouse into a target-created virtualenv. Source setup resolves only locked dependencies. Setup checks actual sqlite-vec extension loading and ONNX Runtime CPU availability; it never falls back to pseudo-embeddings or installs with sudo.
+Release setup uses the uv-managed tool environment already installed by the bot
+user; it does not install from a bundled wheelhouse or CLI source directory.
+Source setup resolves only locked dependencies. Setup checks actual sqlite-vec
+extension loading and ONNX Runtime CPU availability; it never falls back to
+pseudo-embeddings or installs with sudo.
 
 Release `bin/battuta setup-memory` and `bin/battuta memory` load `.env.prod` when present, matching the bot commands' data-directory settings. Direct source setup uses the calling shell's environment; export any custom `BATTUTA_MEMORY_DATA_DIR` before provisioning.
 
 Model setup downloads the approximately 80 MB pinned MiniLM ONNX archive, verifies its SHA256, and atomically installs weights/tokenizer under `~/.cache/mcp_memory/onnx_models/all-MiniLM-L6-v2/onnx/`. This cache follows HOME, not the database setting. An unknown existing cache is not overwritten: move it aside yourself if you want to replace it. A verified cache is reused offline. Runtime downloads are disabled.
 
-For disconnected provisioning, copy the archive from `https://chroma-onnx-models.s3.amazonaws.com/all-MiniLM-L6-v2/onnx.tar.gz` and run setup with `--archive /path/onnx.tar.gz`. Expected SHA256: `913d7300ceae3b2dbc2c50d1de4baacab4be7b9380491c27fab7418616a16ec3`. The release wheelhouse works offline; uv's managed Python must already be available if the Pi has no network.
+For model provisioning without downloading the model, copy the archive from `https://chroma-onnx-models.s3.amazonaws.com/all-MiniLM-L6-v2/onnx.tar.gz` and run setup with `--archive /path/onnx.tar.gz`. Expected SHA256: `913d7300ceae3b2dbc2c50d1de4baacab4be7b9380491c27fab7418616a16ec3`. Python tool installation still requires network access to GitHub and PyPI; an offline dependency bundle is not provided.
 
 ```sh
-memory-service/.venv/bin/battuta-memory model verify --json
-memory-service/.venv/bin/battuta-memory doctor --json
+export PATH="$(uv tool dir --bin):$PATH"
+battuta-memory model verify --json
+battuta-memory doctor --json
 ```
 
 Run doctor before starting the server; it takes the same single-owner data lock. The running server exposes `memory_health` instead. A corrupt/missing model or changed model fingerprint fails readiness even on an empty database. A model change requires an explicit re-embedding migration, not merely equal dimensions.
+
+For a source checkout, use `memory-service/.venv/bin/battuta-memory` instead of
+the globally installed command above. Do not mix source and release environments.
 
 ## Bot skill exposure
 
