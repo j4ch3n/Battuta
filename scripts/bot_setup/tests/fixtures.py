@@ -107,14 +107,24 @@ with open(os.environ["TMUX_LOG"], "a") as output:
     output.write(json.dumps(args) + "\\n")
 if args[0] == "has-session":
     sys.exit(0 if os.environ["SESSION_EXISTS"] == "1" else 1)
-if args[0] == "new-session":
-    print("%1")
+if "-P" in args:
+    print({"new-session": "%1", "split-window": "%2", "new-window": "%3"}[args[0]])
 ''')
         for name in ("supabase", "make"):
             self.executable(name, "")
+        self.home = self.root / "home"
+        self.worker = self.home / ".battuta/workers/worker-1"
+        (self.worker / ".pi").mkdir(parents=True)
+        for name in ("AGENTS.md", ".pi/settings.json", ".pi/mcp.json", ".pi/auth.json"):
+            (self.worker / name).write_text("{}")
+        (self.root / "assignment-worker/node_modules").mkdir(parents=True)
+        (self.root / "assignment-worker/host.ts").touch()
+        scripts = self.root / "scripts/bot_setup"
+        scripts.mkdir()
+        shutil.copy2(ROOT / "scripts/bot_setup/run-worker.sh", scripts / "run-worker.sh")
 
     def run_launcher(self, mode, existing=True):
-        env = dict(os.environ, PATH=f"{self.bin}:{os.environ['PATH']}",
+        env = dict(os.environ, HOME=str(self.home), PATH=f"{self.bin}:{os.environ['PATH']}",
                    TMUX_LOG=str(self.log), SESSION_EXISTS=str(int(existing)))
         env.pop("TMUX", None)
         return subprocess.run([shutil.which("make"), mode], env=env,

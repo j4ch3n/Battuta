@@ -39,6 +39,11 @@ fi
 
 if [[ "$mode" == dev ]]; then
   [[ -f "$repo_dir/supabase/.env" ]] || { printf 'Missing supabase/.env; copy supabase/.env.example\n' >&2; exit 1; }
+  worker_dir="$HOME/.battuta/workers/worker-1"
+  for file in AGENTS.md .pi/settings.json .pi/mcp.json .pi/auth.json; do
+    [[ -s "$worker_dir/$file" ]] || { printf 'Configure and authenticate the worker at %s before launch\n' "$worker_dir" >&2; exit 1; }
+  done
+  [[ -f "$repo_dir/assignment-worker/host.ts" && -d "$repo_dir/assignment-worker/node_modules" ]] || { printf 'Install the shared worker runtime dependencies first\n' >&2; exit 1; }
 fi
 [[ -x "$bot_dir/node_modules/.bin/pi" ]] || { printf 'Pi is not installed; run make setup-cos-bot\n' >&2; exit 1; }
 [[ -f "$bot_dir/.pi/telegram.json" ]] || { printf 'Telegram is not configured; run make setup-cos-bot\n' >&2; exit 1; }
@@ -70,13 +75,25 @@ printf -v pi_command 'set -e; set -a; source %q; set +a; umask 077; export PATH=
 printf -v manager_command 'set -e; set -a; source %q; set +a; for key in $(compgen -v); do case "$key" in *TELEGRAM*) unset "$key";; esac; done; unset PI_SCHEDULER_STATE_FILE PI_SCHEDULER_CATCHUP_MAX; AGENT_ROLE=manager PI_CODING_AGENT_DIR=%q BATTUTA_MEMORY_URL=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q --extension %q' "$env_file" "$manager_dir/.pi" "$memory_url" "$manager_dir/node_modules/.bin/pi" "$manager_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts" "$repo_dir/memory-client/index.ts"
 # tmux's default shell may be zsh; credential scrubbing uses Bash builtins.
 printf -v manager_command 'exec bash -c %q' "$manager_command"
-pi_pane="$(tmux new-session -d -P -F '#{pane_id}' -s "$session" -n "$mode" -c "$bot_dir" "$pi_command")"
+bot_window="$mode"
+service_window="memory"
 if [[ "$mode" == dev ]]; then
-  tmux split-window -v -p 30 -t "$pi_pane" -c "$repo_dir" 'exec make functions-serve'
+  bot_window="bots"
+  service_window="services"
 fi
-tmux split-window -h -t "$pi_pane" -c "$manager_dir" "$manager_command"
+pi_pane="$(tmux new-session -d -P -F '#{pane_id}' -s "$session" -n "$bot_window" -c "$bot_dir" "$pi_command")"
+manager_pane="$(tmux split-window -h -P -F '#{pane_id}' -t "$pi_pane" -c "$manager_dir" "$manager_command")"
 printf -v memory_command 'set -a; source %q; set +a; exec %q serve' "$env_file" "$repo_dir/memory-service/.venv/bin/battuta-memory"
-tmux new-window -t "=$session" -n memory -c "$repo_dir" "$memory_command"
+memory_pane="$(tmux new-window -P -F '#{pane_id}' -t "=$session" -n "$service_window" -c "$repo_dir" "$memory_command")"
+if [[ "$mode" == dev ]]; then
+  tmux split-window -h -t "$memory_pane" -c "$repo_dir" 'exec make functions-serve'
+  tmux select-layout -t "$memory_pane" even-horizontal
+  printf -v worker_command 'set -e; set -a; source %q; set +a; node %q; exec bash %q --bot-dir %q --env-file %q' "$env_file" "$repo_dir/scripts/bot_setup/wait-for-assignments.mjs" "$repo_dir/scripts/bot_setup/run-worker.sh" "$worker_dir" "$env_file"
+  printf -v worker_command 'exec bash -c %q' "$worker_command"
+  tmux split-window -h -t "$manager_pane" -c "$worker_dir" "$worker_command"
+  tmux select-layout -t "$pi_pane" even-horizontal
+fi
+tmux select-window -t "$pi_pane"
 tmux select-pane -t "$pi_pane"
 
 if [[ -n "${TMUX:-}" ]]; then

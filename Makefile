@@ -15,7 +15,7 @@ help:
 		'  make setup-manager-bot Install Manager Pi and Linear MCP (no Telegram)' \
 		'  make setup-bot        Set up both CoS and Manager bots' \
 		'  make refresh-telegram ENV_FILE=.env  Update CoS Telegram from an env file' \
-		'  make dev              Attach to dev bots + Supabase using .env' \
+		'  make dev              Attach to CoS, Manager, Worker + local services using .env' \
 		'  make prod             Attach to prod bots using .env.prod (remote Supabase)' \
 		'  uv run --project scripts/bot_setup --locked battuta-bot-setup configure --help  Bot setup options'
 

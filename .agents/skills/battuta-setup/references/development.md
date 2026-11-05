@@ -34,7 +34,7 @@ make setup-bot
 make dev
 ```
 
-`make dev` attaches CoS, Manager, and Edge Functions panes; it expects local Supabase to be running already and loads `.env`. Use `make prod` for remote Supabase with `.env.prod`. Launchers do not refresh configuration. Do not run dev and prod concurrently from one checkout; they share Pi state. Source configuration generates manifest-selected relative `.pi/skills/` links locally; these and both session directories are ignored and must not be committed.
+`make dev` opens a `bots` window with CoS, Manager, and Worker in three equal columns, and a `services` window with shared memory and Edge Functions side by side. It expects local Supabase to be running already and loads `.env`. Configure and authenticate `$HOME/.battuta/workers/worker-1` first; see the worker setup entry in the [release setup index](../../../../RELEASE.md#extension-and-skill-setup-index). Use `make prod` for CoS and Manager against remote Supabase with `.env.prod`. Launchers do not refresh configuration. Do not run dev and prod concurrently from one checkout; they share Pi state. Source configuration generates manifest-selected relative `.pi/skills/` links locally; these and both session directories are ignored and must not be committed.
 
 To update CoS Telegram separately, run `make refresh-telegram ENV_FILE=.env`; the file can also be `.env.prod` or another path. It updates CoS's profile only, without reinstalling packages, regenerating instructions, or restarting bots. Reattaching does not reload credentials.
 

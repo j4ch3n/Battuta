@@ -4,24 +4,26 @@ Run source-checkout commands from the repository root. See [development](../.age
 
 ## Make targets
 
-| Command                                        | Purpose                                                     |
-| ---------------------------------------------- | ----------------------------------------------------------- |
-| `make help`                                    | List supported commands                                     |
-| `make setup-checks`                            | Install locked contributor dependencies and Git hooks       |
-| `make format`                                  | Format repository-owned files                               |
-| `make check`                                   | Format, lint, types, unit tests, and supporting-code checks |
-| `make check-all`                               | All checks, including isolated Supabase integration         |
-| `make db-diff NAME=name`                       | Generate a migration from local schema changes              |
-| `make functions-serve`                         | Serve Edge Functions using `supabase/.env`                  |
-| `make setup-bot`                               | Configure both bots and install dependencies                |
-| `make setup-cos-bot`, `make setup-manager-bot` | Configure one bot                                           |
-| `make refresh-telegram ENV_FILE=.env`          | Update CoS Telegram from the selected file                  |
-| `make dev`                                     | Attach CoS, Manager, and local functions; bots use `.env`   |
-| `make prod`                                    | Attach CoS and Manager; bots use `.env.prod`                |
+| Command                                        | Purpose                                                      |
+| ---------------------------------------------- | ------------------------------------------------------------ |
+| `make help`                                    | List supported commands                                      |
+| `make setup-checks`                            | Install locked contributor dependencies and Git hooks        |
+| `make format`                                  | Format repository-owned files                                |
+| `make check`                                   | Format, lint, types, unit tests, and supporting-code checks  |
+| `make check-all`                               | All checks, including isolated Supabase integration          |
+| `make db-diff NAME=name`                       | Generate a migration from local schema changes               |
+| `make functions-serve`                         | Serve Edge Functions using `supabase/.env`                   |
+| `make setup-bot`                               | Configure both bots and install dependencies                 |
+| `make setup-cos-bot`, `make setup-manager-bot` | Configure one bot                                            |
+| `make refresh-telegram ENV_FILE=.env`          | Update CoS Telegram from the selected file                   |
+| `make dev`                                     | Attach CoS, Manager, Worker, and local services using `.env` |
+| `make prod`                                    | Attach CoS and Manager; bots use `.env.prod`                 |
 
 `make refresh-telegram` defaults to `.env`; `ENV_FILE` can select `.env.prod` or another path. It updates only CoS's `.pi/telegram.json` without launching or restarting bots. Manager has no Telegram configuration. Source setup also generates ignored manifest-selected local skill links; releases carry selections as metadata beside one shared catalog.
 
 `make dev` and `make prod` only launch or attach; an existing tmux session is reattached without reloading settings. Dev functions use `supabase/.env` separately.
+
+`make dev` uses two tmux windows: `bots` has CoS, Manager, and one Worker in three equal columns; `services` has shared memory and Edge Functions in two equal columns. Configure and authenticate `$HOME/.battuta/workers/worker-1` first (see [worker setup](workers-setup.md)). Supabase must already be running; the launcher serves functions without starting or restarting the database. Logins and model selections are preserved.
 
 ## Script entry points
 

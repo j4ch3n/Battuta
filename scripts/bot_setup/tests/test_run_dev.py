@@ -10,6 +10,55 @@ from fixtures import LauncherFixture
 
 
 class RunDevTests(LauncherFixture):
+    def test_dev_groups_bots_and_services_in_two_horizontal_windows(self):
+        result = self.run_launcher("dev", existing=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        commands = self.commands()
+        windows = [c[c.index("-n") + 1] for c in commands if c[0] in ("new-session", "new-window")]
+        self.assertEqual(windows, ["bots", "services"])
+        splits = [c for c in commands if c[0] == "split-window"]
+        self.assertEqual(len(splits), 3)
+        self.assertTrue(all("-h" in c for c in splits))
+        self.assertIn("AGENT_ROLE=manager", splits[0][-1])
+        self.assertEqual(splits[1][-1], "exec make functions-serve")
+        self.assertIn("--bot-dir", splits[2][-1])
+        layouts = [c for c in commands if c[0] == "select-layout"]
+        self.assertEqual(len(layouts), 2)
+        self.assertTrue(all(c[-1] == "even-horizontal" for c in layouts))
+
+    def test_dev_worker_command_requires_readiness_and_passes_private_paths(self):
+        result = self.run_launcher("dev", existing=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        command = next(c[-1] for c in self.commands() if "--bot-dir" in c[-1])
+        (self.root / "scripts/bot_setup/run-worker.sh").write_text('printf "%s\\n" "$@"\n')
+        for ready in (False, True):
+            with self.subTest(ready=ready):
+                (self.root / "scripts/bot_setup/wait-for-assignments.mjs").write_text(
+                    f"process.exit({0 if ready else 1});\n")
+                pane = subprocess.run([shutil.which("zsh") or "sh", "-c", command],
+                                      capture_output=True, text=True)
+                self.assertEqual(pane.returncode, 0 if ready else 1, pane.stderr)
+                self.assertEqual(pane.stdout.splitlines(), [
+                    "--bot-dir", str(self.worker), "--env-file", str(self.root / ".env"),
+                ] if ready else [])
+                self.assertNotIn("supabase-test", pane.stdout + pane.stderr)
+
+    def test_dev_missing_worker_prerequisite_fails_before_creating_session(self):
+        paths = [self.worker / name for name in (
+            "AGENTS.md", ".pi/settings.json", ".pi/mcp.json", ".pi/auth.json",
+        )] + [self.root / "assignment-worker" / name for name in ("host.ts", "node_modules")]
+        for path in paths:
+            with self.subTest(path=path):
+                backup = path.with_name(path.name + ".saved")
+                path.rename(backup)
+                try:
+                    result = self.run_launcher("dev", existing=False)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertFalse(any(c[0] == "new-session" for c in self.commands()))
+                    self.assertNotIn("supabase-test", result.stdout + result.stderr)
+                finally:
+                    backup.rename(path)
+
     def test_manager_pane_scrubs_credentials_under_non_bash_tmux_shell(self):
         pi = self.root / "bots/manager-bot/node_modules/.bin/pi"
         pi.write_text(f"#!{sys.executable}\n" + 'import json, os\nprint(json.dumps({"telegram": any("TELEGRAM" in key for key in os.environ)}))\n')
@@ -98,7 +147,7 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"], "token": os.environ.get("LIN
         for role in ("cos", "manager"):
             pi = self.root / f"bots/{role}-bot/node_modules/.bin/pi"
             pi.write_text(f"#!{sys.executable}\n" + 'import json, os, sys\nprint(json.dumps({"mode": os.environ["BATTUTA_TEST_MODE"], "args": sys.argv[1:]}))\n')
-        for mode, expected_splits in (("dev", 2), ("prod", 1)):
+        for mode, expected_splits in (("dev", 3), ("prod", 1)):
             with self.subTest(mode=mode):
                 if self.log.exists():
                     self.log.unlink()
