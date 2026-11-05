@@ -4,12 +4,14 @@ from email.parser import BytesParser
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
 from zipfile import ZipFile
 
-from fixtures import ROOT
+from fixtures import ROOT, copy_scheduler_runtime
+from skill_fixtures import skill_catalog
 
 PROJECTS = {
     "battuta-project": ("project-context-cli", "battuta-project", None),
@@ -73,12 +75,33 @@ class ReleasedToolsTests(unittest.TestCase):
             database = work / ".battuta/artifacts/registry.sqlite3"
             env["BATTUTA_ARTIFACT_DB"] = str(database)
             run(str(work / "bin/battuta-artifact"), "setup")
+            run(str(work / "bin/battuta-artifact"), "init", "release-smoke", "--project", "release-smoke",
+                "--template", "report", "--title", "Release smoke", "--description", "Disposable install check", "--json")
             before = run(str(work / "bin/battuta-artifact"), "list", "--json").stdout
             # Replacing a tool must not replace its user's data/configuration.
             run("uv", "tool", "install", "--reinstall", "--python", "3.12", str(paths["battuta-artifacts"]),
                 "--with", str(paths["battuta-project"]), "--constraint", str(wheels / "battuta-artifacts-constraints.txt"))
             self.assertEqual(run(str(work / "bin/battuta-artifact"), "list", "--json").stdout, before)
             self.assertTrue(database.is_file())
+            release = work / "release"
+            (release / "bin").mkdir(parents=True)
+            shutil.copy2(ROOT / "scripts/packaging/battuta", release / "bin/battuta")
+            (release / "bin/node").symlink_to(shutil.which("node"))
+            copy_scheduler_runtime(release)
+            for role in ("cos", "manager"):
+                skill_catalog(release, role)
+                (release / f"bots/{role}-bot/AGENTS_dedicated.md").write_text(role)
+            (release / "bots/AGENTS_shared.md").write_text("Shared")
+            (release / ".env.prod").write_text(f"LINEAR_API_TOKEN=release-smoke\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=release-smoke\nTELEGRAM_ALLOWED_USER_ID=123\nCOS_TELEGRAM_TOKEN=101:release-smoke\nPI_SCHEDULER_STATE_FILE={work / 'schedule.json'}\n")
+            env.update(PATH=f"{work / 'bin'}:{os.environ['PATH']}", XDG_CONFIG_HOME=str(work / "config"))
+            for _ in range(2):
+                run("bash", str(release / "bin/battuta"), "configure")
+                run("bash", str(release / "bin/battuta"), "install-services")
+            self.assertEqual(len(list((work / "config/systemd/user").glob("*.service"))), 5)
+            self.assertFalse((release / "scripts/packaging").exists())
+            self.assertFalse((release / "project-context-cli").exists())
+            self.assertFalse((release / "memory-service").exists())
+            self.assertFalse((release / "artifact-service").exists())
             if os.environ.get("BATTUTA_NATIVE_SMOKE") == "1":
                 run(str(work / "tools/battuta-memory/bin/python"), "-c", "import sqlite3, sqlite_vec, onnxruntime, tokenizers; c=sqlite3.connect(':memory:'); c.enable_load_extension(True); sqlite_vec.load(c); c.enable_load_extension(False); c.close(); assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()")
 

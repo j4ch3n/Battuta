@@ -3,6 +3,8 @@
 import os
 from pathlib import Path
 import re
+import shutil
+import subprocess
 import tempfile
 
 import click
@@ -11,8 +13,14 @@ import click
 def install_services(root: Path, *, replace: bool = False) -> None:
     root = root.resolve()
     home = Path.home()
-    if any(re.search(r"[^a-zA-Z0-9_./-]", str(path)) for path in (root, home)):
+    try:
+        tool_bin = subprocess.check_output(["uv", "tool", "dir", "--bin"], text=True).strip()
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise click.ClickException("uv tool dir --bin must succeed before installing services") from error
+    uv_bin = str(Path(shutil.which("uv")).parent)
+    if not Path(tool_bin).is_absolute() or any(re.search(r"[^a-zA-Z0-9_./-]", str(path)) for path in (root, home, tool_bin, uv_bin)):
         raise click.ClickException("Install path must not contain spaces or systemd special characters")
+    service_path = f'{tool_bin}:{uv_bin}:/usr/local/bin:/usr/bin:/bin'
     directory = Path(os.environ.get("XDG_CONFIG_HOME", home / ".config")) / "systemd/user"
     units = {}
     for role in ("cos", "manager", "worker"):
@@ -28,6 +36,7 @@ Wants=network-online.target battuta-memory.service
 [Service]
 Type=simple
 WorkingDirectory={bot_dir}
+Environment="PATH={service_path}"
 UMask=0077
 # Pi needs a terminal even when supervised by systemd.
 ExecStart=/usr/bin/script -q -e -c "{command}" /dev/null
@@ -45,6 +54,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory={root}
+Environment="PATH={service_path}"
 Environment=HOME={home}
 Environment=MCP_MEMORY_ONNX_ALLOW_DOWNLOAD=false
 UMask=0077
@@ -63,6 +73,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory={root}
+Environment="PATH={service_path}"
 Environment=HOME={home}
 Environment=PYTHONDONTWRITEBYTECODE=1
 UMask=0077

@@ -19,6 +19,19 @@ def test_shared_launcher_rejects_invalid_mode_from_an_unrelated_cwd(tmp_path):
 
 
 class RunDevTests(LauncherFixture):
+    def test_release_memory_pane_uses_installed_tool_through_release_launcher(self):
+        binary = self.root / "bin"
+        binary.mkdir(exist_ok=True)
+        launcher = binary / "battuta"
+        launcher.write_text('#!/bin/sh\ntest "$*" = memory || exit 99\nprintf installed-memory\n')
+        launcher.chmod(0o700)
+        result = self.run_launcher("prod", existing=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        command = next(call[-1] for call in self.commands() if call[0] == "new-window")
+        pane = subprocess.run(["bash", "-c", command], capture_output=True, text=True)
+        self.assertEqual(pane.returncode, 0, pane.stderr)
+        self.assertEqual(pane.stdout, "installed-memory")
+
     def test_dev_groups_bots_and_services_in_two_horizontal_windows(self):
         result = self.run_launcher("dev", existing=False)
         self.assertEqual(result.returncode, 0, result.stderr)

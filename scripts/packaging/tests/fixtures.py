@@ -21,8 +21,8 @@ def copy_scheduler_runtime(root):
 
 def installed_tools(root):
     """Stub only installation; execute the real installed Python CLI code."""
-    binary = root / "scripts/packaging/.venv/bin"
-    binary.mkdir(parents=True)
+    binary = root / "bin"
+    binary.mkdir(parents=True, exist_ok=True)
     for command, module in (("battuta-bot-setup", "bot_setup.cli"), ("battuta-packaging", "battuta_packaging.cli")):
         script = binary / command
         script.write_text(f"#!{sys.executable}\nfrom {module} import main\nmain()\n")

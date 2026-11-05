@@ -24,8 +24,7 @@ class SetupTests(unittest.TestCase):
             (root / 'scripts').mkdir()
             shutil.copy2(ROOT / 'scripts/packaging/battuta', root / 'bin/battuta')
             shutil.copy2(ROOT / 'scripts/setup-artifacts.sh', root / 'scripts/setup-artifacts.sh')
-            venv = root / 'artifact-service/.venv/bin'
-            venv.mkdir(parents=True)
+            venv = root / 'bin'
             (root / 'bin/uv').write_text('#!/bin/sh\nexit 0\n')
             (root / 'bin/uv').chmod(0o755)
             (venv / 'battuta-artifact').write_text(f'#!{sys.executable}\nfrom battuta_artifacts.cli import main\nmain()\n')
@@ -51,26 +50,15 @@ class SetupTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(store.get('draft')['status'], 'draft')
 
-    def test_release_setup_reinstalls_local_wheels_before_migration_and_propagates_failure(self):
-        import hashlib
+    def test_release_setup_uses_installed_tool_and_propagates_failure(self):
         import json
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'scripts').mkdir()
             shutil.copy2(ROOT / 'scripts/setup-artifacts.sh', root / 'scripts/setup-artifacts.sh')
-            wheels = root / 'artifact-service/wheels'
-            wheels.mkdir(parents=True)
-            (wheels.parent / 'requirements.txt').write_text('')
-            names = ['battuta_artifacts-0.1.0-py3-none-any.whl', 'battuta_project-0.1.0-py3-none-any.whl']
-            for name in names:
-                (wheels / name).write_bytes(name.encode())
-            (wheels / 'SHA256SUMS').write_text(''.join(f'{hashlib.sha256(name.encode()).hexdigest()}  {name}\n' for name in names))
             binary = root / 'bin'
             binary.mkdir()
-            venv = root / 'artifact-service/.venv/bin'
-            venv.mkdir(parents=True)
-            (venv / 'python').symlink_to(sys.executable)
-            for executable in (binary / 'uv', venv / 'battuta-artifact'):
+            for executable in (binary / 'uv', binary / 'battuta-artifact'):
                 executable.write_text(f'#!{sys.executable}\nimport json, os, sys\nwith open(os.environ["CALLS"], "a") as log: log.write(json.dumps(sys.argv) + "\\n")\nif sys.argv[1:] == ["setup"]: sys.exit(7)\n')
                 executable.chmod(0o755)
             log = root / 'calls'
@@ -78,8 +66,5 @@ class SetupTests(unittest.TestCase):
                 'PATH': f'{binary}:{os.environ["PATH"]}', 'CALLS': str(log)}, capture_output=True, text=True)
             self.assertEqual(result.returncode, 7)
             calls = [json.loads(line) for line in log.read_text().splitlines()]
-            installations = [call for call in calls if '--no-deps' in call]
-            self.assertEqual(len(installations), 1)
-            self.assertIn('--reinstall', installations[0])
-            self.assertTrue(all(any(arg.endswith(name) for arg in installations[0]) for name in names))
-            self.assertEqual(calls[-1][1:], ['setup'])
+            self.assertEqual([call[1:] for call in calls], [['setup']])
+            self.assertFalse((root / 'artifact-service').exists())

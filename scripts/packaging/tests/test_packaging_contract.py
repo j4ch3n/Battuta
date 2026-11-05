@@ -3,11 +3,31 @@
 import pytest
 import click
 import shlex
+import os
+import subprocess
 from click.testing import CliRunner
 
 from battuta_packaging.cli import main
 from battuta_packaging.services import install_services
 from skill_fixtures import skill_catalog
+
+
+def test_services_can_resolve_tools_without_shell_initialization(tmp_path, monkeypatch):
+    tools = tmp_path / "tool-bin"
+    tools.mkdir()
+    cli = tools / "battuta-project"
+    cli.write_text("#!/bin/sh\nprintf installed\n")
+    cli.chmod(0o700)
+    monkeypatch.setenv("UV_TOOL_BIN_DIR", str(tools))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    install_services(tmp_path / "release")
+    for unit in (tmp_path / "config/systemd/user").glob("*.service"):
+        value, = (line.removeprefix('Environment="PATH=').removesuffix('"')
+                  for line in unit.read_text().splitlines() if line.startswith('Environment="PATH='))
+        result = subprocess.run(["/bin/sh", "-c", "battuta-project"],
+                                env={**os.environ, "PATH": value}, capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == "installed"
 
 
 @pytest.mark.parametrize("names", [["memory"], []])

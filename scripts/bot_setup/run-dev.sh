@@ -62,13 +62,16 @@ done
 [[ -d "$repo_dir/project-spec/node_modules" ]] || { printf 'Install project-spec dependencies with pnpm --dir project-spec install --frozen-lockfile\n' >&2; exit 1; }
 [[ -d "$repo_dir/memory-client/node_modules" ]] || { printf 'Install memory client dependencies with pnpm --dir memory-client install --frozen-lockfile\n' >&2; exit 1; }
 memory_url="${BATTUTA_MEMORY_URL:-http://127.0.0.1:8901/mcp}"
+if [[ -f "$repo_dir/artifact-service/pyproject.toml" ]]; then
+  export PATH="$repo_dir/artifact-service/.venv/bin:$PATH"
+fi
 export PI_SCHEDULER_STATE_FILE
 PI_SCHEDULER_STATE_FILE="$(node "$repo_dir/memory-client/configure-scheduler.mjs" --print-path)"
 export PI_SCHEDULER_CATCHUP_MAX
 PI_SCHEDULER_CATCHUP_MAX="$(node "$repo_dir/memory-client/configure-scheduler.mjs" --print-catchup)"
 node "$repo_dir/memory-client/configure-scheduler.mjs" --check
 
-printf -v pi_command 'set -e; set -a; source %q; set +a; umask 077; export PATH=%q; export PI_SCHEDULER_STATE_FILE; PI_SCHEDULER_STATE_FILE="$(node %q --print-path)"; export PI_SCHEDULER_CATCHUP_MAX; PI_SCHEDULER_CATCHUP_MAX="$(node %q --print-catchup)"; node %q --check; AGENT_ROLE=cos PI_CODING_AGENT_DIR=%q BATTUTA_MEMORY_URL=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q --extension %q' "$env_file" "$repo_dir/artifact-service/.venv/bin:$PATH" "$repo_dir/memory-client/configure-scheduler.mjs" "$repo_dir/memory-client/configure-scheduler.mjs" "$repo_dir/memory-client/configure-scheduler.mjs" "$bot_dir/.pi" "$memory_url" "$bot_dir/node_modules/.bin/pi" "$bot_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts" "$repo_dir/memory-client/index.ts"
+printf -v pi_command 'set -e; set -a; source %q; set +a; umask 077; export PATH=%q; export PI_SCHEDULER_STATE_FILE; PI_SCHEDULER_STATE_FILE="$(node %q --print-path)"; export PI_SCHEDULER_CATCHUP_MAX; PI_SCHEDULER_CATCHUP_MAX="$(node %q --print-catchup)"; node %q --check; AGENT_ROLE=cos PI_CODING_AGENT_DIR=%q BATTUTA_MEMORY_URL=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q --extension %q' "$env_file" "$PATH" "$repo_dir/memory-client/configure-scheduler.mjs" "$repo_dir/memory-client/configure-scheduler.mjs" "$repo_dir/memory-client/configure-scheduler.mjs" "$bot_dir/.pi" "$memory_url" "$bot_dir/node_modules/.bin/pi" "$bot_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts" "$repo_dir/memory-client/index.ts"
 printf -v manager_command 'set -e; set -a; source %q; set +a; for key in $(compgen -v); do case "$key" in *TELEGRAM*) unset "$key";; esac; done; unset PI_SCHEDULER_STATE_FILE PI_SCHEDULER_CATCHUP_MAX; AGENT_ROLE=manager PI_CODING_AGENT_DIR=%q BATTUTA_MEMORY_URL=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q --extension %q' "$env_file" "$manager_dir/.pi" "$memory_url" "$manager_dir/node_modules/.bin/pi" "$manager_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts" "$repo_dir/memory-client/index.ts"
 # tmux's default shell may be zsh; credential scrubbing uses Bash builtins.
 printf -v manager_command 'exec bash -c %q' "$manager_command"
@@ -81,6 +84,9 @@ fi
 pi_pane="$(tmux new-session -d -P -F '#{pane_id}' -s "$session" -n "$bot_window" -c "$bot_dir" "$pi_command")"
 manager_pane="$(tmux split-window -h -P -F '#{pane_id}' -t "$pi_pane" -c "$manager_dir" "$manager_command")"
 printf -v memory_command 'set -a; source %q; set +a; exec %q serve' "$env_file" "$repo_dir/memory-service/.venv/bin/battuta-memory"
+if [[ -x "$repo_dir/bin/battuta" ]]; then
+  printf -v memory_command 'exec %q memory' "$repo_dir/bin/battuta"
+fi
 memory_pane="$(tmux new-window -P -F '#{pane_id}' -t "=$session" -n "$service_window" -c "$repo_dir" "$memory_command")"
 if [[ "$mode" == dev ]]; then
   tmux split-window -h -t "$memory_pane" -c "$repo_dir" 'exec make functions-serve'
