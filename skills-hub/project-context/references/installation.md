@@ -45,19 +45,22 @@ Use `--reinstall` for an updated release. Python 3.12 must already be available 
 
 `uv tool dir --bin` prints the executable directory (normally `~/.local/bin`). Interactive shell initialization does not automatically apply to systemd user services.
 
-For each service, use `systemctl --user edit battuta-cos.service` or `battuta-manager.service` and set an explicit PATH, replacing the example home with the actual absolute tool directory:
+For each bot service (`battuta-cos.service`, `battuta-manager.service`, and `battuta-worker.service`), use `systemctl --user edit <service>` and set an explicit PATH, replacing the example home with the actual absolute tool directory:
 
 ```ini
 [Service]
 Environment="PATH=/home/bot/.local/bin:/usr/local/bin:/usr/bin:/bin"
 ```
 
-Then reload and restart the affected services:
+Then reload the unit definitions without starting services:
 
 ```sh
 systemctl --user daemon-reload
-systemctl --user restart battuta-cos.service battuta-manager.service
 ```
+
+During release setup, keep bots stopped and return to the release guide's startup
+step. For an already running deployment, ask the owner before restarting affected
+bots to pick up PATH changes; a worker restart can claim available work.
 
 Include custom `gh`/Git locations in PATH when needed (Homebrew on Apple Silicon commonly uses `/opt/homebrew/bin`). Source/tmux launches inherit their shell environment; make the tool available before starting them. Ensure bot services also receive `LINEAR_API_TOKEN` through their runtime environment. Verify `battuta-project --help` and, when cloning is needed, `gh auth status` as the bot user with each bot's intended PATH and token environment. Notes use ordinary Pi file tools; this CLI does not manage notebooks or TODO progress.
 

@@ -146,4 +146,23 @@ session dumps. A triggered turn is not recorded assignment success.
 Sessions stay under the instance's `.pi/sessions/`. The launcher does not
 automatically resume a previous conversation. Interrupting/exiting Pi does not
 release an unfinished claim; inspect it before any manual recovery or restart.
-No worker daemon, pool, service, or automatic takeover is installed.
+No pool or automatic takeover is installed. Source setup does not install a
+worker service.
+
+## Release user service
+
+`bin/battuta install-services` also writes `battuta-worker.service`, without
+starting or enabling it. The unit runs the normal worker launcher under a PTY,
+using that release's `bots/worker` as its private instance. Prepare or retain its
+configuration before starting it. Do not run another process for that profile.
+
+Follow [release setup](../RELEASE.md) to stop the old deployment, retain private
+configuration, install all three bot services, and switch their release paths.
+`install-services --replace` explicitly replaces regular unit files; it refuses
+symlinks and leaves systemd drop-ins unchanged. Check customizations before use.
+
+Only enable/start the worker after owner approval to execute available work.
+The owner handles authentication, model access, and functional acceptance; service
+status alone does not establish readiness. Stop the service before opening its
+profile interactively. Inspect unfinished claims before interrupting or restarting
+the worker; supervision does not add automatic claim recovery.

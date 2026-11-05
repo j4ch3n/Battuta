@@ -17,6 +17,7 @@ TypeScript on Node.js and Deno, the Pi coding-agent runtime, Telegram, Linear, a
 - Cover changed behavior, edge cases, and regressions with meaningful tests. Use parameterized tests for equivalent cases.
 - Arrange tests using the current post-update state as the starting state; do not add legacy-state or migration scenarios unless migration behavior is explicitly in scope.
 - For setup/configuration tests, test behavior (validation, role separation, preservation, idempotence, failure handling, and credential privacy), not exact configured values or configuration snapshots.
+- Keep setup/release testing minimal: reuse existing test infrastructure, add only focused checks for changed executable behavior, and do not introduce extra test setup, elaborate fixtures, or duplicate end-to-end launch tests. Leave authentication and bot/model functional checks to the human.
 - Do not add tests that assert prompt or instruction wording. Test executable behavior and integration contracts instead.
 - Keep unit tests small and focused. Stub external services, clocks, and runtime boundaries; exercise real internal logic. Use integration tests for cross-system behavior.
 - Name Python integration tests `<subject>.it.py`; keep unit tests as `test_<subject>.py`. Run both through `pnpm check:support`; see [code checks](.agents/skills/battuta-verify/references/checks.md) for direct invocation and opt-in integration prerequisites.

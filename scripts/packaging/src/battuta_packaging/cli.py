@@ -22,9 +22,10 @@ def validate(root):
 
 @main.command("install-services")
 @click.option("--root", required=True, type=click.Path(file_okay=False, path_type=Path))
-def services(root):
+@click.option("--replace", is_flag=True, help="Replace existing regular unit files with this release's definitions. Stop services first.")
+def services(root, replace):
     """Install user service units, never start or restart them."""
-    install_services(root)
+    install_services(root, replace=replace)
 
 
 if __name__ == "__main__":

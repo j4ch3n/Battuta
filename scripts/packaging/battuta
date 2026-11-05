@@ -109,8 +109,9 @@ case "${1:-}" in
     exec "$bot_dir/node_modules/.bin/pi" --approve --continue --session-dir "$bot_dir/.pi/mail-sessions" --extension "$root/agent-mail/index.ts" --extension "$root/project-spec/index.ts" --extension "$root/memory-client/index.ts"
     ;;
   install-services)
+    shift
     ensure_setup_tools
-    exec "$tools/.venv/bin/battuta-packaging" install-services --root "$root"
+    exec "$tools/.venv/bin/battuta-packaging" install-services --root "$root" "$@"
     ;;
   *)
     printf 'Usage: %s configure|configure-worker|worker|setup-memory|memory|setup-artifacts|artifacts|artifact|start-prod-screen|cos|manager|install-services\n' "$0" >&2

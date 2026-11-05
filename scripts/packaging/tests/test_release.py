@@ -1,6 +1,7 @@
 """Release package installation runs inside the staged bot workspaces."""
 
 import os
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -18,6 +19,16 @@ from skill_fixtures import skill_catalog
 
 
 class ReleaseInstallTests(ConfigFixture):
+    def extraction_commands(self, home):
+        guide = (ROOT / "RELEASE.md").read_text()
+        block = next(block for block in re.findall(r"```(?:bash|sh)\n(.*?)```", guide, re.DOTALL) if "tar -xzf" in block)
+        downloads = Path(home) / "battuta"
+        downloads.mkdir(exist_ok=True)
+        archive = downloads / "battuta-vX.X.X-linux-arm64.tar.gz"
+        archive.write_bytes(b"unused: checks stop before extraction")
+        archive.with_suffix(".gz.sha256").write_text(f"{hashlib.sha256(archive.read_bytes()).hexdigest()}  {archive.name}\n")
+        return block.split("tar -xzf", 1)[0] + "\nprintf extraction-reached\n"
+
     def test_production_screen_calls_shared_launcher_after_relocation(self):
         release = self.root / "release"
         (release / "bin").mkdir(parents=True)
@@ -93,32 +104,30 @@ os.execv(sys.executable, [sys.executable, "-m", "battuta_packaging.cli", *args[i
         self.assertEqual(snapshots[0], snapshots[1])
 
     def test_extraction_stops_on_visible_or_hidden_existing_content(self):
-        guide = (ROOT / "RELEASE.md").read_text()
-        commands = guide.split("```sh\nset -eu\n", 1)[1].split("tar -xzf", 1)[0]
-        for content in (None, "existing", ".private", "\n"):
+        for content in (None, "", "existing", ".private", "\n"):
             with self.subTest(content=content), tempfile.TemporaryDirectory(dir=self.root) as directory:
-                target = Path(directory) / "apps/battuta"
-                target.mkdir(parents=True)
+                command = self.extraction_commands(directory)
+                target = Path(directory) / "battuta/battuta-vX.X.X"
+                if content is not None:
+                    target.mkdir()
                 if content:
                     (target / content).write_text("preserve")
-                command = "set -eu\n" + commands + "\nprintf extraction-reached\n"
                 result = subprocess.run(["bash", "-c", command], env={**os.environ, "HOME": directory}, capture_output=True, text=True)
-                self.assertEqual(result.returncode == 0, content is None)
-                self.assertEqual("extraction-reached" in result.stdout, content is None)
+                self.assertEqual(result.returncode == 0, not content, result.stderr)
+                self.assertEqual("extraction-reached" in result.stdout, not content)
                 if content:
                     self.assertTrue(result.stderr)
                     self.assertEqual((target / content).read_text(), "preserve")
 
     @unittest.skipIf(os.geteuid() == 0, "root bypasses directory read permissions")
     def test_extraction_stops_if_target_cannot_be_inspected(self):
-        guide = (ROOT / "RELEASE.md").read_text()
-        commands = guide.split("```sh\nset -eu\n", 1)[1].split("tar -xzf", 1)[0]
         with tempfile.TemporaryDirectory(dir=self.root) as directory:
-            target = Path(directory) / "apps/battuta"
-            target.mkdir(parents=True)
+            commands = self.extraction_commands(directory)
+            target = Path(directory) / "battuta/battuta-vX.X.X"
+            target.mkdir()
             target.chmod(0o300)
             try:
-                result = subprocess.run(["bash", "-c", "set -eu\n" + commands + "\nprintf extraction-reached\n"], env={**os.environ, "HOME": directory}, capture_output=True, text=True)
+                result = subprocess.run(["bash", "-c", commands], env={**os.environ, "HOME": directory}, capture_output=True, text=True)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertNotIn("extraction-reached", result.stdout)
             finally:
