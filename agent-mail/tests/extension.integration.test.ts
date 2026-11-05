@@ -39,7 +39,7 @@ type Tool = {
 };
 
 function session(
-  role: "pm" | "tl",
+  role: "cos" | "manager",
   id: string = randomUUID(),
   entries: Entry[] = [],
   autoAccept = true,
@@ -101,7 +101,7 @@ function session(
 }
 const intent = (
   summary: string,
-  recipient: "pm" | "tl" = "tl",
+  recipient: "cos" | "manager" = "manager",
   expectation: Static<typeof SendArguments>["reply_expectation"] = null,
 ): Static<typeof SendArguments> => ({
   recipient,
@@ -113,17 +113,17 @@ const intent = (
 test("different Pi UUIDs communicate by role; JSON delivery, acceptance, replies and session changes", async () => {
   process.env.SUPABASE_URL = url;
   process.env.SUPABASE_SECRET_KEY = secret;
-  const pm = session("pm"),
-    lead = session("tl", randomUUID(), [], false),
-    sessions = [pm, lead];
-  const conversations = [pm.id];
+  const cos = session("cos"),
+    lead = session("manager", randomUUID(), [], false),
+    sessions = [cos, lead];
+  const conversations = [cos.id];
   try {
-    assert.notEqual(pm.id, lead.id);
-    await pm.start();
+    assert.notEqual(cos.id, lead.id);
+    await cos.start();
     await lead.start();
-    const sent = await pm.execute(
+    const sent = await cos.execute(
       "send_agent_message",
-      intent("Technical question", "tl", { window: "medium" }),
+      intent("Technical question", "manager", { window: "medium" }),
     );
     const ref = sent.details.message_ref;
     await wait(() => lead.messages.some((message) => message.details.message_ref.id === ref.id));
@@ -136,7 +136,7 @@ test("different Pi UUIDs communicate by role; JSON delivery, acceptance, replies
     };
     assert.deepEqual(envelope.message_ref, ref);
     assert.equal(envelope.in_reply_to, null);
-    assert.equal(envelope.sender, "pm");
+    assert.equal(envelope.sender, "cos");
     assert.equal((await row(ref)).status, "created"); // Receipt alone is not read.
     await lead.accept(delivered);
     await wait(async () => (await row(ref)).status === "read");
@@ -146,14 +146,14 @@ test("different Pi UUIDs communicate by role; JSON delivery, acceptance, replies
       content: content("Technical answer"),
       reply_expectation: null,
     });
-    assert.equal(answer.details.message_ref.conversation_id, pm.id);
+    assert.equal(answer.details.message_ref.conversation_id, cos.id);
     await wait(() =>
-      pm.messages.some(
+      cos.messages.some(
         (message) => message.details.message_ref.id === answer.details.message_ref.id,
       ),
     );
     assert.deepEqual(
-      (JSON.parse(pm.messages.at(-1)!.content) as { in_reply_to: MessageReference }).in_reply_to,
+      (JSON.parse(cos.messages.at(-1)!.content) as { in_reply_to: MessageReference }).in_reply_to,
       ref,
     );
     assert.equal((await row(ref)).status, "replied");
@@ -165,8 +165,8 @@ test("different Pi UUIDs communicate by role; JSON delivery, acceptance, replies
         reply_expectation: null,
       }),
     );
-    await pm.stop();
-    const resumed = session("pm", pm.id, pm.entries);
+    await cos.stop();
+    const resumed = session("cos", cos.id, cos.entries);
     sessions.push(resumed);
     await resumed.start();
     assert.equal(resumed.messages.length, 0);
@@ -177,7 +177,7 @@ test("different Pi UUIDs communicate by role; JSON delivery, acceptance, replies
     await resumed.start();
     const next = await resumed.execute("send_agent_message", intent("New session"));
     assert.equal(next.details.message_ref.conversation_id, nextId);
-    assert.equal((await row(next.details.message_ref)).recipient, "tl");
+    assert.equal((await row(next.details.message_ref)).recipient, "manager");
   } finally {
     for (const item of sessions.reverse()) await item.stop();
     await cleanup(conversations);
@@ -191,8 +191,8 @@ test("append-before-ack recovery and failed acknowledgement retry do not reinjec
   const stored = ok(
     await db
       .rpc("agent_mail_send", {
-        p_sender_role: "pm",
-        p_recipient_role: "tl",
+        p_sender_role: "cos",
+        p_recipient_role: "manager",
         p_conversation_id: conversation,
         p_message_type: "chat",
         p_content: content("Recover me"),
@@ -217,7 +217,7 @@ test("append-before-ack recovery and failed acknowledgement retry do not reinjec
     }
     return originalFetch(input, init);
   };
-  const lead = session("tl", randomUUID(), [
+  const lead = session("manager", randomUUID(), [
     { type: "custom_message", customType: "agent-mail", details: { message_ref: ref } },
   ]);
   try {
@@ -238,13 +238,13 @@ test("complete reports cover original requirements, including after an initial p
   process.env.SUPABASE_URL = url;
   process.env.SUPABASE_SECRET_KEY = secret;
   const conversation = randomUUID(),
-    lead = session("tl");
+    lead = session("manager");
   const requirements = ["Retain the original task", "Do not create duplicate retry work"];
   const parent = ok(
     await db
       .rpc("agent_mail_send", {
-        p_sender_role: "pm",
-        p_recipient_role: "tl",
+        p_sender_role: "cos",
+        p_recipient_role: "manager",
         p_conversation_id: conversation,
         p_message_type: "chat",
         p_content: requestContent("Implement retry behavior", requirements),
@@ -282,7 +282,7 @@ test("complete reports cover original requirements, including after an initial p
     });
     assert.equal(await lead.settle(), undefined); // Responding is not a completion claim.
     const followup = {
-      recipient: "pm",
+      recipient: "cos",
       message_type: "chat",
       reply_expectation: null,
       content: completedContent("Verified retry behavior", requirements),
@@ -309,13 +309,13 @@ test("required-reply guard corrects missing mail twice, reports failure, and rec
   process.env.SUPABASE_URL = url;
   process.env.SUPABASE_SECRET_KEY = secret;
   const conversation = randomUUID(),
-    lead = session("tl"),
+    lead = session("manager"),
     sessions = [lead];
   const parent = ok(
     await db
       .rpc("agent_mail_send", {
-        p_sender_role: "pm",
-        p_recipient_role: "tl",
+        p_sender_role: "cos",
+        p_recipient_role: "manager",
         p_conversation_id: conversation,
         p_message_type: "chat",
         p_content: requestContent("Please investigate"),
@@ -340,7 +340,7 @@ test("required-reply guard corrects missing mail twice, reports failure, and rec
     assert.equal((await row(ref)).status, "read");
     await lead.stop();
     // A new Pi session receives only unanswered read requests, not all old mail.
-    const recovered = session("tl");
+    const recovered = session("manager");
     sessions.push(recovered);
     await recovered.start();
     assert.equal(recovered.messages.length, 1);
@@ -363,13 +363,13 @@ test("ambiguous reply failures persist across restart and never trigger automati
   process.env.SUPABASE_URL = url;
   process.env.SUPABASE_SECRET_KEY = secret;
   const conversation = randomUUID(),
-    lead = session("tl"),
+    lead = session("manager"),
     sessions = [lead];
   const parent = ok(
     await db
       .rpc("agent_mail_send", {
-        p_sender_role: "pm",
-        p_recipient_role: "tl",
+        p_sender_role: "cos",
+        p_recipient_role: "manager",
         p_conversation_id: conversation,
         p_message_type: "chat",
         p_content: requestContent("Investigate"),
@@ -405,7 +405,7 @@ test("ambiguous reply failures persist across restart and never trigger automati
     await assert.rejects(() => lead.execute("reply_agent_message", answer), /delivery unknown/);
     assert.equal(await lead.settle(), undefined);
     await lead.stop();
-    const recovered = session("tl", lead.id, lead.entries);
+    const recovered = session("manager", lead.id, lead.entries);
     sessions.push(recovered);
     await recovered.start();
     assert.equal(await recovered.settle(), undefined);
@@ -418,7 +418,7 @@ test("ambiguous reply failures persist across restart and never trigger automati
     globalThis.fetch = originalFetch;
     ok<unknown>(
       await db.rpc("agent_mail_reply", {
-        p_sender_role: "tl",
+        p_sender_role: "manager",
         p_parent_conversation_id: conversation,
         p_parent_id: ref.id,
         p_message_type: "chat",

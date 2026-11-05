@@ -11,8 +11,8 @@ const sha = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("he
 test("metadata rejects malformed or impossible terminal timestamps", async () => {
   const f = await fixture();
   try {
-    await f.pm.initSpec(input);
-    await f.pm.finalizeSpec({
+    await f.cos.initSpec(input);
+    await f.cos.finalizeSpec({
       project: "atlas",
       name: input.name,
       decision: "go",
@@ -27,7 +27,7 @@ test("metadata rejects malformed or impossible terminal timestamps", async () =>
     ]) {
       metadata.specs[0].decision!.recorded_at = timestamp;
       await writeFile(path, JSON.stringify(metadata));
-      await assert.rejects(f.pm.inspectSpecs("atlas"), /timestamp/);
+      await assert.rejects(f.cos.inspectSpecs("atlas"), /timestamp/);
     }
   } finally {
     await f.cleanup();
@@ -38,21 +38,21 @@ for (const outcome of ["go", "no-go"] as const) {
   test(`${outcome} saves rationale, snapshots exact bytes, and locks all further authoring`, async () => {
     const f = await fixture();
     try {
-      const spec = await f.pm.initSpec(input);
-      const checklist = await f.tl.writeChecklist({ ...input, content: "C1: criterion" });
-      const review = await f.tl.writeReview({
+      const spec = await f.cos.initSpec(input);
+      const checklist = await f.manager.writeChecklist({ ...input, content: "C1: criterion" });
+      const review = await f.manager.writeReview({
         ...input,
         content: "C1: failed; unresolved",
         spec_version: "v1",
         checklist_sha256: checklist.sha256,
       });
-      const result = await f.pm.finalizeSpec({
+      const result = await f.cos.finalizeSpec({
         project: "atlas",
         name: input.name,
         decision: outcome,
         rationale: "Scope tradeoff accepted.\r\n",
       });
-      const metadata = (await f.pm.describeSpec("atlas", input.name)).spec.decision!;
+      const metadata = (await f.cos.describeSpec("atlas", input.name)).spec.decision!;
       assert.equal(metadata.outcome, outcome);
       assert.deepEqual(metadata.sha256, {
         spec: sha(await readFile(spec.path)),
@@ -64,12 +64,16 @@ for (const outcome of ["go", "no-go"] as const) {
       for (const path of [spec.path, checklist.path, review.path, result.path])
         assert.equal((await stat(path)).mode & 0o222, 0);
       for (const operation of [
-        () => f.pm.updateSpec(input),
-        () => f.tl.writeChecklist(input),
+        () => f.cos.updateSpec(input),
+        () => f.manager.writeChecklist(input),
         () =>
-          f.tl.writeReview({ ...input, spec_version: "v1", checklist_sha256: checklist.sha256 }),
+          f.manager.writeReview({
+            ...input,
+            spec_version: "v1",
+            checklist_sha256: checklist.sha256,
+          }),
         () =>
-          f.pm.finalizeSpec({
+          f.cos.finalizeSpec({
             project: "atlas",
             name: input.name,
             decision: outcome,
@@ -86,56 +90,56 @@ for (const outcome of ["go", "no-go"] as const) {
 test("finalization has no optional-artifact gate and accepts stale review snapshots", async () => {
   const f = await fixture();
   try {
-    await f.pm.initSpec(input);
-    await f.pm.finalizeSpec({
+    await f.cos.initSpec(input);
+    await f.cos.finalizeSpec({
       project: "atlas",
       name: input.name,
       decision: "go",
       rationale: "Proceed without review.",
     });
-    const snapshot = (await f.pm.describeSpec("atlas", input.name)).spec.decision!.sha256;
+    const snapshot = (await f.cos.describeSpec("atlas", input.name)).spec.decision!.sha256;
     assert.equal(snapshot.checklist, null);
     assert.equal(snapshot.review, null);
-    await f.pm.initSpec({ ...input, project: "harbor" });
-    const checklist = await f.tl.writeChecklist({ ...input, project: "harbor" });
-    await f.tl.writeReview({
+    await f.cos.initSpec({ ...input, project: "harbor" });
+    const checklist = await f.manager.writeChecklist({ ...input, project: "harbor" });
+    await f.manager.writeReview({
       ...input,
       project: "harbor",
       spec_version: "v1",
       checklist_sha256: checklist.sha256,
     });
-    await f.pm.updateSpec({ ...input, project: "harbor" });
-    await f.pm.finalizeSpec({
+    await f.cos.updateSpec({ ...input, project: "harbor" });
+    await f.cos.finalizeSpec({
       project: "harbor",
       name: input.name,
       decision: "no-go",
       rationale: "Do not proceed.",
     });
-    assert.equal((await f.pm.describeSpec("harbor", input.name)).review_status, "stale");
+    assert.equal((await f.cos.describeSpec("harbor", input.name)).review_status, "stale");
   } finally {
     await f.cleanup();
   }
 });
 
-test("TL cannot finalize and blank content/rationale never creates artifacts", async () => {
+test("Manager cannot finalize and blank content/rationale never creates artifacts", async () => {
   const f = await fixture();
   try {
-    await assert.rejects(f.pm.initSpec({ ...input, content: "  " }), /content/);
-    await f.pm.initSpec(input);
+    await assert.rejects(f.cos.initSpec({ ...input, content: "  " }), /content/);
+    await f.cos.initSpec(input);
     await assert.rejects(
-      f.tl.finalizeSpec({
+      f.manager.finalizeSpec({
         project: "atlas",
         name: input.name,
         decision: "go",
         rationale: "No authority",
       }),
-      /PM/,
+      /COS/,
     );
     await assert.rejects(
-      f.pm.finalizeSpec({ project: "atlas", name: input.name, decision: "go", rationale: " " }),
+      f.cos.finalizeSpec({ project: "atlas", name: input.name, decision: "go", rationale: " " }),
       /rationale/,
     );
-    assert.equal((await f.pm.describeSpec("atlas", input.name)).spec.decision, null);
+    assert.equal((await f.cos.describeSpec("atlas", input.name)).spec.decision, null);
   } finally {
     await f.cleanup();
   }

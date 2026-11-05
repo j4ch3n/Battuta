@@ -1,0 +1,12 @@
+{
+  "tasks": {
+    "lint": "deno lint .",
+    "check": "deno check --frozen *.ts",
+    "integration": "deno test --frozen --allow-env --allow-net *.it.ts"
+  },
+  "imports": {
+    "postgres": "npm:postgres@3.4.7",
+    "@modelcontextprotocol/client": "npm:@modelcontextprotocol/client@2.4.0",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.117.2"
+  }
+}

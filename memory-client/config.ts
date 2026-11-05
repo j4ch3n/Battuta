@@ -9,8 +9,8 @@ const settingsSchema = z
     batchMessages: z.number().int().min(1).max(100).default(6),
   })
   .strict();
-export async function captureSettings(directory: string, role: "pm" | "tl" = "pm") {
-  const schema = settingsSchema.extend({ enabled: z.boolean().default(role === "pm") });
+export async function captureSettings(directory: string, role: "cos" | "manager" = "cos") {
+  const schema = settingsSchema.extend({ enabled: z.boolean().default(role === "cos") });
   try {
     const settings: unknown = JSON.parse(await readFile(join(directory, "settings.json"), "utf8"));
     return schema.parse(
@@ -24,7 +24,7 @@ export async function captureSettings(directory: string, role: "pm" | "tl" = "pm
 
 export function clientConfig() {
   const role = process.env.AGENT_ROLE;
-  if (role !== "pm" && role !== "tl") throw new Error("AGENT_ROLE must be pm or tl");
+  if (role !== "cos" && role !== "manager") throw new Error("AGENT_ROLE must be cos or manager");
   const dataDirectory = process.env.BATTUTA_MEMORY_DATA_DIR ?? join(homedir(), ".battuta/memory");
   return {
     role,

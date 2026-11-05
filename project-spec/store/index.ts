@@ -6,7 +6,7 @@ import { findSpec, latest, specPath } from "./metadata.ts";
 import { defaultProjectsRoot, resolveSpecStorage } from "./storage.ts";
 import { inspect, loadMetadata } from "./transactions.ts";
 
-export type Role = "pm" | "tl";
+export type Role = "cos" | "manager";
 export type ConstitutionInput = Omit<DocumentInput, "name">;
 const constitutionName = "Constitution";
 export class ProjectSpecStore {
@@ -15,7 +15,7 @@ export class ProjectSpecStore {
     readonly role: Role,
     root = defaultProjectsRoot(),
   ) {
-    if (role !== "pm" && role !== "tl") throw new Error("AGENT_ROLE must be pm or tl");
+    if (role !== "cos" && role !== "manager") throw new Error("AGENT_ROLE must be cos or manager");
     this.root = resolve(root);
   }
   private allow(role: Role) {
@@ -76,7 +76,7 @@ export class ProjectSpecStore {
     });
   }
   async initSpec(input: DocumentInput) {
-    this.allow("pm");
+    this.allow("cos");
     return writeSpec(await resolveSpecStorage(this.root, input.project), input, true);
   }
   async readConstitution(project: string) {
@@ -95,7 +95,7 @@ export class ProjectSpecStore {
     };
   }
   async initConstitution(input: ConstitutionInput) {
-    this.allow("pm");
+    this.allow("cos");
     const saved = await writeSpec(
       await resolveSpecStorage(this.root, input.project),
       { ...input, name: constitutionName },
@@ -109,19 +109,19 @@ export class ProjectSpecStore {
     return { name: constitutionName, ...saved };
   }
   async updateSpec(input: DocumentInput) {
-    this.allow("pm");
+    this.allow("cos");
     return writeSpec(await resolveSpecStorage(this.root, input.project), input, false);
   }
   async writeChecklist(input: DocumentInput) {
-    this.allow("tl");
+    this.allow("manager");
     return writeArtifact(await resolveSpecStorage(this.root, input.project), input, "checklist");
   }
   async writeReview(input: ReviewInput) {
-    this.allow("tl");
+    this.allow("manager");
     return writeArtifact(await resolveSpecStorage(this.root, input.project), input, "review");
   }
   async finalizeSpec(input: DecisionInput) {
-    this.allow("pm");
+    this.allow("cos");
     return finalize(await resolveSpecStorage(this.root, input.project), input);
   }
 }

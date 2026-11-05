@@ -8,8 +8,8 @@ import { content } from "./fixtures.ts";
 const send = (conversation: string, overrides: Record<string, unknown> = {}) =>
   db
     .rpc("agent_mail_send", {
-      p_sender_role: "pm",
-      p_recipient_role: "tl",
+      p_sender_role: "cos",
+      p_recipient_role: "manager",
       p_conversation_id: conversation,
       p_message_type: "chat",
       p_content: content("Question"),
@@ -21,7 +21,7 @@ const ref = (message: MessageReference) => ({
   conversation_id: message.conversation_id,
   id: message.id,
 });
-const read = (message: MessageReference, role = "tl") =>
+const read = (message: MessageReference, role = "manager") =>
   db
     .rpc("agent_mail_read", {
       p_recipient_role: role,
@@ -32,7 +32,7 @@ const read = (message: MessageReference, role = "tl") =>
 const reply = (parent: MessageReference, overrides: Record<string, unknown> = {}) =>
   db
     .rpc("agent_mail_reply", {
-      p_sender_role: "tl",
+      p_sender_role: "manager",
       p_parent_conversation_id: parent.conversation_id,
       p_parent_id: parent.id,
       p_message_type: "chat",
@@ -68,7 +68,7 @@ test("RPCs enforce role routing, JSON, enum types and database-time deadlines", 
       "future-role",
     );
     for (const invalid of [
-      { p_recipient_role: "pm" },
+      { p_recipient_role: "cos" },
       { p_sender_role: "invalid role!" },
       { p_message_type: "unknown" },
       { p_content: null },
@@ -94,8 +94,8 @@ test("RPCs enforce role routing, JSON, enum types and database-time deadlines", 
         await db.from("agent_messages").insert({
           conversation_id: conversation,
           id: "111111111111",
-          sender: "pm",
-          recipient: "tl",
+          sender: "cos",
+          recipient: "manager",
           content: [],
         })
       ).error,
@@ -103,12 +103,12 @@ test("RPCs enforce role routing, JSON, enum types and database-time deadlines", 
     for (const table of ["agent_mail_leases", "agent_mail_chases"])
       assert.ok((await db.from(table).select("*")).error);
     assert.ok(
-      (await db.rpc("agent_mail_lease_session", { p_session: "pm", p_owner: randomUUID() })).error,
+      (await db.rpc("agent_mail_lease_session", { p_session: "cos", p_owner: randomUUID() })).error,
     );
     assert.ok(
       (
         await db.rpc("agent_mail_due_session", {
-          p_session: "pm",
+          p_session: "cos",
           p_deadline_seconds: 1,
           p_interval_seconds: 1,
         })
@@ -117,8 +117,8 @@ test("RPCs enforce role routing, JSON, enum types and database-time deadlines", 
     assert.ok(
       (
         await db.rpc("agent_mail_store", {
-          p_sender_role: "pm",
-          p_recipient_role: "tl",
+          p_sender_role: "cos",
+          p_recipient_role: "manager",
           p_conversation_id: conversation,
           p_message_type: "chat",
           p_content: { content: "Bypass" },
@@ -143,11 +143,11 @@ test("composite references scope acknowledgement and atomic concurrent replies",
         .select("id"),
     );
     assert.ok((await reply(parent)).error); // Cannot reply before acceptance.
-    assert.equal(ok(await read(parent, "pm")), false);
+    assert.equal(ok(await read(parent, "cos")), false);
     assert.equal(ok(await read(parent)), true);
     assert.equal(ok(await read(parent)), false);
     assert.equal((await row({ conversation_id: other, id: parent.id })).status, "created");
-    assert.ok((await reply(parent, { p_sender_role: "pm" })).error);
+    assert.ok((await reply(parent, { p_sender_role: "cos" })).error);
     assert.ok((await reply(parent, { p_parent_conversation_id: randomUUID() })).error);
     const attempts = await Promise.all([reply(parent), reply(parent)]);
     assert.equal(attempts.filter((attempt) => !attempt.error).length, 1);
@@ -155,18 +155,18 @@ test("composite references scope acknowledgement and atomic concurrent replies",
     assert.ok(successful);
     const answer = ok(successful);
     assert.equal(answer.conversation_id, parent.conversation_id);
-    assert.equal(answer.sender, "tl");
-    assert.equal(answer.recipient, "pm");
+    assert.equal(answer.sender, "manager");
+    assert.equal(answer.recipient, "cos");
     assert.equal(answer.in_reply_to, parent.id);
     assert.equal((await row(ref(parent))).status, "replied");
     assert.ok((await reply(parent)).error);
-    ok(await read(answer, "pm"));
+    ok(await read(answer, "cos"));
     const clarification = ok(
-      await reply(answer, { p_sender_role: "pm", p_response_due_minutes: 5 }),
+      await reply(answer, { p_sender_role: "cos", p_response_due_minutes: 5 }),
     );
     assert.equal(clarification.conversation_id, conversation);
     assert.equal(clarification.in_reply_to, answer.id);
-    assert.equal(clarification.recipient, "tl");
+    assert.equal(clarification.recipient, "manager");
     assert.ok(clarification.response_due);
     assert.equal(
       Date.parse(clarification.response_due) - Date.parse(clarification.created_at),

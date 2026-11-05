@@ -10,7 +10,7 @@ const inboundMemoryText = z
   .refine((v) => redact(v) === v, "Unsafe memory text");
 const modelText = z.string().trim().min(1).max(16000);
 const source = z.object({
-  agent_id: z.enum(["pm", "tl"]),
+  agent_id: z.enum(["cos", "manager"]),
   session_id: z.string(),
   entry_id: z.string(),
 });

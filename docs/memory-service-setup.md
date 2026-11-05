@@ -37,38 +37,38 @@ Run doctor before starting the server; it takes the same single-owner data lock.
 
 ## Bot skill exposure
 
-Each bot owns a tracked `.pi/skills/memory/` directory: PM's skill is read/write and TL's is read-only. Pi discovers these local files directly; ordinary source/release configuration does not install or link a memory skill. Both frontmatters are named `memory`; do not install both into one bot. Project-context remains shared and linked.
+Both bot manifests select the single `skills-hub/memory/` skill. It retains CoS read/write and Manager read-only workflows. Source setup exposes it through each bot's `.pi/skills/memory/` link; release staging supplies complete local copies. See [skill management](skill-management.md) for ownership and manifest validation.
 
-For source `--bot-dir` workspaces outside the bundled bot directory, configuration copies the role's memory skill only when missing, or replaces its known old shared-memory link with a local copy. Existing local directories are preserved; unrelated links/files are refused rather than overwritten. Release configuration leaves memory entries alone. PM capture defaults on and TL capture defaults off. The shared server may still expose write tools: TL's read-only boundary is role guidance, not server-side access control. Setup does not edit private profiles or start bots.
+Source `--bot-dir` workspaces use their own manifest or the owning role's selection. Existing local directories are preserved; unrelated links/files are refused rather than overwritten. Release configuration leaves local memory entries alone. CoS capture defaults on and Manager capture defaults off. The shared server may still expose write tools: Manager's read-only boundary is role guidance, not server-side access control. Setup does not edit private profiles or start bots.
 
 ## Services
 
-`bin/battuta install-services` writes three user units without enabling/restarting them. It refuses conflicting existing units before writing anything; move customized old units aside explicitly. Then enable `battuta-memory.service` with `systemctl --user`. PM/TL want the memory unit but do not require it: memory failure must not kill Telegram conversations. Use `journalctl --user -u battuta-memory` for diagnostics. Only one server owns the shared data directory; occupied ports are errors, not permission to connect to an unknown backend.
+`bin/battuta install-services` writes five user units (CoS, Manager, Worker, memory, and artifacts) without enabling/restarting them. It refuses conflicting existing units before writing anything unless the operator explicitly uses `--replace` after stopping the old deployment; symlinked units are always refused. Check custom unit edits and drop-ins before replacement. Then enable `battuta-memory.service` with `systemctl --user`. All three bots want the memory unit but do not require it: memory failure must not kill conversations. Use `journalctl --user -u battuta-memory` for diagnostics. Only one server owns the shared data directory; occupied ports are errors, not permission to connect to an unknown backend.
 
 Default endpoint: `http://127.0.0.1:8901/mcp`. Default data: `~/.battuta/memory/`. Bots must use the same `BATTUTA_MEMORY_URL`. Remote binding/authentication is deliberately unsupported. Source tmux launching adds one memory window; do not run it alongside a systemd server on the same data/port.
 
-## Nightly PM dream setup
+## Nightly CoS dream setup
 
 Dream automatically changes server memories and replaces the shared personal profile. Configure it only after the owner has approved unattended consolidation. Ordinary bot configuration does not imply this approval.
 
-**Installing the scheduler does not create the dream schedule.** Neither normal bot configuration nor memory-service setup runs the command below. Normal PM configuration initializes an empty native store at `~/.battuta/schedule-prompts.json`; dream is not active until explicitly provisioned.
+**Installing the scheduler does not create the dream schedule.** Neither normal bot configuration nor memory-service setup runs the command below. Normal CoS configuration initializes an empty native store at `~/.battuta/schedule-prompts.json`; dream is not active until explicitly provisioned.
 
 An approved dream runs LLM-guided cleanup first, then global-only upstream clustering/relationship analysis, then profile refresh and reflection. Analysis uses existing stored embeddings and needs no additional model download or login. Its graph generations live in `state.db`; no extra scheduler/setup command or upstream automatic compression/forgetting is enabled. Upgrade the memory server and client together before relying on this stage. Existing dream checkpoints and mutation receipts are preserved.
 
-1. Stop PM before editing scheduler files. Confirm the memory service is ready, PM's scheduler is `@jl1990/pi-scheduler@0.5.1`, and normal PM configuration has initialized the stable store. Load the same selected environment as PM, including any `PI_SCHEDULER_STATE_FILE` and `BATTUTA_MEMORY_DATA_DIR` overrides. In PM `.pi/settings.json`, select explicit `defaultProvider` and `defaultModel` IDs for the intended dream model; ensure it is authenticated and available in PM's model registry.
-2. Confirm which timezone should define **03:00**. The scheduler and catch-up use process-local time; configure PM's launch environment `TZ` consistently when a specific zone is required. There is no separately configured dream timezone or OS wake-up timer.
+1. Stop CoS before editing scheduler files. Confirm the memory service is ready, CoS's scheduler is `@jl1990/pi-scheduler@0.5.1`, and normal CoS configuration has initialized the stable store. Load the same selected environment as CoS, including any `PI_SCHEDULER_STATE_FILE` and `BATTUTA_MEMORY_DATA_DIR` overrides. In CoS `.pi/settings.json`, select explicit `defaultProvider` and `defaultModel` IDs for the intended dream model; ensure it is authenticated and available in CoS's model registry.
+2. Confirm which timezone should define **03:00**. The scheduler and catch-up use process-local time; configure CoS's launch environment `TZ` consistently when a specific zone is required. There is no separately configured dream timezone or OS wake-up timer.
 3. Back up the shared memory data and any existing profile. The new profile path is `<BATTUTA_MEMORY_DATA_DIR>/ME.md`, defaulting to `~/.battuta/memory/ME.md`. Old bot `.pi/ME.md` files are not imported. If the owner wants existing private understanding carried forward, arrange an explicit reviewed copy before activation; setup never overwrites it with a template.
 4. From the installation root, provision the owned global task and dedicated extension:
 
    ```sh
-   node memory-client/configure-dream.mjs bots/pm-bot
+   node memory-client/configure-dream.mjs bots/cos-bot
    ```
 
-   In a release archive use `bin/node` in place of `node`. This command requires a valid initialized stable store, writes the owned task there, creates `<BATTUTA_MEMORY_DATA_DIR>/dream-config.json` (default `~/.battuta/memory/dream-config.json`), and registers `memory-client/dream-extension.ts` in PM's `.pi/settings.json`. For a custom PM workspace, replace `bots/pm-bot` with its directory. It edits configuration only; do not run it against live PM.
+   In a release archive use `bin/node` in place of `node`. This command requires a valid initialized stable store, writes the owned task there, creates `<BATTUTA_MEMORY_DATA_DIR>/dream-config.json` (default `~/.battuta/memory/dream-config.json`), and registers `memory-client/dream-extension.ts` in CoS's `.pi/settings.json`. For a custom CoS workspace, replace `bots/cos-bot` with its directory. It edits configuration only; do not run it against live CoS.
 
-   The command preserves unrelated settings/tasks, an existing model configuration and the task's disabled state. A new task is enabled; the next PM startup may immediately catch up the latest missed run. It captures PM defaults only when creating model configuration, never falling back to the conversation model later. To change the model, edit `dream-config.json` with PM stopped: `{"version":1,"model":"provider/model-id"}`. Conflicting owned tasks or malformed configuration fail without replacing the schedule.
+   The command preserves unrelated settings/tasks, an existing model configuration and the task's disabled state. A new task is enabled; the next CoS startup may immediately catch up the latest missed run. It captures CoS defaults only when creating model configuration, never falling back to the conversation model later. To change the model, edit `dream-config.json` with CoS stopped: `{"version":1,"model":"provider/model-id"}`. Conflicting owned tasks or malformed configuration fail without replacing the schedule.
 
-5. Verify the configuration without starting PM or invoking a model:
+5. Verify the configuration without starting CoS or invoking a model:
 
    ```sh
    test -s "${PI_SCHEDULER_STATE_FILE:-$HOME/.battuta/schedule-prompts.json}"
@@ -76,7 +76,7 @@ An approved dream runs LLM-guided cleanup first, then global-only upstream clust
    ```
 
    Both checks must exit zero. Stop if either file is missing or empty; do not
-   start PM to recover from incomplete setup. The configured task and model are
+   start CoS to recover from incomplete setup. The configured task and model are
    intentionally not exercised during setup.
 
-To pause future dreams, stop PM and set the owned job's `enabled` to `false`, then restart. Capture has a separate `battutaMemoryCapture.enabled` toggle: disabling capture does not disable an approved dream schedule. See [memory operations](memory-service.md#owner-profile-and-nightly-dream) for recovery and privacy boundaries. No setup command restarts bots, changes provider login, or enables an OS service automatically.
+To pause future dreams, stop CoS and set the owned job's `enabled` to `false`, then restart. Capture has a separate `battutaMemoryCapture.enabled` toggle: disabling capture does not disable an approved dream schedule. See [memory operations](memory-service.md#owner-profile-and-nightly-dream) for recovery and privacy boundaries. No setup command restarts bots, changes provider login, or enables an OS service automatically.

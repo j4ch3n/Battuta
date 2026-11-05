@@ -7,7 +7,7 @@ export function registerSpecTools(pi: ExtensionAPI, store: ProjectSpecStore) {
     name: "init_spec",
     label: "Create spec",
     description:
-      "PM only: save the complete first spec version, v1. Existing names require update_spec. No separate publish step.",
+      "CoS only: save the complete first spec version, v1. Existing names require update_spec. No separate publish step.",
     parameters: DocumentParameters,
     async execute(_id, args) {
       return result(await store.initSpec(argumentsFor(DocumentParameters, args)));
@@ -17,7 +17,7 @@ export function registerSpecTools(pi: ExtensionAPI, store: ProjectSpecStore) {
     name: "update_spec",
     label: "Create next spec version",
     description:
-      "PM only: save complete Markdown as the next immutable version. Never modifies previous versions. Finalized specs reject updates.",
+      "CoS only: save complete Markdown as the next immutable version. Never modifies previous versions. Finalized specs reject updates.",
     parameters: DocumentParameters,
     async execute(_id, args) {
       return result(await store.updateSpec(argumentsFor(DocumentParameters, args)));

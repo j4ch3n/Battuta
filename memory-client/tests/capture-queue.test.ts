@@ -29,12 +29,17 @@ test("filters reasoning, tools and profile context; keeps labelled incoming mail
       },
     },
     { id: "3", type: "message", message: { role: "toolResult", content: "unsafe" } },
-    { id: "4", type: "custom_message", customType: "agent-mail", content: "TL says use sqlite" },
+    {
+      id: "4",
+      type: "custom_message",
+      customType: "agent-mail",
+      content: "Manager says use sqlite",
+    },
   ];
   expect(collectMessages(entries).map((m) => m.text)).toEqual([
     "hello",
     "answer",
-    "[inter-bot mail] TL says use sqlite",
+    "[inter-bot mail] Manager says use sqlite",
   ]);
 });
 test("large messages are fully split at bounded segment sizes", () => {
@@ -53,7 +58,7 @@ test("large messages are fully split at bounded segment sizes", () => {
 test("durable accumulator survives a crash below threshold and redacts before storage", async () => {
   const dir = await mkdtemp(join(tmpdir(), "capture-test-"));
   dirs.push(dir);
-  const queue = await CaptureQueue.open(dir, "pm");
+  const queue = await CaptureQueue.open(dir, "cos");
   await queue.track("s", [entry("old", "old history")], "atlas", false);
   await queue.track(
     "s",
@@ -61,7 +66,7 @@ test("durable accumulator survives a crash below threshold and redacts before st
     "atlas",
     false,
   );
-  const recovered = await CaptureQueue.open(dir, "pm");
+  const recovered = await CaptureQueue.open(dir, "cos");
   expect(recovered.pending("s")).toHaveLength(1);
   expect(recovered.pending("s")[0].messages[0].text).not.toContain("hunter2");
   const serialized = await readFile(join(dir, "state.json"), "utf8");
@@ -73,7 +78,7 @@ test("durable accumulator survives a crash below threshold and redacts before st
 test("flush keeps original binding and a validated batch survives reconnect", async () => {
   const dir = await mkdtemp(join(tmpdir(), "capture-test-"));
   dirs.push(dir);
-  const queue = await CaptureQueue.open(dir, "tl");
+  const queue = await CaptureQueue.open(dir, "manager");
   await queue.track("s", [], "atlas", false);
   await queue.track("s", [entry("a", "Atlas fact")], "atlas", false);
   await queue.track("s", [entry("a", "Atlas fact"), entry("b", "Beacon fact")], "beacon", true);
@@ -81,7 +86,7 @@ test("flush keeps original binding and a validated batch survives reconnect", as
   expect(jobs.map((j) => j.segment.project)).toEqual(["atlas", "beacon"]);
   jobs[0].batch = { items: [] };
   await queue.update(jobs[0]);
-  const restored = await CaptureQueue.open(dir, "tl");
+  const restored = await CaptureQueue.open(dir, "manager");
   expect(restored.jobs()[0].batch).toEqual({ items: [] });
   expect(restored.jobs()[0].id).toBe(jobs[0].id);
   await restored.markUploaded(jobs[0].id);

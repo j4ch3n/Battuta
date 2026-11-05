@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export PATH="$root/bin:$root/artifact-service/.venv/bin:$PATH"
+
+ensure_setup_tools() {
+  tools="$root/scripts/packaging"
+  if [[ ! -x "$tools/.venv/bin/battuta-packaging" || ! -x "$tools/.venv/bin/battuta-bot-setup" ]]; then
+    command -v uv >/dev/null || { printf 'Install uv before configuring this release\n' >&2; exit 1; }
+    [[ -f "$tools/wheels/SHA256SUMS" ]] || { printf 'Missing bundled setup wheels\n' >&2; exit 1; }
+    (cd "$tools/wheels" && sha256sum -c SHA256SUMS)
+    uv venv --offline --python 3.12 "$tools/.venv"
+    uv pip install --python "$tools/.venv/bin/python" --offline --no-index --find-links "$tools/wheels" battuta-packaging
+  fi
+}
+
+load_memory_environment() {
+  if [[ -f "$root/.env.prod" ]]; then
+    set -a
+    source "$root/.env.prod"
+    set +a
+  fi
+}
+
+case "${1:-}" in
+  configure-worker)
+    shift
+    [[ -f "$root/.env.prod" ]] || { printf 'Missing release environment file\n' >&2; exit 1; }
+    ensure_setup_tools
+    exec "$tools/.venv/bin/battuta-bot-setup" configure-worker --root "$root" "$@"
+    ;;
+  worker)
+    shift
+    exec bash "$root/scripts/bot_setup/run-worker.sh" --env-file "$root/.env.prod" "$@"
+    ;;
+  setup-artifacts)
+    shift
+    exec bash "$root/scripts/setup-artifacts.sh" "$@"
+    ;;
+  artifacts|artifact)
+    command="$1"
+    shift
+    [[ -x "$root/artifact-service/.venv/bin/battuta-artifact" ]] || { printf 'Run bin/battuta setup-artifacts first\n' >&2; exit 1; }
+    if [[ "$command" == artifacts ]]; then
+      exec "$root/artifact-service/.venv/bin/battuta-artifact" serve "$@"
+    fi
+    exec "$root/artifact-service/.venv/bin/battuta-artifact" "$@"
+    ;;
+  setup-memory)
+    shift
+    load_memory_environment
+    exec bash "$root/scripts/setup-memory.sh" "$@"
+    ;;
+  memory)
+    load_memory_environment
+    [[ -x "$root/memory-service/.venv/bin/battuta-memory" ]] || { printf 'Run bin/battuta setup-memory first\n' >&2; exit 1; }
+    exec "$root/memory-service/.venv/bin/battuta-memory" serve
+    ;;
+  configure)
+    shift
+    [[ -f "$root/.env.prod" ]] || { printf 'Copy %s/.env.example to %s/.env.prod and fill it in first\n' "$root" "$root" >&2; exit 1; }
+    set -a
+    source "$root/.env.prod"
+    set +a
+    ensure_setup_tools
+    exec "$tools/.venv/bin/battuta-bot-setup" configure-release --root "$root" "$@"
+    ;;
+  start-prod-screen)
+    exec bash "$root/scripts/bot_setup/run-dev.sh" prod
+    ;;
+  cos|manager)
+    role="$1"
+    bot_dir="$root/bots/$role-bot"
+    [[ -f "$root/.env.prod" ]] || { printf 'Missing %s/.env.prod\n' "$root" >&2; exit 1; }
+    [[ -x "$bot_dir/node_modules/.bin/pi" && -f "$bot_dir/AGENTS.md" && -f "$bot_dir/.pi/mcp.json" ]] || {
+      printf 'Configure %s first with bin/battuta configure\n' "$role" >&2
+      exit 1
+    }
+    if [[ "$role" == cos && ! -f "$bot_dir/.pi/telegram.json" ]]; then
+      printf 'Configure CoS Telegram first with bin/battuta configure\n' >&2
+      exit 1
+    fi
+    [[ -d "$root/agent-mail/node_modules" ]] || { printf 'Missing agent-mail dependencies\n' >&2; exit 1; }
+    [[ -d "$root/project-spec/node_modules" ]] || { printf 'Missing project-spec dependencies\n' >&2; exit 1; }
+    [[ -d "$root/memory-client/node_modules" ]] || { printf 'Missing memory client dependencies\n' >&2; exit 1; }
+    set -a
+    source "$root/.env.prod"
+    set +a
+    for key in LINEAR_API_TOKEN SUPABASE_URL SUPABASE_SECRET_KEY; do
+      [[ -n "${!key:-}" ]] || { printf 'Set %s in .env.prod\n' "$key" >&2; exit 1; }
+    done
+    export AGENT_ROLE="$role" PI_CODING_AGENT_DIR="$bot_dir/.pi"
+    export BATTUTA_MEMORY_URL="${BATTUTA_MEMORY_URL:-http://127.0.0.1:8901/mcp}"
+    if [[ "$role" == cos ]]; then
+      umask 077
+      export PI_SCHEDULER_STATE_FILE
+      PI_SCHEDULER_STATE_FILE="$("$root/bin/node" "$root/memory-client/configure-scheduler.mjs" --print-path)"
+      export PI_SCHEDULER_CATCHUP_MAX
+      PI_SCHEDULER_CATCHUP_MAX="$("$root/bin/node" "$root/memory-client/configure-scheduler.mjs" --print-catchup)"
+      "$root/bin/node" "$root/memory-client/configure-scheduler.mjs" --check
+    else
+      for key in $(compgen -v); do
+        case "$key" in *TELEGRAM*) unset "$key";; esac
+      done
+      unset PI_SCHEDULER_STATE_FILE PI_SCHEDULER_CATCHUP_MAX
+    fi
+    cd "$bot_dir"
+    exec "$bot_dir/node_modules/.bin/pi" --approve --continue --session-dir "$bot_dir/.pi/mail-sessions" --extension "$root/agent-mail/index.ts" --extension "$root/project-spec/index.ts" --extension "$root/memory-client/index.ts"
+    ;;
+  install-services)
+    shift
+    ensure_setup_tools
+    exec "$tools/.venv/bin/battuta-packaging" install-services --root "$root" "$@"
+    ;;
+  *)
+    printf 'Usage: %s configure|configure-worker|worker|setup-memory|memory|setup-artifacts|artifacts|artifact|start-prod-screen|cos|manager|install-services\n' "$0" >&2
+    exit 2
+    ;;
+esac

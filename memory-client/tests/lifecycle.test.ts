@@ -14,7 +14,7 @@ const entries = (count: number) =>
 test("oversized memories allow one durable rephrase, not repeated paid extraction", async () => {
   const dir = await mkdtemp(join(tmpdir(), "runtime-test-"));
   try {
-    const queue = await CaptureQueue.open(dir, "pm");
+    const queue = await CaptureQueue.open(dir, "cos");
     const extract = vi.fn(() => Promise.resolve({ batch: { items: [] } }));
     let now = 0;
     const runtime = new CaptureRuntime(queue, {
@@ -40,7 +40,7 @@ test("oversized memories allow one durable rephrase, not repeated paid extractio
 test("six-message trigger, project freeze, durable extraction and bounded upload retry", async () => {
   const dir = await mkdtemp(join(tmpdir(), "runtime-test-"));
   try {
-    const queue = await CaptureQueue.open(dir, "pm");
+    const queue = await CaptureQueue.open(dir, "cos");
     const extract = vi.fn(() => Promise.resolve({ batch: { items: [] }, usage: { input: 2 } }));
     const upload = vi.fn(() => Promise.reject(new Error("offline")));
     let now = 1000;
@@ -71,7 +71,7 @@ test("six-message trigger, project freeze, durable extraction and bounded upload
 test("boundary flush queues short batches; a fork does not backfill old history", async () => {
   const dir = await mkdtemp(join(tmpdir(), "runtime-test-"));
   try {
-    const queue = await CaptureQueue.open(dir, "tl");
+    const queue = await CaptureQueue.open(dir, "manager");
     const extract = vi.fn(() => Promise.reject(new Error("no model")));
     const runtime = new CaptureRuntime(queue, {
       extract,
@@ -94,7 +94,7 @@ test("boundary flush queues short batches; a fork does not backfill old history"
 test("shutdown aborts an active worker and never acknowledges its queued batch", async () => {
   const dir = await mkdtemp(join(tmpdir(), "runtime-test-"));
   try {
-    const queue = await CaptureQueue.open(dir, "pm");
+    const queue = await CaptureQueue.open(dir, "cos");
     let started!: () => void;
     const ready = new Promise<void>((resolve) => {
       started = resolve;

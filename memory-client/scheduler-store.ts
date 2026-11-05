@@ -85,7 +85,7 @@ export async function readSchedulerStore(path: string): Promise<SchedulerStore> 
   return storeSchema.parse(JSON.parse(await readFile(path, "utf8")));
 }
 
-// Setup only, PM stopped. Never overwrite or automatically import an old store.
+// Setup only, CoS stopped. Never overwrite or automatically import an old store.
 export async function initializeSchedulerStore(path: string): Promise<void> {
   try {
     await readSchedulerStore(path);

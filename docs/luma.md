@@ -1,9 +1,9 @@
 # Luma runtime and acceptance
 
-PM connects directly to the official `https://mcp.luma.com` server using Pi 1.3.0
+CoS connects directly to the official `https://mcp.luma.com` server using Pi 1.3.0
 native streamable HTTP and CIMD OAuth. No Battuta proxy, token parser, or paid API
-is involved. Source and release setup both call the dependency-free `bot-setup`
-package for MCP configuration; TL does not receive a Luma entry.
+is involved. Source and release setup both call the standalone Python
+`scripts/bot_setup/` package for MCP configuration; Manager does not receive a Luma entry.
 
 ## Access boundary
 
@@ -15,15 +15,15 @@ alone cannot establish read-only semantics. Authenticated tool descriptions must
 be reviewed before accepting this integration; unknown tools remain hidden unless
 they match one of those patterns.
 
-Pi owns refresh and authentication failures. PM must distinguish authorization,
+Pi owns refresh and authentication failures. CoS must distinguish authorization,
 permission, rate-limit, and service failures from a successful empty result, and
 must never broaden tools to work around a failure. Information returned by Luma
-can enter the PM model context and conversation transcript; do not request private
+can enter the CoS model context and conversation transcript; do not request private
 guest/contact information unnecessarily.
 
 ## Developer verification and product acceptance
 
-Offline configuration tests cover PM/TL separation, the CIMD/exposure contract,
+Offline configuration tests cover CoS/Manager separation, the CIMD/exposure contract,
 idempotence, retention of custom servers, and unchanged private OAuth-state bytes
 and permissions in both source and release setup. They do not prove provider-side
 authorization, live search behavior, token refresh, or successful revocation.
@@ -41,7 +41,7 @@ not as an installation check:
 1. Inspect the authenticated official tool descriptions and schemas. Confirm
    discovery and lookup are available, matched tools are read-only, and mutation
    and diagnostic-feedback tools remain hidden.
-2. From the owner's PM Telegram conversation, search upcoming London public
+2. From the owner's CoS Telegram conversation, search upcoming London public
    events using a specified topic and bounded future dates. Retrieve one result's
    details. Confirm source links, date/time with timezone, location and price when
    provided, with missing fields and empty results called out honestly.

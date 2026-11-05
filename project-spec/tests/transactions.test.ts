@@ -19,9 +19,9 @@ test("finalization index failure removes decision and restores checklist/review 
   const f = await fixture();
   const original = vi.mocked(fs.rename).getMockImplementation()!;
   try {
-    await f.pm.initSpec(input);
-    const checklist = await f.tl.writeChecklist(input);
-    const review = await f.tl.writeReview({
+    await f.cos.initSpec(input);
+    const checklist = await f.manager.writeChecklist(input);
+    const review = await f.manager.writeReview({
       ...input,
       spec_version: "v1",
       checklist_sha256: checklist.sha256,
@@ -36,7 +36,7 @@ test("finalization index failure removes decision and restores checklist/review 
       return original(from, to);
     });
     await assert.rejects(
-      f.pm.finalizeSpec({
+      f.cos.finalizeSpec({
         project: "atlas",
         name: input.name,
         decision: "go",
@@ -44,7 +44,7 @@ test("finalization index failure removes decision and restores checklist/review 
       }),
       /commit failed/,
     );
-    const description = await f.pm.describeSpec("atlas", input.name);
+    const description = await f.cos.describeSpec("atlas", input.name);
     assert.equal(description.spec.decision, null);
     assert.equal(description.has_decision, false);
     for (const path of [checklist.path, review.path]) {
@@ -61,7 +61,7 @@ test("committed finalization survives journal-cleanup failure and recovery", asy
   const f = await fixture();
   const original = vi.mocked(fs.rm).getMockImplementation()!;
   try {
-    await f.pm.initSpec(input);
+    await f.cos.initSpec(input);
     let fail = true;
     vi.mocked(fs.rm).mockImplementation(async (path, options) => {
       if (String(path).endsWith(".project-spec-transaction.json") && fail) {
@@ -71,7 +71,7 @@ test("committed finalization survives journal-cleanup failure and recovery", asy
       return original(path, options);
     });
     await assert.rejects(
-      f.pm.finalizeSpec({
+      f.cos.finalizeSpec({
         project: "atlas",
         name: input.name,
         decision: "no-go",
@@ -79,11 +79,11 @@ test("committed finalization survives journal-cleanup failure and recovery", asy
       }),
       /cleanup failed/,
     );
-    const description = await f.pm.describeSpec("atlas", input.name);
+    const description = await f.cos.describeSpec("atlas", input.name);
     assert.equal(description.spec.decision?.outcome, "no-go");
     assert.equal(description.has_decision, true);
-    assert.equal((await f.pm.describeSpec("atlas", input.name)).spec.decision?.outcome, "no-go");
-    await assert.rejects(f.pm.updateSpec(input), /finalized/);
+    assert.equal((await f.cos.describeSpec("atlas", input.name)).spec.decision?.outcome, "no-go");
+    await assert.rejects(f.cos.updateSpec(input), /finalized/);
   } finally {
     vi.mocked(fs.rm).mockImplementation(original);
     await f.cleanup();
@@ -95,7 +95,7 @@ test("failed index directory sync retains recovery journal until commit is durab
   const originalOpen = vi.mocked(fs.open).getMockImplementation()!;
   const originalRename = vi.mocked(fs.rename).getMockImplementation()!;
   try {
-    await f.pm.initSpec(input);
+    await f.cos.initSpec(input);
     const specs = join(f.projects, "atlas/specs");
     let committed = false;
     let failures = 2;
@@ -116,7 +116,7 @@ test("failed index directory sync retains recovery journal until commit is durab
       return handle;
     });
     await assert.rejects(
-      f.pm.finalizeSpec({
+      f.cos.finalizeSpec({
         project: "atlas",
         name: input.name,
         decision: "go",
@@ -126,7 +126,7 @@ test("failed index directory sync retains recovery journal until commit is durab
     );
     assert.ok((await fs.stat(join(specs, ".project-spec-transaction.json"))).isFile());
     failures = 0;
-    assert.equal((await f.pm.describeSpec("atlas", input.name)).spec.decision?.outcome, "go");
+    assert.equal((await f.cos.describeSpec("atlas", input.name)).spec.decision?.outcome, "go");
   } finally {
     vi.mocked(fs.open).mockImplementation(originalOpen);
     vi.mocked(fs.rename).mockImplementation(originalRename);
@@ -145,10 +145,10 @@ test("describe_spec holds the shared lock across metadata and file reads", async
   const reached = new Promise<void>((resolve) => {
     observed = resolve;
   });
-  let reading: ReturnType<typeof f.pm.describeSpec> | undefined;
+  let reading: ReturnType<typeof f.cos.describeSpec> | undefined;
   try {
-    await f.pm.initSpec(input);
-    await f.tl.writeChecklist(input);
+    await f.cos.initSpec(input);
+    await f.manager.writeChecklist(input);
     let once = true;
     vi.mocked(fs.open).mockImplementation(async (...args) => {
       const handle = await original(...args);
@@ -164,14 +164,14 @@ test("describe_spec holds the shared lock across metadata and file reads", async
       }
       return handle;
     });
-    reading = f.pm.describeSpec("atlas", input.name);
+    reading = f.cos.describeSpec("atlas", input.name);
     await reached;
     assert.equal(
       await lockfile.check(join(f.projects, "atlas/specs")),
       true,
       "Description must retain the lock while constructing its snapshot",
     );
-    const writing = f.tl.writeChecklist({ ...input, content: "Changed checklist" });
+    const writing = f.manager.writeChecklist({ ...input, content: "Changed checklist" });
     release();
     const description = await reading;
     await writing;
@@ -203,7 +203,7 @@ test("journal, artifact and index renames have directory-sync ordering", async (
       };
       return handle;
     });
-    await f.pm.initSpec(input);
+    await f.cos.initSpec(input);
     const specs = join(f.projects, "atlas/specs");
     const journal = events.indexOf(`rename:${join(specs, ".project-spec-transaction.json")}`);
     const artifact = events.indexOf(`rename:${join(specs, "api-design/spec-v1.md")}`);
@@ -230,9 +230,9 @@ test("journal, artifact and index renames have directory-sync ordering", async (
 test("index-commit failure restores old review and metadata with no journal or temporary leaks", async () => {
   const f = await fixture();
   try {
-    await f.pm.initSpec(input);
-    const checklist = await f.tl.writeChecklist(input);
-    const review = await f.tl.writeReview({
+    await f.cos.initSpec(input);
+    const checklist = await f.manager.writeChecklist(input);
+    const review = await f.manager.writeReview({
       ...input,
       spec_version: "v1",
       checklist_sha256: checklist.sha256,
@@ -249,7 +249,7 @@ test("index-commit failure restores old review and metadata with no journal or t
       return original(from, to);
     });
     await assert.rejects(
-      f.tl.writeReview({
+      f.manager.writeReview({
         ...input,
         content: "Replacement",
         spec_version: "v1",
@@ -288,10 +288,10 @@ test("failure during initial file write removes its temporary file", async () =>
       }
       return handle;
     });
-    await assert.rejects(f.pm.initSpec(input), /write failed/);
+    await assert.rejects(f.cos.initSpec(input), /write failed/);
     const files = await fs.readdir(join(f.projects, "atlas/specs"));
     assert.ok(!files.some((file) => file.endsWith(".tmp")), `Leaked files: ${files.join(", ")}`);
-    assert.equal((await f.pm.inspectSpecs("atlas")).specs.length, 0);
+    assert.equal((await f.cos.inspectSpecs("atlas")).specs.length, 0);
   } finally {
     vi.mocked(fs.open).mockImplementation(original);
     await f.cleanup();
@@ -301,8 +301,8 @@ test("failure during initial file write removes its temporary file", async () =>
 test("restart recovers an uncommitted document replacement from a durable journal", async () => {
   const f = await fixture();
   try {
-    await f.pm.initSpec(input);
-    const saved = await f.tl.writeChecklist(input);
+    await f.cos.initSpec(input);
+    const saved = await f.manager.writeChecklist(input);
     const specs = join(f.projects, "atlas/specs");
     const index = await fs.readFile(join(specs, "index.json"));
     await fs.writeFile(
@@ -319,7 +319,7 @@ test("restart recovers an uncommitted document replacement from a durable journa
       }),
     );
     await fs.writeFile(saved.path, "Interrupted replacement");
-    assert.equal((await f.pm.inspectSpecs("atlas")).specs.length, 1);
+    assert.equal((await f.cos.inspectSpecs("atlas")).specs.length, 1);
     assert.equal(await fs.readFile(saved.path, "utf8"), input.content);
     await assert.rejects(fs.stat(join(specs, ".project-spec-transaction.json")), /ENOENT/);
   } finally {

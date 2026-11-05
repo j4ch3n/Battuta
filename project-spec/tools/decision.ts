@@ -18,7 +18,7 @@ export function registerDecisionTools(pi: ExtensionAPI, store: ProjectSpecStore)
     name: "finalize_spec",
     label: "Finalize product decision",
     description:
-      "PM only: create decision.md with rationale, SHA-256 fingerprint latest spec/checklist/decision/review, and record terminal go/no-go in JSON. Missing checklist/review yield null hashes; no quality/freshness gate. All further artifact writes are rejected. Product go is not execution/cycle authorization.",
+      "CoS only: create decision.md with rationale, SHA-256 fingerprint latest spec/checklist/decision/review, and record terminal go/no-go in JSON. Missing checklist/review yield null hashes; no quality/freshness gate. All further artifact writes are rejected. Product go is not execution/cycle authorization.",
     parameters,
     async execute(_id, args) {
       return result(await store.finalizeSpec(argumentsFor(parameters, args)));

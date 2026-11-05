@@ -4,8 +4,8 @@ import { collectMessages } from "../session-messages.ts";
 
 test.each([
   "SUPABASE_SECRET_KEY=sb_secret_" + "s".repeat(32),
-  "PM_TELEGRAM_TOKEN=123456789:" + "A".repeat(35),
-  "export TL_TELEGRAM_TOKEN='987654321:" + "B".repeat(35) + "'",
+  "COS_TELEGRAM_TOKEN=123456789:" + "A".repeat(35),
+  "export MANAGER_TELEGRAM_TOKEN='987654321:" + "B".repeat(35) + "'",
   "sb_secret_" + "s".repeat(32),
   "123456789:" + "A".repeat(35),
 ])("redacts supported credentials before conversation text can be queued", (input) => {

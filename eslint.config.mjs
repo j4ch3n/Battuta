@@ -8,7 +8,7 @@ export default defineConfig(
   globalIgnores([
     "**/node_modules/**",
     "**/vendor/**",
-    "bots/**/.pi/skills/**/{references,tools}/**",
+    "skills-hub/**/{references,tools}/**",
     "**/.venv/**",
     ".memory-spike/**",
     "supabase/**",
@@ -33,6 +33,7 @@ export default defineConfig(
       "agent-mail/**/*.ts",
       "project-spec/**/*.ts",
       "memory-client/**/*.ts",
+      "bots/worker/extension/**/*.ts",
       "bots/**/.pi/extensions/**/*.ts",
     ],
     extends: [js.configs.recommended, tseslint.configs.recommendedTypeChecked],

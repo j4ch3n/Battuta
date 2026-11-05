@@ -2,6 +2,8 @@
 bots/AGENTS_personal.md export-ignore
 **/.pi/ME.md export-ignore
 **/.pi/ME.md.* export-ignore
+**/.pi/mail-sessions/** export-ignore
+**/.pi/sessions/** export-ignore
 *.db export-ignore
 *.db-wal export-ignore
 *.db-shm export-ignore
@@ -10,7 +12,11 @@ bots/AGENTS_personal.md export-ignore
 **/capture-queue/** export-ignore
 **/onnx_models/** export-ignore
 **/.venv/** export-ignore
+scripts/bot_setup/.venv export-ignore
+scripts/packaging/.venv export-ignore
+scripts/bot_setup/tests export-ignore
+scripts/packaging/tests export-ignore
 **/node_modules/** export-ignore
-bots/pm-bot/.pi/skills/present-to-owner/references/live-panel/assets/fonts/*-OFL.txt whitespace=-trailing-space
+skills-hub/present-to-owner/references/live-panel/assets/fonts/*-OFL.txt whitespace=-trailing-space
 .memory-spike/** export-ignore
 .superpowers/** export-ignore

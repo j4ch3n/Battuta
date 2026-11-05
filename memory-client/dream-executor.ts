@@ -41,7 +41,7 @@ export async function executeDream(
     signal.throwIfAborted();
     const config = clientConfig();
     const client = new MemoryMcpClient(config.url);
-    // Fixed model completions receive evidence, not PM history or tool access.
+    // Fixed model completions receive evidence, not CoS history or tool access.
     // The engine returns a separate public summary, never the private reflection.
     return await abortable(
       runDream(

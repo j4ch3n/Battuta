@@ -3,6 +3,12 @@
 .env.*
 !.env.example
 /bots/AGENTS_personal.md
+# Generated bot state; maintained profiles explicitly allow their owned config/code.
+/bots/*/AGENTS.md
+/bots/*/.pi/*
+**/.pi/mail-sessions/
+**/.pi/sessions/
+**/.pi/skills/
 # Private owner profiles and SQLite memory (including suppression and recovery)
 **/.pi/ME.md
 **/.pi/ME.md.*
@@ -13,6 +19,7 @@
 capture-queue/
 onnx_models/
 /supabase/snippets/
+.credentials/
 
 # Python
 .venv/

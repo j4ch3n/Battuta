@@ -21,7 +21,7 @@ dependencies = [
 dev = ["httpx2"]
 
 [tool.uv.sources]
-battuta-project = { path = "../shared-skills/project-context-cli" }
+battuta-project = { path = "../project-context-cli" }
 
 [project.scripts]
 battuta-artifact = "battuta_artifacts.cli:main"

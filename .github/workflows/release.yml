@@ -44,21 +44,30 @@ jobs:
       - name: Install pnpm
         run: corepack enable && corepack prepare pnpm@10.20.0 --activate
 
+      - name: Validate skill manifests
+        run: pnpm check:skills
+
       - name: Assemble release
         env:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots bot-setup shared-skills agent-mail project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/gogcli-setup.md docs/luma-setup.md docs/luma.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md | tar -x -C dist/stage/battuta
+          git archive HEAD bots scripts/bot_setup scripts/packaging skills-hub project-context-cli agent-mail project-spec memory-client memory-service artifact-service scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/skill-management.md docs/gogcli-setup.md docs/luma-setup.md docs/luma.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md docs/assignments.md docs/assignments-setup.md docs/workers.md docs/workers-setup.md | tar -x -C dist/stage/battuta
           test -s dist/stage/battuta/RELEASE.md
+          git archive HEAD docs/workers.md docs/workers-setup.md docs/scheduler.md | tar -x -C dist/stage/battuta
           test -s dist/stage/battuta/docs/gogcli-setup.md
           test -s dist/stage/battuta/docs/luma-setup.md
           test -s dist/stage/battuta/docs/luma.md
-          test -s dist/stage/battuta/bots/pm-bot/.pi/skills/memory/references/tools.md
-          test -s dist/stage/battuta/bots/tl-bot/.pi/skills/memory/references/tools.md
+          test -s dist/stage/battuta/skills-hub/memory/references/tools.md
           test ! -e dist/stage/battuta/bots/AGENTS_personal.md
-          cli_dir="$PWD/dist/stage/battuta/shared-skills/project-context-cli"
+          tool_dir="$PWD/dist/stage/battuta/scripts/packaging"
+          uv export --project "$tool_dir" --locked --no-dev --no-emit-project --no-emit-package battuta-bot-setup --format requirements-txt --output-file "$RUNNER_TEMP/tool-requirements.txt"
+          uv build --project "$PWD/dist/stage/battuta/scripts/bot_setup" --wheel --out-dir "$tool_dir/wheels"
+          uv build --project "$tool_dir" --wheel --out-dir "$tool_dir/wheels"
+          python3 -m pip download --require-hashes --no-deps --only-binary=:all: --dest "$tool_dir/wheels" -r "$RUNNER_TEMP/tool-requirements.txt"
+          (cd "$tool_dir/wheels" && sha256sum *.whl > SHA256SUMS)
+          cli_dir="$PWD/dist/stage/battuta/project-context-cli"
           uv export --project "$cli_dir" --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/project-requirements.txt"
           uv build --project "$cli_dir" --wheel --out-dir "$cli_dir/wheels"
           python3 -m pip download --require-hashes --no-deps --only-binary=:all: --dest "$cli_dir/wheels" -r "$RUNNER_TEMP/project-requirements.txt"
@@ -74,40 +83,14 @@ jobs:
           python3 -m pip download --require-hashes --no-deps --only-binary=:all: --dest "$artifact_dir/wheels" -r "$artifact_dir/requirements.txt"
           (cd "$artifact_dir/wheels" && sha256sum *.whl > SHA256SUMS)
           cp "$(command -v node)" dist/stage/battuta/bin/node
-          cp packaging/battuta dist/stage/battuta/bin/battuta
-          cp packaging/configure.mjs dist/stage/battuta/bin/configure.mjs
-          cp packaging/shared-resources.mjs dist/stage/battuta/bin/shared-resources.mjs
-          cp packaging/configure-subagents.mjs dist/stage/battuta/bin/configure-subagents.mjs
-          cp packaging/install-services.mjs dist/stage/battuta/bin/install-services.mjs
+          cp scripts/packaging/battuta dist/stage/battuta/bin/battuta
           chmod +x dist/stage/battuta/bin/*
-          for bot in pm-bot tl-bot; do
-            mkdir -p "dist/stage/battuta/bots/$bot/.pi/skills"
+          test -d dist/stage/battuta/skills-hub
+          uv run --project scripts/packaging --locked battuta-packaging validate-skills dist/stage/battuta
+          for bot in cos-bot manager-bot; do
             test ! -e "dist/stage/battuta/bots/$bot/.pi/ME.md"
-            test ! -L "dist/stage/battuta/bots/$bot/.pi/skills/memory"
-            test -f "dist/stage/battuta/bots/$bot/.pi/skills/memory/SKILL.md"
-            for skill in project-context todo note-taking; do
-              ln -s "../../../../shared-skills/$skill" "dist/stage/battuta/bots/$bot/.pi/skills/$skill"
-              test -f "dist/stage/battuta/bots/$bot/.pi/skills/$skill/SKILL.md"
-            done
-            if [ "$bot" = pm-bot ]; then
-              test ! -L "dist/stage/battuta/bots/$bot/.pi/skills/draft-writing"
-              test -f "dist/stage/battuta/bots/$bot/.pi/skills/draft-writing/SKILL.md"
-            else
-              test ! -e "dist/stage/battuta/bots/$bot/.pi/skills/draft-writing"
-              test ! -L "dist/stage/battuta/bots/$bot/.pi/skills/draft-writing"
-            fi
-            source_references="dist/stage/battuta/shared-skills/project-context/references"
-            runtime_references="dist/stage/battuta/bots/$bot/.pi/skills/project-context/references"
-            ls -l "$runtime_references/"
-            for document in "$source_references"/*/*.md; do
-              test -f "$document" || continue
-              relative_document="${document#"$source_references/"}"
-              test -f "$runtime_references/$relative_document"
-            done
           done
           bash -n dist/stage/battuta/bin/battuta
-          node --check dist/stage/battuta/bin/install-services.mjs
-          node --check dist/stage/battuta/bot-setup/mcp.mjs
           export UV_TOOL_DIR="$RUNNER_TEMP/project-tools"
           export UV_TOOL_BIN_DIR="$RUNNER_TEMP/project-tool-bin"
           uv tool install --offline --python 3.12 --no-index --find-links "$cli_dir/wheels" battuta-project
@@ -141,7 +124,7 @@ jobs:
           assert "{{" not in summary
           PY
           rm -rf "$smoke_home"
-          for bot in pm-bot tl-bot; do
+          for bot in cos-bot manager-bot; do
             bot_dir="$PWD/dist/stage/battuta/bots/$bot"
             pnpm --dir "$bot_dir" install --frozen-lockfile --prod
             while IFS=$'\t' read -r source package; do
@@ -157,14 +140,21 @@ jobs:
                 console.log(`${source}\t${packageName}`);
               }
             ' "$bot_dir/.pi/settings.json")
-            if [ "$bot" = pm-bot ]; then test -f "$bot_dir/.pi/skills/manage-google/SKILL.md"; fi
+            test ! -e "$bot_dir/.pi/skills"
           done
           pnpm --dir dist/stage/battuta/agent-mail install --frozen-lockfile --prod
           pnpm --dir dist/stage/battuta/project-spec install --frozen-lockfile --prod
           pnpm --dir dist/stage/battuta/memory-client install --frozen-lockfile --prod
+          worker_runtime="$PWD/dist/stage/battuta/bots/worker/extension/assignment-worker"
+          pnpm --dir "$worker_runtime" install --frozen-lockfile --prod
+          test -f dist/stage/battuta/bots/worker/.pi/web-search.json
+          test -f "$worker_runtime/index.ts"
+          test -f "$worker_runtime/node_modules/@earendil-works/pi-coding-agent/dist/extensions/mcp/index.js"
+          test -f "$worker_runtime/node_modules/@earendil-works/pi-coding-agent/dist/extensions/codemode/index.js"
+          bash -n dist/stage/battuta/scripts/bot_setup/run-worker.sh
           memory_smoke_home="$(mktemp -d)"
           mkdir -p "$memory_smoke_home/agent"
-          HOME="$memory_smoke_home" node dist/stage/battuta/memory-client/tests/loader-worker.mjs "$memory_smoke_home/agent" "$PWD/dist/stage/battuta/bots/pm-bot/node_modules/@earendil-works/pi-coding-agent/dist/index.js" "$PWD/dist/stage/battuta/bots/pm-bot/.pi/npm/node_modules/@jl1990/pi-scheduler/extensions/scheduler/index.ts"
+          HOME="$memory_smoke_home" node dist/stage/battuta/memory-client/tests/loader-worker.mjs "$memory_smoke_home/agent" "$PWD/dist/stage/battuta/bots/cos-bot/node_modules/@earendil-works/pi-coding-agent/dist/index.js" "$PWD/dist/stage/battuta/bots/cos-bot/.pi/npm/node_modules/@jl1990/pi-scheduler/extensions/scheduler/index.ts"
           uv venv --python 3.12 "$RUNNER_TEMP/memory-smoke"
           uv pip install --python "$RUNNER_TEMP/memory-smoke/bin/python" --offline --no-index --find-links "$memory_dir/wheels" battuta-memory
           "$RUNNER_TEMP/memory-smoke/bin/battuta-memory" --help
@@ -183,23 +173,23 @@ jobs:
             test ! -e "$RUNNER_TEMP/artifact-smoke/.battuta/projects/release-smoke/artifacts/$template/file-meta.json"
           done
           rm -rf "$memory_smoke_home"
-          test -x dist/stage/battuta/bots/pm-bot/node_modules/.bin/pi
-          test -x dist/stage/battuta/bots/tl-bot/node_modules/.bin/pi
-          test -f dist/stage/battuta/bots/tl-bot/.pi/npm/node_modules/pi-subagents/bundle/index.js
-          test -f dist/stage/battuta/bots/tl-bot/.pi/npm/node_modules/pi-subagents/skills/pi-subagents/SKILL.md
-          test ! -e dist/stage/battuta/bots/pm-bot/node_modules/pi-subagents
-          test ! -e dist/stage/battuta/bots/tl-bot/.pi/subagents.json
-          pnpm --dir dist/stage/battuta/bots/tl-bot exec node --input-type=module -e 'import upstream from "pi-subagents"; import { SUBAGENT_DELEGATION_REQUEST_EVENT } from "pi-subagents/delegation"; if (typeof upstream !== "function" || !SUBAGENT_DELEGATION_REQUEST_EVENT) process.exit(1)'
+          test -x dist/stage/battuta/bots/cos-bot/node_modules/.bin/pi
+          test -x dist/stage/battuta/bots/manager-bot/node_modules/.bin/pi
+          test -f dist/stage/battuta/bots/manager-bot/.pi/npm/node_modules/pi-subagents/bundle/index.js
+          test -f dist/stage/battuta/bots/manager-bot/.pi/npm/node_modules/pi-subagents/skills/pi-subagents/SKILL.md
+          test ! -e dist/stage/battuta/bots/cos-bot/node_modules/pi-subagents
+          test ! -e dist/stage/battuta/bots/manager-bot/.pi/subagents.json
+          pnpm --dir dist/stage/battuta/bots/manager-bot exec node --input-type=module -e 'import upstream from "pi-subagents"; import { SUBAGENT_DELEGATION_REQUEST_EVENT } from "pi-subagents/delegation"; if (typeof upstream !== "function" || !SUBAGENT_DELEGATION_REQUEST_EVENT) process.exit(1)'
           test -d dist/stage/battuta/agent-mail/node_modules
           test -d dist/stage/battuta/project-spec/node_modules
           test -d dist/stage/battuta/memory-client/node_modules
           test ! -e dist/stage/battuta/.env
-          test ! -e dist/stage/battuta/bots/pm-bot/.pi/auth.json
-          test ! -e dist/stage/battuta/bots/tl-bot/.pi/auth.json
-          test ! -e dist/stage/battuta/bots/pm-bot/.pi/mcp-auth.json
-          test ! -e dist/stage/battuta/bots/tl-bot/.pi/mcp-auth.json
-          test ! -e dist/stage/battuta/bots/pm-bot/.pi/telegram.json
-          test ! -e dist/stage/battuta/bots/tl-bot/.pi/telegram.json
+          test ! -e dist/stage/battuta/bots/cos-bot/.pi/auth.json
+          test ! -e dist/stage/battuta/bots/manager-bot/.pi/auth.json
+          test ! -e dist/stage/battuta/bots/cos-bot/.pi/mcp-auth.json
+          test ! -e dist/stage/battuta/bots/manager-bot/.pi/mcp-auth.json
+          test ! -e dist/stage/battuta/bots/cos-bot/.pi/telegram.json
+          test ! -e dist/stage/battuta/bots/manager-bot/.pi/telegram.json
           tar -C dist/stage --exclude='battuta/memory-service/.venv' --exclude='battuta/artifact-service/.venv' -czf "dist/battuta-$TAG-linux-arm64.tar.gz" battuta
           (cd dist && sha256sum "battuta-$TAG-linux-arm64.tar.gz" > "battuta-$TAG-linux-arm64.tar.gz.sha256")
 

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "vitest";
-import { cleanup, invoke, secret, url } from "./local.ts";
+import { cleanup, invoke, secret, url, db, row } from "./local.ts";
 import { content, requestContent } from "./fixtures.ts";
+import { sendProgrammaticMail } from "../transport.ts";
 
 const request = (conversation: string) => ({
   operation: "send",
@@ -12,6 +13,27 @@ const request = (conversation: string) => ({
   message_type: "chat",
   content: requestContent("Question"),
   response_due_minutes: 10,
+});
+
+test("programmatic worker report reaches Manager through the existing mail contract", async () => {
+  const conversationId = randomUUID();
+  try {
+    const ref = await sendProgrammaticMail(db, {
+      senderRole: "worker",
+      recipientRole: "manager",
+      conversationId,
+      content: content("Assignment blocked", {
+        result: { state: "blocked", accomplished: [], remaining: ["Missing input"], checks: [] },
+      }),
+    });
+    const stored = await row(ref);
+    assert.equal(stored.sender, "worker");
+    assert.equal(stored.recipient, "manager");
+    assert.equal(stored.response_due, null);
+    assert.equal(stored.content.result?.state, "blocked");
+  } finally {
+    await cleanup([conversationId]);
+  }
 });
 const post = (body: unknown, apikey = secret) =>
   fetch(`${url}/functions/v1/agent-mail`, {
@@ -28,7 +50,7 @@ test("Edge Function authenticates, validates, and dispatches transactional send/
       { ...request(conversation), response_due_minutes: "10" },
       { ...request(conversation), response_due_minutes: 15 },
       { ...request(conversation), response_due: "tomorrow" },
-      { ...request(conversation), conversation_id: "pm" },
+      { ...request(conversation), conversation_id: "cos" },
       { ...request(conversation), content: "not a JSON object" },
       { ...request(conversation), content: [] },
     ])

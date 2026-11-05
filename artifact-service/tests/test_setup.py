@@ -22,7 +22,7 @@ class SetupTests(unittest.TestCase):
             root = Path(directory).resolve()
             (root / 'bin').mkdir()
             (root / 'scripts').mkdir()
-            shutil.copy2(ROOT / 'packaging/battuta', root / 'bin/battuta')
+            shutil.copy2(ROOT / 'scripts/packaging/battuta', root / 'bin/battuta')
             shutil.copy2(ROOT / 'scripts/setup-artifacts.sh', root / 'scripts/setup-artifacts.sh')
             venv = root / 'artifact-service/.venv/bin'
             venv.mkdir(parents=True)

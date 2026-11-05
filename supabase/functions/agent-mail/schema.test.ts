@@ -4,8 +4,8 @@ import { parseRequest, rpcRequest } from "./schema.ts";
 const conversation = "b8fe06dc-8855-4a5a-86d1-968fd8d936f4";
 const send = {
   operation: "send",
-  sender_role: "pm",
-  recipient_role: "tl",
+  sender_role: "cos",
+  recipient_role: "manager",
   conversation_id: conversation,
   message_type: "chat",
   content: { future: [1, true, null] },
@@ -17,7 +17,7 @@ Deno.test("transport validates without coercion or accepting injected fields", (
   for (const invalid of [
     { ...send, response_due_minutes: "10" },
     { ...send, response_due_minutes: 15 },
-    { ...send, conversation_id: "pm" },
+    { ...send, conversation_id: "cos" },
     { ...send, content: [] },
     { ...send, response_due: "tomorrow" },
   ]) {
@@ -33,7 +33,7 @@ Deno.test("send, reply and read map composite references to the appropriate RPC"
   const reply = rpcRequest(
     parseRequest({
       operation: "reply",
-      sender_role: "tl",
+      sender_role: "manager",
       parent,
       message_type: "chat",
       content: {},
@@ -46,10 +46,14 @@ Deno.test("send, reply and read map composite references to the appropriate RPC"
   assert.equal(reply.args.p_parent_conversation_id, conversation);
   assert.equal("p_recipient_role" in reply.args, false);
   assert.deepEqual(
-    rpcRequest(parseRequest({ operation: "read", recipient_role: "tl", message_ref: parent })),
+    rpcRequest(parseRequest({ operation: "read", recipient_role: "manager", message_ref: parent })),
     {
       name: "agent_mail_read",
-      args: { p_recipient_role: "tl", p_conversation_id: conversation, p_message_id: parent.id },
+      args: {
+        p_recipient_role: "manager",
+        p_conversation_id: conversation,
+        p_message_id: parent.id,
+      },
     },
   );
 });

@@ -1,0 +1,11 @@
+{
+  "defaultProvider": "openai",
+  "defaultModel": "gpt-6.1-terra",
+  "extensions": [
+    "../extension/assignment-worker/index.ts",
+    "../extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/extensions/mcp/index.js",
+    "../extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/extensions/codemode/index.js"
+  ],
+  "packages": ["npm:pi-web-access@0.43.0"],
+  "battutaMemoryCapture": { "enabled": false }
+}

@@ -33,10 +33,10 @@ interface State {
 export class CaptureQueue {
   private constructor(
     readonly directory: string,
-    readonly role: "pm" | "tl",
+    readonly role: "cos" | "manager",
     private state: State,
   ) {}
-  static async open(directory: string, role: "pm" | "tl") {
+  static async open(directory: string, role: "cos" | "manager") {
     await mkdir(directory, { recursive: true, mode: 0o700 });
     await chmod(directory, 0o700);
     let state: State = { version: 1, seen: {}, pending: {}, jobs: [] };

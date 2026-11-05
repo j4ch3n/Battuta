@@ -10,7 +10,7 @@ const record = (ref = a, projects = ["atlas"]) => ({
   scope: { global: projects.length === 0, projects },
   kind: "decision",
   tags: [],
-  sources: [{ agent_id: "pm", session_id: "s", entry_id: "e" }],
+  sources: [{ agent_id: "cos", session_id: "s", entry_id: "e" }],
   active: true,
 });
 const update = {
@@ -138,7 +138,7 @@ test("updates include unioned cited sources and reject source overflow before di
   const first = memoryRecordSchema.parse(record());
   const second = memoryRecordSchema.parse({
     ...record(b),
-    sources: [{ agent_id: "tl", session_id: "other", entry_id: "b" }],
+    sources: [{ agent_id: "manager", session_id: "other", entry_id: "b" }],
   });
   const plan = validateDreamPlan(
     { operations: [{ ...update, source_refs: [a, b] }] },
@@ -150,7 +150,7 @@ test("updates include unioned cited sources and reject source overflow before di
     evidence: [first, second].map(({ ref, revision }) => ({ ref, revision })),
   });
   second.sources = Array.from({ length: 201 }, (_, i) => ({
-    agent_id: "pm",
+    agent_id: "cos",
     session_id: "many",
     entry_id: String(i),
   }));
@@ -162,13 +162,13 @@ test("updates include unioned cited sources and reject source overflow before di
 test("preflights update citation limits including uncited existing target sources", () => {
   const first = memoryRecordSchema.parse(record());
   first.sources = Array.from({ length: 150 }, (_, i) => ({
-    agent_id: "pm",
+    agent_id: "cos",
     session_id: "target",
     entry_id: String(i),
   }));
   const second = memoryRecordSchema.parse(record(b));
   second.sources = Array.from({ length: 150 }, (_, i) => ({
-    agent_id: "pm",
+    agent_id: "cos",
     session_id: "evidence",
     entry_id: String(i),
   }));

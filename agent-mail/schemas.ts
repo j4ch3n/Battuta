@@ -13,7 +13,8 @@ export { validateCoverage, type MessageContent } from "./content.ts";
 Format.Set("uuid", Format.IsUuid);
 Format.Set("date-time", Format.IsDateTime);
 
-export const Role = Type.Union([Type.Literal("pm"), Type.Literal("tl")]);
+export const Role = Type.Union([Type.Literal("cos"), Type.Literal("manager")]);
+export const SenderRole = Type.Union([Role, Type.Literal("worker")]);
 export const MessageRef = MessageReferenceSchema;
 export type MessageReference = Static<typeof MessageRef>;
 
@@ -63,7 +64,7 @@ export function validate<T extends TSchema>(schema: T, input: unknown): Static<T
   return parsed;
 }
 
-type AgentContext = { role: Static<typeof Role>; sessionId: string };
+type AgentContext = { role: Static<typeof SenderRole>; sessionId: string };
 export function sendRequest(agent: AgentContext, input: unknown) {
   const args = validate(SendArguments, input);
   validateExpectation(args.content, args.reply_expectation !== null);

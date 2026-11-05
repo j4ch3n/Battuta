@@ -14,7 +14,7 @@ afterEach(() => {
   run.mockReset();
 });
 function harness() {
-  vi.stubEnv("AGENT_ROLE", "pm");
+  vi.stubEnv("AGENT_ROLE", "cos");
   const complete = vi.fn().mockResolvedValue({
     stopReason: "stop",
     content: [{ type: "text", text: "private reflection" }],

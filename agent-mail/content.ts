@@ -119,7 +119,7 @@ const content = object(
       10,
     ),
   },
-  "One shared content contract for PM and TL. Include every field; use [] or null for unused sections.",
+  "One shared content contract for CoS and Manager. Include every field; use [] or null for unused sections.",
 );
 
 export const MessageContentSchema = content;

@@ -2,7 +2,7 @@
 
 Run all source-checkout commands from the repository root. See the shared [tech stack](../../../../docs/tech-stack.md) for runtime responsibilities and [command reference](../../../../docs/commands.md) for scripts and Make targets.
 
-Run the Project Manager and Tech Lead bots from a source checkout with Python **3.12+**, uv, Node.js from `.node-version` (24 LTS), pnpm **10.20.x**, and tmux. Local Supabase also needs Docker and the Supabase CLI; a remote Supabase project does not.
+Run CoS and Manager from a source checkout with Python **3.12+**, uv, Node.js from `.node-version` (24 LTS), pnpm **10.20.x**, and tmux. Local Supabase also needs Docker and the Supabase CLI; a remote Supabase project does not.
 
 ## Contributor tooling
 
@@ -22,29 +22,29 @@ Install the recommended VS Code extensions. Deno language support is scoped to `
 
 ## Bot configuration
 
-For local Supabase, copy `.env.example` to `.env` and `supabase/.env.example` to `supabase/.env`. Restrict both to mode `600` and fill in the two distinct Telegram bot tokens, allowed numeric Telegram user ID, Linear API key, and Supabase URL and server-side secret key. The local functions environment also needs the Linear webhook secret and API key. For remote Supabase development, copy `.env.example` to `.env.prod` instead, restrict it to mode `600`, and set it to the deployed project's URL and secret key. Keep these files out of source control and enter credentials in a private editor rather than chat or shell commands. Optional fields are described in the templates.
+Use a clean setup, without copying previous-release runtime files or state. For local Supabase, create `.env` from `.env.example` and `supabase/.env` from its example only if absent. Restrict both to mode `600`. Enter CoS's `COS_TELEGRAM_TOKEN`, `TELEGRAM_ALLOWED_USER_ID`, `LINEAR_API_TOKEN`, and the shared Supabase URL/secret key using a private editor; Manager needs no Telegram token. The local functions environment also needs its webhook credentials. For remote development, use `.env.prod` with the deployed project's URL and secret key. Never print secrets or overwrite an existing private environment file to retry setup.
 
-For local Supabase, start Docker and run `supabase start`, then copy its URL and server-side secret key into `.env`. For remote Supabase, ensure migrations and Edge Functions have already been deployed.
+For local Supabase, start Docker and run `supabase start`, then copy its URL and server-side secret key into `.env` using a private editor. For remote Supabase, ensure migrations and Edge Functions, including assignments, have already been deployed. Each profile's own setup registers assignment MCP; CoS/Manager setup does not rewrite worker configuration. Setup never embeds the key value in MCP JSON.
 
 ## Run
 
 ```sh
-uv sync --locked
+uv sync --project scripts/bot_setup --locked
 make setup-bot
 make dev
 ```
 
-`make dev` attaches the Project Manager, Tech Lead, and Edge Functions panes; it expects local Supabase to be running already and loads the bots' runtime environment from `.env`. Use `make prod` instead when connecting to remote Supabase with `.env.prod` (it runs the two bots only). These commands launch or reattach without updating Telegram configuration. Do not run dev and prod modes concurrently from the same checkout; they share Pi state.
+`make dev` opens a `bots` window with CoS, Manager, and Worker in three equal columns, and a `services` window with shared memory and Edge Functions side by side. It expects local Supabase to be running already and loads `.env`. The worker launcher prepares a private instance by copying relevant configuration from the shared profile only when absent, preserving existing files. See the worker setup entry in the [release setup index](../../../../RELEASE.md#extension-and-skill-setup-index) for preparation and authentication guidance. Workers use normal interactive Pi; the operator launches/tests them. Use `make prod` for CoS and Manager against remote Supabase with `.env.prod`. Do not run dev and prod concurrently from one checkout; they share Pi state. Generated runtime state is ignored and must not be committed.
 
-To update Telegram settings separately, run `make refresh-telegram ENV_FILE=.env`. The file argument can select `.env.prod` or another path; omitting it defaults to `.env`. This refreshes the token, derived bot ID, allowed user ID, and optional username in each bot's `.pi/telegram.json` without reinstalling packages or regenerating instructions. Restart any running bots separately to pick up the refreshed settings; reattaching an existing session does not reload them.
+To update CoS Telegram separately, run `make refresh-telegram ENV_FILE=.env`; the file can also be `.env.prod` or another path. It updates CoS's profile only, without reinstalling packages, regenerating instructions, or restarting bots. Reattaching does not reload credentials.
 
-Complete `/login` in each Pi pane and finish model-provider authentication, then message both Telegram bots from the allowed user account and confirm each responds. Inspect errors in the panes before declaring setup complete. Detach with `Ctrl-b d` and rerun the same Make target to reattach.
+Complete model-provider `/login` interactively in each Pi pane when operating the bots. For setup validation, check generated instructions/MCP files for both profiles, CoS's Telegram file, Manager's absence of Telegram package/configuration, and ignored local skill/session paths. Fail on invalid configuration; do not send bot messages or make model requests as setup checks. Detach with `Ctrl-b d` and use the same Make target to reattach.
 
 Pi handles Linear MCP natively. `make setup-bot` writes the environment-expanded `Authorization` header to each bot's `.pi/mcp.json` and removes older `pi-mcp-adapter` package entries from settings. Rerun setup to migrate an existing checkout. The Make setup targets use `.env`; for production credentials, invoke each setup script explicitly:
 
 ```sh
-uv run --locked python bots/pm-bot/scripts/configure-bot.py --env-file .env.prod
-uv run --locked python bots/tl-bot/scripts/configure-bot.py --env-file .env.prod
+uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role cos --env-file .env.prod
+uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role manager --env-file .env.prod
 ```
 
-Restart running bots separately to load the migration. In each pane, check `/mcp` and request a read-only Linear lookup. Linear uses native `codemode` exposure for tool discovery and calls.
+Restart running bots separately when authorized to load configuration. Validate generated MCP files and credential placeholders without messaging bots or invoking models. Linear and assignments use native `codemode` exposure for tool discovery and calls.

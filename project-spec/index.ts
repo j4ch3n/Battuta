@@ -13,12 +13,12 @@ export default function projectSpec(
   options?: { role: Role; projectsRoot?: string },
 ) {
   const role = options?.role ?? process.env.AGENT_ROLE;
-  if (role !== "pm" && role !== "tl") throw new Error("AGENT_ROLE must be pm or tl");
+  if (role !== "cos" && role !== "manager") throw new Error("AGENT_ROLE must be cos or manager");
   const store = new ProjectSpecStore(role, options?.projectsRoot);
   registerReadTools(pi, store);
   registerConstitutionTools(pi, store);
   registerGuards(pi, store.root);
-  if (role === "pm") {
+  if (role === "cos") {
     registerSpecTools(pi, store);
     registerDecisionTools(pi, store);
   } else {

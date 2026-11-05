@@ -4,7 +4,7 @@
 
 Memory carries useful understanding across conversations: settled decisions, stable preferences, constraints, and concise project facts. It is **context, not execution authority or a replacement for canonical project documents**. Remembered statements may be stale, incomplete, or wrong; agents must check current evidence before acting.
 
-The service is framework-independent. Battuta's Pi adapter is one client, not the owner of its storage or tool semantics. PM and TL share one server and database: PM reads/writes and TL reads under their runtime responsibilities. This trusted local service does not enforce per-agent authorization. Dream orchestration and profile generation belong to the PM client; dashboards, historical import and remote hosting/authentication remain excluded.
+The service is framework-independent. Battuta's Pi adapter is one client, not the owner of its storage or tool semantics. CoS and Manager share one server and database: CoS reads/writes and Manager reads under their runtime responsibilities. This trusted local service does not enforce per-agent authorization. Dream orchestration and profile generation belong to the CoS client; dashboards, historical import and remote hosting/authentication remain excluded.
 
 ## Memory layers
 
@@ -14,7 +14,7 @@ These are conceptual layers with different responsibilities, **not implemented s
 | -------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Working conversation | Current request, recent exchanges, immediate reasoning context | Managed by the agent runtime. Persisted session history is evidence for extraction, not a memory-server transcript archive.                                                 |
 | Durable fact memory  | Small, reusable facts retrieved across sessions                | Shared SQLite records exposed through MCP. Each has scope, kind, tags, and optional source references. Corrections create versions; explicit forgetting tombstones records. |
-| Owner profile        | High-level understanding of the human owner                    | Shared private `ME.md`, loaded by PM and replaced as a whole by the dream worker using cited personal evidence. TL does not preload it.                                     |
+| Owner profile        | High-level understanding of the human owner                    | Shared private `ME.md`, loaded by CoS and replaced as a whole by the dream worker using cited personal evidence. Manager does not preload it.                               |
 
 Canonical specifications, checklists, reviews, and project documents sit alongside these layers, not above them as another memory database. Use the project-context workflow for authoritative artifacts. A memory about an approval is not the approval itself.
 
@@ -54,7 +54,7 @@ A fact evidenced to apply to Atlas and Beacon can have `projects:["atlas","beaco
 
 ### Relevance, not authorization
 
-Both bots may explicitly inspect any project or all memories. The selected project supplies a useful default, not an access boundary. `agent_id` identifies a source; it does not create a private PM/TL namespace. V1 relies on a trusted local, same-user deployment rather than per-agent access control.
+Both bots may explicitly inspect any project or all memories. The selected project supplies a useful default, not an access boundary. `agent_id` identifies a source; it does not create a private CoS/Manager namespace. V1 relies on a trusted local, same-user deployment rather than per-agent access control.
 
 Recall and inventory use these selectors:
 
@@ -87,15 +87,15 @@ Persisted bot conversation
 Any other MCP client → the same shared tools and storage
 ```
 
-| Component                              | Responsibility                                                                                               |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `memory-client/`                       | Pi lifecycle hooks, existing PM profile loading, bounded conversation extraction, private queue, MCP upload. |
-| `contracts.py`, `scope.py`             | Public request validation, registry resolution, and relevance selection.                                     |
-| `service.py`, `capture.py`, `state.py` | Memory workflows, serialized mutations, durable intent/receipt state, capture deduplication.                 |
-| `upstream.py`                          | The pinned boundary to mcp-memory-service 12.1.1 storage, embeddings, schema, and read-only graph analysis.  |
-| `consolidation.py`                     | Snapshot-verified, recoverable publication of derived global clusters and relationships.                     |
-| `model_setup.py`                       | Explicit model provisioning, archive/file verification, and model identity.                                  |
-| `server.py`                            | Tailored tools over loopback Streamable HTTP; no upstream server/dashboard is exposed.                       |
+| Component                              | Responsibility                                                                                                |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `memory-client/`                       | Pi lifecycle hooks, existing CoS profile loading, bounded conversation extraction, private queue, MCP upload. |
+| `contracts.py`, `scope.py`             | Public request validation, registry resolution, and relevance selection.                                      |
+| `service.py`, `capture.py`, `state.py` | Memory workflows, serialized mutations, durable intent/receipt state, capture deduplication.                  |
+| `upstream.py`                          | The pinned boundary to mcp-memory-service 12.1.1 storage, embeddings, schema, and read-only graph analysis.   |
+| `consolidation.py`                     | Snapshot-verified, recoverable publication of derived global clusters and relationships.                      |
+| `model_setup.py`                       | Explicit model provisioning, archive/file verification, and model identity.                                   |
+| `server.py`                            | Tailored tools over loopback Streamable HTTP; no upstream server/dashboard is exposed.                        |
 
 One process owns the shared data directory. Upstream owns `memory.db`; Battuta owns `state.db` for recovery, receipts, and derived global graph generations. These are **not a single transaction**. Per-role capture queues are delivery state, not separate memory stores. No per-project database or `MEMORY.md` is created, and no upstream source/schema is forked or patched.
 
@@ -108,7 +108,7 @@ One process owns the shared data directory. Upstream owns `memory.db`; Battuta o
 5. Persist the validated batch before sending it through MCP. Source refs identify agent, session, and persisted entry. Batch/item identity and a canonical payload digest make retries distinguishable from conflicting requests.
 6. Acknowledge only confirmed complete batches. Retain incomplete work with bounded retry/backoff; a transport retry reuses the extracted batch rather than calling the LLM again. A token-limit rejection permits one rephrase under a distinct identity, not unbounded paid retries.
 
-Automatic capture is enabled for PM and disabled for TL by default. It is best-effort understanding, not a guarantee that every fact is remembered correctly. PM uses tools directly for important explicit corrections; TL forwards findings to PM. Capture failure must not prevent normal conversation. The server itself receives extracted facts, not a continuous transcript feed, and needs no model-provider credential.
+Automatic capture is enabled for CoS and disabled for Manager by default. It is best-effort understanding, not a guarantee that every fact is remembered correctly. CoS uses tools directly for important explicit corrections; Manager forwards findings to CoS. Capture failure must not prevent normal conversation. The server itself receives extracted facts, not a continuous transcript feed, and needs no model-provider credential.
 
 ## Retrieval and embeddings
 
@@ -138,9 +138,9 @@ Forgetting is **not secure erasure**. Tombstones retain upstream content; comple
 
 Mutation receipts may retain before/after fact content so replay can distinguish a new write from a reused record or a historical acknowledgement whose record is now inactive. Clearing the intent payload does not erase these acknowledged outcomes.
 
-## PM dream orchestration
+## CoS dream orchestration
 
-The PM client uses the existing prompt scheduler for a daily isolated session. Its dedicated tool takes a bounded inventory, partitions exact scopes, asks the configured model for cited mutations, validates the whole plan and applies server operations under revision preconditions. It refreshes the complete canonical personal profile from global evidence, then obtains an LLM reflection grounded in confirmed changes. The service does not run a separate consolidation scheduler or accept model-authored arbitrary commands.
+The CoS client uses the existing prompt scheduler for a daily isolated session. Its dedicated tool takes a bounded inventory, partitions exact scopes, asks the configured model for cited mutations, validates the whole plan and applies server operations under revision preconditions. It refreshes the complete canonical personal profile from global evidence, then obtains an LLM reflection grounded in confirmed changes. The service does not run a separate consolidation scheduler or accept model-authored arbitrary commands.
 
 Between canonical cleanup and profile publication, `memory_consolidate_global` derives clusters and relationships from all surviving active global memories, using the pinned upstream clustering, association, and relationship-inference components. The three-day window triggers LLM reconciliation; it does not replace accumulated historical state or limit graph inputs. Existing project-memory cleanup stays unchanged; project/multi-project records and upstream graph rows are excluded from the new analysis. No compression, forgetting, decay writes, automatic superseding, or synthetic association memories run. Upstream's full consolidation orchestrator and horizon schedules are not used.
 
@@ -156,4 +156,4 @@ Version-2 checkpoints add the acknowledged graph generation before profile publi
 
 Upstream automatic semantic merging/compression/forgetting, confidence/importance-based tiers, automatic global promotion, project graphs, graph-based recall ranking, historical Stone import, multilingual-model adoption, model migration tooling, remote authentication, dashboards and per-agent permission boundaries are not implemented. Dream uses Battuta's validated server APIs and selected read-only upstream analysis components rather than enabling upstream's direct-storage consolidation engine.
 
-For operational configuration, recovery, and cutover, see [memory operations](../docs/memory-service.md). For invocation examples and user-visible tool behavior, see [tool workflow](../bots/pm-bot/.pi/skills/memory/references/tools.md).
+For operational configuration, recovery, and cutover, see [memory operations](../docs/memory-service.md). For invocation examples and user-visible tool behavior, see [tool workflow](../skills-hub/memory/references/tools.md).
