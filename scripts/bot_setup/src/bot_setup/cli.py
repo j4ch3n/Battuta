@@ -23,7 +23,7 @@ def main():
 @main.command()
 @click.option("--root", type=DIRECTORY, required=True)
 @click.option("--role", type=click.Choice(["cos", "manager", "worker"]), required=True)
-@click.option("--bot-dir", type=DIRECTORY)
+@click.option("--bot-dir", type=click.Path(file_okay=False, path_type=Path, resolve_path=True))
 @click.option("--env-file", type=FILE)
 @click.option("--env-prefix")
 @click.option("--telegram-package", default=TELEGRAM_PACKAGE)
@@ -53,10 +53,10 @@ def release(root):
 
 @main.command("configure-worker")
 @click.option("--root", type=DIRECTORY, required=True)
-@click.option("--bot-dir", type=DIRECTORY, required=True)
+@click.option("--bot-dir", type=click.Path(file_okay=False, path_type=Path, resolve_path=True))
 @click.option("--env-file", type=FILE)
 def worker(root, bot_dir, env_file):
-    """Prepare a private worker instance from an installed shared catalog."""
+    """Prepare the release worker profile, or copy it to a private instance."""
     configure_worker(root, bot_dir=bot_dir, env_file=env_file or root / ".env.prod", shared_catalog=True)
 
 

@@ -61,6 +61,17 @@ def test_release_setup_is_repeatable_without_skill_output(release, capsys):
     assert "private-" not in output.out + output.err
 
 
+def test_release_setup_preserves_worker_tool_restrictions(release):
+    from bot_setup.mcp import configure_mcp
+
+    worker = release / "bots/worker"
+    configure_mcp(worker, role="worker", supabase_url="http://localhost")
+    before = (worker / ".pi/mcp.json").read_bytes()
+    with patch("bot_setup.configure.run"):
+        configure_release(release)
+    assert (worker / ".pi/mcp.json").read_bytes() == before
+
+
 @pytest.mark.parametrize("field", ["TELEGRAM_ALLOWED_USER_ID", "COS_TELEGRAM_TOKEN"])
 def test_unsafe_telegram_id_prevents_any_writes(release, monkeypatch, field):
     monkeypatch.setenv(field, "9007199254740993" if field == "TELEGRAM_ALLOWED_USER_ID" else "9007199254740993:private-token")

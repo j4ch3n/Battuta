@@ -1,6 +1,7 @@
 # Persistent assignment workers
 
-`assignment-worker/` runs one long-lived Pi runtime per worker instance. A fixed
+`bots/worker/extension/assignment-worker/` is a worker-only Pi extension. Each
+worker is an ordinary long-lived interactive Pi CLI instance. A fixed
 set of operator-started workers competes for whole assignments; no pool manager,
 dispatch queue, result queue, or scheduler daemon is introduced.
 
@@ -19,10 +20,19 @@ and privilege contracts. Assignment completion is not product acceptance.
 
 ## Native Pi lifecycle
 
-The host fixes cwd to the worker directory and agentDir to its private `.pi`.
-Setup consumes `bots/worker/skills.json`; Pi natively discovers the prepared
+The Bash launcher sets cwd to the private worker directory and agentDir to its
+`.pi`, then execs the normal pinned Pi CLI with terminal I/O intact. There is no
+custom SDK host. Setup prepares `bots/worker` from its `skills.json`; instances
+copy prepared configuration and share extension/dependency/catalog resources.
+Authentication and runtime state are private, never copied. Pi natively discovers the prepared
 skills, packages, extensions, and instructions. Runtime code does not parse the
 manifest or implement a custom resource loader.
+
+Instance settings retain setup-only `battutaWorkerResources` ownership metadata.
+Explicit reconfiguration replaces those exact owned paths with the current
+installation's paths, preserving unrelated custom resources. Pi does not interpret
+that metadata at runtime. CoS/Manager configuration never rewrites worker MCP
+exposure; worker assignment mutations remain hidden from model/codemode tools.
 
 Startup creates a fresh idle conversation, never automatically resumes an old
 claimed crash session. Availability wakes `/worker-next`, a registered control
@@ -30,12 +40,17 @@ command that does not require a model call. Busy/pending contexts do not claim.
 One serialized coordinator owns at most one binding and one running TODO.
 
 After claiming, `newSession` starts a fresh conversation at the same cwd/agentDir.
-Setup records the binding before the new extension restores it. Old callbacks
-are fenced during disposal; a host-owned failure path can record an acquired
-claim's blocker if replacement fails. TODOs within an assignment retain one
+Setup records the binding before the new extension restores it. Disposal stops
+the old coordinator and its availability connections. A failed/cancelled handoff
+retains the claim for operator inspection rather than invoking a recovery host.
+TODOs within an assignment retain one
 conversation; unrelated or reactivated assignments get a fresh one.
 
-The extension persists TODO start before prompting. The model's strict
+The extension persists TODO start before dispatching a normal Pi message with
+turn triggering. Pi owns execution, provider retries, errors, and terminal
+interaction; the extension adds no awaitable sender bridge or prompt-failure
+supervisor. A failure before a turn starts may leave the claim/TODO unfinished
+for manual inspection. Message delivery is not execution success. The model's strict
 `report_execution_result` tool has no identity/token fields and accepts completed
 or blocked, nonblank summary, real evidence references, and a required blocker
 for blocked. Identical duplicate reports are harmless; distinct replacements
@@ -84,6 +99,7 @@ first verify the process is stopped and inspect its exact claim and stored TODOs
 Do not start another worker as an implicit takeover. An authorized operator can
 record an honest claim-bound runtime blocker, then Manager can use the normal
 blocked-work recovery workflow. Unconfirmed writes or mail require inspection,
-not automatic retry. SIGINT/SIGTERM disposes timers/connections without releasing
-the claim. Automatic crash recovery, age-based reclaim, and a dynamic pool remain
+not automatic retry. Exiting Pi cleans up extension timers/connections without
+releasing the claim; a crash may prevent cleanup. Automatic crash recovery,
+age-based reclaim, and a dynamic pool remain
 out of scope.

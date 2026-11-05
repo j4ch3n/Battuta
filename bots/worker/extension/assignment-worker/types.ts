@@ -33,7 +33,7 @@ export interface ExecutionSessions {
   isIdle(): boolean;
   hasPendingMessages(): boolean;
   openAssignmentSession(detail: Detail): Promise<Binding>;
-  runTodo(binding: Binding, todo: TodoRow, detail: Detail): Promise<void>;
+  runTodo(binding: Binding, todo: TodoRow, detail: Detail): void;
   appendEntry(kind: string, data: unknown): void;
 }
 export type ReconcileReason = "startup" | "reconnect" | "idle" | "event" | "fallback";

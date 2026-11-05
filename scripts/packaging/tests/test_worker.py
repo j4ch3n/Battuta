@@ -24,20 +24,24 @@ class WorkerReleaseTests(ConfigFixture):
         skill = release / "skills-hub/execute-assignment"
         skill.mkdir(parents=True)
         (skill / "SKILL.md").write_text("execution fixture")
-        runtime = release / "assignment-worker"
+        runtime = release / "bots/worker/extension/assignment-worker"
         for name in ("mcp", "codemode"):
             extension = runtime / f"node_modules/@earendil-works/pi-coding-agent/dist/extensions/{name}/index.js"
             extension.parent.mkdir(parents=True, exist_ok=True)
             extension.write_text("fixture")
-        (runtime / "host.ts").write_text("fixture")
+        (runtime / "index.ts").write_text("fixture")
+        cli = runtime / "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
+        cli.parent.mkdir(parents=True)
+        cli.write_text("fixture")
         (release / ".env.prod").write_text("SUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n")
         moved = self.root / "relocated"
         release.rename(moved)
         bot = moved / "instances/worker-1"
-        bot.mkdir(parents=True)
         self.executable("pnpm", f"from pathlib import Path\nPath({str(self.root / 'unexpected-install')!r}).write_text('called')\n")
         self.executable("node", "import sys,json\nprint(json.dumps(sys.argv[1:]))\n")
         env = {**os.environ, "PATH":f"{self.bin}:{os.environ['PATH']}"}
+        prepared = subprocess.run(["bash", str(moved / "bin/battuta"), "configure-worker"], env=env, text=True, capture_output=True)
+        self.assertEqual(prepared.returncode, 0, prepared.stderr)
         for _ in range(2):
             configured = subprocess.run(["bash", str(moved / "bin/battuta"), "configure-worker", "--bot-dir", str(bot)], env=env, text=True, capture_output=True)
             self.assertEqual(configured.returncode, 0, configured.stderr)
@@ -47,5 +51,5 @@ class WorkerReleaseTests(ConfigFixture):
         self.assertTrue(any((bot / ".pi" / value / "SKILL.md").is_file() for value in settings["skills"]))
         launch = subprocess.run(["bash", str(moved / "bin/battuta"), "worker", "--bot-dir", str(bot)], env=env, text=True, capture_output=True)
         self.assertEqual(launch.returncode, 0, launch.stderr)
-        self.assertIn(str(moved / "assignment-worker/host.ts"), json.loads(launch.stdout))
+        self.assertEqual(json.loads(launch.stdout), [str(moved / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js")])
         self.assertNotIn("private-sentinel", configured.stdout + configured.stderr + launch.stdout + launch.stderr)

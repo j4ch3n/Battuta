@@ -36,7 +36,25 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
     assert (pi / "skills/memory").is_symlink()
     assert json.loads((pi / "settings.json").read_text())["battutaMemoryCapture"]["enabled"] == (role == "cos")
     assert "assignments" in json.loads((pi / "mcp.json").read_text())["mcpServers"]
-    assert "assignments" in json.loads((tmp_path / "bots/worker/.pi/mcp.json").read_text())["mcpServers"]
+    assert not (tmp_path / "bots/worker/.pi/mcp.json").exists()
+
+
+@pytest.mark.parametrize("role", ["cos", "manager"])
+def test_other_bot_setup_preserves_prepared_worker_tool_restrictions(tmp_path, role):
+    from bot_setup.mcp import configure_mcp
+
+    skill_catalog(tmp_path, role)
+    bot = tmp_path / f"bots/{role}-bot"
+    (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
+    (bot / "AGENTS_dedicated.md").write_text("Dedicated")
+    (bot / "package.json").write_text("{}")
+    (tmp_path / ".env").write_text("LINEAR_API_TOKEN=private-linear\nSUPABASE_URL=http://localhost:54321\nSUPABASE_SECRET_KEY=private-supabase\nCOS_TELEGRAM_TOKEN=101:private-token\nTELEGRAM_ALLOWED_USER_ID=123\n")
+    worker = tmp_path / "bots/worker"
+    configure_mcp(worker, role="worker", supabase_url="http://localhost:54321")
+    before = (worker / ".pi/mcp.json").read_bytes()
+    with patch("bot_setup.configure.run"), patch("bot_setup.install.run"):
+        configure_source(tmp_path, role=role)
+    assert (worker / ".pi/mcp.json").read_bytes() == before
 
 
 @pytest.mark.parametrize("values", ["", "COS_TELEGRAM_TOKEN=101:private-token\n", "COS_TELEGRAM_TOKEN=9007199254740993:private-token\nTELEGRAM_ALLOWED_USER_ID=123\n"])

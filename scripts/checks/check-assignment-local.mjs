@@ -31,16 +31,20 @@ const result = spawnSync("deno", ["task", "integration"], {
 if (result.error) throw result.error;
 process.exitCode = result.status ?? 1;
 if (result.status === 0) {
-  const worker = spawnSync("pnpm", ["--dir", "assignment-worker", "test:integration"], {
-    cwd: root,
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      SUPABASE_URL: status.API_URL,
-      SUPABASE_SECRET_KEY: status.SECRET_KEY,
-      SUPABASE_DB_URL: status.DB_URL,
+  const worker = spawnSync(
+    "pnpm",
+    ["--dir", "bots/worker/extension/assignment-worker", "test:integration"],
+    {
+      cwd: root,
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        SUPABASE_URL: status.API_URL,
+        SUPABASE_SECRET_KEY: status.SECRET_KEY,
+        SUPABASE_DB_URL: status.DB_URL,
+      },
     },
-  });
+  );
   if (worker.error) throw worker.error;
   process.exitCode = worker.status ?? 1;
 }

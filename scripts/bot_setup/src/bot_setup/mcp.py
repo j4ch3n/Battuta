@@ -44,18 +44,6 @@ def assignment_server(supabase_url: str) -> dict:
     return {"url": supabase_url.rstrip("/") + "/functions/v1/assignments", "headers": {"apikey": "${SUPABASE_SECRET_KEY}"}, "exposure": "codemode", "description": "Shared project assignments, ordered TODOs, and local note paths"}
 
 
-def configure_assignment_mcp(bot_dir: Path, *, supabase_url: str) -> None:
-    server = assignment_server(supabase_url)
-    path = bot_dir / ".pi/mcp.json"
-    config = read_config(path)
-    servers = config.get("mcpServers", {})
-    if not isinstance(servers, dict):
-        raise click.ClickException("mcpServers must be a JSON object")
-    servers["assignments"] = server
-    config["mcpServers"] = servers
-    write_config(path, config, ".mcp-")
-
-
 def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager", "worker"], supabase_url: str, memory_url: str | None = None) -> None:
     if role not in {"cos", "manager", "worker"}:
         raise click.ClickException("Bot role must be cos or manager")

@@ -46,7 +46,7 @@ class RunDevTests(LauncherFixture):
     def test_dev_missing_worker_prerequisite_fails_before_creating_session(self):
         paths = [self.worker / name for name in (
             "AGENTS.md", ".pi/settings.json", ".pi/mcp.json", ".pi/auth.json",
-        )] + [self.root / "assignment-worker" / name for name in ("host.ts", "node_modules")]
+        )] + [self.root / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"]
         for path in paths:
             with self.subTest(path=path):
                 backup = path.with_name(path.name + ".saved")

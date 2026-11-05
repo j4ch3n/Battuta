@@ -21,8 +21,7 @@ type Phase =
 export function createCoordinator(options: CoordinatorOptions): Coordinator {
   const { assignments, sessions, notify, diagnostics } = options;
   let phase: Phase = "idle",
-    stopped = false,
-    runGeneration = 0;
+    stopped = false;
   let binding: Binding | undefined,
     current: TodoRow | undefined,
     accepted: ExecutionResult | undefined;
@@ -37,7 +36,6 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
   function pause(event: string, error?: unknown) {
     if (stopped) return;
     phase = "paused";
-    runGeneration++;
     diagnostics(event, error);
   }
   const matches = (row: AssignmentView) =>
@@ -73,7 +71,6 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     accepted = undefined;
     boundary = undefined;
     phase = "idle";
-    runGeneration++;
     queueMicrotask(() => {
       void coordinator.reconcile("idle");
     });
@@ -81,7 +78,6 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
   async function blockRun(explanation: string) {
     if (stopped || !binding) return;
     phase = "persisting";
-    runGeneration++;
     try {
       const detail = await blockAndInspect(assignments, binding, explanation);
       if (!stopped) await deliver(detail);
@@ -143,22 +139,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     accepted = undefined;
     boundary = undefined;
     phase = "executing";
-    const generation = ++runGeneration;
-    const runBinding = { ...binding },
-      runTodo = structuredClone(current);
-    // A Pi prompt can await its tool calls; never await it while holding the control queue.
-    void Promise.resolve()
-      .then(() => {
-        if (stopped || generation !== runGeneration || phase !== "executing") return;
-        return sessions.runTodo(runBinding, runTodo, latest);
-      })
-      .catch((error) =>
-        serial(async () => {
-          if (stopped || generation !== runGeneration || phase !== "executing") return;
-          diagnostics("Execution prompt failed", error);
-          await blockRun("Execution failed before a final result could be confirmed");
-        }).catch((error) => pause("Execution failure handling could not finish", error)),
-      );
+    sessions.runTodo({ ...binding }, structuredClone(current), latest);
   }
   function matchesReport(todo: TodoRow, row: AssignmentView, report: ExecutionResult) {
     return (
@@ -217,7 +198,10 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
             } catch (error) {
               if (stopped) return;
               diagnostics("Fresh assignment conversation failed", error);
-              await blockRun("Could not initialize the assignment conversation");
+              pause(
+                "Assignment conversation did not initialize; inspect the retained claim",
+                error,
+              );
             }
             return;
           }
@@ -332,7 +316,6 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     },
     stop() {
       stopped = true;
-      runGeneration++;
       return Promise.resolve();
     },
   };

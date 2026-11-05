@@ -6,7 +6,7 @@
   "lastChangelogVersion": "1.3.0",
   "theme": "dark",
   "defaultProvider": "openai",
-  "defaultModel": "gpt-5.5",
+  "defaultModel": "gpt-6.1-terra",
   "battutaMemoryCapture": {
     "enabled": false,
     "batchMessages": 6

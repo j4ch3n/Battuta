@@ -398,21 +398,6 @@ test("duplicate handoff cannot restart the executing TODO or replace its identit
   expect(h.turns.map((t) => t.position)).toEqual([1, 2]);
 });
 
-test("a prompt promise may span tool reporting without deadlocking the control queue", async () => {
-  const h = harness(1);
-  let release: (() => void) | undefined;
-  h.sessions.runTodo.mockImplementation(
-    () =>
-      new Promise<void>((resolve) => {
-        release = resolve;
-      }),
-  );
-  await h.begin();
-  await h.complete();
-  expect(h.state.assignment.status).toBe("done");
-  release?.();
-});
-
 test("stop invalidates callbacks immediately and never releases a claim", async () => {
   const h = harness();
   await h.begin();
@@ -432,20 +417,17 @@ test("return to idle reconciles the board even if the availability event was mis
   expect(h.turns).toHaveLength(1);
 });
 
-test("conversation or prompt startup failures become honest persisted blockers", async () => {
+test("cancelled conversation handoff retains the claim for operator inspection", async () => {
   const conversation = harness();
   conversation.sessions.openAssignmentSession.mockRejectedValue(
     new Error("Session initialization failed"),
   );
   await conversation.coordinator.reconcile("startup");
-  expect(conversation.state.assignment.status).toBe("blocked");
-  expect(conversation.notifications[0].assignment.status).toBe("blocked");
+  expect(conversation.state.assignment.status).toBe("in_process");
+  expect(conversation.notifications).toEqual([]);
   expect(conversation.turns).toEqual([]);
-  const prompt = harness();
-  prompt.sessions.runTodo.mockRejectedValue(new Error("Provider unavailable"));
-  await prompt.begin();
-  await vi.waitFor(() => expect(prompt.state.assignment.status).toBe("blocked"));
-  expect(prompt.state.todos[1].status).toBe("todo");
+  await conversation.coordinator.reconcile("event");
+  expect(conversation.assignments.claim).toHaveBeenCalledTimes(1);
 });
 
 test.each([true, false])(

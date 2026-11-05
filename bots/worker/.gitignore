@@ -1,0 +1,4 @@
+# Keep the shared profile configuration, never private runtime state.
+AGENTS.md
+.pi/*
+!.pi/settings.json

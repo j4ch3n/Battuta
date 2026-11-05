@@ -113,12 +113,13 @@ if "-P" in args:
         for name in ("supabase", "make"):
             self.executable(name, "")
         self.home = self.root / "home"
-        self.worker = self.home / ".battuta/workers/worker-1"
+        self.worker = self.home / ".battuta/worker/worker-1"
         (self.worker / ".pi").mkdir(parents=True)
         for name in ("AGENTS.md", ".pi/settings.json", ".pi/mcp.json", ".pi/auth.json"):
             (self.worker / name).write_text("{}")
-        (self.root / "assignment-worker/node_modules").mkdir(parents=True)
-        (self.root / "assignment-worker/host.ts").touch()
+        cli = self.root / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
+        cli.parent.mkdir(parents=True)
+        cli.touch()
         scripts = self.root / "scripts/bot_setup"
         scripts.mkdir()
         shutil.copy2(ROOT / "scripts/bot_setup/run-worker.sh", scripts / "run-worker.sh")

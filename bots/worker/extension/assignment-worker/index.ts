@@ -1,5 +1,4 @@
 import type {
-  AgentSession,
   ExtensionAPI,
   ExtensionCommandContext,
   ExtensionContext,
@@ -11,10 +10,7 @@ import { ExecutionResultSchema } from "./contracts.ts";
 import { createNotifier } from "./notify.ts";
 import type { AssignmentClient, Binding, Coordinator, Detail } from "./types.ts";
 
-export default function worker(
-  pi: ExtensionAPI,
-  sendMessage?: (message: Parameters<AgentSession["sendCustomMessage"]>[0]) => Promise<void>,
-) {
+export default function worker(pi: ExtensionAPI) {
   let coordinator: Coordinator | undefined, client: AssignmentClient | undefined;
   let db: ReturnType<typeof createClient> | undefined,
     timer: ReturnType<typeof setInterval> | undefined;
@@ -73,6 +69,28 @@ export default function worker(
   pi.on("session_start", async (event, ctx) => {
     if (client || stopped) return;
     context = ctx;
+    pi.setActiveTools([
+      "codemode",
+      "web_search",
+      "web_fetch",
+      "read",
+      "bash",
+      "edit",
+      "write",
+      "grep",
+      "find",
+      "ls",
+      "report_execution_result",
+      "mcp__assignments__list_assignments",
+      "mcp__assignments__get_assignment",
+      "mcp__assignments__prepare_notes",
+      "mcp__assignments__locate_notes",
+      "mcp__memory__memory_recall",
+      "mcp__memory__memory_list",
+      "mcp__memory__memory_get",
+      "mcp__memory__memory_health",
+      "mcp__memory__memory_global_relationships",
+    ]);
     const supabaseUrl = process.env.SUPABASE_URL ?? "",
       secretKey = process.env.SUPABASE_SECRET_KEY ?? "";
     client = await createAssignmentClient({ supabaseUrl, secretKey });
@@ -122,16 +140,18 @@ export default function worker(
         },
         runTodo(_binding, todo, detail) {
           if (stopped) throw new Error("Worker session was disposed");
-          if (!sendMessage) throw new Error("Execution requires the persistent worker host");
-          return sendMessage({
-            customType: "assignment-todo",
-            content: JSON.stringify({
-              assignment: detail.assignment,
-              todos: detail.todos,
-              current_todo: todo,
-            }),
-            display: true,
-          });
+          pi.sendMessage(
+            {
+              customType: "assignment-todo",
+              content: JSON.stringify({
+                assignment: detail.assignment,
+                todos: detail.todos,
+                current_todo: todo,
+              }),
+              display: true,
+            },
+            { triggerTurn: true },
+          );
         },
       },
     });

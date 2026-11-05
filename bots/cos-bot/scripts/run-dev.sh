@@ -39,11 +39,11 @@ fi
 
 if [[ "$mode" == dev ]]; then
   [[ -f "$repo_dir/supabase/.env" ]] || { printf 'Missing supabase/.env; copy supabase/.env.example\n' >&2; exit 1; }
-  worker_dir="$HOME/.battuta/workers/worker-1"
+  worker_dir="$HOME/.battuta/worker/worker-1"
   for file in AGENTS.md .pi/settings.json .pi/mcp.json .pi/auth.json; do
     [[ -s "$worker_dir/$file" ]] || { printf 'Configure and authenticate the worker at %s before launch\n' "$worker_dir" >&2; exit 1; }
   done
-  [[ -f "$repo_dir/assignment-worker/host.ts" && -d "$repo_dir/assignment-worker/node_modules" ]] || { printf 'Install the shared worker runtime dependencies first\n' >&2; exit 1; }
+  [[ -f "$repo_dir/bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js" ]] || { printf 'Prepare the shared worker profile and dependencies first\n' >&2; exit 1; }
 fi
 [[ -x "$bot_dir/node_modules/.bin/pi" ]] || { printf 'Pi is not installed; run make setup-cos-bot\n' >&2; exit 1; }
 [[ -f "$bot_dir/.pi/telegram.json" ]] || { printf 'Telegram is not configured; run make setup-cos-bot\n' >&2; exit 1; }

@@ -2,6 +2,8 @@
 
 from pathlib import Path
 import re
+import shutil
+import tempfile
 import unittest
 from bot_setup.skills import check_manifests
 
@@ -28,7 +30,12 @@ class SkillCatalogTests(unittest.TestCase):
         self.assertEqual(len(names), len(set(names)))
 
     def test_bot_selections_validate_without_discovery_output(self):
-        check_manifests(ROOT)
-        for role in ("cos", "manager"):
-            skills = ROOT / f"bots/{role}-bot/.pi/skills"
-            self.assertFalse(skills.exists() and any(skills.iterdir()))
+        with tempfile.TemporaryDirectory(dir="/tmp") as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / "skills-hub", root / "skills-hub")
+            for manifest in (ROOT / "bots").glob("*/skills.json"):
+                target = root / manifest.relative_to(ROOT)
+                target.parent.mkdir(parents=True)
+                shutil.copy2(manifest, target)
+            check_manifests(root)
+            self.assertFalse(any((root / "bots").glob("*/.pi")))
