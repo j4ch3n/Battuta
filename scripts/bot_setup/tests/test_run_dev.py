@@ -19,6 +19,27 @@ def test_shared_launcher_rejects_invalid_mode_from_an_unrelated_cwd(tmp_path):
 
 
 class RunDevTests(LauncherFixture):
+    def test_manager_and_memory_panes_keep_tool_path_with_stale_tmux_environment(self):
+        self.executable("battuta-project", "")
+        self.executable("battuta-memory", "print('installed-memory')\n")
+        binary = self.root / "bin"
+        binary.mkdir(exist_ok=True)
+        launcher = binary / "battuta"
+        launcher.write_text('#!/bin/sh\nexec battuta-memory\n')
+        launcher.chmod(0o700)
+        pi = self.root / "bots/manager-bot/node_modules/.bin/pi"
+        pi.write_text(f"#!{sys.executable}\nimport shutil\nprint(shutil.which('battuta-project'))\n")
+        result = self.run_launcher("prod", existing=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for call in self.commands():
+            if "AGENT_ROLE=manager" not in call[-1] and call[0] != "new-window":
+                continue
+            with self.subTest(pane=call[0]):
+                pane = subprocess.run(["bash", "-c", call[-1]], env={**os.environ, "PATH": "/usr/bin:/bin"}, capture_output=True, text=True)
+                self.assertEqual(pane.returncode, 0, pane.stderr)
+                expected = str(self.bin / "battuta-project") if "AGENT_ROLE=manager" in call[-1] else "installed-memory"
+                self.assertEqual(pane.stdout.strip(), expected)
+
     def test_release_memory_pane_uses_installed_tool_through_release_launcher(self):
         binary = self.root / "bin"
         binary.mkdir(exist_ok=True)
