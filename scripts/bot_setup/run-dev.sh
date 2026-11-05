@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-bot_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-repo_dir="$(dirname "$(dirname "$bot_dir")")"
+repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+bot_dir="$repo_dir/bots/cos-bot"
 manager_dir="$repo_dir/bots/manager-bot"
 mode="${1:-}"
 case "$mode" in

@@ -67,7 +67,7 @@ case "${1:-}" in
     exec "$tools/.venv/bin/battuta-bot-setup" configure-release --root "$root" "$@"
     ;;
   start-prod-screen)
-    exec bash "$root/bots/cos-bot/scripts/run-dev.sh" prod
+    exec bash "$root/scripts/bot_setup/run-dev.sh" prod
     ;;
   cos|manager)
     role="$1"

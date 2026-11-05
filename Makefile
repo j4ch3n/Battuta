@@ -46,10 +46,10 @@ refresh-telegram:
 	uv run --project scripts/bot_setup --locked battuta-bot-setup refresh-telegram --root . "$(ENV_FILE)"
 
 dev:
-	bash bots/cos-bot/scripts/run-dev.sh dev
+	bash scripts/bot_setup/run-dev.sh dev
 
 prod:
-	bash bots/cos-bot/scripts/run-dev.sh prod
+	bash scripts/bot_setup/run-dev.sh prod
 
 setup-checks:
 	pnpm install --frozen-lockfile

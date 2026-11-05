@@ -6,7 +6,16 @@ import subprocess
 import sys
 import shutil
 
-from fixtures import LauncherFixture
+from fixtures import LauncherFixture, ROOT
+
+
+def test_shared_launcher_rejects_invalid_mode_from_an_unrelated_cwd(tmp_path):
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/bot_setup/run-dev.sh"), "invalid"],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert result.returncode == 2
+    assert "dev|prod" in result.stderr
 
 
 class RunDevTests(LauncherFixture):

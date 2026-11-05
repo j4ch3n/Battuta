@@ -81,9 +81,9 @@ os.execv(sys.executable, [sys.executable, "-m", "bot_setup.cli", *args[args.inde
 class LauncherFixture(ConfigFixture):
     def setUp(self):
         super().setUp()
-        launcher = self.root / "bots/cos-bot/scripts/run-dev.sh"
+        launcher = self.root / "scripts/bot_setup/run-dev.sh"
         launcher.parent.mkdir(parents=True)
-        shutil.copy2(ROOT / "bots/cos-bot/scripts/run-dev.sh", launcher)
+        shutil.copy2(ROOT / "scripts/bot_setup/run-dev.sh", launcher)
         for role in ("cos", "manager"):
             bot = self.root / f"bots/{role}-bot"
             (bot / "node_modules/.bin").mkdir(parents=True)
@@ -121,7 +121,7 @@ if "-P" in args:
         cli.parent.mkdir(parents=True)
         cli.touch()
         scripts = self.root / "scripts/bot_setup"
-        scripts.mkdir()
+        scripts.mkdir(exist_ok=True)
         shutil.copy2(ROOT / "scripts/bot_setup/run-worker.sh", scripts / "run-worker.sh")
 
     def run_launcher(self, mode, existing=True):

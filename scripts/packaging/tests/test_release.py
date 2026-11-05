@@ -18,6 +18,19 @@ from skill_fixtures import skill_catalog
 
 
 class ReleaseInstallTests(ConfigFixture):
+    def test_production_screen_calls_shared_launcher_after_relocation(self):
+        release = self.root / "release"
+        (release / "bin").mkdir(parents=True)
+        shutil.copy2(ROOT / "scripts/packaging/battuta", release / "bin/battuta")
+        launcher = release / "scripts/bot_setup/run-dev.sh"
+        launcher.parent.mkdir(parents=True)
+        launcher.write_text('printf "shared-launcher:%s\\n" "$1"\n')
+        moved = self.root / "relocated release"
+        release.rename(moved)
+        result = subprocess.run(["bash", str(moved / "bin/battuta"), "start-prod-screen"], cwd=self.root, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "shared-launcher:prod\n")
+
     def test_manager_subagent_release_boundary_requires_runtime_files(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         boundary = re.search(
