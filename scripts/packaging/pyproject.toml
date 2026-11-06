@@ -31,3 +31,8 @@ root = "../.."
 addopts = "-p no:cacheprovider --import-mode=importlib"
 testpaths = ["tests"]
 pythonpath = ["tests"]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
