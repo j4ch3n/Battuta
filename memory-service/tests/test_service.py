@@ -40,13 +40,13 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
 
     def add(self, char, content, tags, distance, superseded=None):
         cursor = self.conn.execute("INSERT INTO memories(content_hash,content,tags,memory_type,metadata,created_at,updated_at,superseded_by,version,embedding_pending) VALUES(?,?,?,?,?,?,?,?,1,0)",
-            (char * 64, content, tags, "observation", json.dumps({"sources": []}), 1, 1, superseded))
+            (char * 64, content, tags, "observation", json.dumps({"sources": [{"agent_id": "cos", "session_id": "s", "entry_id": char}]}), 1, 1, superseded))
         self.conn.execute("INSERT INTO memory_embeddings VALUES(?,?)", (cursor.lastrowid, str(distance).encode()))
 
     async def test_scoped_recall_filters_before_limit(self):
         for n in range(30):
             self.add(str(n), "Distractor", "proj:beacon", 0)
-        result = await self.service.recall(RecallRequest(query="note", limit=2))
+        result = await self.service.recall(RecallRequest(query="note", limit=2, mode="semantic"))
         self.assertEqual([r["content"] for r in result["records"]], ["Global note", "Atlas note"])
         self.assertFalse(result["incomplete"])
 
@@ -77,7 +77,7 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
 
     async def test_missing_selection_is_global_only(self):
         (self.root / ".config.json").unlink()
-        result = await self.service.recall(RecallRequest(query="note"))
+        result = await self.service.recall(RecallRequest(query="note", mode="semantic"))
         self.assertTrue(result["warnings"])
         self.assertEqual([r["content"] for r in result["records"]], ["Global note"])
 

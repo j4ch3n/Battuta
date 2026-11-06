@@ -2,8 +2,11 @@ import asyncio
 import hashlib
 import json
 import uuid
+from datetime import datetime, timezone
 from .scope import resolve_selector, resolve_scope, registered
-from .contracts import UpdateRequest
+from .contracts import UpdateRequest, ListRequest
+from .records import eligible_records
+from .retrieval import fuse_ranks
 from .upstream import TerminalMutationError
 from .consolidation import GlobalConsolidation
 
@@ -24,8 +27,40 @@ class MemoryService:
 
     async def recall(self, request):
         selected = resolve_selector(request, self.config.registry_root)
-        records = await self.adapter.search(request, selected)
-        return {"records": records, "incomplete": False, "warnings": selected.warnings}
+        async with self.mutations:
+            if self.state is not None:
+                await self._recover()
+            records = await self.adapter.list(request.model_copy(update={"kind": None, "tags": [], "include_history": False}), selected)
+            eligible = eligible_records(records, datetime.now(timezone.utc), request.include_expired)
+            eligible = [r for r in eligible if (not request.kind or r["kind"] == request.kind) and
+                (not request.tags or (all(t in r["tags"] for t in request.tags) if request.tag_match == "all" else any(t in r["tags"] for t in request.tags)))]
+            branches, semantic, lexical = {}, [], []
+            try:
+                semantic = await self.adapter.search(request.model_copy(update={"limit": min(request.limit, 20)}), selected, [r["ref"] for r in eligible])
+                branches["semantic"] = "ready"
+            except Exception:
+                branches["semantic"] = "unavailable"
+            if request.mode == "hybrid":
+                try:
+                    if self.state is None:
+                        raise RuntimeError("Keyword index unavailable")
+                    await self._reconcile_index()
+                    lexical = self.state.lexical_search(request.query, eligible, min(request.limit, 20))
+                    branches["lexical"] = "ready"
+                except Exception:
+                    branches["lexical"] = "unavailable"
+            if not any(value == "ready" for value in branches.values()):
+                raise RuntimeError("Memory retrieval unavailable")
+            lookup = {r["ref"]: r for r in eligible}
+            refs = fuse_ranks([r["ref"] for r in semantic], lexical, request.limit)
+            incomplete = "unavailable" in branches.values()
+            return {"records": [lookup[ref] for ref in refs if ref in lookup], "incomplete": incomplete, "branches": branches,
+                "warnings": selected.warnings + (["Memory retrieval is partial"] if incomplete else [])}
+
+    async def _reconcile_index(self):
+        request = ListRequest(selector="all")
+        records = await self.adapter.list(request, resolve_selector(request, self.config.registry_root))
+        self.state.reconcile_index(records)
 
     async def list(self, request):
         selected = resolve_selector(request, self.config.registry_root)
@@ -73,6 +108,7 @@ class MemoryService:
         try:
             await getattr(self.adapter, payload["operation"])(payload)
             result = dict(payload["result"])
+            await self._reconcile_index()
             if "before" in result:
                 record = await self.adapter.get(payload["ref"], include_deleted=True)
                 result.update(after=record["content"] if record and record["active"] else None,
@@ -89,6 +125,7 @@ class MemoryService:
     async def recover(self):
         async with self.mutations:
             await self._recover()
+            await self._reconcile_index()
 
     async def _mutation(self, key, request, planner):
         digest = self.digest(self.request_value(request))

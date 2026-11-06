@@ -150,9 +150,14 @@ class UpstreamAdapter:
         rows = await self._rows(f"SELECT m.* FROM memories m WHERE {where} ORDER BY m.updated_at DESC, m.content_hash ASC", params)
         return [self.record(row) for row in rows]
 
-    async def search(self, request, resolved):
+    async def search(self, request, resolved, eligible_refs=None):
+        if eligible_refs == []:
+            return []
         vector = await asyncio.to_thread(self.embed, request.query)
         where, params = self._filters(request, resolved)
+        if eligible_refs is not None:
+            where += " AND m.content_hash IN (SELECT value FROM json_each(?))"
+            params.append(json.dumps(eligible_refs))
         # Exact filtered distance search has no global-neighbour candidate cap.
         # sqlite-vec still computes distance; upstream owns all stored embeddings.
         rows = await self._rows(f"""SELECT m.*, vec_distance_l2(e.content_embedding, ?) AS distance

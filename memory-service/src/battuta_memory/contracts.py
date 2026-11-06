@@ -141,6 +141,8 @@ class Selector(Tagged):
 class RecallRequest(Selector):
     query: str = Field(min_length=1, max_length=16000)
     limit: int = Field(default=10, ge=1, le=100)
+    mode: Literal["hybrid", "semantic"] = "hybrid"
+    include_expired: bool = False
 
 
 class ListRequest(Selector):
