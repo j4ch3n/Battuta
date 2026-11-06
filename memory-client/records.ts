@@ -69,6 +69,8 @@ export const memoryRecordSchema = z
   .object({
     ref: memoryRefSchema,
     revision: memoryRefSchema,
+    review_fingerprint: memoryRefSchema.optional(),
+    metadata_error: z.literal(false).optional(),
     content: z
       .string()
       .trim()
@@ -113,7 +115,11 @@ export function inRequestScope(record: MemoryRecord, project: string | null) {
 
 export function eligibleRecords(records: MemoryRecord[], now: Date, includeExpired = false) {
   const lookup = new Map(records.map((r) => [r.ref, r]));
+  const checked = new Map<string, boolean>();
   const valid = (ref: string, historical: boolean, visiting: Set<string>): boolean => {
+    const key = `${ref}:${historical}`;
+    const cached = checked.get(key);
+    if (cached !== undefined) return cached;
     const r = lookup.get(ref);
     if (!r || !r.active || !r.sources.length || visiting.has(ref)) return false;
     const m = r.memory_metadata;
@@ -123,7 +129,7 @@ export function eligibleRecords(records: MemoryRecord[], now: Date, includeExpir
         (!historical && m.expires_at && now.getTime() >= Date.parse(m.expires_at)))
     )
       return false;
-    return (m?.evidence ?? []).every((link) => {
+    const eligible = (m?.evidence ?? []).every((link) => {
       const support = lookup.get(link.ref);
       return (
         support?.revision === link.revision &&
@@ -133,6 +139,8 @@ export function eligibleRecords(records: MemoryRecord[], now: Date, includeExpir
         valid(link.ref, link.requirement === "historical", new Set([...visiting, ref]))
       );
     });
+    checked.set(key, eligible);
+    return eligible;
   };
   return records.filter((r) => valid(r.ref, includeExpired, new Set()));
 }

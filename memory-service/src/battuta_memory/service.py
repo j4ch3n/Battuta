@@ -65,6 +65,8 @@ class MemoryService:
     async def list(self, request):
         selected = resolve_selector(request, self.config.registry_root)
         records = await self.adapter.list(request, selected)
+        if not request.include_history:
+            records = [r for r in records if r["active"]]
         offset = (request.page - 1) * request.page_size
         return {"records": records[offset:offset + request.page_size], "total": len(records), "warnings": selected.warnings}
 
@@ -217,8 +219,14 @@ class MemoryService:
                 raise ValueError("Memory changed since inventory")
             metadata = request.memory_metadata.model_dump(mode="json")
             await self._validate_metadata(request.ref, metadata, current["scope"], current["sources"])
+            replacement = None
+            if request.replacement_ref is not None:
+                replacement = await self._active(request.replacement_ref)
+                if request.replacement_ref == request.ref or replacement["scope"] != current["scope"] or metadata["status"] != "superseded":
+                    raise ValueError("Invalid lifecycle replacement")
             tags = (["scope:global"] if current["scope"]["global"] else [f"proj:{p}" for p in current["scope"]["projects"]]) + current["tags"] + [f"kind:{current['kind']}"]
             return {"operation": "metadata", "ref": request.ref, "tags": tags, "sources": current["sources"], "memory_metadata": metadata,
+                **({"replacement_ref": request.replacement_ref} if replacement else {}),
                 "result": {"ref": request.ref, "before": current["content"]}}
         return await self._mutation("metadata:" + request.idempotency_key, request, plan)
 

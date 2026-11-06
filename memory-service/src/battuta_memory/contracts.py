@@ -237,6 +237,7 @@ class SetMetadataRequest(GetRequest, EvidenceGuard):
     expected_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
     idempotency_key: str = Field(min_length=1, max_length=200)
     memory_metadata: MemoryMetadata
+    replacement_ref: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
 class ForgetRequest(GetRequest, EvidenceGuard):

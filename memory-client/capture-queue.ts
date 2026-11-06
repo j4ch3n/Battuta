@@ -1,19 +1,11 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { chmod, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { collectMessages, splitSegments, type CaptureSegment } from "./session-messages.ts";
 import type { RequestBinding } from "./binding.ts";
 
-export function canonical(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  return `{${Object.entries(value)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`)
-    .join(",")}}`;
-}
-export const digest = (value: unknown) =>
-  createHash("sha256").update(canonical(value)).digest("hex");
+import { digest } from "./canonical.ts";
+export { canonical, digest } from "./canonical.ts";
 export interface CaptureJob {
   rephraseAttempts?: number;
   blocked?: boolean;

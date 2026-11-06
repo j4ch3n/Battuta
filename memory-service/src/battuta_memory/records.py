@@ -20,8 +20,15 @@ def decode_record(record):
 
 def eligible_records(records, now, include_expired=False):
     lookup = {r["ref"]: decode_record(r) for r in records}
+    checked = {}
 
     def valid(ref, historical, visiting):
+        key = (ref, historical)
+        if key not in checked:
+            checked[key] = check(ref, historical, visiting)
+        return checked[key]
+
+    def check(ref, historical, visiting):
         record = lookup.get(ref)
         if not record or ref in visiting or not record.get("active") or record.get("metadata_error"):
             return False
@@ -52,13 +59,23 @@ def eligible_records(records, now, include_expired=False):
 
 def review_fingerprint(record, evidence_records):
     lookup = {r["ref"]: r for r in evidence_records}
-
-    def meaningful(value, seen):
+    lookup[record["ref"]] = record
+    states, pending = {}, [record["ref"]]
+    while pending:
+        ref = pending.pop()
+        if ref in states:
+            continue
+        value = lookup.get(ref)
+        if value is None:
+            states[ref] = None
+            continue
+        if value.get("metadata_error"):
+            states[ref] = {"revision": value["revision"], "invalid": True}
+            continue
         metadata = dict(value.get("memory_metadata") or {})
         metadata.pop("stage", None)
         links = metadata.pop("evidence", [])
-        return {**{k: value.get(k) for k in ("ref", "content", "scope", "sources", "kind", "tags", "active", "superseded_by")},
-            "memory_metadata": metadata, "evidence": [{**{k: v for k, v in link.items() if k != "revision"},
-                "state": meaningful(lookup[link["ref"]], seen | {link["ref"]}) if link["ref"] in lookup and link["ref"] not in seen else None} for link in links]}
-
-    return hashlib.sha256(json.dumps(meaningful(record, {record["ref"]}), sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        states[ref] = {**{k: value.get(k) for k in ("content", "scope", "sources", "kind", "tags", "active", "superseded_by")},
+            "memory_metadata": metadata, "evidence": [{k: v for k, v in link.items() if k != "revision"} for link in links]}
+        pending.extend(link["ref"] for link in links)
+    return hashlib.sha256(json.dumps({"claim": record["ref"], "states": states}, sort_keys=True, ensure_ascii=False).encode()).hexdigest()

@@ -72,7 +72,7 @@ class StateStore:
     def reconcile_index(self, records):
         import unicodedata
         current = dict(self.conn.execute("SELECT ref,revision FROM memory_fts_revisions"))
-        canonical = {record["ref"]: record for record in records}
+        canonical = {record["ref"]: record for record in records if record["active"]}
         with self.conn:
             for ref in current.keys() - canonical.keys():
                 self.conn.execute("DELETE FROM memory_fts WHERE ref=?", (ref,))
@@ -80,7 +80,7 @@ class StateStore:
             for ref, record in canonical.items():
                 if current.get(ref) == record["revision"]:
                     continue
-                keywords = " ".join((record.get("memory_metadata") or {}).get("keywords", []))
+                keywords = " ".join(record["memory_metadata"].get("keywords", [])) if record.get("memory_metadata") and not record.get("metadata_error") else ""
                 self.conn.execute("DELETE FROM memory_fts WHERE ref=?", (ref,))
                 self.conn.execute("INSERT INTO memory_fts VALUES(?,?,?)", (ref, unicodedata.normalize("NFKC", record["content"]).casefold(), unicodedata.normalize("NFKC", keywords).casefold()))
                 self.conn.execute("INSERT OR REPLACE INTO memory_fts_revisions VALUES(?,?)", (ref, record["revision"]))

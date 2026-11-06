@@ -111,15 +111,24 @@ class UpstreamAdapter:
     @staticmethod
     def record(row):
         tags = row["tags"].split(",") if row["tags"] else []
-        metadata = json.loads(row["metadata"] or "{}")
+        try:
+            metadata = json.loads(row["metadata"] or "{}")
+            if not isinstance(metadata, dict):
+                raise ValueError("Invalid metadata object")
+            metadata_error = False
+        except ValueError:
+            metadata, metadata_error = {}, True
+        lifecycle = metadata.get("memory_metadata")
+        superseded = isinstance(lifecycle, dict) and lifecycle.get("status") == "superseded"
         record = {
             "ref": row["content_hash"], "content": row["content"],
             "scope": {"global": "scope:global" in tags, "projects": sorted(t[5:] for t in tags if t.startswith("proj:"))},
             "tags": sorted(t for t in tags if not t.startswith(("scope:", "proj:", "kind:"))),
             "kind": next((t[5:] for t in tags if t.startswith("kind:")), row["memory_type"] or "observation"), "sources": metadata.get("sources", []),
             "created_at": row["created_at"], "updated_at": row["updated_at"],
-            "parent_ref": row.get("parent_id"), "superseded_by": row.get("superseded_by") or (metadata.get("replacement_ref") if row.get("deleted_at") is not None else None),
-            "active": not row.get("superseded_by") and row.get("deleted_at") is None,
+            "parent_ref": row.get("parent_id"), "superseded_by": row.get("superseded_by") or (metadata.get("replacement_ref") if row.get("deleted_at") is not None or superseded else None),
+            "active": not row.get("superseded_by") and row.get("deleted_at") is None and not superseded,
+            **({"metadata_error": True} if metadata_error else {}),
             **({"memory_metadata": metadata["memory_metadata"]} if "memory_metadata" in metadata else {}),
             **({"distance": row["distance"]} if "distance" in row else {}),
         }
@@ -191,6 +200,10 @@ class UpstreamAdapter:
                 records.append(record)
             else:
                 inactive.append({"ref": record["ref"], "superseded_by": record["superseded_by"]})
+        from .records import review_fingerprint
+        for record in records:
+            if not record.get("metadata_error"):
+                record["review_fingerprint"] = review_fingerprint(record, records)
         return {"records": records, "inactive": inactive, "recent_refs": recent,
             "window_start": request.window_start, "window_end": request.window_end}
 
@@ -334,6 +347,10 @@ class UpstreamAdapter:
 
     async def metadata(self, payload):
         current = await self.get(payload["ref"], include_deleted=True)
+        if current and not current["active"] and payload.get("memory_metadata", {}).get("status") == "superseded":
+            tags = (["scope:global"] if current["scope"]["global"] else [f"proj:{p}" for p in current["scope"]["projects"]]) + current["tags"] + [f"kind:{current['kind']}"]
+            if current.get("memory_metadata") == payload["memory_metadata"] and current["sources"] == payload["sources"] and current["superseded_by"] == payload.get("replacement_ref") and set(tags) == set(payload["tags"]):
+                return
         if not current or not current["active"]:
             raise ValueError("Memory is inactive")
         metadata = await self._merged_metadata(payload["ref"], payload)
