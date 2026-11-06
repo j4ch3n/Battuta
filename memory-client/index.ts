@@ -1,13 +1,14 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { clientConfig, captureSettings } from "./config.ts";
 import { profilePrompt } from "./profile-loader.ts";
-import { resolveBinding } from "./binding.ts";
+import { resolveRequestBinding, type RequestBinding } from "./binding.ts";
 import { CaptureQueue } from "./capture-queue.ts";
 import { CaptureRuntime } from "./lifecycle.ts";
 import { MemoryMcpClient } from "./mcp-client.ts";
 import { extractMemories } from "./extract.ts";
 
 export default function memoryClient(pi: ExtensionAPI) {
+  if (process.env.AGENT_ROLE !== "cos") return;
   let runtime: CaptureRuntime | undefined;
   let context: ExtensionContext;
   let serial = Promise.resolve();
@@ -52,16 +53,33 @@ export default function memoryClient(pi: ExtensionAPI) {
     }),
   );
   pi.on("before_agent_start", async (event, ctx) => {
+    let binding: RequestBinding | undefined;
     await safe(ctx, async () => {
       const r = await getRuntime(ctx);
-      let binding: string | null = null;
+      const entries = ctx.sessionManager.getBranch();
+      const origin = [...entries]
+        .reverse()
+        .find(
+          (e) =>
+            e.type === "custom" &&
+            (e.customType === "memory-request" || e.customType === "memory-request-origin"),
+        );
       try {
-        binding = await resolveBinding(clientConfig().registry);
+        binding = await resolveRequestBinding(
+          origin?.type === "custom" && origin.customType === "memory-request-origin"
+            ? origin.data
+            : undefined,
+          clientConfig().registry,
+        );
+        if (binding.session_id !== ctx.sessionManager.getSessionId())
+          throw new Error("Wrong memory session");
+        pi.appendEntry("memory-request", binding);
       } catch {
         ctx.ui.setStatus(
           "memory-capture",
-          "Invalid project selection; project facts will not be captured",
+          "Memory origin unavailable; capture and personalization disabled for this request",
         );
+        binding = undefined;
       }
       await r.startRequest(
         ctx.sessionManager.getSessionId(),
@@ -69,6 +87,7 @@ export default function memoryClient(pi: ExtensionAPI) {
         binding,
       );
     });
+    if (!binding || binding.origin === "internal") return;
     try {
       const config = clientConfig();
       const profile = await profilePrompt(config.role, config.dataDirectory);

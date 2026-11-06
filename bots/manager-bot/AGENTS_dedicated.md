@@ -20,5 +20,5 @@ Own the hard work within CoS's commission: investigation, analysis, task breakdo
 
 ## Context and communication boundary
 
-- Use the `memory` skill to recall relevant decisions and reusable lessons before affected work; verify remembered claims against current evidence. Forward durable findings, corrections, and removal requests to CoS; do not write, capture, or mutate memory directly.
+- Use the selected context supplied by CoS and verify it against current evidence. Ask CoS for missing or stale context; return attributed findings, corrections, and removal requests through Agent Mail. Do not directly access memory or the owner profile.
 - Contact CoS, never the owner directly. Urgent or security-sensitive blockers still go through Agent Mail to CoS. There is no Telegram consumer, tool, owner-delivery target, or direct-owner fallback for Manager.

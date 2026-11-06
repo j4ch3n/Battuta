@@ -4,7 +4,7 @@
 
 Memory carries useful understanding across conversations: settled decisions, stable preferences, constraints, and concise project facts. It is **context, not execution authority or a replacement for canonical project documents**. Remembered statements may be stale, incomplete, or wrong; agents must check current evidence before acting.
 
-The service is framework-independent. Battuta's Pi adapter is one client, not the owner of its storage or tool semantics. CoS and Manager share one server and database: CoS reads/writes and Manager reads under their runtime responsibilities. This trusted local service does not enforce per-agent authorization. Dream orchestration and profile generation belong to the CoS client; dashboards, historical import and remote hosting/authentication remain excluded.
+The service is framework-independent. Battuta's Pi adapter is one client, not the owner of its storage or tool semantics. Only CoS connects to the memory service. Manager and workers receive selected context through Agent Mail and return attributed findings/corrections to CoS. This trusted local service does not enforce per-agent authorization. Dream orchestration and profile generation belong to the CoS client; dashboards, historical import and remote hosting/authentication remain excluded.
 
 ## Memory layers
 
@@ -54,7 +54,7 @@ A fact evidenced to apply to Atlas and Beacon can have `projects:["atlas","beaco
 
 ### Relevance, not authorization
 
-Both bots may explicitly inspect any project or all memories. The selected project supplies a useful default, not an access boundary. `agent_id` identifies a source; it does not create a private CoS/Manager namespace. V1 relies on a trusted local, same-user deployment rather than per-agent access control.
+CoS may explicitly inspect any project or all memories. Automatic capture requires a validated request binding; shared project selection is never an origin fallback. Scope is relevance, not an access boundary. `agent_id` identifies a source; it does not create a private namespace. The service relies on a trusted local, same-user deployment rather than per-agent access control.
 
 Recall and inventory use these selectors:
 
@@ -108,7 +108,7 @@ One process owns the shared data directory. Upstream owns `memory.db`; Battuta o
 5. Persist the validated batch before sending it through MCP. Source refs identify agent, session, and persisted entry. Batch/item identity and a canonical payload digest make retries distinguishable from conflicting requests.
 6. Acknowledge only confirmed complete batches. Retain incomplete work with bounded retry/backoff; a transport retry reuses the extracted batch rather than calling the LLM again. A token-limit rejection permits one rephrase under a distinct identity, not unbounded paid retries.
 
-Automatic capture is enabled for CoS and disabled for Manager by default. It is best-effort understanding, not a guarantee that every fact is remembered correctly. CoS uses tools directly for important explicit corrections; Manager forwards findings to CoS. Capture failure must not prevent normal conversation. The server itself receives extracted facts, not a continuous transcript feed, and needs no model-provider credential.
+Automatic capture is CoS-only. It is best-effort understanding, not a guarantee that every fact is remembered correctly. CoS uses tools directly for important explicit corrections; Manager forwards findings to CoS. Capture failure must not prevent normal conversation. The server itself receives extracted facts, not a continuous transcript feed, and needs no model-provider credential.
 
 ## Retrieval and embeddings
 

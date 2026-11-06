@@ -28,22 +28,22 @@ The [component design](../memory-service/DESIGN.md) explains memory layers, scop
 
 ### Scope and record behavior
 
-| Concern                                    | Rule                                                                                                                        |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| Global facts                               | Use `scope:global`.                                                                                                         |
-| Project facts                              | Use `proj:<registered-name>`; a record may belong to multiple projects.                                                     |
-| CoS/Manager responsibilities               | CoS reads/writes; Manager reads and forwards durable findings to CoS. The local server is not a per-role security boundary. |
-| Default recall                             | Current project plus global; explicit global/projects/all selectors are available.                                          |
-| Additional filters                         | AND with scope; registry errors never silently broaden the search.                                                          |
-| Exact duplicates                           | Reuse content identity and can attach evidenced project membership.                                                         |
-| Semantic near-duplicates                   | Remain distinct until an evidence-backed CoS correction or dream merge.                                                     |
-| Global/project collisions or inactive refs | Conflict rather than implicitly broaden scope.                                                                              |
-| Content corrections                        | Create a new hash/version.                                                                                                  |
-| Membership changes                         | Reuse the stored embedding.                                                                                                 |
-| Superseded records                         | Omitted by default from recall/list/get.                                                                                    |
-| Forgetting                                 | Tombstones one ref and retains upstream content; **not secure erasure**.                                                    |
-| Wrapper kinds                              | Preserved in owned `kind:` tags, including `preference`, independently of upstream's narrower type ontology.                |
-| User-supplied tags                         | Cannot contain commas or reserved prefixes that could manufacture scope/kind metadata through CSV serialization.            |
+| Concern                                    | Rule                                                                                                                                                                           |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Global facts                               | Use `scope:global`.                                                                                                                                                            |
+| Project facts                              | Use `proj:<registered-name>`; a record may belong to multiple projects.                                                                                                        |
+| Team responsibilities                      | Only CoS connects to memory. Manager/workers use selected Agent Mail context and return attributed findings/corrections. The local server is not a per-role security boundary. |
+| Default recall                             | Current project plus global; explicit global/projects/all selectors are available.                                                                                             |
+| Additional filters                         | AND with scope; registry errors never silently broaden the search.                                                                                                             |
+| Exact duplicates                           | Reuse content identity and can attach evidenced project membership.                                                                                                            |
+| Semantic near-duplicates                   | Remain distinct until an evidence-backed CoS correction or dream merge.                                                                                                        |
+| Global/project collisions or inactive refs | Conflict rather than implicitly broaden scope.                                                                                                                                 |
+| Content corrections                        | Create a new hash/version.                                                                                                                                                     |
+| Membership changes                         | Reuse the stored embedding.                                                                                                                                                    |
+| Superseded records                         | Omitted by default from recall/list/get.                                                                                                                                       |
+| Forgetting                                 | Tombstones one ref and retains upstream content; **not secure erasure**.                                                                                                       |
+| Wrapper kinds                              | Preserved in owned `kind:` tags, including `preference`, independently of upstream's narrower type ontology.                                                                   |
+| User-supplied tags                         | Cannot contain commas or reserved prefixes that could manufacture scope/kind metadata through CSV serialization.                                                               |
 
 ### Retrieval, recovery, and backups
 
@@ -75,11 +75,27 @@ The [component design](../memory-service/DESIGN.md) explains memory layers, scop
 
 ### Collection and extraction
 
-This pipeline runs only when capture is enabled: CoS by default, not Manager.
+This pipeline runs only for CoS when capture is enabled. Manager and workers do not load the extension or connect to memory MCP. Old private queues remain untouched.
+
+### Request-origin contract
+
+Before admission, the origin integration must append a Pi custom entry named
+`memory-request-origin` with `{request_id, conversation_id, session_id, project,
+origin, admitted_at}`. Project is a registered slug or explicit `null` (general
+context); origin is `owner`, `mail`, or `internal`; time requires a timezone offset.
+The memory consumer validates this metadata, consumes it once with a
+`memory-request` custom entry, and persists the frozen binding in capture segments.
+Missing/invalid origin never falls back to shared project selection or global
+capture. Forks/switches cannot reuse another session's origin. Internal activity
+bypasses ordinary memory capture and personalization.
+
+The producer integration is gated on FIS-143/FIS-146. Until it supplies this
+contract, automatic capture/personalization is unavailable; manual CoS memory
+tools remain available. Two-conversation safety is not yet accepted end to end.
 
 | Stage      | Behavior                                                                                                                                                                            |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Collect    | Both bots collect new persisted user/assistant text and labelled incoming agent mail.                                                                                               |
+| Collect    | CoS collects new persisted user/assistant text and labelled incoming agent mail.                                                                                                    |
 | Exclude    | System/profile content, thinking, attachments, and raw tool results. First-seen resumed history is not backfilled.                                                                  |
 | Persist    | Atomically save redacted messages and source cursor at settlement, even below the extraction threshold.                                                                             |
 | Bind scope | Keep the request-start project binding with its segment.                                                                                                                            |
@@ -102,7 +118,7 @@ Bot `.pi/settings.json` accepts:
 ```
 
 - `batchMessages` defaults to **6**, with an allowed range of **1–100**.
-- `enabled` controls automatic collection, extraction, and uploads, including retries of queued work. It defaults to **true for CoS**, **false for Manager**; an explicit boolean overrides the client default. Memory reads are unaffected. Disabled capture leaves existing queue files untouched.
+- `enabled` controls CoS automatic collection, extraction, and uploads, including retries of queued work. It defaults to **true**. Other roles cannot enable the extension. Manual CoS reads are unaffected. Disabled capture leaves existing queue files untouched.
 - Source and release setup configure Manager capture as **disabled**, including previously enabled Manager configurations; CoS's explicit setting is preserved. Setup does not delete queues.
 - Settings load when the adapter initializes; restart after changes.
 - Queues retain private source text until acknowledged. Inspect stuck queues locally; do not paste them into chat or indiscriminately delete them.
@@ -163,7 +179,7 @@ The shared memory directory also contains `dream-config.json`, `dream-lock.db`, 
 2. Record existing data/profile paths and take consistent backups. **Do not naively copy a live SQLite WAL database.**
 3. Provision the new server separately and configure both native MCP entries.
 4. Restart bots with the new adapter; do not start duplicate bot processes.
-5. Verify `memory_health`, CoS scoped writes/recall, Manager read-only recall and disabled capture, and a CoS capture batch.
+5. Verify `memory_health`, CoS scoped writes/recall, and effective Manager/worker configuration without memory access. Capture requires the origin integration above.
 6. Confirm CoS-only preload with temporary sentinel fixtures, never by exposing real profile text.
 
 The isolated exploration server on port **8900** is unrelated and must not be killed.

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { chmod, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { collectMessages, splitSegments, type CaptureSegment } from "./session-messages.ts";
+import type { RequestBinding } from "./binding.ts";
 
 export function canonical(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -84,6 +85,8 @@ export class CaptureQueue {
     entries: readonly unknown[],
     project: string | null,
     flush: boolean,
+    binding?: RequestBinding,
+    capture = true,
   ) {
     const next = structuredClone(this.state);
     const messages = collectMessages(entries);
@@ -95,9 +98,15 @@ export class CaptureQueue {
       next.seen[session] = [...new Set([...next.seen[session], ...fresh.map((m) => m.entry_id)])];
       const pending = next.pending[session] ?? [];
       const tail = pending.at(-1);
-      if (fresh.length) {
-        if (tail && tail.project === project) tail.messages.push(...fresh);
-        else pending.push({ project, messages: fresh });
+      if (capture && fresh.length) {
+        if (tail && tail.project === project && tail.binding?.request_id === binding?.request_id)
+          tail.messages.push(...fresh);
+        else
+          pending.push({
+            project,
+            messages: fresh,
+            ...(binding ? { binding: structuredClone(binding) } : {}),
+          });
       }
       next.pending[session] = pending;
     }
@@ -108,6 +117,7 @@ export class CaptureQueue {
     const next = structuredClone(this.state);
     for (const pending of next.pending[session] ?? []) {
       for (const segment of splitSegments(pending.messages, pending.project)) {
+        if (pending.binding) segment.binding = pending.binding;
         const id = digest([this.role, session, segment]);
         if (!next.jobs.some((j) => j.id === id))
           next.jobs.push({ id, session_id: session, segment, attempts: 0, nextAttempt: 0 });

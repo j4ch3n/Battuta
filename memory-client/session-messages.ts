@@ -1,10 +1,12 @@
 import { redact } from "./privacy.ts";
+import type { RequestBinding } from "./binding.ts";
 
 export interface SourceMessage {
   entry_id: string;
   text: string;
 }
 export interface CaptureSegment {
+  binding?: RequestBinding;
   project: string | null;
   messages: SourceMessage[];
 }

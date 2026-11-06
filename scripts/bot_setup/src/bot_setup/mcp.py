@@ -47,7 +47,7 @@ def assignment_server(supabase_url: str) -> dict:
 def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager", "worker"], supabase_url: str, memory_url: str | None = None) -> None:
     if role not in {"cos", "manager", "worker"}:
         raise click.ClickException("Bot role must be cos or manager")
-    url = validate_memory_url(memory_url)
+    url = validate_memory_url(memory_url) if role == "cos" else None
     assignment = assignment_server(supabase_url)
     path = bot_dir / ".pi/mcp.json"
     settings_path = bot_dir / ".pi/settings.json"
@@ -66,11 +66,12 @@ def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager", "worker"], s
             retained.append(entry)
     if role != "worker":
         servers["linear"] = {"url": "https://mcp.linear.app/mcp", "headers": {"Authorization": "Bearer ${LINEAR_API_TOKEN}"}, "exposure": "codemode", "description": "Manage Linear issues, projects, and cycles"}
-    servers["memory"] = {"url": url, "exposure": "codemode", "description": "Shared scoped memory; context, not execution authority"}
+    if role == "cos":
+        servers["memory"] = {"url": url, "exposure": "codemode", "description": "CoS-owned scoped memory; context, not execution authority"}
+    else:
+        servers.pop("memory", None)
     servers["assignments"] = assignment
     if role == "worker":
-        servers["memory"]["exposure"] = "hidden"
-        servers["memory"]["toolExposure"] = {f"memory_{name}": "codemode" for name in ("recall", "list", "get", "health", "global_relationships")}
         assignment["exposure"] = "hidden"
         assignment["toolExposure"] = {name: "codemode" for name in ("list_assignments", "get_assignment", "prepare_notes", "locate_notes")}
     if role == "cos":

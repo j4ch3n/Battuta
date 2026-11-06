@@ -57,8 +57,7 @@ for (const role of ["cos", "manager"]) {
     const result = await handler({ systemPrompt: "Original prompt" }, ctx);
     if (result?.systemPrompt) prompt = result.systemPrompt;
   }
-  if (role === "cos") assert.ok(prompt?.includes(profile));
-  else assert.equal(prompt, undefined);
+  assert.equal(prompt, undefined, "Missing origin must never inject personal context");
   for (const event of [
     "session_start",
     "agent_settled",

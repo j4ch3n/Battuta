@@ -1,4 +1,5 @@
 import type { CaptureJob, CaptureQueue } from "./capture-queue.ts";
+import type { RequestBinding } from "./binding.ts";
 
 interface Worker {
   extract: (
@@ -10,7 +11,7 @@ interface Worker {
   notify: (message: string) => void;
 }
 export class CaptureRuntime {
-  private binding: string | null = null;
+  private bindings = new Map<string, RequestBinding>();
   private active?: AbortController;
   constructor(
     readonly queue: CaptureQueue,
@@ -18,27 +19,38 @@ export class CaptureRuntime {
     readonly threshold = 6,
   ) {}
   async initialize(session: string, entries: readonly unknown[]) {
+    this.bindings.delete(session);
     await this.queue.track(session, entries, null, false);
     this.initialized.add(session);
   }
-  async startRequest(session: string, entries: readonly unknown[], project: string | null) {
-    this.binding = project;
+  async startRequest(session: string, entries: readonly unknown[], binding?: RequestBinding) {
     // Session initialization must precede the first persisted request.
     if (!this.initialized.has(session)) {
       await this.initialize(session, entries);
       this.initialized.add(session);
     }
-    await this.recover();
+    this.bindings.delete(session);
+    if (binding && binding.session_id !== session)
+      throw new Error("Memory binding session mismatch");
+    if (binding && binding.origin !== "internal")
+      this.bindings.set(session, structuredClone(binding));
   }
   private initialized = new Set<string>();
   async settle(session: string, entries: readonly unknown[]) {
-    await this.queue.track(session, entries, this.binding, false);
+    const binding = this.bindings.get(session);
+    if (!binding) {
+      await this.queue.track(session, entries, null, false, undefined, false);
+      return;
+    }
+    await this.queue.track(session, entries, binding.project, false, binding);
     const count = this.queue.pending(session).reduce((n, s) => n + s.messages.length, 0);
     if (count >= this.threshold) await this.queue.flush(session);
     await this.recover();
   }
   async flush(session: string, entries: readonly unknown[]) {
-    await this.queue.track(session, entries, this.binding, true);
+    const binding = this.bindings.get(session);
+    await this.queue.track(session, entries, binding?.project ?? null, true, binding, !!binding);
+    this.bindings.delete(session);
   }
   shutdown() {
     this.active?.abort();

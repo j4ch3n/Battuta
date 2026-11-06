@@ -4,6 +4,16 @@ import { join } from "node:path";
 import { expect, test, vi } from "vitest";
 import { CaptureQueue } from "../capture-queue.ts";
 import { CaptureRuntime } from "../lifecycle.ts";
+import type { RequestBinding } from "../binding.ts";
+
+const binding = (project: string | null, session_id = "s"): RequestBinding => ({
+  request_id: `${session_id}-${project}`,
+  conversation_id: session_id,
+  session_id,
+  project,
+  origin: "owner",
+  admitted_at: "2026-11-06T10:00:00Z",
+});
 
 const entries = (count: number) =>
   Array.from({ length: count }, (_, i) => ({
@@ -24,7 +34,7 @@ test("oversized memories allow one durable rephrase, not repeated paid extractio
       notify: () => {},
     });
     await runtime.initialize("s", []);
-    await runtime.startRequest("s", [], "atlas");
+    await runtime.startRequest("s", [], binding("atlas"));
     await runtime.settle("s", entries(6));
     now = 2000;
     await runtime.recover();
@@ -51,7 +61,7 @@ test("six-message trigger, project freeze, durable extraction and bounded upload
       notify: () => {},
     });
     await runtime.initialize("s", []);
-    await runtime.startRequest("s", [], "atlas");
+    await runtime.startRequest("s", [], binding("atlas"));
     await runtime.settle("s", entries(2));
     expect(extract).not.toHaveBeenCalled();
     await runtime.settle("s", entries(6));
@@ -59,8 +69,10 @@ test("six-message trigger, project freeze, durable extraction and bounded upload
     expect(queue.jobs()[0].segment.project).toBe("atlas");
     expect(queue.jobs()[0].batch).toEqual({ items: [] });
     now += 2000;
-    await runtime.startRequest("s", entries(6), "beacon");
+    await runtime.startRequest("s", entries(6), binding("beacon"));
     expect(extract).toHaveBeenCalledTimes(1);
+    expect(upload).toHaveBeenCalledTimes(1);
+    await runtime.recover();
     expect(upload).toHaveBeenCalledTimes(2);
     await runtime.settle("s", entries(6));
     expect(queue.pending("s")).toEqual([]);
@@ -80,12 +92,12 @@ test("boundary flush queues short batches; a fork does not backfill old history"
       notify: () => {},
     });
     await runtime.initialize("s", []);
-    await runtime.startRequest("s", [], "atlas");
+    await runtime.startRequest("s", [], binding("atlas"));
     await runtime.flush("s", entries(2));
     expect(queue.jobs()).toHaveLength(1);
     await runtime.initialize("fork", entries(2));
     expect(queue.pending("fork")).toEqual([]);
-    await runtime.startRequest("fork", entries(2), "beacon");
+    await runtime.startRequest("fork", entries(2), binding("beacon", "fork"));
     expect(queue.jobs()[0].segment.project).toBe("atlas");
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -112,13 +124,40 @@ test("shutdown aborts an active worker and never acknowledges its queued batch",
       notify: () => {},
     });
     await runtime.initialize("s", []);
-    await runtime.startRequest("s", [], "atlas");
+    await runtime.startRequest("s", [], binding("atlas"));
     const settling = runtime.settle("s", entries(6));
     await ready;
     runtime.shutdown();
     await settling;
     expect(queue.jobs()).toHaveLength(1);
     expect(queue.jobs()[0].batch).toBeUndefined();
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("interleaved sessions keep their own binding; unbound turns never become global facts", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-binding-"));
+  try {
+    const queue = await CaptureQueue.open(dir, "cos");
+    const runtime = new CaptureRuntime(queue, {
+      extract: () => Promise.reject(new Error("offline")),
+      upload: async () => {},
+      now: () => 0,
+      notify: () => {},
+    });
+    await runtime.startRequest("s", [], binding("atlas"));
+    await runtime.startRequest("other", [], binding("beacon", "other"));
+    await runtime.flush("s", entries(2));
+    await runtime.flush("other", entries(2));
+    expect(queue.jobs().map((j) => j.segment.project)).toEqual(["atlas", "beacon"]);
+    expect(queue.jobs()[0].segment.binding?.request_id).toBe("s-atlas");
+    await runtime.startRequest("unknown", [], undefined);
+    await runtime.flush("unknown", entries(2));
+    expect(queue.jobs()).toHaveLength(2);
+    await runtime.startRequest("general", [], binding(null, "general"));
+    await runtime.flush("general", entries(2));
+    expect(queue.jobs().at(-1)?.segment.project).toBeNull();
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

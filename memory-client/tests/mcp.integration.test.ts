@@ -117,7 +117,14 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       };
       const runtime = new CaptureRuntime(queue, worker);
       await runtime.initialize("session", []);
-      await runtime.startRequest("session", [], null);
+      await runtime.startRequest("session", [], {
+        request_id: "r1",
+        conversation_id: "conversation",
+        session_id: "session",
+        project: null,
+        origin: "owner",
+        admitted_at: "2026-11-06T10:00:00Z",
+      });
       await runtime.settle(
         "session",
         Array.from({ length: 6 }, (_, i) => ({
