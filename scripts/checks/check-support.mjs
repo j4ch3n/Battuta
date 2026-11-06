@@ -29,12 +29,20 @@ function pythonTests(directory, project) {
     run("uv", [...prefix, resolve(tests, file)]);
   }
 }
-run("bash", ["-n", "scripts/packaging/battuta", "scripts/bot_setup/run-dev.sh"]);
-run("bash", ["-n", "scripts/setup-memory.sh", "scripts/setup-artifacts.sh"]);
-run("bash", ["-n", "scripts/bot_setup/run-worker.sh"]);
-pythonTests("scripts/bot_setup/tests", "scripts/bot_setup");
-pythonTests("scripts/packaging/tests", "scripts/packaging");
-pythonTests("memory-service/tests", "memory-service");
-
-pythonTests("artifact-service/tests", "artifact-service");
-pythonTests("project-context-cli/tests", "project-context-cli");
+const groups = {
+  scripts: ["scripts/bot_setup", "scripts/packaging"],
+  "memory-service": ["memory-service"],
+  "artifact-service": ["artifact-service"],
+  "project-context-cli": ["project-context-cli"],
+};
+const selected = process.argv.slice(2);
+if (selected.some((name) => !Object.hasOwn(groups, name)))
+  throw new Error("Unknown support check group");
+const names = selected.length ? selected : Object.keys(groups);
+if (names.includes("scripts")) {
+  run("bash", ["-n", "scripts/packaging/battuta", "scripts/bot_setup/run-dev.sh"]);
+  run("bash", ["-n", "scripts/setup-memory.sh", "scripts/setup-artifacts.sh"]);
+  run("bash", ["-n", "scripts/bot_setup/run-worker.sh"]);
+}
+for (const name of names)
+  for (const project of groups[name]) pythonTests(`${project}/tests`, project);

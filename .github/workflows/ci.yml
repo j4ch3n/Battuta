@@ -1,6 +1,8 @@
 name: Code checks
 
 on:
+  push:
+    branches: [main]
   pull_request:
     types: [opened, synchronize, reopened]
   merge_group:
@@ -20,60 +22,70 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
-      functions: ${{ steps.functions.outputs.names }}
+      checks: ${{ steps.select.outputs.checks }}
     concurrency:
       group: checks-format-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup-node-checks
       - run: pnpm format:check
-      - id: functions
-        name: Discover Edge Functions
+      - run: pnpm exec eslint '**/*.{js,mjs,cjs}' --max-warnings=0
+      - id: select
+        name: Select affected components
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          node --input-type=module - <<'JS' >> "$GITHUB_OUTPUT"
-          import { readdirSync } from "node:fs";
-          const names = readdirSync("supabase/functions", { withFileTypes: true })
-            .filter((entry) => entry.isDirectory() && !entry.name.startsWith("_"))
-            .map((entry) => entry.name);
-          if (!names.length) throw new Error("No Edge Functions found");
-          console.log(`names=${JSON.stringify(names)}`);
-          JS
+          args=()
+          if [[ "$EVENT" == pull_request ]]; then
+            args=("$BASE" "$HEAD")
+          elif [[ "$EVENT" == push && "$GITHUB_REF" == refs/heads/main ]]; then
+            args=(--full "$BASE" "$HEAD")
+          fi
+          checks="$(node scripts/checks/select-checks.mjs "${args[@]}")"
+          echo "checks=$checks" >> "$GITHUB_OUTPUT"
+          echo "$checks"
 
   node:
-    name: Node plugins
+    name: Node (${{ matrix.component }})
     needs: format
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    concurrency:
-      group: checks-node-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
-      cancel-in-progress: true
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-node-checks
-      - run: pnpm setup:node-checks
-      - run: pnpm lint:node
-      - run: pnpm typecheck:node
-      - run: pnpm test:coverage
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-${{ github.workflow }}-${{ github.run_attempt }}
-          path: |
-            agent-mail/coverage/
-            project-spec/coverage/
-            memory-client/coverage/
-          if-no-files-found: ignore
-
-  deno:
-    name: Deno (${{ matrix.function }})
-    needs: format
+    if: ${{ fromJSON(needs.format.outputs.checks).node[0] != null }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        function: ${{ fromJSON(needs.format.outputs.functions) }}
+        component: ${{ fromJSON(needs.format.outputs.checks).node }}
+    concurrency:
+      group: checks-node-${{ matrix.component }}-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-node-checks
+      - run: node scripts/checks/check-node.mjs "$COMPONENT"
+        env:
+          COMPONENT: ${{ matrix.component }}
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.component != 'bots/cos-bot'
+        with:
+          name: coverage-${{ strategy.job-index }}-${{ github.workflow }}-${{ github.run_attempt }}
+          path: ${{ matrix.component }}/coverage/
+          if-no-files-found: ignore
+
+  deno:
+    name: Deno (${{ matrix.function }})
+    needs: format
+    if: ${{ fromJSON(needs.format.outputs.checks).functions[0] != null }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        function: ${{ fromJSON(needs.format.outputs.checks).functions }}
     concurrency:
       group: checks-deno-${{ matrix.function }}-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
       cancel-in-progress: true
@@ -91,16 +103,26 @@ jobs:
         working-directory: supabase/functions/${{ matrix.function }}
 
   support:
-    name: Supporting code
+    name: Python (${{ matrix.group }})
     needs: format
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ${{ fromJSON(needs.format.outputs.checks).python }}
     concurrency:
-      group: checks-support-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+      group: checks-support-${{ matrix.group }}-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-node-checks
+      - uses: pnpm/action-setup@v6
+        if: matrix.group == 'scripts'
+        with:
+          version: 10.20.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -108,15 +130,13 @@ jobs:
         with:
           version: "0.11.19"
           enable-cache: true
-          cache-dependency-glob: |
-            scripts/bot_setup/uv.lock
-            scripts/packaging/uv.lock
-            memory-service/uv.lock
-            artifact-service/uv.lock
-            project-context-cli/uv.lock
+          cache-dependency-glob: ${{ matrix.group == 'scripts' && 'scripts/**/uv.lock' || format('{0}/uv.lock', matrix.group) }}
       - name: Install scheduler setup/launcher runtime dependencies
+        if: matrix.group == 'scripts'
         run: pnpm --dir memory-client install --frozen-lockfile --prod
-      - run: pnpm check:support
+      - run: node scripts/checks/check-support.mjs "$GROUP"
+        env:
+          GROUP: ${{ matrix.group }}
 
   quality:
     name: Quality gate
@@ -128,12 +148,27 @@ jobs:
       - name: Require every check to succeed
         env:
           RESULTS: ${{ toJSON(needs) }}
+          CHECKS: ${{ needs.format.outputs.checks }}
         run: |
           python3 - <<'PY'
           import json, os
           results = json.loads(os.environ["RESULTS"])
-          failures = {name: job["result"] for name, job in results.items() if job["result"] != "success"}
+          checks = json.loads(os.environ["CHECKS"])
+          expected = {"format": "success", "support": "success",
+                      "node": "success" if checks["node"] else "skipped",
+                      "deno": "success" if checks["functions"] else "skipped"}
+          failures = {name: job["result"] for name, job in results.items() if job["result"] != expected[name]}
           if failures:
               raise SystemExit(f"Required checks did not succeed: {failures}")
           print("All required checks passed")
           PY
+
+  deploy:
+    name: Deploy Supabase
+    needs: [format, quality]
+    if: >-
+      ${{ !cancelled() && needs.quality.result == 'success' &&
+          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          fromJSON(needs.format.outputs.checks).supabase }}
+    uses: ./.github/workflows/supabase-deploy.yml
+    secrets: inherit

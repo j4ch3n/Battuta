@@ -29,8 +29,10 @@ Run source-checkout commands from the repository root. See [development](../.age
 
 - Root `package.json` defines individual formatting, Node/Deno lint and type checks, unit tests, coverage, integration tests, and supporting checks. The [code-check reference](../.agents/skills/battuta-verify/references/checks.md) lists their invocations.
 - `scripts/checks/check-deno.mjs` discovers each function's `lint`, `check`, or `test` task.
+- `scripts/checks/check-node.mjs <component-directory>` installs and checks one Node component, including its required local dependencies, with unit coverage where available.
+- `scripts/checks/select-checks.mjs [--full] [BASE HEAD]` selects affected CI components from a Git comparison. With no comparison, or with `--full`, it selects the full suite. See [CI selection](../.agents/skills/battuta-verify/references/checks.md#ci-selection).
 - `scripts/checks/check-supabase.mjs` manages isolated Supabase integration checks, migrations, database permissions tests, and Node integration tests; diagnostics are retained in the printed `/tmp/battuta-check-reports-*` directory.
-- `scripts/checks/check-support.mjs` checks shell syntax and runs each Python package's tests through its own locked uv environment. Setup and packaging tests live under their owning projects; all test workspaces use `/tmp`.
+- `scripts/checks/check-support.mjs [scripts|memory-service|artifact-service|project-context-cli ...]` runs selected groups through their locked uv environments; no arguments runs all groups. `scripts` includes shell syntax, setup, and packaging tests. All test workspaces use `/tmp`.
 - `scripts/checks/lint-staged-code.mjs` applies runtime-specific linting to staged code through lint-staged/Husky.
 - `uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role cos` generates bot instructions and runtime configuration; use `--role manager` for Manager or `configure --help` for workspace/environment overrides.
 - `scripts/bot_setup/run-dev.sh` implements the shared `dev` and `prod` tmux launch modes.
