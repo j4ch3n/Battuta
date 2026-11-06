@@ -1,4 +1,4 @@
-"""Release memory provisioning keeps native/model checks in the installed tool."""
+"""Stub host and tool boundaries while exercising provisioning order/failures."""
 
 import json
 import os
@@ -20,10 +20,12 @@ def test_release_memory_setup_checks_installed_environment_before_readiness(tmp_
     tool_bin = tmp_path / "tools/battuta-memory/bin"
     tool_bin.mkdir(parents=True)
     log = tmp_path / "calls.jsonl"
-    for name, path, body in (
-        ("uv", binary / "uv", f'#!/bin/sh\ntest "$*" = "tool dir" || exit 99\nprintf "%s" "{tmp_path}/tools"\n'),
-        ("python", tool_bin / "python", '#!/usr/bin/env python3\nimport os,json\nwith open(os.environ["CALLS"], "a") as f: f.write(json.dumps("native")+"\\n")\nraise SystemExit(7 if os.environ.get("FAIL_STAGE") == "native" else 0)\n'),
-        ("battuta-memory", binary / "battuta-memory", '#!/usr/bin/env python3\nimport os,sys,json\nwith open(os.environ["CALLS"], "a") as f: f.write(json.dumps(sys.argv[1])+"\\n")\nraise SystemExit(7 if os.environ.get("FAIL_STAGE") == sys.argv[1] else 0)\n'),
+    for path, body in (
+        (binary / "uname", '#!/bin/sh\ncase "$1" in -s) printf Linux;; -m) printf aarch64;; *) exit 99;; esac\n'),
+        (binary / "getconf", '#!/bin/sh\ncase "$1" in LONG_BIT) printf 64;; GNU_LIBC_VERSION) printf "glibc 2.28";; *) exit 99;; esac\n'),
+        (binary / "uv", f'#!/bin/sh\ntest "$*" = "tool dir" || exit 99\nprintf "%s" "{tmp_path}/tools"\n'),
+        (tool_bin / "python", '#!/usr/bin/env python3\nimport os,json\nwith open(os.environ["CALLS"], "a") as f: f.write(json.dumps("native")+"\\n")\nraise SystemExit(7 if os.environ.get("FAIL_STAGE") == "native" else 0)\n'),
+        (binary / "battuta-memory", '#!/usr/bin/env python3\nimport os,sys,json\nwith open(os.environ["CALLS"], "a") as f: f.write(json.dumps(sys.argv[1])+"\\n")\nraise SystemExit(7 if os.environ.get("FAIL_STAGE") == sys.argv[1] else 0)\n'),
     ):
         path.write_text(body)
         path.chmod(0o700)

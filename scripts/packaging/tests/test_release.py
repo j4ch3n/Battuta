@@ -67,10 +67,10 @@ class ReleaseInstallTests(ConfigFixture):
                     self.assertNotEqual(result.returncode, 0)
                     self.assertFalse(output.exists())
 
-    def test_publish_waits_for_all_parallel_wheels_and_archive_validation(self):
+    def test_publish_waits_for_all_parallel_wheels_and_archive(self):
         jobs = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())["jobs"]
-        self.assertEqual(set(jobs["publish"]["needs"]), {"build", "verify-tools"})
-        self.assertIn("wheels", jobs["verify-tools"]["needs"])
+        self.assertEqual(set(jobs["publish"]["needs"]), {"build", "collect-tools"})
+        self.assertIn("wheels", jobs["collect-tools"]["needs"])
         self.assertEqual(jobs["wheels"]["needs"], jobs["build"]["needs"])
         self.assertEqual({entry["path"] for entry in jobs["wheels"]["strategy"]["matrix"]["include"]},
                          {"project-context-cli", "artifact-service", "memory-service", "scripts/bot_setup", "scripts/packaging"})
