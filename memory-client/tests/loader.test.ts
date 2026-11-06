@@ -11,7 +11,6 @@ test("Pi loader registers only lifecycle capture and read-only CoS profile loadi
     const result = await promisify(execFile)(process.execPath, [
       "tests/loader-worker.mjs",
       directory,
-      "../bots/cos-bot/node_modules/@earendil-works/pi-coding-agent/dist/index.js",
     ]);
     expect(result.stdout).toContain("read-only profile smoke passed");
   } finally {

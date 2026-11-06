@@ -11,8 +11,7 @@ import { randomUUID } from "node:crypto";
 import { abortable } from "./abortable.ts";
 import { prepareCorrectionCandidates, prepareRecall, type RecallPacket } from "./recall.ts";
 import { boundRecentMessages, collectMessages, hasUnboundOrigin } from "./session-messages.ts";
-import { prepareDelegation } from "./delegation.ts";
-import type { MessageContent } from "../agent-mail/content.ts";
+import { prepareDelegation, type DelegationContent } from "./delegation.ts";
 
 export default function memoryClient(pi: ExtensionAPI) {
   if (process.env.AGENT_ROLE !== "cos") return;
@@ -247,7 +246,7 @@ export default function memoryClient(pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {
     if (event.toolName !== "send_agent_message" && event.toolName !== "reply_agent_message") return;
     const input = event.input;
-    const content = input.content as MessageContent | undefined;
+    const content = input.content as DelegationContent | undefined;
     if (content?.request === null) return;
     const binding = active.get(ctx.sessionManager.getSessionId())?.binding;
     if (

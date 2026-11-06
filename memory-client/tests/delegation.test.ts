@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { prepareDelegation } from "../delegation.ts";
 import { record } from "./fixtures/record.ts";
-import { requestContent } from "../../agent-mail/tests/fixtures.ts";
+import { requestContent } from "./fixtures/mail.ts";
 import type { RequestBinding } from "../binding.ts";
 
 const binding: RequestBinding = {
@@ -41,6 +41,9 @@ test("selected task constraint keeps provenance and expiry without forwarding un
   expect(JSON.stringify(result)).toContain("sources");
   expect(JSON.stringify(result)).not.toContain(privateFact.content);
   expect(result.references.some((r) => r.locator === `memory:${selected.ref}`)).toBe(true);
+  expect({ ...result, context: [], references: [] }).toEqual(
+    requestContent("Propose a calendar integration"),
+  );
 });
 
 test.each(["stale", "scope"])("%s selection is rejected instead of widened", async (failure) => {

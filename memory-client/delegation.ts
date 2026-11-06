@@ -1,16 +1,22 @@
-import type { MessageContent } from "../agent-mail/content.ts";
 import type { RequestBinding } from "./binding.ts";
 import type { MemoryMcpClient } from "./mcp-client.ts";
 import { memoryRefSchema } from "./records.ts";
 import { prepareRecall, renderMemories } from "./recall.ts";
 
-export async function prepareDelegation(
+export interface DelegationContent {
+  summary: string;
+  request: unknown;
+  context: string[];
+  references: { locator: string; note: string }[];
+}
+
+export async function prepareDelegation<T extends DelegationContent>(
   binding: RequestBinding,
-  content: MessageContent,
+  content: T,
   selectedRefs: string[],
   client: Pick<MemoryMcpClient, "call">,
   signal: AbortSignal,
-): Promise<MessageContent> {
+): Promise<T> {
   if (
     !content ||
     typeof content !== "object" ||

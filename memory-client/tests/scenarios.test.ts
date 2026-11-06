@@ -5,7 +5,7 @@ import { digest } from "../canonical.ts";
 import { eligibleRecords, inRequestScope, memoryRecordSchema } from "../records.ts";
 import { prepareRecall } from "../recall.ts";
 import { prepareDelegation } from "../delegation.ts";
-import { requestContent } from "../../agent-mail/tests/fixtures.ts";
+import { requestContent } from "./fixtures/mail.ts";
 
 const scenarios = z
   .array(

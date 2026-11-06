@@ -8,7 +8,7 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { MemoryMcpClient } from "../mcp-client.ts";
 import { record } from "./fixtures/record.ts";
 import { CaptureQueue } from "../capture-queue.ts";
-import { requestContent } from "../../agent-mail/tests/fixtures.ts";
+import { requestContent } from "./fixtures/mail.ts";
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
