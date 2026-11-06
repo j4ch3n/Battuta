@@ -1,0 +1,15 @@
+{
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.*",
+    "**/venv",
+    "**/build",
+    "**/dist",
+    "artifact-service",
+    "memory-service",
+    "project-context-cli",
+    "scripts/bot_setup",
+    "scripts/packaging"
+  ]
+}

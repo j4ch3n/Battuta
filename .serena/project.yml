@@ -41,6 +41,7 @@ project_name: "Battuta"
 # Note that when using the JetBrains backend, language servers are not used and this list is correspondingly ignored.
 language_servers:
   - typescript
+  - python
 
 # the encoding used by text files in the project
 # For a list of possible encodings, see https://docs.python.org/3.11/library/codecs.html#standard-encodings
@@ -96,6 +97,12 @@ ls_specific_settings: {}
 #     - "./subproject2"
 ls_workspace_folders:
   - "."
+  # Separate Pyright workspaces load each package's own virtual environment.
+  - "scripts/bot_setup"
+  - "scripts/packaging"
+  - "project-context-cli"
+  - "artifact-service"
+  - "memory-service"
 
 # list of additional workspace folder paths for cross-package reference support.
 # Paths can be absolute or relative to the project root.

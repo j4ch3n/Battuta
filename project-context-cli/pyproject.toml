@@ -20,3 +20,8 @@ source = "vcs"
 
 [tool.hatch.version.raw-options]
 root = ".."
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
