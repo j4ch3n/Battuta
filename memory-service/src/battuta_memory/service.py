@@ -93,6 +93,9 @@ class MemoryService:
     @staticmethod
     def request_value(request, by_alias=True):
         value = request.model_dump(mode="json", by_alias=by_alias)
+        for source in value.get("sources", []):
+            if source.get("attribution") is None:
+                source.pop("attribution", None)
         # Preserve pre-extension receipt keys/digests when optional guards and
         # extra update citations were not supplied.
         if not value.get("evidence"):
@@ -152,7 +155,7 @@ class MemoryService:
             await asyncio.to_thread(self.adapter.embed, request.content)
             ref = self.adapter.content_ref(request.content)
             current = await self.adapter.get(ref, include_deleted=True)
-            sources = [s.model_dump() for s in request.sources]
+            sources = [s.wire() for s in request.sources]
             metadata = request.memory_metadata.model_dump(mode="json") if request.memory_metadata is not None else None
             await self._validate_metadata(ref, metadata, request.scope.model_dump(by_alias=True), sources)
             outcome = "created"
@@ -219,9 +222,11 @@ class MemoryService:
                 "result": {"ref": request.ref, "before": current["content"]}}
         return await self._mutation("metadata:" + request.idempotency_key, request, plan)
 
-    async def update(self, request):
+    async def update(self, request, expected_scope=None):
         async def plan():
             current = await self._active(request.ref)
+            if expected_scope is not None and current["scope"] != expected_scope:
+                raise ValueError("Correction scope conflict")
             if request.expected_revision is not None and current["revision"] != request.expected_revision:
                 raise ValueError("Memory changed since inventory")
             await asyncio.to_thread(self.adapter.embed, request.content)
@@ -230,7 +235,7 @@ class MemoryService:
                 raise ValueError("Version content already exists; explicit conflict resolution required")
             scope_tags = ["scope:global"] if current["scope"]["global"] else [f"proj:{p}" for p in current["scope"]["projects"]]
             kind = request.kind or current["kind"]
-            sources = list({self.digest(s): s for s in current["sources"] + [s.model_dump() for s in request.sources]}.values())
+            sources = list({self.digest(s): s for s in current["sources"] + [s.wire() for s in request.sources]}.values())
             if len(sources) > 200:
                 raise ValueError("Too many source citations")
             metadata = request.memory_metadata.model_dump(mode="json") if request.memory_metadata is not None else current.get("memory_metadata")

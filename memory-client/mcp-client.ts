@@ -14,6 +14,7 @@ export class MemoryMcpClient {
     if (
       ![
         "memory_inventory",
+        "memory_recall",
         "memory_get",
         "memory_remember",
         "memory_update",

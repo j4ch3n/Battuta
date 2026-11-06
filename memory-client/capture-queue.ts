@@ -32,6 +32,12 @@ interface State {
 }
 
 export class CaptureQueue {
+  private changes = Promise.resolve();
+  private change(action: () => Promise<void>) {
+    const pending = this.changes.then(action);
+    this.changes = pending.catch(() => {});
+    return pending;
+  }
   private constructor(
     readonly directory: string,
     readonly role: "cos" | "manager",
@@ -80,6 +86,14 @@ export class CaptureQueue {
   jobs() {
     return structuredClone(this.state.jobs);
   }
+  hasPending() {
+    return (
+      this.state.jobs.length > 0 ||
+      Object.values(this.state.pending).some((segments) =>
+        segments.some((s) => s.messages.length > 0),
+      )
+    );
+  }
   async track(
     session: string,
     entries: readonly unknown[],
@@ -88,32 +102,37 @@ export class CaptureQueue {
     binding?: RequestBinding,
     capture = true,
   ) {
-    const next = structuredClone(this.state);
-    const messages = collectMessages(entries);
-    if (!Object.hasOwn(next.seen, session)) {
-      next.seen[session] = messages.map((m) => m.entry_id);
-    } else {
-      const seen = new Set(next.seen[session]);
-      const fresh = messages.filter((m) => !seen.has(m.entry_id));
-      next.seen[session] = [...new Set([...next.seen[session], ...fresh.map((m) => m.entry_id)])];
-      const pending = next.pending[session] ?? [];
-      const tail = pending.at(-1);
-      if (capture && fresh.length) {
-        if (tail && tail.project === project && tail.binding?.request_id === binding?.request_id)
-          tail.messages.push(...fresh);
-        else
-          pending.push({
-            project,
-            messages: fresh,
-            ...(binding ? { binding: structuredClone(binding) } : {}),
-          });
+    return this.change(async () => {
+      const next = structuredClone(this.state);
+      const messages = collectMessages(entries);
+      if (!Object.hasOwn(next.seen, session)) {
+        next.seen[session] = messages.map((m) => m.entry_id);
+      } else {
+        const seen = new Set(next.seen[session]);
+        const fresh = messages.filter((m) => !seen.has(m.entry_id));
+        next.seen[session] = [...new Set([...next.seen[session], ...fresh.map((m) => m.entry_id)])];
+        const pending = next.pending[session] ?? [];
+        const tail = pending.at(-1);
+        if (capture && fresh.length) {
+          if (tail && tail.project === project && tail.binding?.request_id === binding?.request_id)
+            tail.messages.push(...fresh);
+          else
+            pending.push({
+              project,
+              messages: fresh,
+              ...(binding ? { binding: structuredClone(binding) } : {}),
+            });
+        }
+        next.pending[session] = pending;
       }
-      next.pending[session] = pending;
-    }
-    await this.save(next);
-    if (flush) await this.flush(session);
+      await this.save(next);
+      if (flush) await this.flushNow(session);
+    });
   }
   async flush(session: string) {
+    return this.change(() => this.flushNow(session));
+  }
+  private async flushNow(session: string) {
     const next = structuredClone(this.state);
     for (const pending of next.pending[session] ?? []) {
       for (const segment of splitSegments(pending.messages, pending.project)) {
@@ -127,15 +146,19 @@ export class CaptureQueue {
     await this.save(next);
   }
   async update(job: CaptureJob) {
-    const next = structuredClone(this.state);
-    const i = next.jobs.findIndex((j) => j.id === job.id);
-    if (i < 0) throw new Error("Unknown capture job");
-    next.jobs[i] = structuredClone(job);
-    await this.save(next);
+    return this.change(async () => {
+      const next = structuredClone(this.state);
+      const i = next.jobs.findIndex((j) => j.id === job.id);
+      if (i < 0) throw new Error("Unknown capture job");
+      next.jobs[i] = structuredClone(job);
+      await this.save(next);
+    });
   }
   async markUploaded(jobId: string) {
-    const next = structuredClone(this.state);
-    next.jobs = next.jobs.filter((j) => j.id !== jobId);
-    await this.save(next);
+    return this.change(async () => {
+      const next = structuredClone(this.state);
+      next.jobs = next.jobs.filter((j) => j.id !== jobId);
+      await this.save(next);
+    });
   }
 }

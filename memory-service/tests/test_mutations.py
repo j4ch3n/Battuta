@@ -26,7 +26,7 @@ class StorageFixture(unittest.IsolatedAsyncioTestCase):
         for p in self.patches:
             p.start()
             self.addCleanup(p.stop)
-        storage = SqliteVecMemoryStorage(str(self.root / "memory.db"))
+        storage = UpstreamAdapter.create_storage(config)
         await storage.initialize()
         self.addAsyncCleanup(storage.close)
         self.adapter = UpstreamAdapter(storage)

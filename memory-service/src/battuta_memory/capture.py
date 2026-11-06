@@ -1,6 +1,6 @@
 import hashlib
 import json
-from .contracts import RememberRequest
+from .contracts import RememberRequest, UpdateRequest
 
 
 class CaptureService:
@@ -13,6 +13,11 @@ class CaptureService:
         for item in value["items"]:
             if item.get("memory_metadata") is None:
                 item.pop("memory_metadata", None)
+            if item.get("correction") is None:
+                item.pop("correction", None)
+            for source in item["sources"]:
+                if source.get("attribution") is None:
+                    source.pop("attribution", None)
         return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
 
     async def ingest(self, batch):
@@ -25,10 +30,15 @@ class CaptureService:
             return result
         results = []
         for item in batch.items:
-            request = RememberRequest.model_validate(item.model_dump(by_alias=True, exclude={"item_id", "idempotency_key"}) | {
+            request = RememberRequest.model_validate(item.model_dump(by_alias=True, exclude={"item_id", "idempotency_key", "correction"}) | {
                 "idempotency_key": "capture:" + self.service.digest([key, item.item_id])})
             try:
-                receipt = await self.service.remember(request)
+                if item.correction:
+                    receipt = await self.service.update(UpdateRequest(ref=item.correction.ref, expected_revision=item.correction.revision,
+                        content=item.content, reason="Attributed conversation correction", sources=item.sources, memory_metadata=item.memory_metadata),
+                        expected_scope=item.scope.model_dump(by_alias=True))
+                else:
+                    receipt = await self.service.remember(request)
                 results.append({"item_id": item.item_id, "status": "completed", **receipt})
             except Exception as error:
                 results.append({"item_id": item.item_id, "status": "failed", "error": "Capture item could not be stored",

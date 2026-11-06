@@ -29,10 +29,32 @@ class Scope(Contract):
         return self
 
 
+class OriginalMail(Contract):
+    message_ref: dict[str, str]
+    sender: str = Field(min_length=1, max_length=200)
+
+
+class SourceAttribution(Contract):
+    speaker: Literal["owner", "assistant", "agent"]
+    mentioned_at: str | None = None
+    timezone: str | None = None
+    original_mail: OriginalMail | None = None
+
+    @field_validator("mentioned_at")
+    @classmethod
+    def source_instant(cls, value):
+        utc_timestamp(value)
+        return value
+
+
 class SourceRef(Contract):
     agent_id: Literal["cos", "manager"]
     session_id: str = Field(min_length=1, max_length=200)
     entry_id: str = Field(min_length=1, max_length=200)
+    attribution: SourceAttribution | None = None
+
+    def wire(self):
+        return self.model_dump(exclude={"attribution"} if self.attribution is None else set())
 
 
 class Tagged(Contract):
@@ -85,11 +107,11 @@ class MemoryMetadata(Contract):
     @field_validator("keywords")
     @classmethod
     def valid_keywords(cls, values):
-        values = [unicodedata.normalize("NFKC", v).strip() for v in values]
+        values = [v.strip() for v in values]
         if any(not v or len(v) > 80 or any(unicodedata.category(c).startswith("C") for c in v)
                 or re.search(r"(?i)(?:bearer\s|sk-[a-z0-9]{12}|(?:token|password|secret)\s*[:=])", v) for v in values):
             raise ValueError("Invalid keyword")
-        if len({v.casefold() for v in values}) != len(values):
+        if len({unicodedata.normalize("NFKC", v).casefold() for v in values}) != len(values):
             raise ValueError("Duplicate keywords")
         return values
 
@@ -225,6 +247,7 @@ class ForgetRequest(GetRequest, EvidenceGuard):
 
 class CaptureItem(RememberContent):
     item_id: str = Field(min_length=1, max_length=200)
+    correction: EvidenceRef | None = None
 
 
 class CaptureBatch(Contract):

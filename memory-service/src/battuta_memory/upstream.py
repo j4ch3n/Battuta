@@ -31,7 +31,11 @@ class UpstreamAdapter:
     @staticmethod
     def create_storage(config):
         from mcp_memory_service.storage.sqlite_vec import SqliteVecMemoryStorage
-        return SqliteVecMemoryStorage(str(config.database), embedding_model=MODEL)
+        class CanonicalStorage(SqliteVecMemoryStorage):
+            def _detect_conflicts(self, new_hash, new_content, embedding):
+                # Heuristic cross-record writes bypass scope, evidence guards and our journal.
+                return []
+        return CanonicalStorage(str(config.database), embedding_model=MODEL)
 
     @classmethod
     async def open(cls, config: MemoryConfig):

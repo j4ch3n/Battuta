@@ -2,7 +2,16 @@ import { z } from "zod";
 import { redact } from "./privacy.ts";
 
 export const memoryRefSchema = z.string().regex(/^[0-9a-f]{64}$/);
-const timestamp = z.string().datetime({ offset: true }).nullable().optional();
+const timestamp = z
+  .string()
+  .datetime({ offset: true })
+  .transform((v) =>
+    new Date(v)
+      .toISOString()
+      .replace(/\.(\d{3})Z$/, (_match, ms: string) => (ms === "000" ? "Z" : `.${ms}000Z`)),
+  )
+  .nullable()
+  .optional();
 export const memoryMetadataSchema = z
   .object({
     stage: z.enum(["temporal", "durable"]),
@@ -77,6 +86,19 @@ export const memoryRecordSchema = z
         agent_id: z.enum(["cos", "manager"]),
         session_id: z.string().min(1),
         entry_id: z.string().min(1),
+        attribution: z
+          .object({
+            speaker: z.enum(["owner", "assistant", "agent"]),
+            mentioned_at: z.string().datetime({ offset: true }).nullable(),
+            timezone: z.string().nullable(),
+            original_mail: z
+              .object({
+                message_ref: z.object({ conversation_id: z.string(), id: z.string() }),
+                sender: z.string(),
+              })
+              .nullable(),
+          })
+          .optional(),
       }),
     ),
     active: z.literal(true),

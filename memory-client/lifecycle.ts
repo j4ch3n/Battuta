@@ -13,10 +13,10 @@ interface Worker {
 export class CaptureRuntime {
   private bindings = new Map<string, RequestBinding>();
   private active?: AbortController;
+  private recovery?: Promise<void>;
   constructor(
     readonly queue: CaptureQueue,
     private worker: Worker,
-    readonly threshold = 6,
   ) {}
   async initialize(session: string, entries: readonly unknown[]) {
     this.bindings.delete(session);
@@ -43,9 +43,10 @@ export class CaptureRuntime {
       return;
     }
     await this.queue.track(session, entries, binding.project, false, binding);
-    const count = this.queue.pending(session).reduce((n, s) => n + s.messages.length, 0);
-    if (count >= this.threshold) await this.queue.flush(session);
-    await this.recover();
+    await this.queue.flush(session);
+    void this.recover().catch(() =>
+      this.worker.notify("Memory capture pending; retained for retry"),
+    );
   }
   async flush(session: string, entries: readonly unknown[]) {
     const binding = this.bindings.get(session);
@@ -55,7 +56,17 @@ export class CaptureRuntime {
   shutdown() {
     this.active?.abort();
   }
-  async recover() {
+  hasPendingCapture() {
+    return this.queue.hasPending();
+  }
+  recover(): Promise<void> {
+    if (!this.recovery)
+      this.recovery = this.runRecovery().finally(() => {
+        this.recovery = undefined;
+      });
+    return this.recovery;
+  }
+  private async runRecovery() {
     for (const job of this.queue
       .jobs()
       .filter((j) => !j.blocked && j.nextAttempt <= this.worker.now())

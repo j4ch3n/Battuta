@@ -36,6 +36,7 @@ test("oversized memories allow one durable rephrase, not repeated paid extractio
     await runtime.initialize("s", []);
     await runtime.startRequest("s", [], binding("atlas"));
     await runtime.settle("s", entries(6));
+    await runtime.recover();
     now = 2000;
     await runtime.recover();
     now = 100000;
@@ -47,7 +48,7 @@ test("oversized memories allow one durable rephrase, not repeated paid extractio
     await rm(dir, { recursive: true, force: true });
   }
 });
-test("six-message trigger, project freeze, durable extraction and bounded upload retry", async () => {
+test("settled turn queues immediately with project freeze and bounded upload retry", async () => {
   const dir = await mkdtemp(join(tmpdir(), "runtime-test-"));
   try {
     const queue = await CaptureQueue.open(dir, "cos");
@@ -63,17 +64,20 @@ test("six-message trigger, project freeze, durable extraction and bounded upload
     await runtime.initialize("s", []);
     await runtime.startRequest("s", [], binding("atlas"));
     await runtime.settle("s", entries(2));
-    expect(extract).not.toHaveBeenCalled();
-    await runtime.settle("s", entries(6));
+    await runtime.recover();
     expect(extract).toHaveBeenCalledTimes(1);
+    expect(runtime.hasPendingCapture()).toBe(true);
+    await runtime.settle("s", entries(6));
+    await runtime.recover();
+    expect(extract).toHaveBeenCalledTimes(2);
     expect(queue.jobs()[0].segment.project).toBe("atlas");
     expect(queue.jobs()[0].batch).toEqual({ items: [] });
     now += 2000;
     await runtime.startRequest("s", entries(6), binding("beacon"));
-    expect(extract).toHaveBeenCalledTimes(1);
-    expect(upload).toHaveBeenCalledTimes(1);
-    await runtime.recover();
+    expect(extract).toHaveBeenCalledTimes(2);
     expect(upload).toHaveBeenCalledTimes(2);
+    await runtime.recover();
+    expect(upload).toHaveBeenCalledTimes(4);
     await runtime.settle("s", entries(6));
     expect(queue.pending("s")).toEqual([]);
   } finally {
@@ -129,6 +133,7 @@ test("shutdown aborts an active worker and never acknowledges its queued batch",
     await ready;
     runtime.shutdown();
     await settling;
+    await runtime.recover();
     expect(queue.jobs()).toHaveLength(1);
     expect(queue.jobs()[0].batch).toBeUndefined();
   } finally {

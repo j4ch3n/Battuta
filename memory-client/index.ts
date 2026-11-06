@@ -6,6 +6,8 @@ import { CaptureQueue } from "./capture-queue.ts";
 import { CaptureRuntime } from "./lifecycle.ts";
 import { MemoryMcpClient } from "./mcp-client.ts";
 import { extractMemories } from "./extract.ts";
+import { memoryRecordSchema } from "./records.ts";
+import { z } from "zod";
 
 export default function memoryClient(pi: ExtensionAPI) {
   if (process.env.AGENT_ROLE !== "cos") return;
@@ -19,19 +21,35 @@ export default function memoryClient(pi: ExtensionAPI) {
       const settings = await captureSettings(config.directory, config.role);
       if (!settings.enabled) throw new Error("Capture disabled");
       const client = new MemoryMcpClient(config.url);
-      runtime = new CaptureRuntime(
-        await CaptureQueue.open(config.queue, config.role),
-        {
-          extract: (job, signal) =>
-            extractMemories(job, context, signal, config.role, (usage) =>
-              pi.appendEntry("memory-capture-usage", { usage }),
+      runtime = new CaptureRuntime(await CaptureQueue.open(config.queue, config.role), {
+        extract: async (job, signal) => {
+          const result = z.object({ records: z.array(memoryRecordSchema) }).parse(
+            await client.call(
+              "memory_recall",
+              {
+                query: Buffer.from(job.segment.messages.map((m) => m.text).join(" "))
+                  .subarray(0, 240)
+                  .toString("utf8"),
+                selector: job.segment.project ? "projects" : "global",
+                projects: job.segment.project ? [job.segment.project] : [],
+                limit: 20,
+              },
+              signal,
             ),
-          upload: (batch, signal) => client.capture(batch, signal),
-          now: () => Date.now(),
-          notify: (message) => context.ui.setStatus("memory-capture", message),
+          );
+          return extractMemories(
+            job,
+            context,
+            signal,
+            config.role,
+            (usage) => pi.appendEntry("memory-capture-usage", { usage }),
+            result.records,
+          );
         },
-        settings.batchMessages,
-      );
+        upload: (batch, signal) => client.capture(batch, signal),
+        now: () => Date.now(),
+        notify: (message) => context.ui.setStatus("memory-capture", message),
+      });
     }
     return runtime;
   }
