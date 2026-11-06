@@ -24,7 +24,12 @@ Drafts reserve their slug/project identity and are visible to local management, 
 
 `add-file --type markdown` validates an existing absolute regular UTF-8 Markdown source and immediately creates a published single-file record pointing to it. It creates no bundle, wrapper or project and shares no adjacent files. `register` is no longer a CLI command. The artifacts skill owns template selection and the single runtime command reference.
 
-Offline release wheels include the scaffold descriptors/resources, licenses, migration and existing `battuta-project` dependency. Setup installs/reinstalls both local packages and invokes `battuta-artifact setup`, which upgrades Alembic to head. Startup still never migrates.
+The separately published artifact wheel includes scaffold descriptors/resources,
+licenses, and migrations. It declares `battuta-project` as a dependency; release
+installation supplies that release's project wheel explicitly to uv, rather than
+embedding it inside the artifact wheel or bot archive. Provisioning invokes the
+installed `battuta-artifact setup`, which upgrades Alembic to head. Startup still
+never migrates.
 
 For opt-in real-browser developer checks (not installation validation), run `BATTUTA_ARTIFACT_BROWSER=1 uv run --project artifact-service --locked --with playwright python artifact-service/tests/templates.it.py`. Set `BATTUTA_BROWSER_EXECUTABLE` to an existing Chromium executable when needed. The check uses temporary example files and a loopback server, never bot/model calls or production state.
 

@@ -2,17 +2,10 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export PATH="$root/bin:$root/artifact-service/.venv/bin:$PATH"
+export PATH="$root/bin:$PATH"
 
-ensure_setup_tools() {
-  tools="$root/scripts/packaging"
-  if [[ ! -x "$tools/.venv/bin/battuta-packaging" || ! -x "$tools/.venv/bin/battuta-bot-setup" ]]; then
-    command -v uv >/dev/null || { printf 'Install uv before configuring this release\n' >&2; exit 1; }
-    [[ -f "$tools/wheels/SHA256SUMS" ]] || { printf 'Missing bundled setup wheels\n' >&2; exit 1; }
-    (cd "$tools/wheels" && sha256sum -c SHA256SUMS)
-    uv venv --offline --python 3.12 "$tools/.venv"
-    uv pip install --python "$tools/.venv/bin/python" --offline --no-index --find-links "$tools/wheels" battuta-packaging
-  fi
+require_tool() {
+  command -v "$1" >/dev/null || { printf 'Missing %s; use uv tool install as described in RELEASE.md and add the tool directory to PATH\n' "$1" >&2; exit 1; }
 }
 
 load_memory_environment() {
@@ -27,8 +20,8 @@ case "${1:-}" in
   configure-worker)
     shift
     [[ -f "$root/.env.prod" ]] || { printf 'Missing release environment file\n' >&2; exit 1; }
-    ensure_setup_tools
-    exec "$tools/.venv/bin/battuta-bot-setup" configure-worker --root "$root" "$@"
+    require_tool battuta-bot-setup
+    exec battuta-bot-setup configure-worker --root "$root" "$@"
     ;;
   worker)
     shift
@@ -41,11 +34,11 @@ case "${1:-}" in
   artifacts|artifact)
     command="$1"
     shift
-    [[ -x "$root/artifact-service/.venv/bin/battuta-artifact" ]] || { printf 'Run bin/battuta setup-artifacts first\n' >&2; exit 1; }
+    require_tool battuta-artifact
     if [[ "$command" == artifacts ]]; then
-      exec "$root/artifact-service/.venv/bin/battuta-artifact" serve "$@"
+      exec battuta-artifact serve "$@"
     fi
-    exec "$root/artifact-service/.venv/bin/battuta-artifact" "$@"
+    exec battuta-artifact "$@"
     ;;
   setup-memory)
     shift
@@ -54,8 +47,8 @@ case "${1:-}" in
     ;;
   memory)
     load_memory_environment
-    [[ -x "$root/memory-service/.venv/bin/battuta-memory" ]] || { printf 'Run bin/battuta setup-memory first\n' >&2; exit 1; }
-    exec "$root/memory-service/.venv/bin/battuta-memory" serve
+    require_tool battuta-memory
+    exec battuta-memory serve
     ;;
   configure)
     shift
@@ -63,8 +56,8 @@ case "${1:-}" in
     set -a
     source "$root/.env.prod"
     set +a
-    ensure_setup_tools
-    exec "$tools/.venv/bin/battuta-bot-setup" configure-release --root "$root" "$@"
+    require_tool battuta-bot-setup
+    exec battuta-bot-setup configure-release --root "$root" "$@"
     ;;
   start-prod-screen)
     exec bash "$root/scripts/bot_setup/run-dev.sh" prod
@@ -110,8 +103,8 @@ case "${1:-}" in
     ;;
   install-services)
     shift
-    ensure_setup_tools
-    exec "$tools/.venv/bin/battuta-packaging" install-services --root "$root" "$@"
+    require_tool battuta-packaging
+    exec battuta-packaging install-services --root "$root" "$@"
     ;;
   *)
     printf 'Usage: %s configure|configure-worker|worker|setup-memory|memory|setup-artifacts|artifacts|artifact|start-prod-screen|cos|manager|install-services\n' "$0" >&2

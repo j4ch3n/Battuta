@@ -30,22 +30,33 @@ For source development without a global tool installation, run `uv run --project
 
 ## Released archive
 
-The release includes a built tool and locked dependency wheels. From the extracted Battuta root, install without downloading Python packages:
+The bot archive does not contain the Python CLI or dependency wheels. Install the
+selected GitHub Release's `battuta_project-<version>-py3-none-any.whl` with
+`uv tool install`; the version includes the tag and short commit SHA. Release
+setup provides the exact download URLs, SHA256 checks, and dependency constraints.
+For a wheel already downloaded and verified with its constraints:
 
 ```sh
-uv tool install --python 3.12 --no-index \
-  --find-links ./project-context-cli/wheels battuta-project
+uv tool install --python 3.12 --no-build \
+  --constraint battuta-project-constraints.txt ./battuta_project-<version>-py3-none-any.whl
 uv tool update-shell
 battuta-project --help
 ```
 
-Use `--reinstall` for an updated release. Python 3.12 must already be available for a fully offline installation. Release wheels target the release platform: Linux ARM64, Python 3.12. Installing from source resolves dependencies for the host's platform and supported Python version instead.
+Replace `<version>` before running the command. Use `--reinstall` for an updated
+release. Online installation resolves third-party packages from PyPI; Battuta's
+wheel is a separate GitHub asset. Production verification targets Linux ARM64,
+Python 3.12. Installing from source remains a separate development workflow.
 
 ## Bot service PATH
 
 `uv tool dir --bin` prints the executable directory (normally `~/.local/bin`). Interactive shell initialization does not automatically apply to systemd user services.
 
-For each bot service (`battuta-cos.service`, `battuta-manager.service`, and `battuta-worker.service`), use `systemctl --user edit <service>` and set an explicit PATH, replacing the example home with the actual absolute tool directory:
+Newly generated release units already include the uv tool directory and uv's
+executable directory on PATH. Check any retained overrides. For custom or older
+bot units (`battuta-cos.service`, `battuta-manager.service`, and
+`battuta-worker.service`), use `systemctl --user edit <service>` and set an explicit
+PATH, replacing the example home with the actual absolute tool directory:
 
 ```ini
 [Service]

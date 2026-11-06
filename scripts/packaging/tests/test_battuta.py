@@ -18,8 +18,7 @@ class BattutaLauncherTests(LauncherFixture):
         setup = self.root / "scripts/setup-memory.sh"
         setup.parent.mkdir(exist_ok=True)
         setup.write_text('printf "%s" "$BATTUTA_MEMORY_DATA_DIR"\n')
-        cli = self.root / "memory-service/.venv/bin/battuta-memory"
-        cli.parent.mkdir(parents=True)
+        cli = self.bin / "battuta-memory"
         cli.write_text('#!/usr/bin/env bash\nprintf "%s" "$BATTUTA_MEMORY_DATA_DIR"\n')
         cli.chmod(0o700)
         for command in ("setup-memory", "memory"):
@@ -46,8 +45,28 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"],
     def launch(self, role):
         env = dict(os.environ)
         env.pop("LINEAR_API_TOKEN", None)
+        env["PATH"] = f"{self.bin}:{env['PATH']}"
         return subprocess.run(["bash", str(self.bin / "battuta"), role],
                               env=env, capture_output=True, text=True)
+
+    def test_installed_artifact_commands_preserve_arguments(self):
+        self.executable("battuta-artifact", "import json, sys\nprint(json.dumps(sys.argv[1:]))\n")
+        for command, expected in (("artifact", []), ("artifacts", ["serve"])):
+            with self.subTest(command=command):
+                result = self.launch(command)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout), expected)
+
+    def test_missing_tool_never_falls_back_to_release_virtualenv(self):
+        stale = self.root / "memory-service/.venv/bin/battuta-memory"
+        stale.parent.mkdir(parents=True)
+        stale.write_text("#!/bin/sh\nprintf stale\n")
+        stale.chmod(0o700)
+        result = subprocess.run(["bash", str(self.bin / "battuta"), "memory"],
+                                env={**os.environ, "PATH": "/usr/bin:/bin"}, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("stale", result.stdout)
+        self.assertIn("uv tool install", result.stderr)
 
     def test_both_roles_receive_token_from_production_file(self):
         for role in ("cos", "manager"):

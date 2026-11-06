@@ -47,37 +47,15 @@ case "$system/$machine" in
 esac
 command -v uv >/dev/null || fail 'uv is required. Install uv, then rerun setup; do not use system pip or sudo.'
 
-if [[ -d "$component/wheels" ]]; then
-  # Verify the wrapper too; dependency installation additionally enforces requirement hashes.
-  [[ -s "$component/wheels/SHA256SUMS" ]] || fail 'Missing wheel checksums. Re-download and verify the complete release archive.'
-  if command -v sha256sum >/dev/null; then
-    checksum=(sha256sum)
-  elif command -v shasum >/dev/null; then
-    checksum=(shasum -a 256)
-  else
-    fail 'sha256sum or shasum is required to verify release wheels.'
-  fi
-  while read -r expected name; do
-    [[ "$expected" =~ ^[0-9a-f]{64}$ && "$name" == *.whl && "$name" != */* && -f "$component/wheels/$name" ]] || fail 'Invalid wheel manifest. Re-download the release; do not bypass checksum verification.'
-    actual="$("${checksum[@]}" "$component/wheels/$name")" || fail "Cannot read wheel: $name"
-    [[ "${actual%% *}" == "$expected" ]] || fail "Wheel checksum mismatch: $name. Re-download and verify the release archive."
-  done < "$component/wheels/SHA256SUMS"
-  if [[ ! -x "$python" ]]; then
-    run 'Python environment creation' 'Make managed CPython 3.12 available through uv; offline hosts must provision Python first.' \
-      uv venv --managed-python --python 3.12 "$component/.venv"
-  fi
-  run 'offline release dependency installation' 'Use the complete linux-arm64 release with CPython 3.12. Read the missing/incompatible wheel error above; no source build fallback is supported.' \
-    uv pip install --python "$python" --offline --no-index --find-links "$component/wheels" --require-hashes --only-binary :all: -r "$component/requirements.txt"
-  shopt -s nullglob
-  own=("$component"/wheels/battuta_memory-*.whl)
-  [[ ${#own[@]} -eq 1 ]] || fail 'Expected exactly one Battuta memory wheel. Re-download the complete release.'
-  run 'Battuta memory wheel installation' 'Verify the release archive and Python 3.12 environment, then rerun setup.' \
-    uv pip install --python "$python" --offline --no-index --no-deps "${own[0]}"
-else
+if [[ -f "$component/pyproject.toml" ]]; then
   run 'locked dependency installation' 'Check uv, network access, and compatible native wheels for managed CPython 3.12. Dependencies must not need source compilation.' \
     uv sync --project "$component" --locked --no-dev --no-install-project --no-build --managed-python --python 3.12
   run 'local Battuta package installation' 'Check the build error above; only this repository-owned package is built locally.' \
     uv pip install --python "$python" --no-deps --editable "$component"
+else
+  cli="$(command -v battuta-memory)" || fail 'Install battuta-memory with uv tool install as described in RELEASE.md.'
+  python="$(uv tool dir)/battuta-memory/bin/python"
+  [[ -x "$python" ]] || fail 'Missing uv-managed memory environment; reinstall the selected release tool as the bot user.'
 fi
 
 run 'native SQLite and ONNX loading' 'Use managed CPython 3.12 with SQLite extension loading. On Raspberry Pi OS, install libgomp1/libstdc++6 if the native loader reports missing libraries; read the error above.' \

@@ -18,32 +18,10 @@ fi
 command -v uv >/dev/null || { printf 'uv is required for artifact setup.\n' >&2; exit 1; }
 umask 077
 
-if [[ -d "$component/wheels" ]]; then
-  [[ -s "$component/wheels/SHA256SUMS" ]] || { printf 'Missing artifact wheel checksums.\n' >&2; exit 1; }
-  if [[ ! -x "$python" ]]; then uv venv --python 3.12 "$component/.venv"; fi
-  "$python" - "$component/wheels" <<'PY'
-import hashlib
-import sys
-from pathlib import Path
-root = Path(sys.argv[1])
-for line in (root / "SHA256SUMS").read_text().splitlines():
-    expected, name = line.split()
-    if Path(name).name != name or not name.endswith(".whl"):
-        raise SystemExit("Invalid artifact wheel checksum entry")
-    with (root / name).open("rb") as wheel:
-        if hashlib.file_digest(wheel, "sha256").hexdigest() != expected:
-            raise SystemExit(f"Artifact wheel checksum mismatch: {name}")
-PY
-  uv pip install --python "$python" --offline --no-index --find-links "$component/wheels" \
-    --require-hashes --only-binary :all: -r "$component/requirements.txt"
-  shopt -s nullglob
-  own=("$component"/wheels/battuta_artifacts-*.whl)
-  project=("$component"/wheels/battuta_project-*.whl)
-  [[ ${#own[@]} == 1 ]] || { printf 'Expected one Battuta artifact wheel.\n' >&2; exit 1; }
-  [[ ${#project[@]} == 1 ]] || { printf 'Expected one Battuta project wheel.\n' >&2; exit 1; }
-  uv pip install --python "$python" --offline --no-index --no-deps --reinstall "${project[0]}" "${own[0]}"
-else
+if [[ -f "$component/pyproject.toml" ]]; then
   uv sync --project "$component" --locked --no-dev --python 3.12
+else
+  cli="$(command -v battuta-artifact)" || { printf 'Install battuta-artifacts with uv tool install as described in RELEASE.md\n' >&2; exit 1; }
 fi
 
 "$cli" setup

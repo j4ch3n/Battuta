@@ -14,19 +14,22 @@ requests to validate setup.
 
 ## 1. Prepare the machine and release
 
-Use 64-bit Raspberry Pi OS with Python **3.12**, uv, `script`, and working systemd
+Use 64-bit Raspberry Pi OS with Python **3.12**, uv, `curl`, `script`, and working systemd
 user services. Run as the bot user, without sudo:
 
 ```sh
 uname -m
 python3.12 --version
-command -v uv script systemctl
+command -v uv curl script systemctl
 systemctl --user status
 ```
 
 Expect `aarch64`/`arm64`, Python 3.12, and a working user service manager. Stop if
-anything is unavailable. Node, Pi, runtime dependencies, and Python wheels are
-bundled; pnpm, Docker, and local Supabase are not required. The remote Supabase
+anything is unavailable. Node, Pi, and JavaScript runtime dependencies are
+bundled; Python tools are separate GitHub Release wheel assets installed with
+`uv tool install`. Network access to GitHub and PyPI is required; Python tool
+sources and dependency wheelhouses are not in the archive. pnpm, Docker, and
+local Supabase are not required. The remote Supabase
 database migrations and Edge Functions must already be deployed separately.
 
 Download `battuta-vX.X.X-linux-arm64.tar.gz` and its matching `.sha256` from GitHub
@@ -50,7 +53,7 @@ if [[ -n "$target_contents" ]]; then
 fi
 tar -xzf "battuta-$version-linux-arm64.tar.gz" --strip-components=1 -C "$target"
 cd "$target"
-test -x bin/battuta && test -f .env.example && test -f RELEASE.md
+test -x bin/battuta && test -f .env.example && test -f RELEASE.md && test -s python-tools-version.txt
 ```
 
 The checksum must report `OK`; all remaining commands run from this new release
@@ -130,22 +133,68 @@ Have the owner fill missing values in a private editor: `COS_TELEGRAM_TOKEN`,
 the Supabase values refer to the intended remote production backend. Never ask
 for credential values in chat.
 
-Load the environment without shell tracing, then install the release's project
-CLI and application components:
+Load the environment without shell tracing, then install **all five Python
+tools** from the same GitHub Release. Keep affected services stopped: uv tools
+are shared by this user across release directories. The wheel version combines
+the release tag and short commit SHA, for example `0.2.5+gabc1234`; read the exact
+value bundled in `python-tools-version.txt`, not a guessed hash or `latest`.
+
+Download and verify the wheels and tested dependency constraints outside the
+bot release directory, then install them into uv-managed environments:
 
 ```bash
 set -a
 source .env.prod
 set +a
-uv tool install --reinstall --python 3.12 --no-index \
-  --find-links ./project-context-cli/wheels battuta-project
+tool_version="$(cat python-tools-version.txt)"
+release="https://github.com/j4ch3n/Battuta/releases/download/$version"
+tools="$HOME/battuta/python-tools/$version"
+mkdir -p "$tools"
+cd "$tools"
+curl --fail --location --output python-tools-SHA256SUMS "$release/python-tools-SHA256SUMS"
+curl --fail --location --output python-tools-version.txt "$release/python-tools-version.txt"
+for package in battuta-project battuta-artifacts battuta-memory battuta-bot-setup battuta-packaging; do
+  wheel="${package//-/_}-$tool_version-py3-none-any.whl"
+  curl --fail --location --output "$wheel" "$release/$wheel"
+  curl --fail --location --output "$package-constraints.txt" "$release/$package-constraints.txt"
+done
+sha256sum -c python-tools-SHA256SUMS
+cmp python-tools-version.txt "$target/python-tools-version.txt"
+
+uv tool install --reinstall --managed-python --python 3.12 --no-build \
+  --constraint battuta-project-constraints.txt "./battuta_project-$tool_version-py3-none-any.whl"
+uv tool install --reinstall --managed-python --python 3.12 --no-build \
+  --constraint battuta-artifacts-constraints.txt "./battuta_artifacts-$tool_version-py3-none-any.whl" \
+  --with "./battuta_project-$tool_version-py3-none-any.whl"
+uv tool install --reinstall --managed-python --python 3.12 --no-build \
+  --constraint battuta-memory-constraints.txt "./battuta_memory-$tool_version-py3-none-any.whl"
+uv tool install --reinstall --managed-python --python 3.12 --no-build \
+  --constraint battuta-bot-setup-constraints.txt "./battuta_bot_setup-$tool_version-py3-none-any.whl"
+uv tool install --reinstall --managed-python --python 3.12 --no-build \
+  --constraint battuta-packaging-constraints.txt "./battuta_packaging-$tool_version-py3-none-any.whl" \
+  --with "./battuta_bot_setup-$tool_version-py3-none-any.whl"
 export PATH="$(uv tool dir --bin):$PATH"
-battuta-project --help
+for command in battuta-project battuta-artifact battuta-memory battuta-bot-setup battuta-packaging; do
+  "$command" --help >/dev/null
+done
+cd "$target"
 bin/battuta setup-memory
 bin/battuta setup-artifacts
 ```
 
-These setup commands provision local runtimes but do not start bots. Memory setup
+Every download, checksum, installation, and help command must succeed; otherwise
+stop before provisioning or service activation. Third-party dependencies come
+from PyPI at the exported constraints. `--with` supplies the same-release Battuta
+dependency inside the tool's isolated environment; a separately installed global
+CLI does not satisfy another tool's Python imports.
+
+uv also accepts wheel URLs directly, for example
+`uv tool install --python 3.12 "$release/battuta_artifacts-$tool_version-py3-none-any.whl" --with "$release/battuta_project-$tool_version-py3-none-any.whl"`.
+That shorthand omits the explicit checksum and constraints verification above;
+use the verified procedure for deployment. No PyPI publication of Battuta tools
+is needed, and setup must not install them from release source directories.
+
+These setup commands provision application data but do not start bots. Memory setup
 also provisions the verified ONNX model; see its setup guide for offline input.
 Use the same HOME and any data-directory overrides as the previous deployment.
 Artifact setup applies required database migrations; leaving the old release in
@@ -193,8 +242,9 @@ refused. If existing units have custom edits, stop and ask the owner before
 replacing them; existing systemd drop-ins remain in effect and must also be
 checked for references to the previous release.
 
-Make `battuta-project` available on **all three bot services' PATH**, following
-the [service PATH instructions](skills-hub/project-context/references/installation.md#bot-service-path).
+Generated units set an explicit PATH using `uv tool dir --bin`, making both
+`battuta-project` and `battuta-artifact` available to **all three bot services**.
+Check that retained custom PATH drop-ins do not override it with an old tool path.
 Keep the bots stopped during PATH setup. **Before starting, obtain the owner's
 approval to execute queued production work:** the worker can immediately claim
 available assignments. Then start the new deployment:
@@ -264,3 +314,19 @@ make refresh-telegram ENV_FILE=.env.prod
 Restart affected bots separately. This Make command requires source tooling and
 is not an archive command; releases use retained configuration or
 `bin/battuta configure` when configuration is missing.
+
+## Returning to an older release
+
+Changing the bot release directory does **not** restore the user's Python tools.
+Before returning to an older release that uses this wheel-based process, stop
+affected services and reinstall all five tools using that release's wheel
+version, checksums, and constraints from step 3; replace the units to target its
+directory. Do not use `uv tool upgrade` to discover newer GitHub tags. Retain the
+same HOME, private configuration, and shared data paths, and run only provisioning
+compatible with the selected version before obtaining approval to restart.
+
+Artifact database migrations and memory model/data changes are not reversed by
+reinstalling an old wheel. Stop if the older version cannot read the current
+schema/model; recovery requires a separate reviewed data-restoration procedure.
+For older archives that bundled Python tooling, follow that version's guide and
+review compatibility explicitly rather than mixing installation models.
