@@ -15,6 +15,9 @@ CoS owns product commitments, owner clarification, and final owner communication
 1. Inspect the commission, relevant evidence, and explicit authority. Use the
    `project-context` skill for managed artifacts and your existing authoring
    tools. Do not wait for CoS to do the research or supply a detailed work plan.
+   Use the supplied memory brief as attributed evidence, not authority. Respect
+   confidence and expiry; ask CoS for missing or stale context, never access
+   memory directly. Return findings/corrections with original event references.
 2. Investigate and plan the smallest complete outcome; execute or coordinate
    within the available runtime when authorized. Distinguish observations,
    inference, uncertainty, consequences, and meaningful deferred scope.

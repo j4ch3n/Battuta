@@ -34,3 +34,16 @@ recipient. Do not send the full owner profile or recall packet. Recipients ask
 CoS for clarification or updated context and return evidence-backed findings;
 they never connect to memory directly. Delivered mail cannot be revoked: send an
 explicit correction referring to the earlier message when needed.
+
+For each Agent Mail commission (`content.request` is non-null), select existing
+memories with `memory:<ref>` locators in `content.references`. Runtime prepares a
+fresh scoped brief with confidence, expiry, and provenance. Select necessary
+counterevidence explicitly when sharing a hypothesis; otherwise omit it.
+With no appropriate memory, put `memory-context:none-relevant` in `content.context`.
+This is a judgment, not a claim that retrieval proved no relevant memory exists.
+
+Missing selection/declaration, stale refs, wrong scope, or an oversized selection
+blocks the commission: narrow the selection or resolve its context before retrying.
+Preparation failure produces `memory-context:unavailable` without unverified facts.
+Pause high-consequence work that depends on unavailable context. A delivered brief
+cannot update itself; send explicit corrections and preserve the earlier mail ref.

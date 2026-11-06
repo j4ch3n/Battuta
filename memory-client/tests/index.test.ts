@@ -8,6 +8,7 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { MemoryMcpClient } from "../mcp-client.ts";
 import { record } from "./fixtures/record.ts";
 import { CaptureQueue } from "../capture-queue.ts";
+import { requestContent } from "../../agent-mail/tests/fixtures.ts";
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
@@ -77,6 +78,27 @@ test("admission recalls even with capture disabled and removes another request's
       expect.stringContaining("Owner bought an NS2"),
     );
     expect(result).not.toHaveProperty("systemPrompt");
+    for (const toolName of ["send_agent_message", "reply_agent_message"]) {
+      const input = { content: requestContent("Propose Nintendo games") };
+      input.content.references.push({ locator: `memory:${r.ref}`, note: "Selected event" });
+      const blocked = await hooks.get("tool_call")!(
+        { toolName, toolCallId: "codemode/1", parentToolCallId: "codemode", input },
+        ctx,
+      );
+      expect(blocked).toBeUndefined();
+      expect(input.content.context.some((c) => c.includes("Owner bought an NS2"))).toBe(true);
+      expect(
+        await hooks.get("tool_call")!(
+          {
+            toolName,
+            toolCallId: "codemode/2",
+            parentToolCallId: "codemode",
+            input: { content: requestContent("Unbriefed commission") },
+          },
+          ctx,
+        ),
+      ).toMatchObject({ block: true });
+    }
     const context = await hooks.get("context")!(
       {
         messages: [

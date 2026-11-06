@@ -21,6 +21,29 @@ const intent = {
   reply_expectation: null,
 };
 
+test("final send and reply validation accepts bounded memory briefs and rejects oversized post-hook content", () => {
+  const prepared = requestContent("Compare calendar tooling");
+  prepared.context.push(
+    "memory-context:ready; confirmed owner constraint: minimize ongoing maintenance",
+  );
+  prepared.references.push({
+    locator: `memory:${"a".repeat(64)}`,
+    note: "Selected scoped constraint",
+  });
+  const send = { ...intent, content: prepared, reply_expectation: { window: "medium" } };
+  assert.equal(sendRequest(agent, send).content.references[0].locator, `memory:${"a".repeat(64)}`);
+  const reply = {
+    parent: { conversation_id: randomUUID(), id: "a7c91e3b4d62" },
+    message_type: "chat",
+    content: prepared,
+    reply_expectation: { window: "medium" },
+  };
+  assert.equal(replyRequest(agent, reply).content.context[0], prepared.context[0]);
+  prepared.context.push("x".repeat(4001));
+  assert.throws(() => sendRequest(agent, send));
+  assert.throws(() => replyRequest(agent, reply));
+});
+
 test("LLM expectations translate to offsets; runtime owns identity and conversation", () => {
   for (const [window, minutes] of [
     [null, null],

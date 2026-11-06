@@ -20,6 +20,9 @@ to the owner and owns product/authority decisions and final communication.
     solution and creates complete assignments/TODOs before workers can claim them.
    Give Manager the brief and decision boundaries, not a detailed execution
    plan you have already produced. Share only authorized owner/account context.
+   Use the `memory` skill to select a narrow task brief, never the whole owner
+   profile. Resolve missing origin/project context rather than borrowing another
+   conversation's selection.
 3. Choose an outbound example from the [template index](references/templates/index.md).
    Send or reply through Agent Mail to `manager`, preserving the existing
    message-reference and reply-expectation contract.

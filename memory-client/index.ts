@@ -12,6 +12,8 @@ import { randomUUID } from "node:crypto";
 import { abortable } from "./abortable.ts";
 import { boundedQuery, prepareRecall, type RecallPacket } from "./recall.ts";
 import { boundRecentMessages } from "./session-messages.ts";
+import { prepareDelegation } from "./delegation.ts";
+import type { MessageContent } from "../agent-mail/content.ts";
 
 export default function memoryClient(pi: ExtensionAPI) {
   if (process.env.AGENT_ROLE !== "cos") return;
@@ -232,6 +234,47 @@ export default function memoryClient(pi: ExtensionAPI) {
       ).settle(ctx.sessionManager.getSessionId(), ctx.sessionManager.getBranch());
     }),
   );
+  pi.on("tool_call", async (event, ctx) => {
+    if (event.toolName !== "send_agent_message" && event.toolName !== "reply_agent_message") return;
+    const input = event.input;
+    const content = input.content as MessageContent | undefined;
+    if (content?.request === null) return;
+    const binding = active.get(ctx.sessionManager.getSessionId())?.binding;
+    if (!binding || binding.origin === "internal")
+      return {
+        block: true,
+        reason:
+          "Commission requires a validated request origin; no other conversation's project can be borrowed.",
+      };
+    const controller = new AbortController();
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(3000)]);
+    try {
+      const config = clientConfig();
+      try {
+        if (await abortable(readCapturePending(config.queue), signal)) controller.abort();
+      } catch {
+        controller.abort();
+      }
+      const refs = Array.isArray(content?.references)
+        ? content.references
+            .filter((r) => typeof r?.locator === "string" && r.locator.startsWith("memory:"))
+            .map((r) => r.locator.slice(7))
+        : [];
+      input.content = await prepareDelegation(
+        binding,
+        content!,
+        refs,
+        new MemoryMcpClient(config.url),
+        signal,
+      );
+    } catch {
+      return {
+        block: true,
+        reason:
+          "Memory brief missing, stale, outside scope or too large. Select verified memory:<ref> references or declare memory-context:none-relevant; do not invent context.",
+      };
+    }
+  });
   const flush = (ctx: ExtensionContext) =>
     safe(ctx, async () => {
       const session = ctx.sessionManager.getSessionId();
