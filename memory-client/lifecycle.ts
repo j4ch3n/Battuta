@@ -23,12 +23,18 @@ export class CaptureRuntime {
     await this.queue.track(session, entries, null, false);
     this.initialized.add(session);
   }
-  async startRequest(session: string, entries: readonly unknown[], binding?: RequestBinding) {
+  async startRequest(
+    session: string,
+    entries: readonly unknown[],
+    binding?: RequestBinding,
+    signal?: AbortSignal,
+  ) {
     // Session initialization must precede the first persisted request.
     if (!this.initialized.has(session)) {
       await this.initialize(session, entries);
       this.initialized.add(session);
     }
+    signal?.throwIfAborted();
     this.bindings.delete(session);
     if (binding && binding.session_id !== session)
       throw new Error("Memory binding session mismatch");

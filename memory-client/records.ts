@@ -106,3 +106,33 @@ export const memoryRecordSchema = z
   })
   .strip();
 export type MemoryRecord = z.infer<typeof memoryRecordSchema>;
+
+export function inRequestScope(record: MemoryRecord, project: string | null) {
+  return record.scope.global || (project !== null && record.scope.projects.includes(project));
+}
+
+export function eligibleRecords(records: MemoryRecord[], now: Date, includeExpired = false) {
+  const lookup = new Map(records.map((r) => [r.ref, r]));
+  const valid = (ref: string, historical: boolean, visiting: Set<string>): boolean => {
+    const r = lookup.get(ref);
+    if (!r || !r.active || !r.sources.length || visiting.has(ref)) return false;
+    const m = r.memory_metadata;
+    if (
+      m &&
+      (m.status !== "active" ||
+        (!historical && m.expires_at && now.getTime() >= Date.parse(m.expires_at)))
+    )
+      return false;
+    return (m?.evidence ?? []).every((link) => {
+      const support = lookup.get(link.ref);
+      return (
+        support?.revision === link.revision &&
+        support.scope.global === r.scope.global &&
+        JSON.stringify([...support.scope.projects].sort()) ===
+          JSON.stringify([...r.scope.projects].sort()) &&
+        valid(link.ref, link.requirement === "historical", new Set([...visiting, ref]))
+      );
+    });
+  };
+  return records.filter((r) => valid(r.ref, includeExpired, new Set()));
+}

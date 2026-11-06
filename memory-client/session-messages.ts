@@ -94,6 +94,22 @@ export function collectMessages(entries: readonly unknown[]): SourceMessage[] {
       : [];
   });
 }
+
+export function boundRecentMessages(entries: readonly unknown[], binding: RequestBinding) {
+  let sameConversation = false;
+  const recent: SourceMessage[] = [];
+  for (const entry of entries) {
+    const e = object(entry);
+    if (e?.type === "custom" && e.customType === "memory-request") {
+      const marker = object(e.data);
+      sameConversation =
+        marker?.session_id === binding.session_id &&
+        marker.conversation_id === binding.conversation_id &&
+        marker.origin !== "internal";
+    } else if (sameConversation) recent.push(...collectMessages([entry]));
+  }
+  return recent.slice(-6);
+}
 export function splitSegments(messages: SourceMessage[], project: string | null): CaptureSegment[] {
   const segments: CaptureSegment[] = [];
   let current: SourceMessage[] = [];

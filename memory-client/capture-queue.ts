@@ -31,6 +31,23 @@ interface State {
   jobs: CaptureJob[];
 }
 
+export async function readCapturePending(directory: string) {
+  try {
+    const raw = await readFile(join(directory, "state.json"), "utf8");
+    if (Buffer.byteLength(raw) > 4000000) throw new Error("Capture queue exceeds inspection limit");
+    const state = JSON.parse(raw) as State;
+    if (state.version !== 1 || !Array.isArray(state.jobs) || !state.pending)
+      throw new Error("Invalid capture queue");
+    return (
+      state.jobs.length > 0 ||
+      Object.values(state.pending).some((segments) => segments.some((s) => s.messages.length > 0))
+    );
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
+}
+
 export class CaptureQueue {
   private changes = Promise.resolve();
   private change(action: () => Promise<void>) {

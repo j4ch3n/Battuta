@@ -1,19 +1,25 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { clientConfig, captureSettings } from "./config.ts";
-import { profilePrompt } from "./profile-loader.ts";
+import { readValidatedProfile } from "./profile-loader.ts";
 import { resolveRequestBinding, type RequestBinding } from "./binding.ts";
-import { CaptureQueue } from "./capture-queue.ts";
+import { CaptureQueue, readCapturePending } from "./capture-queue.ts";
 import { CaptureRuntime } from "./lifecycle.ts";
 import { MemoryMcpClient } from "./mcp-client.ts";
 import { extractMemories } from "./extract.ts";
 import { memoryRecordSchema } from "./records.ts";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
+import { abortable } from "./abortable.ts";
+import { boundedQuery, prepareRecall, type RecallPacket } from "./recall.ts";
+import { boundRecentMessages } from "./session-messages.ts";
 
 export default function memoryClient(pi: ExtensionAPI) {
   if (process.env.AGENT_ROLE !== "cos") return;
   let runtime: CaptureRuntime | undefined;
   let context: ExtensionContext;
   let serial = Promise.resolve();
+  const active = new Map<string, { id: string; binding?: RequestBinding; packet?: RecallPacket }>();
+  const controllers = new Map<string, AbortController>();
   async function getRuntime(ctx: ExtensionContext) {
     context = ctx;
     if (!runtime) {
@@ -27,9 +33,7 @@ export default function memoryClient(pi: ExtensionAPI) {
             await client.call(
               "memory_recall",
               {
-                query: Buffer.from(job.segment.messages.map((m) => m.text).join(" "))
-                  .subarray(0, 240)
-                  .toString("utf8"),
+                query: boundedQuery(job.segment.messages.map((m) => m.text).join(" ")),
                 selector: job.segment.project ? "projects" : "global",
                 projects: job.segment.project ? [job.segment.project] : [],
                 limit: 20,
@@ -71,10 +75,44 @@ export default function memoryClient(pi: ExtensionAPI) {
     }),
   );
   pi.on("before_agent_start", async (event, ctx) => {
+    const started = performance.now();
+    const session = ctx.sessionManager.getSessionId();
+    controllers.get(session)?.abort();
+    const controller = new AbortController();
+    controllers.set(session, controller);
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(3000)]);
+    const request = { id: randomUUID() } as {
+      id: string;
+      binding?: RequestBinding;
+      packet?: RecallPacket;
+    };
+    active.set(session, request);
     let binding: RequestBinding | undefined;
-    await safe(ctx, async () => {
-      const r = await getRuntime(ctx);
-      const entries = ctx.sessionManager.getBranch();
+    const config = clientConfig();
+    const entries = ctx.sessionManager.getBranch();
+    const internal = event.messageType === "custom" && event.message.customType !== "agent-mail";
+    if (internal) {
+      pi.appendEntry("memory-request", {
+        request_id: request.id,
+        conversation_id: "internal",
+        session_id: session,
+        project: null,
+        origin: "internal",
+        admitted_at: new Date().toISOString(),
+      });
+      await abortable(
+        safe(ctx, async () => {
+          const r = await getRuntime(ctx);
+          if (active.get(session) === request)
+            await r.startRequest(session, entries, undefined, signal);
+        }),
+        signal,
+      ).catch(() => {});
+      return;
+    }
+    let content =
+      "memory-unavailable: request origin could not be verified. This is not an empty memory inventory.";
+    try {
       const origin = [...entries]
         .reverse()
         .find(
@@ -82,37 +120,110 @@ export default function memoryClient(pi: ExtensionAPI) {
             e.type === "custom" &&
             (e.customType === "memory-request" || e.customType === "memory-request-origin"),
         );
-      try {
-        binding = await resolveRequestBinding(
+      binding = await abortable(
+        resolveRequestBinding(
           origin?.type === "custom" && origin.customType === "memory-request-origin"
             ? origin.data
             : undefined,
-          clientConfig().registry,
-        );
-        if (binding.session_id !== ctx.sessionManager.getSessionId())
-          throw new Error("Wrong memory session");
-        pi.appendEntry("memory-request", binding);
-      } catch {
-        ctx.ui.setStatus(
-          "memory-capture",
-          "Memory origin unavailable; capture and personalization disabled for this request",
-        );
-        binding = undefined;
-      }
-      await r.startRequest(
-        ctx.sessionManager.getSessionId(),
-        ctx.sessionManager.getBranch(),
-        binding,
+          config.registry,
+        ),
+        signal,
       );
-    });
-    if (!binding || binding.origin === "internal") return;
-    try {
-      const config = clientConfig();
-      const profile = await profilePrompt(config.role, config.dataDirectory);
-      if (profile) return { systemPrompt: `${event.systemPrompt}\n\n${profile}` };
+      if (binding.session_id !== session) throw new Error("Wrong memory session");
+      if (
+        !internal &&
+        binding.origin !== "internal" &&
+        (event.messageType === "user" ? binding.origin !== "owner" : binding.origin !== "mail")
+      )
+        throw new Error("Memory origin type mismatch");
+      signal.throwIfAborted();
+      request.id = binding.request_id;
+      request.binding = binding;
+      content =
+        "memory-unavailable: preparation could not verify current evidence within its deadline.";
+      pi.appendEntry("memory-request", binding);
+      await abortable(
+        safe(ctx, async () => {
+          const r = await getRuntime(ctx);
+          if (active.get(session) !== request) return;
+          await r.startRequest(session, entries, binding, signal);
+        }),
+        signal,
+      );
+      if (internal || binding.origin === "internal") return;
+      if (await abortable(readCapturePending(config.queue), signal)) {
+        content =
+          "memory-unavailable: capture-pending. Earlier evidence may contain a correction; memory and profile are suppressed until it is reconciled.";
+      } else {
+        const packet = await prepareRecall(
+          binding,
+          event.messageType === "user"
+            ? event.prompt
+            : typeof event.message.content === "string"
+              ? event.message.content
+              : JSON.stringify(event.message.content),
+          boundRecentMessages(entries, binding),
+          new MemoryMcpClient(config.url),
+          signal,
+        );
+        request.packet = packet;
+        const profile =
+          packet.status === "unavailable"
+            ? ""
+            : await abortable(
+                readValidatedProfile(config.dataDirectory, packet.records, new Date()),
+                signal,
+              );
+        signal.throwIfAborted();
+        content = `memory-context:${packet.status}\n${packet.content}${profile ? `\n${profile}` : ""}`;
+      }
     } catch {
-      ctx.ui.notify("Owner profile unavailable; continuing without it", "warning");
+      request.packet = undefined;
+      if (!binding)
+        await abortable(
+          safe(ctx, async () => {
+            const r = await getRuntime(ctx);
+            if (active.get(session) === request)
+              await r.startRequest(session, entries, undefined, signal);
+          }),
+          signal,
+        ).catch(() => {});
     }
+    if (internal || binding?.origin === "internal" || active.get(session) !== request) return;
+    ctx.ui.setStatus(
+      "memory-recall",
+      request.packet ? `Memory ${request.packet.status}` : "Memory unavailable",
+    );
+    pi.appendEntry("memory-recall-status", {
+      status: request.packet?.status ?? "unavailable",
+      elapsed_ms: Math.round(performance.now() - started),
+      records: request.packet?.records.length ?? 0,
+    });
+    return {
+      message: {
+        customType: "memory-context",
+        content,
+        display: false,
+        details: { request_id: request.id },
+      },
+    };
+  });
+  pi.on("context", (event, ctx) => {
+    const request = active.get(ctx.sessionManager.getSessionId());
+    const expired = request?.packet?.records.some(
+      (r) =>
+        r.memory_metadata?.expires_at && Date.now() >= Date.parse(r.memory_metadata.expires_at),
+    );
+    return {
+      messages: event.messages.filter(
+        (message) =>
+          message.role !== "custom" ||
+          message.customType !== "memory-context" ||
+          (!!request &&
+            !expired &&
+            (message.details as { request_id?: string } | undefined)?.request_id === request.id),
+      ),
+    };
   });
   pi.on("agent_settled", (_event, ctx) =>
     safe(ctx, async () => {
@@ -123,6 +234,10 @@ export default function memoryClient(pi: ExtensionAPI) {
   );
   const flush = (ctx: ExtensionContext) =>
     safe(ctx, async () => {
+      const session = ctx.sessionManager.getSessionId();
+      controllers.get(session)?.abort();
+      controllers.delete(session);
+      active.delete(session);
       await (
         await getRuntime(ctx)
       ).flush(ctx.sessionManager.getSessionId(), ctx.sessionManager.getBranch());

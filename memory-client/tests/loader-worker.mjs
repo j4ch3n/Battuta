@@ -38,6 +38,7 @@ for (const role of ["cos", "manager"]) {
     agent,
   );
   assert.deepEqual(loaded.errors, []);
+  loaded.runtime.appendEntry = () => {};
   const extension = loaded.extensions[0];
   assert.equal(extension.tools.size, 0);
   let prompt;
