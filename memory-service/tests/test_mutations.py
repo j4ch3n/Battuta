@@ -44,6 +44,35 @@ class StorageFixture(unittest.IsolatedAsyncioTestCase):
 
 
 class MutationTests(StorageFixture):
+    async def test_withdrawal_preserves_old_evidence_but_cannot_change_claim_or_bypass_guards(self):
+        from battuta_memory.contracts import SetMetadataRequest
+        from test_records import SOURCE, fact
+        for withdrawn in ("forgotten", "corrected"):
+            with self.subTest(withdrawn=withdrawn):
+                values = dict(scope={"global": True}, sources=[SOURCE], memory_metadata=fact()["memory_metadata"])
+                support = await self.service.remember(RememberRequest(content=f"Support {withdrawn}", **values))
+                source = await self.adapter.get(support["ref"])
+                metadata = {**values["memory_metadata"], "knowledge_type": "hypothesis", "confidence": "tentative", "rationale": "Possible pattern", "evidence": [{"ref": source["ref"], "revision": source["revision"], "relation": "supports", "requirement": "historical"}]}
+                claim = await self.service.remember(RememberRequest(content=f"Claim {withdrawn}", **{**values, "memory_metadata": metadata}))
+                before = await self.adapter.get(claim["ref"])
+                if withdrawn == "forgotten":
+                    await self.service.forget(ForgetRequest(ref=source["ref"]))
+                else:
+                    await self.service.update(UpdateRequest(ref=source["ref"], content="Corrected supporting fact", reason="Owner correction"))
+                request = dict(ref=claim["ref"], expected_revision=before["revision"], idempotency_key=f"reject-{withdrawn}", memory_metadata={**before["memory_metadata"], "status": "rejected"})
+                for change in ({"rationale": "New unsupported explanation"}, {"confidence": "disputed"}, {"evidence": [{**metadata["evidence"][0], "revision": "0" * 64}]}):
+                    with self.subTest(change=change), self.assertRaises(ValueError):
+                        await self.service.set_metadata(SetMetadataRequest(**{**request, "memory_metadata": {**request["memory_metadata"], **change}}))
+                with self.assertRaisesRegex(ValueError, "evidence"):
+                    await self.service.set_metadata(SetMetadataRequest(**request, evidence=[{"ref": source["ref"], "revision": source["revision"]}]))
+                receipt = await self.service.set_metadata(SetMetadataRequest(**request))
+                self.assertEqual(await self.service.set_metadata(SetMetadataRequest(**request)), receipt)
+                after = await self.adapter.get(claim["ref"])
+                self.assertEqual(after["sources"], before["sources"])
+                self.assertEqual(after["memory_metadata"], request["memory_metadata"])
+                with self.assertRaises(ValueError):
+                    await self.service.set_metadata(SetMetadataRequest(**{**request, "expected_revision": after["revision"], "idempotency_key": f"reactivate-{withdrawn}", "memory_metadata": {**after["memory_metadata"], "status": "active"}}))
+
     async def test_malformed_old_metadata_does_not_block_inventory_or_valid_work(self):
         from battuta_memory.contracts import InventoryRequest
         from test_records import SOURCE, fact

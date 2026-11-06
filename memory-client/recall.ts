@@ -14,6 +14,7 @@ export interface RecallPacket {
   request_id: string;
   status: "ready" | "partial" | "unavailable";
   records: MemoryRecord[];
+  validationEvidence: MemoryRecord[];
   content: string;
   prepared_at: string;
 }
@@ -25,6 +26,53 @@ export function boundedQuery(text: string, bytes = 256) {
     result += character;
   }
   return result;
+}
+
+export async function prepareCorrectionCandidates(
+  project: string | null,
+  text: string,
+  client: Pick<MemoryMcpClient, "call">,
+  signal: AbortSignal,
+) {
+  const result = z.object({ records: z.array(memoryRecordSchema).max(20) }).parse(
+    await abortable(
+      client.call(
+        "memory_recall",
+        {
+          query: boundedQuery(text),
+          selector: project ? "projects" : "global",
+          projects: project ? [project] : [],
+          include_global: true,
+          include_expired: true,
+          mode: "hybrid",
+          limit: 20,
+        },
+        signal,
+      ),
+      signal,
+    ),
+  );
+  const candidates = new Map(
+    result.records.filter((r) => inRequestScope(r, project)).map((r) => [r.ref, r]),
+  );
+  const refs = [
+    ...new Set(
+      [...candidates.values()].flatMap((r) => r.memory_metadata?.evidence.map((e) => e.ref) ?? []),
+    ),
+  ]
+    .filter((ref) => !candidates.has(ref))
+    .slice(0, 20);
+  const evidence = await Promise.allSettled(
+    refs.map((ref) => abortable(client.call("memory_get", { ref }, signal), signal)),
+  );
+  for (const value of evidence) {
+    if (value.status !== "fulfilled") continue;
+    const record = memoryRecordSchema.safeParse(value.value);
+    if (record.success && inRequestScope(record.data, project))
+      candidates.set(record.data.ref, record.data);
+  }
+  signal.throwIfAborted();
+  return [...candidates.values()];
 }
 
 export function recallFacets(text: string, recent: SourceMessage[]) {
@@ -98,6 +146,7 @@ export async function prepareRecall(
     request_id: binding.request_id,
     status: "unavailable",
     records: [],
+    validationEvidence: [],
     content:
       "memory-unavailable: context could not be verified; this is not an empty memory inventory.",
     prepared_at: new Date().toISOString(),
@@ -192,6 +241,7 @@ export async function prepareRecall(
       request_id: binding.request_id,
       status: partial || rendered.truncated ? "partial" : "ready",
       records: rendered.records,
+      validationEvidence: verified,
       content: rendered.content,
       prepared_at: now.toISOString(),
     };

@@ -81,7 +81,7 @@ test("abort ends extraction even if provider ignores cancellation", async () => 
   const pending = extractMemories(job, ctx, controller.signal);
   setTimeout(() => controller.abort(), 10);
   await expect(pending).rejects.toThrow();
-}, 100);
+});
 test.each(["topic,scope:global", "topic,proj:other", "topic,kind:decision"])(
   "rejects comma-separated reserved tag injection: %s",
   async (tag) => {

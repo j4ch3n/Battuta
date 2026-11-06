@@ -6,12 +6,11 @@ import { CaptureQueue, readCapturePending } from "./capture-queue.ts";
 import { CaptureRuntime } from "./lifecycle.ts";
 import { MemoryMcpClient } from "./mcp-client.ts";
 import { extractMemories } from "./extract.ts";
-import { memoryRecordSchema } from "./records.ts";
-import { z } from "zod";
+import { eligibleRecords } from "./records.ts";
 import { randomUUID } from "node:crypto";
 import { abortable } from "./abortable.ts";
-import { boundedQuery, prepareRecall, type RecallPacket } from "./recall.ts";
-import { boundRecentMessages } from "./session-messages.ts";
+import { prepareCorrectionCandidates, prepareRecall, type RecallPacket } from "./recall.ts";
+import { boundRecentMessages, collectMessages, hasUnboundOrigin } from "./session-messages.ts";
 import { prepareDelegation } from "./delegation.ts";
 import type { MessageContent } from "../agent-mail/content.ts";
 
@@ -31,17 +30,11 @@ export default function memoryClient(pi: ExtensionAPI) {
       const client = new MemoryMcpClient(config.url);
       runtime = new CaptureRuntime(await CaptureQueue.open(config.queue, config.role), {
         extract: async (job, signal) => {
-          const result = z.object({ records: z.array(memoryRecordSchema) }).parse(
-            await client.call(
-              "memory_recall",
-              {
-                query: boundedQuery(job.segment.messages.map((m) => m.text).join(" ")),
-                selector: job.segment.project ? "projects" : "global",
-                projects: job.segment.project ? [job.segment.project] : [],
-                limit: 20,
-              },
-              signal,
-            ),
+          const candidates = await prepareCorrectionCandidates(
+            job.segment.project,
+            job.segment.messages.map((m) => m.text).join(" "),
+            client,
+            signal,
           );
           return extractMemories(
             job,
@@ -49,7 +42,7 @@ export default function memoryClient(pi: ExtensionAPI) {
             signal,
             config.role,
             (usage) => pi.appendEntry("memory-capture-usage", { usage }),
-            result.records,
+            candidates,
           );
         },
         upload: (batch, signal) => client.capture(batch, signal),
@@ -139,6 +132,14 @@ export default function memoryClient(pi: ExtensionAPI) {
       )
         throw new Error("Memory origin type mismatch");
       signal.throwIfAborted();
+      if (binding.origin === "mail" && event.messageType === "custom") {
+        const mail = collectMessages([
+          { id: "admission", type: "custom_message", ...event.message },
+        ])[0]?.original_mail;
+        if (!mail || mail.message_ref.conversation_id !== binding.conversation_id)
+          throw new Error("Memory mail origin mismatch");
+        binding = { ...binding, mail_ref: mail.message_ref };
+      }
       request.id = binding.request_id;
       request.binding = binding;
       content =
@@ -173,7 +174,7 @@ export default function memoryClient(pi: ExtensionAPI) {
           packet.status === "unavailable"
             ? ""
             : await abortable(
-                readValidatedProfile(config.dataDirectory, packet.records, new Date()),
+                readValidatedProfile(config.dataDirectory, packet.validationEvidence, new Date()),
                 signal,
               );
         signal.throwIfAborted();
@@ -181,7 +182,7 @@ export default function memoryClient(pi: ExtensionAPI) {
       }
     } catch {
       request.packet = undefined;
-      if (!binding)
+      if (!request.binding)
         await abortable(
           safe(ctx, async () => {
             const r = await getRuntime(ctx);
@@ -212,10 +213,18 @@ export default function memoryClient(pi: ExtensionAPI) {
   });
   pi.on("context", (event, ctx) => {
     const request = active.get(ctx.sessionManager.getSessionId());
-    const expired = request?.packet?.records.some(
-      (r) =>
-        r.memory_metadata?.expires_at && Date.now() >= Date.parse(r.memory_metadata.expires_at),
+    const unbound =
+      request?.binding && hasUnboundOrigin(ctx.sessionManager.getBranch(), request.binding);
+    const valid = new Set(
+      eligibleRecords(request?.packet?.validationEvidence ?? [], new Date(Date.now())).map(
+        (r) => r.ref,
+      ),
     );
+    const expired =
+      request?.packet &&
+      eligibleRecords(request.packet.validationEvidence, new Date(request.packet.prepared_at)).some(
+        (r) => !valid.has(r.ref),
+      );
     return {
       messages: event.messages.filter(
         (message) =>
@@ -223,6 +232,7 @@ export default function memoryClient(pi: ExtensionAPI) {
           message.customType !== "memory-context" ||
           (!!request &&
             !expired &&
+            !unbound &&
             (message.details as { request_id?: string } | undefined)?.request_id === request.id),
       ),
     };
@@ -240,7 +250,11 @@ export default function memoryClient(pi: ExtensionAPI) {
     const content = input.content as MessageContent | undefined;
     if (content?.request === null) return;
     const binding = active.get(ctx.sessionManager.getSessionId())?.binding;
-    if (!binding || binding.origin === "internal")
+    if (
+      !binding ||
+      binding.origin === "internal" ||
+      hasUnboundOrigin(ctx.sessionManager.getBranch(), binding)
+    )
       return {
         block: true,
         reason:
@@ -283,11 +297,17 @@ export default function memoryClient(pi: ExtensionAPI) {
       active.delete(session);
       await (
         await getRuntime(ctx)
-      ).flush(ctx.sessionManager.getSessionId(), ctx.sessionManager.getBranch());
+      ).flush(ctx.sessionManager.getSessionId(), ctx.sessionManager.getBranch(), true);
     });
   pi.on("session_before_switch", (_event, ctx) => flush(ctx));
   pi.on("session_before_fork", (_event, ctx) => flush(ctx));
-  pi.on("session_before_compact", (_event, ctx) => flush(ctx));
+  pi.on("session_before_compact", (_event, ctx) =>
+    safe(ctx, async () => {
+      await (
+        await getRuntime(ctx)
+      ).flush(ctx.sessionManager.getSessionId(), ctx.sessionManager.getBranch());
+    }),
+  );
   pi.on("session_shutdown", (_event, ctx) => {
     runtime?.shutdown();
     return flush(ctx);

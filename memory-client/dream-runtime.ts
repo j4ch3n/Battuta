@@ -832,9 +832,11 @@ export async function runDream(
         ? { status: "partial" }
         : { status: "complete", summary: previous.summary ?? "Memory review completed." };
     let state =
-      previous && !previous.completed
+      previous &&
+      !previous.completed &&
+      (previous.run_id === dreamRunId(deps.now()) || Object.keys(previous.requests).length > 0)
         ? previous
-        : await prepareStages(deps, previous, legacy, signal);
+        : await prepareStages(deps, previous, previous?.legacy_receipts ?? legacy, signal);
     const save = () => atomicPrivateWrite(path, JSON.stringify(state));
     await save();
     if (!Object.keys(state.requests).length) {

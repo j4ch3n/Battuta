@@ -218,7 +218,10 @@ class MemoryService:
             if current["revision"] != request.expected_revision:
                 raise ValueError("Memory changed since inventory")
             metadata = request.memory_metadata.model_dump(mode="json")
-            await self._validate_metadata(request.ref, metadata, current["scope"], current["sources"])
+            prior = current.get("memory_metadata")
+            withdrawal = prior is not None and metadata["status"] in {"stale", "superseded", "rejected"} and metadata == {**prior, "status": metadata["status"]}
+            if not withdrawal:
+                await self._validate_metadata(request.ref, metadata, current["scope"], current["sources"])
             replacement = None
             if request.replacement_ref is not None:
                 replacement = await self._active(request.replacement_ref)

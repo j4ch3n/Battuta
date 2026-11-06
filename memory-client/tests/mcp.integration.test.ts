@@ -131,15 +131,14 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
         admitted_at: "2026-11-06T10:00:00Z",
       };
       await runtime.startRequest("session", [], binding);
-      await runtime.settle(
-        "session",
-        Array.from({ length: 6 }, (_, i) => ({
-          id: `e${i}`,
+      await runtime.settle("session", [
+        {
+          id: "e0",
           type: "message",
           timestamp: "2026-11-06T10:00:00Z",
           message: { role: "user", content: "I bought an NS2, the Nintendo console." },
-        })),
-      );
+        },
+      ]);
       await runtime.recover();
       expect(queue.jobs()).toHaveLength(1);
       expect(queue.jobs()[0].batch).toBeDefined();

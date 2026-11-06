@@ -54,10 +54,10 @@ export class CaptureRuntime {
       this.worker.notify("Memory capture pending; retained for retry"),
     );
   }
-  async flush(session: string, entries: readonly unknown[]) {
+  async flush(session: string, entries: readonly unknown[], endRequest = false) {
     const binding = this.bindings.get(session);
     await this.queue.track(session, entries, binding?.project ?? null, true, binding, !!binding);
-    this.bindings.delete(session);
+    if (endRequest) this.bindings.delete(session);
   }
   shutdown() {
     this.active?.abort();

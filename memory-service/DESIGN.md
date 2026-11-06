@@ -74,6 +74,8 @@ and upstream automatic conflict-tag mutations are disabled; CoS proposes changes
 metadata; it merges unrelated JSON fields and reuses content identity/embedding.
 Its optional `replacement_ref` records lifecycle supersession after the replacement
 is acknowledged. Sources and original content remain accessible through history.
+Status-only withdrawal may retain unchanged evidence links after their sources
+are corrected or forgotten; new claims and explicit mutation guards stay strict.
 `memory_forget` is an explicit tombstone, not secure erasure or bulk retirement.
 
 Public revisions cover content, scope, source and lifecycle changes. Inventory also
@@ -117,6 +119,10 @@ The origin producer supplies a validated immutable request/conversation/session,
 project-or-general, origin and admission instant before ordinary Pi admission.
 The consumer persists a one-use request marker and freezes capture segments.
 Another conversation's selection, a switch or a fork cannot supply a fallback.
+Mail admission freezes its exact envelope reference. Queued follow-ups without
+matching admission quarantine the mixed segment as blocked, unbound work and
+suppress context/delegation; a separate origin marker cannot authorize them.
+Compaction flushes capture without ending the continuing request's binding.
 The real producer integration remains gated on FIS-143/FIS-146; see
 [operations](../docs/memory-service.md#request-origin-contract).
 
@@ -124,7 +130,9 @@ Each settled CoS turn enters the durable queue immediately. Serialized queue wri
 prevent extraction persistence racing with new turns. The existing Pi completion
 extracts bounded attributed temporal facts and scoped correction targets supplied
 by recall. Validate source IDs, confidence, dates, scope and credential redaction
-before sending. Unknown source timezone establishes no automatic expiry.
+before sending. Correction candidates include expired active history and bounded
+supporting refs within the frozen scope. Unknown source timezone establishes no
+automatic expiry.
 Corrections use guarded version updates immediately, invalidating dependent claims
 without waiting for dreaming. Batches freeze before upload; retries reuse their
 digests and bounded backoff, not another paid extraction. Old frozen batches and
@@ -140,6 +148,8 @@ Late results cannot attach to another request. Inject labelled untrusted
 `memory-context`, not system authority; the context hook removes previous packets.
 Earlier pending capture suppresses memory/profile rather than risking an obsolete
 fact. Status and diagnostics distinguish partial/unavailable from an empty result.
+Keep supporting records privately for profile and in-turn dependency-expiry
+validation, separately from rendered/disclosed records.
 
 The profile is a bounded view of revision-cited eligible global claims in
 `dream-profile.json`, not an independent evidence source. Raw/untracked `ME.md`
@@ -176,6 +186,8 @@ attempt progress. A cross-process lock prevents concurrent runs. Resume stale
 unpublished stages against fresh evidence; never regenerate acknowledged/uncertain
 requests. Finish legacy journaled operations using their original identities before
 v3, without rerunning old graph/profile reasoning or inventing review completion.
+On a later scheduled day, unpublished failed batches rotate by attempt order only
+when no mutation request is frozen; their pending work and legacy receipts remain.
 Oversized inventory and partial publication remain visibly incomplete.
 
 Old global-relationship tools/data remain optional, revision-checked maintenance

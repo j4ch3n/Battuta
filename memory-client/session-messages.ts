@@ -1,5 +1,5 @@
 import { redact } from "./privacy.ts";
-import type { RequestBinding } from "./binding.ts";
+import { requestBindingSchema, type RequestBinding } from "./binding.ts";
 
 export interface SourceMessage {
   entry_id: string;
@@ -10,6 +10,7 @@ export interface SourceMessage {
   original_mail?: { message_ref: { conversation_id: string; id: string }; sender: string };
 }
 export interface CaptureSegment {
+  blocked_reason?: "unbound-origin";
   binding?: RequestBinding;
   project: string | null;
   messages: SourceMessage[];
@@ -96,19 +97,69 @@ export function collectMessages(entries: readonly unknown[]): SourceMessage[] {
 }
 
 export function boundRecentMessages(entries: readonly unknown[], binding: RequestBinding) {
-  let sameConversation = false;
+  let prior: RequestBinding | undefined;
+  let segment: unknown[] = [];
   const recent: SourceMessage[] = [];
+  const finish = () => {
+    if (
+      prior?.session_id === binding.session_id &&
+      prior.conversation_id === binding.conversation_id &&
+      prior.origin !== "internal" &&
+      !hasUnboundOrigin(segment, prior)
+    )
+      recent.push(...collectMessages(segment));
+  };
   for (const entry of entries) {
     const e = object(entry);
-    if (e?.type === "custom" && e.customType === "memory-request") {
-      const marker = object(e.data);
-      sameConversation =
-        marker?.session_id === binding.session_id &&
-        marker.conversation_id === binding.conversation_id &&
-        marker.origin !== "internal";
-    } else if (sameConversation) recent.push(...collectMessages([entry]));
+    if (
+      e?.type === "custom" &&
+      (e.customType === "memory-request" || e.customType === "memory-request-origin")
+    ) {
+      finish();
+      const parsed = requestBindingSchema.safeParse(
+        e.customType === "memory-request" ? e.data : undefined,
+      );
+      prior = parsed.success ? parsed.data : undefined;
+      segment = [];
+    } else segment.push(entry);
   }
+  finish();
   return recent.slice(-6);
+}
+export function hasUnboundOrigin(entries: readonly unknown[], binding: RequestBinding) {
+  const start = entries.reduce((last: number, entry, index) => {
+    const e = object(entry);
+    return e?.type === "custom" &&
+      e.customType === "memory-request" &&
+      object(e.data)?.request_id === binding.request_id
+      ? index
+      : last;
+  }, -1);
+  const current = entries.slice(start + 1);
+  if (
+    current.some((entry) => {
+      const e = object(entry);
+      return (
+        e?.type === "custom" &&
+        e.customType === "memory-request-origin" &&
+        object(e.data)?.request_id !== binding.request_id
+      );
+    })
+  )
+    return true;
+  const messages = collectMessages(current);
+  return (
+    messages.filter((m) => m.speaker === "owner").length > (binding.origin === "owner" ? 1 : 0) ||
+    messages.some(
+      (m) =>
+        m.speaker === "agent" &&
+        (binding.origin !== "mail" ||
+          !binding.mail_ref ||
+          !m.original_mail ||
+          m.original_mail.message_ref.conversation_id !== binding.mail_ref.conversation_id ||
+          m.original_mail.message_ref.id !== binding.mail_ref.id),
+    )
+  );
 }
 export function splitSegments(messages: SourceMessage[], project: string | null): CaptureSegment[] {
   const segments: CaptureSegment[] = [];

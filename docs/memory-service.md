@@ -74,6 +74,13 @@ validates this metadata, consumes it once with a `memory-request` custom entry,
 and persists the frozen binding in capture segments. It does not infer identity
 from prompt text or shared project selection. Forks/switches cannot reuse another
 session's origin. Internal custom activity bypasses ordinary capture/recall.
+For mail, `conversation_id` must match the delivered envelope; admission also
+freezes its exact message reference. Queued follow-ups bypassing admission are not
+authorized by a separate origin marker. Mixed segments remain blocked with
+`blocked_reason: unbound-origin`, without a project binding; memory context and
+commissions are suppressed. Preserve these jobs for attributed reconciliation,
+not automatic replay under another request. Compaction preserves a continuing
+request's binding; switches, forks and shutdown end it.
 
 **The real producer remains gated on FIS-143/FIS-146.** Until it supplies this
 contract, automatic capture/personalization and new commissions needing a binding

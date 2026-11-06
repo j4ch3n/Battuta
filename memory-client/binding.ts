@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { parse } from "yaml";
 import { z } from "zod";
 
-const requestBindingSchema = z
+export const requestBindingSchema = z
   .object({
     request_id: z.string().trim().min(1).max(200),
     conversation_id: z.string().trim().min(1).max(200),
@@ -14,6 +14,10 @@ const requestBindingSchema = z
       .nullable(),
     origin: z.enum(["owner", "mail", "internal"]),
     admitted_at: z.string().datetime({ offset: true }),
+    mail_ref: z
+      .object({ conversation_id: z.string().min(1), id: z.string().min(1) })
+      .strict()
+      .optional(),
   })
   .strict();
 export type RequestBinding = z.infer<typeof requestBindingSchema>;

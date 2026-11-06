@@ -1,8 +1,10 @@
 import { expect, test } from "vitest";
-import { prepareRecall, renderMemories } from "../recall.ts";
+import { prepareRecall, prepareCorrectionCandidates, renderMemories } from "../recall.ts";
 import type { RequestBinding } from "../binding.ts";
 import type { MemoryRecord } from "../records.ts";
 import { record } from "./fixtures/record.ts";
+import { eligibleRecords } from "../records.ts";
+import { boundRecentMessages } from "../session-messages.ts";
 
 export const binding: RequestBinding = {
   request_id: "r1",
@@ -12,6 +14,112 @@ export const binding: RequestBinding = {
   origin: "owner",
   admitted_at: "2026-11-06T00:00:00Z",
 };
+
+test.each([false, true])(
+  "recent same-conversation history survives a new admission but excludes mixed queued mail (mixed=%s)",
+  (mixed) => {
+    const entries: unknown[] = [
+      {
+        type: "custom",
+        customType: "memory-request-origin",
+        data: { ...binding, request_id: "previous" },
+      },
+      {
+        type: "custom",
+        customType: "memory-request",
+        data: { ...binding, request_id: "previous" },
+      },
+      { id: "owner", type: "message", message: { role: "user", content: "Nintendo games" } },
+    ];
+    if (mixed)
+      entries.push({
+        id: "mail",
+        type: "custom_message",
+        customType: "agent-mail",
+        content: "Unvalidated report",
+      });
+    entries.push({ type: "custom", customType: "memory-request-origin", data: binding });
+    expect(boundRecentMessages(entries, binding).map((m) => m.text)).toEqual(
+      mixed ? [] : ["Nintendo games"],
+    );
+  },
+);
+
+test("undisclosed support remains available for dependency revalidation", async () => {
+  const support = { ...record("b".repeat(64)), content: "Private supporting event" };
+  support.memory_metadata!.expires_at = new Date(Date.now() + 60000).toISOString();
+  const claim = record();
+  claim.memory_metadata = {
+    ...claim.memory_metadata!,
+    knowledge_type: "hypothesis",
+    confidence: "tentative",
+    rationale: "Possible pattern",
+    evidence: [
+      {
+        ref: support.ref,
+        revision: support.revision,
+        relation: "supports",
+        requirement: "current",
+      },
+    ],
+  };
+  const packet = await prepareRecall(
+    binding,
+    "Nintendo",
+    [],
+    {
+      call: (name, args) =>
+        Promise.resolve(
+          name === "memory_get"
+            ? args.ref === support.ref
+              ? support
+              : claim
+            : { records: [claim] },
+        ),
+    },
+    new AbortController().signal,
+  );
+  expect(packet.records.map((r) => r.ref)).toEqual([claim.ref]);
+  expect(packet.content).not.toContain(support.content);
+  expect(eligibleRecords(packet.validationEvidence, new Date()).map((r) => r.ref)).toContain(
+    claim.ref,
+  );
+  expect(eligibleRecords(packet.validationEvidence, new Date(Date.now() + 120000))).toEqual([]);
+});
+
+test("corrections can target expired events behind live historical patterns, never foreign scope", async () => {
+  const event = record("b".repeat(64)),
+    pattern = record(),
+    foreign = { ...record("c".repeat(64)), scope: { global: false, projects: ["beacon"] } };
+  event.memory_metadata!.expires_at = "2020-01-01T00:00:00Z";
+  pattern.memory_metadata!.evidence = [
+    { ref: event.ref, revision: event.revision, relation: "supports", requirement: "historical" },
+    {
+      ref: foreign.ref,
+      revision: foreign.revision,
+      relation: "contradicts",
+      requirement: "historical",
+    },
+  ];
+  const candidates = await prepareCorrectionCandidates(
+    "atlas",
+    "That event never happened",
+    {
+      call: (name, args) => {
+        if (name === "memory_get") return Promise.resolve(args.ref === event.ref ? event : foreign);
+        expect(args).toMatchObject({
+          include_expired: true,
+          selector: "projects",
+          projects: ["atlas"],
+          limit: 20,
+        });
+        return Promise.resolve({ records: [pattern] });
+      },
+    },
+    new AbortController().signal,
+  );
+  expect(candidates.map((r) => r.ref)).toEqual([pattern.ref, event.ref]);
+});
 
 test("follow-up recall uses recent topic with explicit frozen scope and revalidates before use", async () => {
   const r = record();

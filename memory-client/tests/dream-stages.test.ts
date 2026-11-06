@@ -389,10 +389,11 @@ test("deferred and unselected work remains pending, and earlier deferrals cannot
   expect(state.pending).toHaveLength(3);
 });
 
-test("lost acknowledgement replays frozen request, never repeats stage calls or the write", async () => {
+test("lost acknowledgement replays frozen request across days, never repeats stage calls or the write", async () => {
   const f = await fixture();
   f.loseNextAck();
   await expect(runDream(f.deps, new AbortController().signal)).rejects.toThrow("lost ack");
+  f.deps.now = () => new Date("2026-11-07T04:00:00Z");
   await runDream(f.deps, new AbortController().signal);
   expect(f.writes).toHaveLength(1);
   expect(f.calls).toEqual(["cleanup", "synthesis", "challenge", "reflection"]);
@@ -475,3 +476,38 @@ test("missing dispositions and persistent invalid challenge output publish nothi
     expect(f.writes).toEqual([]);
   }
 });
+
+test.each(["cleanup", "challenge"])(
+  "a persistently invalid %s batch rotates next day without losing pending inputs",
+  async (failure) => {
+    const f = await fixture();
+    for (let i = 0; i < 25; i++) {
+      const r = record(i.toString(16).padStart(64, "0"));
+      f.records.set(r.ref, { ...r, review_fingerprint: digest(r) });
+    }
+    const complete = f.deps.complete;
+    f.deps.complete = (prompt, evidence, signal) =>
+      prompt.includes(`Stage: ${failure}`)
+        ? Promise.resolve('{"wrong":true}')
+        : complete(prompt, evidence, signal);
+    const checkpoint = async () =>
+      JSON.parse(await readFile(join(f.deps.directory, "dream-state.json"), "utf8")) as {
+        inputs: string[];
+        pending: { ref: string }[];
+        legacy_receipts: unknown[];
+      };
+    await expect(runDream(f.deps, new AbortController().signal)).rejects.toThrow();
+    const first = await checkpoint();
+    first.legacy_receipts = [{ ref: "e".repeat(64), operation: "preserved-legacy" }];
+    await writeFile(join(f.deps.directory, "dream-state.json"), JSON.stringify(first));
+    await expect(runDream(f.deps, new AbortController().signal)).rejects.toThrow();
+    expect((await checkpoint()).inputs).toEqual(first.inputs);
+    f.deps.now = () => new Date("2026-11-07T04:00:00Z");
+    await expect(runDream(f.deps, new AbortController().signal)).rejects.toThrow();
+    const next = await checkpoint();
+    expect(next.legacy_receipts).toEqual(first.legacy_receipts);
+    expect(next.inputs.some((ref) => !first.inputs.includes(ref))).toBe(true);
+    expect(next.pending.map((p) => p.ref)).toEqual(expect.arrayContaining(first.inputs));
+    expect(f.writes).toEqual([]);
+  },
+);
