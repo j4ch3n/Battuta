@@ -1,35 +1,8 @@
 import { z } from "zod";
-import { redact } from "./privacy.ts";
+import { memoryRefSchema as ref, type MemoryRecord } from "./records.ts";
+export { memoryRecordSchema, type MemoryRecord } from "./records.ts";
 
-const ref = z.string().regex(/^[0-9a-f]{64}$/);
-const inboundMemoryText = z
-  .string()
-  .trim()
-  .min(1)
-  .max(16000)
-  .refine((v) => redact(v) === v, "Unsafe memory text");
 const modelText = z.string().trim().min(1).max(16000);
-const source = z.object({
-  agent_id: z.enum(["cos", "manager"]),
-  session_id: z.string(),
-  entry_id: z.string(),
-});
-export const memoryRecordSchema = z
-  .object({
-    ref,
-    revision: ref,
-    content: inboundMemoryText,
-    scope: z
-      .object({ global: z.boolean(), projects: z.array(z.string()) })
-      .strict()
-      .refine((s) => (s.global ? s.projects.length === 0 : s.projects.length > 0)),
-    kind: z.string(),
-    tags: z.array(z.string()),
-    sources: z.array(source),
-    active: z.literal(true),
-  })
-  .strip();
-export type MemoryRecord = z.infer<typeof memoryRecordSchema>;
 const common = {
   id: z.string().regex(/^[a-z0-9_-]{1,40}$/),
   source_refs: z.array(ref).min(1).max(100),

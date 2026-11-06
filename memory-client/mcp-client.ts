@@ -17,6 +17,7 @@ export class MemoryMcpClient {
         "memory_get",
         "memory_remember",
         "memory_update",
+        "memory_set_metadata",
         "memory_forget",
         "memory_consolidate_global",
         "memory_global_relationships",

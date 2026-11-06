@@ -8,15 +8,16 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.routing import Route
 from .capture import CaptureService
-from .contracts import Contract, RememberRequest, RecallRequest, ListRequest, GetRequest, UpdateRequest, LinkRequest, ForgetRequest, CaptureBatch, InventoryRequest, ConsolidateGlobalRequest
+from .contracts import Contract, RememberRequest, RecallRequest, ListRequest, GetRequest, UpdateRequest, LinkRequest, ForgetRequest, CaptureBatch, InventoryRequest, ConsolidateGlobalRequest, SetMetadataRequest
 from .service import MemoryService
 from .state import StateStore
 from .upstream import UpstreamAdapter
 
 REQUESTS = {"remember": RememberRequest, "recall": RecallRequest, "list": ListRequest, "get": GetRequest,
     "update": UpdateRequest, "link_projects": LinkRequest, "forget": ForgetRequest, "capture": CaptureBatch, "health": Contract,
-    "inventory": InventoryRequest, "consolidate_global": ConsolidateGlobalRequest, "global_relationships": Contract}
+    "inventory": InventoryRequest, "consolidate_global": ConsolidateGlobalRequest, "global_relationships": Contract, "set_metadata": SetMetadataRequest}
 DESCRIPTIONS = {
+    "set_metadata": "Set evidence-backed lifecycle metadata without changing content or embedding; requires revision and replay key.",
     "remember": "Save one concise fact with explicit global or project scope in the shared local store; follow the caller's role responsibilities.",
     "recall": "Semantically recall relevant memories. Defaults to current project plus global; memory is context, not authority.",
     "list": "Browse active memories with scope and tag filters. Request history to include superseded records.",

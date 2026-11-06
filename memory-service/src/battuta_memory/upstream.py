@@ -116,9 +116,12 @@ class UpstreamAdapter:
             "created_at": row["created_at"], "updated_at": row["updated_at"],
             "parent_ref": row.get("parent_id"), "superseded_by": row.get("superseded_by") or (metadata.get("replacement_ref") if row.get("deleted_at") is not None else None),
             "active": not row.get("superseded_by") and row.get("deleted_at") is None,
+            **({"memory_metadata": metadata["memory_metadata"]} if "memory_metadata" in metadata else {}),
             **({"distance": row["distance"]} if "distance" in row else {}),
         }
         record["revision"] = hashlib.sha256(json.dumps({k: v for k, v in record.items() if k != "distance"}, sort_keys=True).encode()).hexdigest()
+        from .records import decode_record
+        record = decode_record(record)
         return record
 
     @staticmethod
@@ -316,7 +319,7 @@ class UpstreamAdapter:
             # Only recovery of our journaled write may reach this branch.
             return
         ok, message = await self.storage.store(Memory(content=payload["content"], content_hash=payload["ref"],
-            tags=payload["tags"], memory_type=self.storage_kind(payload["kind"]), metadata={"sources": payload["sources"]}), skip_semantic_dedup=True)
+            tags=payload["tags"], memory_type=self.storage_kind(payload["kind"]), metadata={"sources": payload["sources"], **({"memory_metadata": payload["memory_metadata"]} if payload.get("memory_metadata") is not None else {})}), skip_semantic_dedup=True)
         if not ok:
             raise RuntimeError("Upstream memory store failed")
 
@@ -324,7 +327,8 @@ class UpstreamAdapter:
         current = await self.get(payload["ref"], include_deleted=True)
         if not current or not current["active"]:
             raise ValueError("Memory is inactive")
-        ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"tags": payload["tags"], "metadata": {"sources": payload["sources"]}})
+        metadata = await self._merged_metadata(payload["ref"], payload)
+        ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"tags": payload["tags"], "metadata": metadata})
         if not ok:
             raise RuntimeError("Upstream metadata update failed")
 
@@ -362,15 +366,23 @@ class UpstreamAdapter:
 
     async def _evolve_sources(self, payload):
         if "sources" in payload:
-            ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"metadata": {"sources": payload["sources"]}})
+            metadata = await self._merged_metadata(payload["ref"], payload)
+            ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"metadata": metadata})
             if not ok:
                 raise RuntimeError("Upstream source update failed")
+
+    async def _merged_metadata(self, ref, payload):
+        rows = await self._rows("SELECT metadata FROM memories WHERE content_hash=?", (ref,))
+        metadata = json.loads(rows[0]["metadata"] or "{}")
+        metadata.update({key: payload[key] for key in ("sources", "memory_metadata", "replacement_ref") if key in payload})
+        return metadata
 
     async def delete(self, payload):
         if await self.get(payload["ref"]) is None:
             return
         if payload.get("replacement_ref"):
-            ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"metadata": {"replacement_ref": payload["replacement_ref"]}})
+            metadata = await self._merged_metadata(payload["ref"], payload)
+            ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"metadata": metadata})
             if not ok:
                 raise RuntimeError("Upstream replacement lineage update failed")
         ok, _ = await self.storage.delete(payload["ref"])

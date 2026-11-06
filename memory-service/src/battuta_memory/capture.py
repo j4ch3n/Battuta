@@ -10,6 +10,9 @@ class CaptureService:
     @staticmethod
     def digest(batch):
         value = batch.model_dump(mode="json", by_alias=True, exclude={"payload_digest"})
+        for item in value["items"]:
+            if item.get("memory_metadata") is None:
+                item.pop("memory_metadata", None)
         return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
 
     async def ingest(self, batch):

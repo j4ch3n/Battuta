@@ -1,7 +1,8 @@
 """Validated, framework-neutral public requests. Reserved metadata is never caller-controlled."""
 
 import re
-from datetime import datetime
+import unicodedata
+from datetime import datetime, timezone
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -55,12 +56,59 @@ class EvidenceGuard(Contract):
     evidence: list[EvidenceRef] = Field(default_factory=list, max_length=100)
 
 
+def utc_timestamp(value):
+    if value is None:
+        return None
+    instant = datetime.fromisoformat(value)
+    if "T" not in value or instant.utcoffset() is None:
+        raise ValueError("Timestamp needs an explicit timezone")
+    return instant.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+class EvidenceLink(EvidenceRef):
+    relation: Literal["supports", "contradicts"]
+    requirement: Literal["historical", "current"]
+
+
+class MemoryMetadata(Contract):
+    stage: Literal["temporal", "durable"]
+    knowledge_type: Literal["fact", "synthesized-observation", "hypothesis"]
+    confidence: Literal["confirmed", "supported", "tentative", "disputed"]
+    status: Literal["active", "stale", "superseded", "rejected"]
+    keywords: list[str] = Field(default_factory=list, max_length=20)
+    mentioned_at: str | None = None
+    expires_at: str | None = None
+    rationale: str | None = Field(default=None, min_length=1, max_length=1000)
+    evidence: list[EvidenceLink] = Field(default_factory=list, max_length=100)
+    _times = field_validator("mentioned_at", "expires_at")(utc_timestamp)
+
+    @field_validator("keywords")
+    @classmethod
+    def valid_keywords(cls, values):
+        values = [unicodedata.normalize("NFKC", v).strip() for v in values]
+        if any(not v or len(v) > 80 or any(unicodedata.category(c).startswith("C") for c in v)
+                or re.search(r"(?i)(?:bearer\s|sk-[a-z0-9]{12}|(?:token|password|secret)\s*[:=])", v) for v in values):
+            raise ValueError("Invalid keyword")
+        if len({v.casefold() for v in values}) != len(values):
+            raise ValueError("Duplicate keywords")
+        return values
+
+    @model_validator(mode="after")
+    def supported_claim(self):
+        if self.knowledge_type != "fact" and (not self.rationale or not any(e.relation == "supports" for e in self.evidence)):
+            raise ValueError("Derived claims require supporting evidence and rationale")
+        if self.knowledge_type != "fact" and self.confidence == "confirmed":
+            raise ValueError("Inference is not owner confirmation")
+        return self
+
+
 class RememberContent(Tagged):
     content: str = Field(min_length=1, max_length=16000)
     scope: Scope
     kind: str = Field(default="observation", pattern=r"^[a-z][a-z0-9_-]{0,39}$")
     sources: list[SourceRef] = Field(default_factory=list, max_length=200)
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
+    memory_metadata: MemoryMetadata | None = None
 
     @field_validator("content")
     @classmethod
@@ -130,6 +178,7 @@ class GetRequest(Contract):
 
 
 class UpdateRequest(GetRequest, EvidenceGuard):
+    memory_metadata: MemoryMetadata | None = None
     sources: list[SourceRef] = Field(default_factory=list, max_length=200)
     expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     content: str = Field(min_length=1, max_length=16000)
@@ -158,6 +207,12 @@ class LinkRequest(GetRequest):
         if set(self.add) & set(self.remove):
             raise ValueError("Overlapping membership changes")
         return self
+
+
+class SetMetadataRequest(GetRequest, EvidenceGuard):
+    expected_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+    idempotency_key: str = Field(min_length=1, max_length=200)
+    memory_metadata: MemoryMetadata
 
 
 class ForgetRequest(GetRequest, EvidenceGuard):

@@ -64,7 +64,7 @@ class MemoryService:
             value.pop("evidence", None)
         if isinstance(request, UpdateRequest) and not value.get("sources"):
             value.pop("sources", None)
-        for field in ("expected_revision", "replacement_ref"):
+        for field in ("expected_revision", "replacement_ref", "memory_metadata"):
             if value.get(field) is None:
                 value.pop(field, None)
         return value
@@ -116,13 +116,17 @@ class MemoryService:
             ref = self.adapter.content_ref(request.content)
             current = await self.adapter.get(ref, include_deleted=True)
             sources = [s.model_dump() for s in request.sources]
+            metadata = request.memory_metadata.model_dump(mode="json") if request.memory_metadata is not None else None
+            await self._validate_metadata(ref, metadata, request.scope.model_dump(by_alias=True), sources)
             outcome = "created"
             operation = "store"
             if current:
                 if not current["active"]:
                     raise ValueError("Inactive history conflict")
-                if current["scope"]["global"] != request.scope.global_:
-                    raise ValueError("Global/project scope conflict")
+                if current["scope"] != request.scope.model_dump(by_alias=True):
+                    raise ValueError("Duplicate scope conflict")
+                if current["sources"] != sources or current.get("memory_metadata") != metadata:
+                    raise ValueError("Duplicate attribution or metadata conflict")
                 existing = current["scope"]["projects"]
                 projects = sorted(set(existing + request.scope.projects))
                 tags = (["scope:global"] if request.scope.global_ else [f"proj:{p}" for p in projects]) + sorted(set(current["tags"] + request.tags)) + [f"kind:{current['kind']}"]
@@ -132,7 +136,7 @@ class MemoryService:
                 operation = "metadata"
                 outcome = "linked" if projects != existing else "reused"
             return {"operation": operation, "ref": ref, "content": request.content, "tags": tags, "kind": request.kind,
-                "sources": sources, "result": {"ref": ref, "outcome": outcome, "before": current["content"] if current else None}}
+                "sources": sources, **({"memory_metadata": metadata} if metadata is not None else {}), "result": {"ref": ref, "outcome": outcome, "before": current["content"] if current else None}}
         return await self._mutation("remember:" + (request.idempotency_key or uuid.uuid4().hex), request, plan)
 
     async def _active(self, ref):
@@ -142,6 +146,41 @@ class MemoryService:
         if not record["active"]:
             raise ValueError("Memory is inactive")
         return record
+
+    async def _validate_metadata(self, ref, metadata, scope, sources):
+        if metadata is None:
+            return
+        if not sources:
+            raise ValueError("Memory needs attributed sources")
+        seen = set()
+        async def visit(target, path):
+            if target in path:
+                raise ValueError("Cyclic memory evidence")
+            if target in seen:
+                return
+            record = await self._active(target)
+            if record["scope"] != scope:
+                raise ValueError("Evidence scope conflict")
+            for link in (record.get("memory_metadata") or {}).get("evidence", []):
+                await visit(link["ref"], path | {target})
+            seen.add(target)
+        for link in metadata["evidence"]:
+            await visit(link["ref"], {ref})
+            record = await self._active(link["ref"])
+            if record["revision"] != link["revision"]:
+                raise ValueError("Memory evidence changed")
+
+    async def set_metadata(self, request):
+        async def plan():
+            current = await self._active(request.ref)
+            if current["revision"] != request.expected_revision:
+                raise ValueError("Memory changed since inventory")
+            metadata = request.memory_metadata.model_dump(mode="json")
+            await self._validate_metadata(request.ref, metadata, current["scope"], current["sources"])
+            tags = (["scope:global"] if current["scope"]["global"] else [f"proj:{p}" for p in current["scope"]["projects"]]) + current["tags"] + [f"kind:{current['kind']}"]
+            return {"operation": "metadata", "ref": request.ref, "tags": tags, "sources": current["sources"], "memory_metadata": metadata,
+                "result": {"ref": request.ref, "before": current["content"]}}
+        return await self._mutation("metadata:" + request.idempotency_key, request, plan)
 
     async def update(self, request):
         async def plan():
@@ -157,9 +196,11 @@ class MemoryService:
             sources = list({self.digest(s): s for s in current["sources"] + [s.model_dump() for s in request.sources]}.values())
             if len(sources) > 200:
                 raise ValueError("Too many source citations")
+            metadata = request.memory_metadata.model_dump(mode="json") if request.memory_metadata is not None else current.get("memory_metadata")
+            await self._validate_metadata(ref, metadata, current["scope"], sources)
             return {"operation": "evolve", "ref": ref, "old_ref": request.ref, "content": request.content,
                 "tags": scope_tags + (request.tags if request.tags is not None else current["tags"]) + [f"kind:{kind}"],
-                "kind": kind, "reason": request.reason, "sources": sources,
+                "kind": kind, "reason": request.reason, "sources": sources, **({"memory_metadata": metadata} if metadata is not None else {}),
                 "result": {"ref": ref, "predecessor_ref": request.ref, "before": current["content"]}}
         return await self._mutation("update:" + self.digest(self.request_value(request, by_alias=False)), request, plan)
 
