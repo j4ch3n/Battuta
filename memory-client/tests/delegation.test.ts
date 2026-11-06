@@ -110,3 +110,63 @@ test("timeout produces an honest unavailable brief and no unverified memory loca
   expect(result.references.some((r) => r.locator.startsWith("memory:"))).toBe(false);
   expect(JSON.stringify(result)).not.toContain(r.content);
 });
+
+test("a selected hypothesis cannot disclose unselected counterevidence", async () => {
+  const support = record(),
+    counter = record("b".repeat(64));
+  const hypothesis = {
+    ...record("c".repeat(64)),
+    memory_metadata: {
+      ...support.memory_metadata!,
+      knowledge_type: "hypothesis" as const,
+      confidence: "tentative" as const,
+      rationale: "A possible pattern",
+      evidence: [
+        {
+          ref: support.ref,
+          revision: support.revision,
+          relation: "supports" as const,
+          requirement: "historical" as const,
+        },
+        {
+          ref: counter.ref,
+          revision: counter.revision,
+          relation: "contradicts" as const,
+          requirement: "historical" as const,
+        },
+      ],
+    },
+  };
+  const records = [hypothesis, support, counter];
+  const client = {
+    call: (name: string, args: Record<string, unknown>) =>
+      Promise.resolve(
+        name === "memory_get" ? records.find((r) => r.ref === args.ref) : { records },
+      ),
+  };
+  await expect(
+    prepareDelegation(
+      binding,
+      requestContent("Compare options"),
+      [hypothesis.ref],
+      client,
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow("counterevidence");
+});
+
+test("a selected constraint is never silently dropped to fit the narrower delegation budget", async () => {
+  const r = { ...record(), content: "x".repeat(1500) };
+  const client = {
+    call: (name: string) => Promise.resolve(name === "memory_get" ? r : { records: [r] }),
+  };
+  await expect(
+    prepareDelegation(
+      binding,
+      requestContent("Compare options"),
+      [r.ref],
+      client,
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow("budget");
+});

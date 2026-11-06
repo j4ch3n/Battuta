@@ -61,8 +61,9 @@ for blocked. Identical duplicate reports are harmless; distinct replacements
 are refused. An accepted report waits for final turn settlement. A final abort
 or error overrides a submitted success; missing reports become blockers.
 
-Approved work tools, assignment inspection/notes, and read-only memory are
-available. Claim/status/control/mail mutations are excluded from model tool
+Approved work tools and assignment inspection/notes are available. Memory context
+arrives through the commission; workers do not connect to memory MCP.
+Claim/status/control/mail mutations are excluded from model tool
 registration, including native MCP/codemode discovery. Shell and the backend
 secret still make this a trusted process, **not a security sandbox**. No Telegram,
 worker inbox, nested delegation, owner-profile preload, or memory capture runs.

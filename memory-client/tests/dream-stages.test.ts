@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { selectUnprocessed } from "../dream-stages.ts";
+import { selectUnprocessed, validateCleanup } from "../dream-stages.ts";
 import { runDream, type DreamDependencies } from "../dream-runtime.ts";
 import { record } from "./fixtures/record.ts";
 import { digest } from "../capture-queue.ts";
@@ -12,6 +12,59 @@ const dirs: string[] = [];
 afterEach(async () => {
   await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
+
+test.each(["unknown-source", "cross-scope", "confidence-boost", "stale-evidence"])(
+  "cleanup rejects %s before publication",
+  (failure) => {
+    const a = record(),
+      b = { ...record("b".repeat(64)), scope: { global: false, projects: ["atlas"] } };
+    if (failure === "confidence-boost") a.memory_metadata!.confidence = "tentative";
+    const fact = {
+      id: "replacement",
+      content: "Consolidated supported detail",
+      kind: "event",
+      source_refs:
+        failure === "unknown-source"
+          ? ["d".repeat(64)]
+          : failure === "cross-scope"
+            ? [a.ref, b.ref]
+            : [a.ref],
+      memory_metadata: {
+        ...a.memory_metadata!,
+        confidence: "confirmed",
+        ...(failure === "stale-evidence"
+          ? {
+              evidence: [
+                {
+                  ref: a.ref,
+                  revision: "d".repeat(64),
+                  relation: "supports",
+                  requirement: "historical",
+                },
+              ],
+            }
+          : {}),
+      },
+    };
+    expect(() =>
+      validateCleanup(
+        {
+          dispositions: [
+            {
+              ref: a.ref,
+              disposition: "replace",
+              replacement_id: "replacement",
+              reason: "Consolidated attributed detail",
+            },
+          ],
+          facts: [fact],
+        },
+        [a],
+        [a, b],
+      ),
+    ).toThrow();
+  },
+);
 
 test.each(["missing", "temporal", "changed-durable"])(
   "old %s records stay pending independent of recent_refs",
