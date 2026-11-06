@@ -22,3 +22,17 @@ make check-all
 The pre-commit hook validates staged skill manifests and catalog entry points, then formats staged files and lints staged code with its runtime-specific configuration. lint-staged preserves partially staged work. `pnpm check:skills` validates all profile selections in the checkout. Run `make check` before pushing; full-project type checks cannot reliably be restricted to staged files.
 
 Use `*.test.ts` for Node unit tests and `*.integration.test.ts` for Node integration tests; new tests are discovered automatically. Co-locate Deno `*.test.ts` files with their function. Every function directory must have `lint`, `check`, and `test` tasks in its `deno.json`; root commands discover directories automatically. Commit updated lockfiles when changing dependencies. CI uses frozen installs/checks.
+
+## CI selection
+
+PRs run checks for affected component directories, including configuration, lockfiles, fixtures, and non-code assets—not only changed file extensions. Selection compares the PR base and head commits, including deletions and both sides of renames.
+
+- Node components run lint, type checks, and unit coverage. The CoS extension has lint/type checks only. Agent Mail changes also check the assignment worker; communication templates, project-management/project-context skill files, and CoS/Manager skill manifests check Agent Mail and the worker. CoS changes also check the memory client, whose loader test uses the CoS Pi installation.
+- Python service/CLI changes run the affected project's suite; project CLI changes also check the artifact service that depends on it. The artifact setup script, release launcher, and presentation skill's live-panel scaffold also select artifact tests that exercise those inputs.
+- Edge Function changes check that function. Shared Supabase inputs, including database changes, check all functions.
+- Every PR runs formatting, JavaScript lint, shell syntax, and both setup/packaging suites. Those suites cover shared launcher, scheduler, and configuration behavior, including changes to the setup package reused by packaging.
+- Workflow/action changes, check-runner changes, root Node tooling, or runtime version changes select all components. Keep the selector's component and dependency mappings current when adding packages or cross-component imports.
+
+Pushes to `main`, merge queues, manual runs, and release validation run the full suite. The stable `Quality gate` requires successful selected checks and permits skipped Node/Deno jobs only when their selection is empty. Local aggregate commands still run everything.
+
+On `main`, Supabase-related changes call the deployment workflow after the Quality gate succeeds, reusing those checks instead of running a second validation suite. Version tags still trigger release validation and packaging independently. Database/transport integration checks remain separate from the default CI suite.

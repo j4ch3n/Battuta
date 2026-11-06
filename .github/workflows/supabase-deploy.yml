@@ -1,12 +1,7 @@
 name: Deploy Supabase
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "supabase/**"
-      - ".github/workflows/supabase-deploy.yml"
+  workflow_call:
 
 permissions:
   contents: read
@@ -16,10 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  validate:
-    uses: ./.github/workflows/ci.yml
   deploy:
-    needs: validate
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
