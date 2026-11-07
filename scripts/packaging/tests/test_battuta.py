@@ -81,7 +81,7 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"],
                     self.assertEqual(response["scheduler"], str(self.scheduler))
                     self.assertEqual(response["catchup"], "0")
                 self.assertIn(str(self.root / "project-spec/index.ts"), response["args"])
-                self.assertIn(str(self.root / "memory-client/index.ts"), response["args"])
+                self.assertEqual(str(self.root / "memory-client/index.ts") in response["args"], role == "cos")
 
     def test_both_roles_honor_the_same_endpoint_override(self):
         path = "http://127.0.0.1:8989/mcp"

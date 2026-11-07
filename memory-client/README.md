@@ -1,5 +1,5 @@
 # Battuta memory client
 
-A Pi adapter for configurable conversation capture and CoS memory continuity. It durably queues scoped facts, loads the shared owner profile for CoS, and provides an isolated nightly dream tool for validated consolidation, whole-profile refresh and private reflections.
+A CoS-only Pi extension for attributed capture, isolated iterative recall, owner-profile context and evidence-backed dreaming. It preserves queued work and private files, and uses Pi's native agent, MCP and lifecycle contracts without exposing memory tools to main CoS.
 
-See [release setup](../RELEASE.md#extension-and-skill-setup-index), [memory operations](../docs/memory-service.md), and the shared [memory skill](../skills-hub/memory/SKILL.md) with role-specific workflows.
+See [release setup](../RELEASE.md#extension-and-skill-setup-index), [design and limits](../memory-service/DESIGN.md), [memory operations](../docs/memory-service.md), and the CoS [memory skill](../skills-hub/memory/SKILL.md).

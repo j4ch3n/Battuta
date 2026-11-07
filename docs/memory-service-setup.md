@@ -47,27 +47,27 @@ the globally installed command above. Do not mix source and release environments
 
 ## Bot skill exposure
 
-Both bot manifests select the single `skills-hub/memory/` skill. It retains CoS read/write and Manager read-only workflows. Source setup exposes it through each bot's `.pi/skills/memory/` link; release staging supplies complete local copies. See [skill management](skill-management.md) for ownership and manifest validation.
+CoS loads the memory client, but its main session does not select the memory skill or connect to memory MCP. Its isolated recall agent exposes only direct recall/get tools using explicit loopback configuration. Manager and workers receive selected Agent Mail context instead. See [skill management](skill-management.md) for manifest ownership and validation.
 
-Source `--bot-dir` workspaces use their own manifest or the owning role's selection. Existing local directories are preserved; unrelated links/files are refused rather than overwritten. Release configuration leaves local memory entries alone. CoS capture defaults on and Manager capture defaults off. The shared server may still expose write tools: Manager's read-only boundary is role guidance, not server-side access control. Setup does not edit private profiles or start bots.
+Source `--bot-dir` workspaces use their own manifest or the owning role's selection. Custom skill content and private queues/profiles remain preserved. CoS capture defaults on; non-CoS roles do not load the adapter. CoS's main MCP configuration has a disabled memory override to prevent inherited user-level exposure; managed Manager/worker entries remain absent. Unrelated servers/auth remain unchanged. This is configuration separation, not a same-user security sandbox. Setup does not edit private profiles, start bots, or invoke models. Recall needs no origin-producer integration and never restricts by selected project. Unknown write scope is omitted/deferred, not invented as global.
 
 ## Services
 
 `bin/battuta install-services` writes five user units (CoS, Manager, Worker, memory, and artifacts) without enabling/restarting them. It refuses conflicting existing units before writing anything unless the operator explicitly uses `--replace` after stopping the old deployment; symlinked units are always refused. Check custom unit edits and drop-ins before replacement. Then enable `battuta-memory.service` with `systemctl --user`. All three bots want the memory unit but do not require it: memory failure must not kill conversations. Use `journalctl --user -u battuta-memory` for diagnostics. Only one server owns the shared data directory; occupied ports are errors, not permission to connect to an unknown backend.
 
-Default endpoint: `http://127.0.0.1:8901/mcp`. Default data: `~/.battuta/memory/`. Bots must use the same `BATTUTA_MEMORY_URL`. Remote binding/authentication is deliberately unsupported. Source tmux launching adds one memory window; do not run it alongside a systemd server on the same data/port.
+Default endpoint: `http://127.0.0.1:8901/mcp`. Default data: `~/.battuta/memory/`. CoS and the service use the same `BATTUTA_MEMORY_URL`. Remote binding/authentication is deliberately unsupported. Source tmux launching adds one memory window; do not run it alongside a systemd server on the same data/port.
 
 ## Nightly CoS dream setup
 
-Dream automatically changes server memories and replaces the shared personal profile. Configure it only after the owner has approved unattended consolidation. Ordinary bot configuration does not imply this approval.
+Dream automatically changes server memories and refreshes revision-cited profile claims. It preserves untracked `ME.md`. Configure it only after owner approval of unattended consolidation; ordinary bot configuration does not imply this approval.
 
 **Installing the scheduler does not create the dream schedule.** Neither normal bot configuration nor memory-service setup runs the command below. Normal CoS configuration initializes an empty native store at `~/.battuta/schedule-prompts.json`; dream is not active until explicitly provisioned.
 
-An approved dream runs LLM-guided cleanup first, then global-only upstream clustering/relationship analysis, then profile refresh and reflection. Analysis uses existing stored embeddings and needs no additional model download or login. Its graph generations live in `state.db`; no extra scheduler/setup command or upstream automatic compression/forgetting is enabled. Upgrade the memory server and client together before relying on this stage. Existing dream checkpoints and mutation receipts are preserved.
+An approved dream enforces cleanup, synthesis and challenge before guarded publication, then refreshes eligible profile claims and the private reflection. It no longer requires global clustering/relationship generation. Upgrade server and client together; existing graph data, checkpoints and mutation receipts remain preserved. No additional scheduler, model download or login is introduced.
 
 1. Stop CoS before editing scheduler files. Confirm the memory service is ready, CoS's scheduler is `@jl1990/pi-scheduler@0.5.1`, and normal CoS configuration has initialized the stable store. Load the same selected environment as CoS, including any `PI_SCHEDULER_STATE_FILE` and `BATTUTA_MEMORY_DATA_DIR` overrides. In CoS `.pi/settings.json`, select explicit `defaultProvider` and `defaultModel` IDs for the intended dream model; ensure it is authenticated and available in CoS's model registry.
 2. Confirm which timezone should define **03:00**. The scheduler and catch-up use process-local time; configure CoS's launch environment `TZ` consistently when a specific zone is required. There is no separately configured dream timezone or OS wake-up timer.
-3. Back up the shared memory data and any existing profile. The new profile path is `<BATTUTA_MEMORY_DATA_DIR>/ME.md`, defaulting to `~/.battuta/memory/ME.md`. Old bot `.pi/ME.md` files are not imported. If the owner wants existing private understanding carried forward, arrange an explicit reviewed copy before activation; setup never overwrites it with a template.
+3. Back up shared memory data and private client state. The tracked view is `<BATTUTA_MEMORY_DATA_DIR>/dream-profile.json`; shared `ME.md` is preserved and injected separately into main CoS as untrusted owner-profile context. Old bot `.pi/ME.md` is not a fallback or automatically imported. Neither file is independently verified evidence merely because it exists.
 4. From the installation root, provision the owned global task and dedicated extension:
 
    ```sh

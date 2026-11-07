@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, expect, test, vi } from "vitest";
-import { runDream, type DreamDependencies } from "../dream-runtime.ts";
+import { runLegacyDream as runDream, type DreamDependencies } from "../dream-runtime.ts";
 import { memoryRecordSchema, type MemoryRecord } from "../dream-mutations.ts";
 import { validatePersonalProfile } from "../dream-personal.ts";
 

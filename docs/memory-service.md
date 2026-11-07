@@ -1,208 +1,219 @@
-# Shared memory architecture and operations
+# Memory operations
 
-The [component design](../memory-service/DESIGN.md) explains memory layers, scope versus kind, data ownership, capture, retrieval, and lifecycle invariants. This reference covers configuration and operations.
+The [component design](../memory-service/DESIGN.md) owns the record, retrieval,
+capture, recall and dream contracts. This reference covers operating the existing
+CoS Pi extension and loopback MCP service, not another daemon or model runtime.
 
-| Component         | Responsibility                                                                                                                    |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `memory-service/` | Tailored MCP tools over loopback Streamable HTTP: `/mcp`, default port `8901`.                                                    |
-| Upstream adapter  | Composes mcp-memory-service **12.1.1** storage, embeddings, and read-only graph analysis; no upstream source is copied or forked. |
-| `memory-client/`  | Thin Pi lifecycle integration, not another memory database.                                                                       |
-| Other MCP clients | Can use the shared server independently of Pi.                                                                                    |
+## Storage and role boundaries
 
-## Persistence and scope
+| Item                 | Location or behavior                                                                                         |
+| -------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Shared data          | `~/.battuta/memory/`; override with `BATTUTA_MEMORY_DATA_DIR`.                                               |
+| `memory.db`          | Existing upstream content, embeddings, sources and owned lifecycle metadata.                                 |
+| `state.db`           | Mutation/capture receipts, recovery intents, rebuildable FTS5 index and retained optional graph generations. |
+| `capture-queue/cos/` | Private CoS delivery state. Other roles' old queues remain untouched.                                        |
+| Dream state          | `dream-config.json`, `dream-lock.db`, `dream-state.json`, `dream-profile.json`, `dream.log`.                 |
+| `ME.md`              | Preserved private owner text; never automatically treated as verified evidence or overwritten by v3 dreams.  |
 
-### Storage
+Only the isolated recall agent has conversational memory MCP exposure. Main CoS
+receives prepared context without memory tools or the memory skill. Capture and
+approved dreaming retain programmatic access. Manager and workers receive
+selected Agent Mail context and return attributed findings/corrections. Same-user
+shell access still exists; this is not credential isolation or a security sandbox.
+Protect all data, logs and backups as private conversation information. One server
+owns the data lock. There is no per-project database or `MEMORY.md`.
 
-| Item                  | Location or behavior                                                                    |
-| --------------------- | --------------------------------------------------------------------------------------- |
-| Shared data directory | `~/.battuta/memory/`; override with `BATTUTA_MEMORY_DATA_DIR`.                          |
-| `memory.db`           | Upstream-owned memory records and embeddings.                                           |
-| `state.db`            | Application-owned mutation journal, receipts, and derived global graph generations.     |
-| Service lock          | Allows one server to own the data directory.                                            |
-| `capture-queue/`      | Private per-role delivery state.                                                        |
-| Model weights         | Remain under the service user's HOME cache, independent of the data-directory override. |
+Exact-content retries must have compatible scope, attribution and lifecycle
+metadata. Conflicts never broaden project membership or extend expiry. Explicit
+membership changes reuse embeddings; content corrections create versions. Ordinary
+recall excludes superseded/rejected/stale/expired or unsupported claims. Explicit
+history/expired retrieval is separate from physical tombstone discovery.
 
-- Run bots and server under the **same user**.
-- Protect data directories and backups as private conversation data.
-- There is no `MEMORY.md` or per-project memory database.
+### Recovery and backups
 
-### Scope and record behavior
+- Journal intent before canonical writes, reconcile the keyword index, then record
+  the receipt. The two databases are not a single transaction. Startup recovers
+  pending intents and reconciles the index before lexical results are served.
+- Lost acknowledgement reuses the frozen mutation/batch identity. Do not delete a
+  pending queue/checkpoint to retry: its write may already have succeeded.
+- Failed version-link compensation never resurrects a tombstoned replacement.
+  Inspect persistent failures privately and retry with current evidenced content.
+- Back up both databases consistently with the service stopped or through SQLite
+  backup, together with client state/queues. Never naively copy a live WAL database.
+- Forgetting is not secure erasure. Original content, receipts, SQLite/WAL pages,
+  transcripts, logs, checkpoints, queues and backups may retain text.
 
-| Concern                                    | Rule                                                                                                                        |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| Global facts                               | Use `scope:global`.                                                                                                         |
-| Project facts                              | Use `proj:<registered-name>`; a record may belong to multiple projects.                                                     |
-| CoS/Manager responsibilities               | CoS reads/writes; Manager reads and forwards durable findings to CoS. The local server is not a per-role security boundary. |
-| Default recall                             | Current project plus global; explicit global/projects/all selectors are available.                                          |
-| Additional filters                         | AND with scope; registry errors never silently broaden the search.                                                          |
-| Exact duplicates                           | Reuse content identity and can attach evidenced project membership.                                                         |
-| Semantic near-duplicates                   | Remain distinct until an evidence-backed CoS correction or dream merge.                                                     |
-| Global/project collisions or inactive refs | Conflict rather than implicitly broaden scope.                                                                              |
-| Content corrections                        | Create a new hash/version.                                                                                                  |
-| Membership changes                         | Reuse the stored embedding.                                                                                                 |
-| Superseded records                         | Omitted by default from recall/list/get.                                                                                    |
-| Forgetting                                 | Tombstones one ref and retains upstream content; **not secure erasure**.                                                    |
-| Wrapper kinds                              | Preserved in owned `kind:` tags, including `preference`, independently of upstream's narrower type ontology.                |
-| User-supplied tags                         | Cannot contain commas or reserved prefixes that could manufacture scope/kind metadata through CSV serialization.            |
+## Embeddings and retrieval
 
-### Retrieval, recovery, and backups
+The existing pinned local ONNX all-MiniLM-L6-v2 model uses 384-dimensional CPU
+embeddings. Content/query preprocessing is identical. Keywords are a separate FTS5
+index; they do not alter a fact's embedding. Inputs exceeding 256 tokenizer tokens
+are rejected rather than silently truncated.
 
-- **Retrieval:** Serialized, read-only queries against the pinned schema propagate inventory errors and rank exact filtered sqlite-vec distances. This avoids global candidate-limit omissions at the cost of linear work within the selected corpus.
-- **Upgrades:** Rerun adapter contract tests before changing the upstream dependency.
-- **Write recovery:** Journal intent in `state.db` before upstream writes, then record receipts. The two databases are **not one transaction**; restart reconciles pending intents before new operations.
-- **Replay safety:** Completed receipts prevent retries from recreating later-forgotten content. Narrow journal-owned lineage repair handles crashes inside upstream's multi-commit version update.
-- **Failed corrections:** If upstream tombstones a replacement to compensate for failure, record a terminal failure rather than revive the target or block unrelated writes. The original stays unchanged; retry with current evidence and revised content.
-- **Retention:** Pending intents contain requested content until completed. Completion clears the logical intent payload, but receipts can retain actual before/after fact text for accurate replay; SQLite/WAL pages and backups may also retain content. No hard-erasure promise is made.
-- **Backups:** Back up both databases consistently with the server stopped or via SQLite backup, together with any pending capture queue you want to retain.
+Provision models explicitly using the [setup guide](memory-service-setup.md).
+Missing/corrupt/changed weights, tokenizer or hash fallback fail readiness, including
+on an empty store. The service never downloads a replacement at startup or needs
+chat-provider credentials. Model migration remains separate work.
 
-## Embeddings
+Hybrid recall reports semantic/lexical branch availability. A failed branch may
+yield labelled partial results; both failing is unavailable, not empty memory.
+Omitting `keywords` runs semantic-only retrieval. Literal keyword matching,
+scope/eligibility-before-limit and dependency checks are described in the design.
+Recall defaults to every scope; only explicit project/global filters narrow it.
+The shared selected/current project never restricts recall.
 
-| Setting or invariant | Value                                                                                          |
-| -------------------- | ---------------------------------------------------------------------------------------------- |
-| Model                | Local MiniLM `all-MiniLM-L6-v2`.                                                               |
-| Runtime/provider     | ONNX Runtime `CPUExecutionProvider`.                                                           |
-| Vector dimensions    | `384`.                                                                                         |
-| Embedded input       | Memory content, not project tags; queries use identical model/preprocessing.                   |
-| Integrity            | Weights/tokenizer are checksum verified and fingerprint-bound to the data directory.           |
-| Readiness            | Missing, corrupt, or changed models and hash fallback fail readiness—even on a fresh database. |
-| Input limit          | More than `256` tokenizer tokens is rejected, never silently truncated.                        |
-| Model changes        | Require an explicit migration/re-embedding workflow; V1 does not supply one.                   |
+## Recall input and local trust
 
-- The server needs **no model-provider credential**.
-- The service exposes no dashboard, graph UI, historical bootstrap or remote binding. Dream orchestration belongs to the CoS client, not the server.
+Ordinary user runs enter an awaited `before_agent_start` preparation block. No
+request-origin marker or current-project selection is required. The child receives
+the latest active compaction summary, up to ten retained human/assistant text
+messages, and current text separately. Tools, thinking, mail, injected context and
+other branches are excluded. Summary text is conversation context, not verified
+evidence. Older context is available only through stored memory.
+
+The child is an in-memory Pi SDK session with its own focused instructions and
+direct recall/get tools. It does not inherit CoS skills/extensions, other MCP
+servers, coding tools, codemode or discovery. Native Pi handles repeated tool
+rounds; the child may skip a greeting, rewrite searches, inspect results and search
+again. It returns skipped, ready, partial or unavailable before main CoS starts.
+Custom/internal runs do not recursively prepare recall. Queued input admitted to
+an existing run is not automatically another preparation boundary.
+
+The service remains loopback-only. Any permitted local client can access all
+scopes; project filtering is relevance, not authorization. Invocation IDs prevent
+late results crossing sessions/runs, but are not origin authentication. Existing
+blocked capture jobs remain preserved, not automatically replayed with new scope.
 
 ## Conversation capture
 
-### Collection and extraction
+CoS capture defaults on. Each settled turn is immediately queued, preserving
+speaker/source time and original mail identity; tools, hidden reasoning, internal
+dreams, injected context and resumed old history are excluded. Source text is
+redacted before persistence. No useful facts is a valid extraction result.
 
-This pipeline runs only when capture is enabled: CoS by default, not Manager.
+The existing Pi completion extracts concise temporal facts and receives bounded
+scoped correction candidates. It cannot guess correction refs or broaden scope.
+Corrections upload through guarded version updates without waiting for dreaming.
+Unknown source timezone establishes no automatic expiry. Model output is checked
+again for scope, source attribution, labels and credential redaction before upload.
 
-| Stage      | Behavior                                                                                                                                                                            |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Collect    | Both bots collect new persisted user/assistant text and labelled incoming agent mail.                                                                                               |
-| Exclude    | System/profile content, thinking, attachments, and raw tool results. First-seen resumed history is not backfilled.                                                                  |
-| Persist    | Atomically save redacted messages and source cursor at settlement, even below the extraction threshold.                                                                             |
-| Bind scope | Keep the request-start project binding with its segment.                                                                                                                            |
-| Flush      | Session switch/fork/compaction/shutdown flush smaller batches for later processing.                                                                                                 |
-| Extract    | Use the bot's configured model/provider—not a new server-side LLM—to produce up to `20` concise cited facts per bounded segment.                                                    |
-| Validate   | Check output schemas, source IDs, scope, and credentials before upload.                                                                                                             |
-| Queue      | Persist the validated extracted batch before its first MCP call.                                                                                                                    |
-| Retry      | Network retries reuse that batch without another model call. A token-limit rejection permits one rephrase under a distinct batch identity, then retains failed work for inspection. |
-| Bound work | Attempt at most two jobs per boundary, with exponential backoff from one second to one minute. Cancellation is not success.                                                         |
-| Report     | Failures produce content-free statuses without stopping normal conversation. Record extraction usage in a `memory-capture-usage` session entry.                                     |
-
-### Settings and queue handling
+Queues freeze validated payloads before upload. At most two jobs run per recovery
+attempt, with existing bounded retries/backoff. A token-limit failure permits one
+durable rephrase identity. Async recovery does not block automatic recall; serialized
+queue changes preserve both a new turn and a concurrently extracted frozen batch.
 
 Bot `.pi/settings.json` accepts:
 
 ```json
-{
-  "battutaMemoryCapture": { "enabled": true, "batchMessages": 6 }
-}
+{ "battutaMemoryCapture": { "enabled": true } }
 ```
 
-- `batchMessages` defaults to **6**, with an allowed range of **1–100**.
-- `enabled` controls automatic collection, extraction, and uploads, including retries of queued work. It defaults to **true for CoS**, **false for Manager**; an explicit boolean overrides the client default. Memory reads are unaffected. Disabled capture leaves existing queue files untouched.
-- Source and release setup configure Manager capture as **disabled**, including previously enabled Manager configurations; CoS's explicit setting is preserved. Setup does not delete queues.
-- Settings load when the adapter initializes; restart after changes.
-- Queues retain private source text until acknowledged. Inspect stuck queues locally; do not paste them into chat or indiscriminately delete them.
-- Capture is best-effort understanding, not guaranteed preservation of every conversation fact.
+`enabled` controls collection/extraction/uploads, including retries. Disabled
+capture leaves existing files untouched and does not disable recall. Legacy
+`batchMessages` values remain accepted/validated but no longer delay settled-turn
+capture. Settings load when the adapter initializes; restart after changes.
+Non-CoS roles cannot enable the extension. Failures produce content-free status;
+queued capture is best-effort understanding, not proof a particular fact was saved.
+
+## Automatic context and delegation
+
+Every ordinary user-run preparation invokes the recall agent, independently of
+capture enablement. There is no application recall deadline or round-count cap:
+a stalled child can delay CoS until cancellation or an underlying failure. Native
+provider/transport limits still apply. Session switch/fork and shutdown cancel
+pending work; old packets do not accumulate. Available Pi operation cancellation
+is forwarded to the child.
+
+One recall tool accepts independent optional `semantic_query` and `keywords`.
+The child rewrites them using history. Either branch can run alone; both combine
+ranked results. Keyword phrases are literal, and semantic queries exceeding the
+256-token limit are rejected for rephrasing. The server checks lifecycle, sources,
+revisions, expiry and dependencies and renders whole evidence/counterevidence
+groups as qualified bullets. Raw tags/ranks are not model context; machine
+records remain available to capture and dream callers.
+
+Earlier pending capture suppresses memory/profile with `capture-pending`, rather
+than risking an obsolete fact. Status distinguishes ready, partial and unavailable
+from an empty result. Numerical retrieval rank/usage is not belief confidence.
+The parent separately loads shared `ME.md` (maximum 32,000 bytes), redacts it, and
+labels it as owner-profile context, not verified facts or instructions. It is not
+sent to the child, counted against the 2,000-byte recalled-evidence budget, or
+gated on search success. Missing files are optional; unreadable/oversized profiles
+are omitted without failing recall. No bot-local or sidecar fallback is injected.
+Pending capture suppresses both profile and recalled facts. Expiring recalled
+support invalidates recalled evidence without dropping a separately loaded profile.
+
+Commission-time origin/ref-selection gates and the extra recall pass are removed.
+CoS chooses relevant prepared evidence for Manager/workers and must not forward
+the whole packet/profile. Agent Mail retains normal envelope validation. Delivered
+mail cannot be revoked: send a correction citing the earlier message. Manual
+remember/update/forget tools are no longer in main CoS's loadout; capture still
+handles supported facts and corrections, without guaranteeing a particular save.
 
 ## Owner profile and nightly dream
 
-| Concern                   | Behavior                                                                                              |
-| ------------------------- | ----------------------------------------------------------------------------------------------------- |
-| CoS                       | Loads `<memory-data-dir>/ME.md` before a request, up to `32,000` bytes.                               |
-| Manager                   | Does not load the profile.                                                                            |
-| Missing file              | Normal; no profile is required.                                                                       |
-| Unreadable/oversized file | Warn without failing the bot.                                                                         |
-| Profile writes            | Dream replaces the complete canonical document; ordinary memory writes do not immediately rewrite it. |
-| Legacy private profile    | Existing bot `.pi/ME.md` is neither loaded nor migrated automatically.                                |
+Unattended dreaming requires separate owner approval and explicit setup. The pinned
+CoS scheduler requests it at process-local 03:00; use consistent `TZ` configuration.
+While CoS is stopped no job runs. Startup catch-up uses the same latest-run identity,
+lock and checkpoint rather than a daemon or one job for every missed day.
 
-### Workflow and limits
+Missing-stage, temporal and changed durable evidence is pending regardless of age.
+The first-release guard is 500 stored records (including inactive history) and
+200,000 bytes of input. Overflow fails visibly. At most 20 pending inputs are
+selected by oldest attempt then ref; failed/deferred/unselected work remains pending.
 
-- The pinned CoS scheduler submits a global prompt at **03:00**, using `0 0 3 * * *`, asking CoS to call `memory_dream` once. It runs only while CoS is running. The process's local timezone determines 03:00; set the same `TZ` consistently if a specific zone is required. The enabled native task is the authority for both scheduled and startup execution.
-- Pi owns the scheduler and daily orchestration. The memory client supplies `memory_dream` and its deterministic worker, not another scheduler. It also depends on the exact pinned scheduler package to reuse its schedule parser during startup validation; importing that parser does not start scheduling or register tools.
-- A frozen rolling **72-hour** window identifies facts to revisit. A bounded all-scope inventory supplies older active context and inactive references. The default limit is **500 stored records** (including inactive records); excess inventory or model-input budgets fail explicitly rather than silently truncate evidence. Three days is a change window, not a replacement for accumulated understanding.
-- A model proposes scoped inserts, versioned updates and forgetting. Deterministic validation checks the whole plan before writes. Server mutations use revision preconditions and journaled receipts; a merge saves its replacement before retiring redundant sources. Project `SUMMARY.md` and canonical documents are not dream outputs.
-- After cleanup, the server uses upstream clustering and association/relationship analysis on **all surviving active global memories**, not projects or just the recent window. Results are derived graph generations in `state.db`, not extra memory facts or upstream graph rows. No automatic upstream compression, forgetting, decay writes, or superseding runs. The server needs no LLM credential for this stage.
-- A generation is published only against matching canonical refs/revisions and analysis/model settings. Analysis does not hold the canonical mutation lock; if global evidence changes, at most two analysis attempts are made before a retryable failure. Small corpora can produce a valid empty graph. Global changes invalidate old hints; edges are not blindly migrated to corrected or merged memories.
-- Future cleanup planning may use up to 100 current relationship hints, checked against its global inventory. Inferred relationships are heuristic context, not canonical evidence or execution authority. Stale/unavailable hints are omitted. Ordinary recall ranking stays unchanged.
-- A separate model call refreshes the entire owner profile using active global personal evidence, preserving canonical headings and supported existing understanding. Evidence references live outside `ME.md`. Project facts are not owner traits, and profile content never grants execution authority.
-- After confirmed changes, a separate bounded model call writes a meaningful reflection to `dream.log`: one timestamped line, **at most 149 words including timestamp and separator**. The log is private prose, not a raw-entry dump, transcript, generic operation count, or new memory input. One invalid-output rewrite is allowed; provider or publication failure is not reported as success.
-- Each planned insert, update, or forget includes a short user-facing `summary` explaining the memory change and why, replacing the planner's old `reason` field. Updates map this summary to the MCP tool's required `reason` argument; the server contract is unchanged. The client normalizes, best-effort credential-redacts, and combines these summaries without another model call, saves the result with the plan, and returns it only after successful completion. Each operation summary is bounded to **1,000 characters**; an empty plan reports that no memory changes were needed. This report covers memory operations, not the later profile refresh or private reflection. Retries reuse the saved report without repeating planning.
-- A cross-process SQLite run lock releases on process exit. Private atomic checkpoints preserve the validated plan, acknowledgements, profile draft and reflection for replay without repeating confirmed writes or paid synthesis. A startup catch-up uses the same worker and run identity, not one run per missed day and not a second daily timer.
+Cleanup, synthesis and challenge are separate validated structured calls, with one
+invalid-output retry per stage. Publication saves facts/metadata, challenged claims,
+then acknowledged replacements' retirements. Review never strengthens confidence.
+Explicitly rejected interpretations remain excluded from ordinary recall. Old graph
+tools/data are retained maintenance views, not mandatory v3 stages.
 
-The scheduled prompt enters the normal CoS conversation. Scheduler success/history means delivery, not a completed dream: a real CoS model can refuse or fail to call the tool. Startup catch-up directly invokes the same engine for the latest due run. Existing locks and checkpoints deduplicate concurrent triggers. On success, the tool returns `{status:"complete", summary}` and CoS reports successful execution with that public summary. Terminal mutation conflicts return `{status:"partial"}`; completed older checkpoints without a summary return `{status:"already_completed"}` without replay or synthesis. Other errors remain generic; CoS reports their status honestly without inventing a summary. Private reflections never enter the public result. Startup catch-up updates UI status but does not itself send a chat report; a subsequent tool call can retrieve the saved outcome.
+The eligible global sidecar profile refresh is deterministic; untracked `ME.md`
+stays untouched. The existing isolated reflection call writes one private
+timestamped `dream.log` line, at most 149 words including timestamp/separator.
+It receives actual acknowledged changes, not hidden reasoning or the CoS transcript.
+One invalid-output rewrite is allowed. The public summary comes from applied
+operations, never the private reflection.
 
-There is no scheduler child or tool-capable dream subagent. The host invokes `runDream` with the exact model from `<BATTUTA_MEMORY_DATA_DIR>/dream-config.json`, fresh system/evidence messages, no CoS history, and no tools. Normal CoS tools/model remain unchanged. The whole run has a ten-minute deadline, caller cancellation and shutdown cancellation. Missing model/configuration or disabled/mismatched task fails closed. This is a narrow model boundary, not a security sandbox; install only trusted extensions.
+Checkpoint v3 stores stage/version, input fingerprint, validated artifacts, frozen
+requests, acknowledgements, reviewed fingerprints and pending attempts. Stale
+unpublished stages rebase; acknowledged/uncertain requests retain their identities.
+Pending version-1/2 journaled mutations finish before v3, without rerunning old
+graph/profile generation or inventing lifecycle review completion.
 
-### Recovery and retained private files
+Successful tools return `complete` and their saved public summary. Pending/deferred
+work or a terminal conflict returns `partial`; errors/cancellation/timeouts are not
+success. Scheduler delivery itself does not prove the real CoS model called the
+tool. The host uses the configured Pi completion/model, fresh evidence, no tools,
+and existing ten-minute caller/shutdown cancellation. No provider fallback is added.
 
-The shared memory directory also contains `dream-config.json`, `dream-lock.db`, `dream-state.json`, `dream-profile.json`, `ME.md` and `dream.log`. Treat these and capture queues as private data; checkpoints can contain before/after fact text. They are separate from server database transactions. Numeric model usage/cost fields are recorded in `dream-usage.jsonl` and content-free CoS custom entries; the usage file contains no prompt/generated text and has no automatic rotation.
+## Cutover and verification
 
-- Transient service/provider failures leave a pending checkpoint for retry. Never delete it merely to retry: an operation may have succeeded before its acknowledgement was lost.
-- Graph failure occurs before new profile publication and leaves the run incomplete. Retry resumes acknowledged canonical work and reuses matching graph drafts/generations rather than resampling after a lost acknowledgement. Current code reads version-1 checkpoints and writes version 2 without replaying confirmed mutations or discarding already published artifacts; completed same-day legacy runs stay completed.
-- A terminal mutation conflict stops dependent cleanup, preserves source facts, and records only confirmed changes as an explicitly partial reflection. Unapplied changes remain eligible for reconsideration on a later run.
-- An edited owner profile or invalidated source during publication must not be overwritten by a stale draft. Recovery re-synthesizes against current evidence without repeating acknowledged mutations. Inspect persistent failures locally, without pasting private checkpoint content into chat.
-- Log publication is reconciled by run identity. A retry after publication must not append a second reflection for that run.
-- Back up dream files and queues together with consistent database backups. Forgetting a server record does not securely erase profile text, checkpoints, logs or backups.
+Setup never starts bots, changes provider login, imports private history, or tests
+by writing production memory. Obtain approval before stopping a deployment; retain
+consistent data/client-state backups. Upgrade server and client together, configure
+isolated recall exposure, disable main CoS memory MCP and remove managed Manager/worker exposure, then use the
+filesystem/CLI checks in the [setup guide](memory-service-setup.md). Do not start a
+second service on the same data/port. The unrelated exploration server on port 8900
+must not be stopped. Rollback is an operator-controlled restore, not live downgrade.
 
-## Breaking replacement and cutover
-
-### Retirement guarantees
-
-- Stone is retired, **not backward compatible**.
-- No old tool aliases, settings translators, dual reads/writes, legacy database loading, or automatic import remain.
-- Setup removes obsolete owned package/extension/settings entries without interpreting their semantics.
-- Existing private profiles are preserved. Setup performs no historical-data migration or cleanup.
-
-### Controlled cutover
-
-1. Obtain approval before stopping existing bots.
-2. Record existing data/profile paths and take consistent backups. **Do not naively copy a live SQLite WAL database.**
-3. Provision the new server separately and configure both native MCP entries.
-4. Restart bots with the new adapter; do not start duplicate bot processes.
-5. Verify `memory_health`, CoS scoped writes/recall, Manager read-only recall and disabled capture, and a CoS capture batch.
-6. Confirm CoS-only preload with temporary sentinel fixtures, never by exposing real profile text.
-
-The isolated exploration server on port **8900** is unrelated and must not be killed.
-
-### Rollback
-
-- Stop the new bots/service and preserve the new data.
-- Restore the previous release/configuration and its consistent pre-cutover backup.
-- Do not downgrade either SQLite schema or point the old release at the new database.
-- This is an operator-controlled restore, not compatibility inside the new system.
-
-## Verification
-
-| Check                    | Coverage                                                              |
-| ------------------------ | --------------------------------------------------------------------- |
-| `pnpm check:support`     | Offline Python unit and adapter-contract tests.                       |
-| `pnpm test:node`         | Thin-client tests alongside other Node components.                    |
-| `pnpm test:coverage`     | Node coverage, including the thin client.                             |
-| GitHub Actions           | ARM64 packaging validation, **not Raspberry Pi hardware acceptance**. |
-| Actual deployment target | Hardware readiness and performance.                                   |
-
-- Prioritize memory correctness and durable replay over extensive setup mocks.
-- Setup failures must explain remediation for unsupported OS/Python/native wheels or model errors.
-- Real-model HTTP checks are opt-in. Default unit discovery does not download models or consume paid completions.
-
-With the model already provisioned for the current HOME, run explicit HTTP integration checks:
+Developer checks are listed in [code checks](../.agents/skills/battuta-verify/references/checks.md).
+With the local embedding model already provisioned, isolated HTTP checks are:
 
 ```sh
 BATTUTA_MEMORY_INTEGRATION=1 uv run --project memory-service --locked python memory-service/tests/mcp.it.py
 BATTUTA_MEMORY_INTEGRATION=1 pnpm --dir memory-client test:integration
 ```
 
-| Integration check | Exercises                                                                                                |
-| ----------------- | -------------------------------------------------------------------------------------------------------- |
-| Python            | Concurrent clients, scoped recall, membership/vector reuse, correction/history, and restart persistence. |
-| JavaScript        | Durable capture after a lost acknowledgement/server restart without repeated extraction.                 |
+They use temporary state/ports and actual local CPU embeddings, stub chat completion,
+and never provision models, contact Telegram or modify live bot state. The JS path
+covers capture/restart/replay, alias recall, staged promotion, immediate correction,
+profile suppression, dependent invalidation and retained history.
 
-Both checks:
-
-- Use temporary data/ports, actual CPU embeddings, and official MCP clients.
-- Stub extraction, so no model-provider charges occur.
-- Do not provision models, contact Telegram, or modify live bot state.
+The fixed synthetic scenarios are developer fixtures, not personal owner history.
+Retrieval/label/privacy checks are deterministic; they do not establish better
+model synthesis or correct answers. Owner acceptance separately compares
+discretionary, automatic semantic and hybrid answers under the same model/context
+budget, observes preparation latency and cancellation, and verifies that separate
+conversations do not share invocation packets. No production speedup or utility
+improvement is claimed from mocks or a single integration timing.

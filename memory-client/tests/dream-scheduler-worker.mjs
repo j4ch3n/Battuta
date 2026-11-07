@@ -51,11 +51,7 @@ const server = createServer(async (req, res) => {
     else {
       assert.equal(input.method, "tools/call");
       const name = input.params.name;
-      assert.ok(
-        ["memory_inventory", "memory_global_relationships", "memory_consolidate_global"].includes(
-          name,
-        ),
-      );
+      assert.ok(["memory_inventory"].includes(name));
       await evidenceGate;
       let value;
       if (name === "memory_inventory") {
@@ -169,7 +165,7 @@ try {
   await assert.rejects(access(join(data, "dream.log")), "Delivery is not dream completion");
   releaseEvidence();
   const result = await scheduled;
-  assert.equal(modelCalls, 2, "Empty inventory needs only profile and private reflection calls");
+  assert.equal(modelCalls, 1, "Empty inventory needs only the private reflection call");
   assert.deepEqual(result.details, { status: "complete", summary });
   assert.deepEqual(JSON.parse(result.content[0].text), { status: "complete", summary });
   assert.ok(!JSON.stringify(result).includes(reflection));

@@ -1,4 +1,23 @@
 import { z } from "zod";
+import { memoryRefSchema } from "./records.ts";
+
+export const trackedProfileSchema = z.object({
+  claims: z
+    .array(
+      z
+        .object({
+          text: z.string().trim().min(1).max(4000),
+          evidence: z
+            .array(z.object({ ref: memoryRefSchema, revision: memoryRefSchema }).strict())
+            .min(1)
+            .max(100),
+          knowledge_type: z.enum(["fact", "synthesized-observation", "hypothesis"]),
+          confidence: z.enum(["confirmed", "supported", "tentative", "disputed"]),
+        })
+        .strict(),
+    )
+    .max(50),
+});
 
 const section = z
   .string()

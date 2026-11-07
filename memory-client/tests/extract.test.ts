@@ -81,7 +81,7 @@ test("abort ends extraction even if provider ignores cancellation", async () => 
   const pending = extractMemories(job, ctx, controller.signal);
   setTimeout(() => controller.abort(), 10);
   await expect(pending).rejects.toThrow();
-}, 100);
+});
 test.each(["topic,scope:global", "topic,proj:other", "topic,kind:decision"])(
   "rejects comma-separated reserved tag injection: %s",
   async (tag) => {
@@ -104,14 +104,51 @@ test.each([
   "SUPABASE_SECRET_KEY=sb_secret_" + "s".repeat(32),
   "COS_TELEGRAM_TOKEN=123456789:" + "A".repeat(35),
   "MANAGER_TELEGRAM_TOKEN=987654321:" + "B".repeat(35),
-])("accepts credential-like model output for local memory", async (content) => {
-  const result = await extractMemories(
-    job,
-    context(
-      JSON.stringify({ items: [{ content, scope: { global: true }, source_entry_ids: ["e"] }] }),
+])("rejects credential-like model output before upload", async (content) => {
+  await expect(
+    extractMemories(
+      job,
+      context(
+        JSON.stringify({ items: [{ content, scope: { global: true }, source_entry_ids: ["e"] }] }),
+      ),
+      new AbortController().signal,
     ),
-    new AbortController().signal,
-  );
+  ).rejects.toThrow();
+});
 
-  expect(result.batch.items[0].content).toBe(content);
+test("assistant-only evidence is not owner confirmation; unknown timezone cannot invent expiry", async () => {
+  const attributed = {
+    ...job,
+    segment: {
+      ...job.segment,
+      messages: [
+        {
+          entry_id: "e",
+          text: "Maybe buy a console",
+          speaker: "assistant" as const,
+          mentioned_at: "2026-11-06T10:00:00Z",
+        },
+      ],
+    },
+  };
+  const item = {
+    content: "Owner wants a console",
+    scope: { global: true },
+    source_entry_ids: ["e"],
+    confidence: "confirmed",
+  };
+  await expect(
+    extractMemories(
+      attributed,
+      context(JSON.stringify({ items: [item] })),
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow();
+  await expect(
+    extractMemories(
+      job,
+      context(JSON.stringify({ items: [{ ...item, expires_at: "2026-11-07T00:00:00Z" }] })),
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow();
 });

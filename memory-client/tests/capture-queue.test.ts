@@ -55,6 +55,33 @@ test("large messages are fully split at bounded segment sizes", () => {
       .join(""),
   ).toBe("x".repeat(25000));
 });
+
+test("collection and splitting preserve speaker, time and original mail identity", () => {
+  const ref = { conversation_id: "mail-conversation", id: "123456789abc" };
+  const messages = collectMessages([
+    { ...entry("owner", "Monday call"), timestamp: "2026-11-06T10:00:00+08:00" },
+    {
+      id: "mail",
+      type: "message",
+      message: {
+        role: "custom",
+        customType: "agent-mail",
+        content: JSON.stringify({
+          message_ref: ref,
+          sender: "manager",
+          created_at: "2026-11-05T00:00:00Z",
+          content: { summary: "Reported result" },
+        }),
+      },
+    },
+  ]);
+  expect(messages[0].speaker).toBe("owner");
+  expect(messages[0].mentioned_at).toBe("2026-11-06T10:00:00+08:00");
+  expect(splitSegments(messages, null)[0].messages[1].original_mail).toEqual({
+    message_ref: ref,
+    sender: "manager",
+  });
+});
 test("durable accumulator survives a crash below threshold and redacts before storage", async () => {
   const dir = await mkdtemp(join(tmpdir(), "capture-test-"));
   dirs.push(dir);
@@ -91,4 +118,21 @@ test("flush keeps original binding and a validated batch survives reconnect", as
   expect(restored.jobs()[0].id).toBe(jobs[0].id);
   await restored.markUploaded(jobs[0].id);
   expect(restored.jobs().map((j) => j.id)).toEqual([jobs[1].id]);
+});
+
+test("settlement racing with extraction persistence loses neither the turn nor its frozen batch", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "capture-race-"));
+  dirs.push(dir);
+  const queue = await CaptureQueue.open(dir, "cos");
+  await queue.track("s", [], null, false);
+  await queue.track("s", [entry("a", "First fact")], null, true);
+  const job = queue.jobs()[0];
+  job.batch = { items: ["frozen"] };
+  await Promise.all([
+    queue.track("s", [entry("a", "First fact"), entry("b", "Correction")], null, false),
+    queue.update(job),
+  ]);
+  const restored = await CaptureQueue.open(dir, "cos");
+  expect(restored.pending("s")[0].messages[0].entry_id).toBe("b");
+  expect(restored.jobs()[0].batch).toEqual({ items: ["frozen"] });
 });

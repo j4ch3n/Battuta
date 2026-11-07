@@ -7,6 +7,25 @@ from battuta_memory.service import MemoryService
 
 
 class CaptureTests(StorageFixture):
+    async def test_owner_correction_versions_old_fact_and_invalidates_dependents_on_upload(self):
+        from battuta_memory.contracts import RememberRequest
+        from battuta_memory.records import eligible_records
+        from test_records import fact, SOURCE, NOW
+        old = await self.service.remember(RememberRequest(content="Owner owns an NS2", scope={"global": True}, sources=[SOURCE], memory_metadata=fact()["memory_metadata"]))
+        source = await self.adapter.get(old["ref"])
+        link = {"ref": old["ref"], "revision": source["revision"], "relation": "supports", "requirement": "current"}
+        derived = await self.service.remember(RememberRequest(content="Owner may want console games", scope={"global": True}, sources=[SOURCE], memory_metadata=fact(knowledge_type="hypothesis", confidence="tentative", rationale="Possible interest", evidence=[link])["memory_metadata"]))
+        item = {"item_id": "correction", "content": "Owner returned the NS2", "scope": {"global": True}, "sources": [SOURCE], "memory_metadata": fact()["memory_metadata"], "correction": {"ref": old["ref"], "revision": source["revision"]}}
+        batch = self.batch([item])
+        capture = CaptureService(self.service)
+        result = await capture.ingest(batch)
+        self.assertTrue(result["complete"])
+        self.assertEqual(await capture.ingest(batch), result)
+        self.assertFalse((await self.adapter.get(old["ref"]))["active"])
+        replacement = await self.adapter.get(result["items"][0]["ref"])
+        self.assertEqual(replacement["memory_metadata"]["stage"], "temporal")
+        self.assertEqual(eligible_records([replacement, await self.adapter.get(derived["ref"])], NOW), [replacement])
+
     def batch(self, items=None):
         items = items if items is not None else [{"item_id": "fact-1", "content": "Useful fact", "scope": {"global": True},
             "sources": [{"agent_id": "cos", "session_id": "s", "entry_id": "entry-1"}]}]

@@ -22,6 +22,25 @@ const update = {
   source_refs: [a],
 };
 
+test("record decoding retains lifecycle and rejects invalid evidence labels", () => {
+  const metadata = {
+    stage: "durable",
+    knowledge_type: "fact",
+    confidence: "confirmed",
+    status: "active",
+    keywords: ["NS2"],
+    mentioned_at: "2026-11-06T10:00:00Z",
+    expires_at: null,
+    evidence: [],
+  };
+  expect(
+    memoryRecordSchema.parse({ ...record(), memory_metadata: metadata }).memory_metadata?.keywords,
+  ).toEqual(["NS2"]);
+  expect(() =>
+    memoryRecordSchema.parse({ ...record(), memory_metadata: { ...metadata, confidence: "90%" } }),
+  ).toThrow();
+});
+
 test.each([undefined, "", "   ", "x".repeat(1001)])(
   "rejects missing or oversized operation summaries (%s)",
   (summary) => {

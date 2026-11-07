@@ -18,8 +18,8 @@ class WorkerSetupTests(unittest.TestCase):
         self.profile.mkdir(parents=True)
         (self.root / "bots/AGENTS_shared.md").write_text("shared fixture")
         (self.profile / "AGENTS_dedicated.md").write_text("dedicated fixture")
-        (self.profile / "skills.json").write_text(json.dumps({"skills": ["execute-assignment", "memory", "research"]}))
-        for name in ("execute-assignment", "memory", "research"):
+        (self.profile / "skills.json").write_text(json.dumps({"skills": ["execute-assignment", "research"]}))
+        for name in ("execute-assignment", "research"):
             skill = self.root / "skills-hub" / name
             skill.mkdir(parents=True)
             (skill / "SKILL.md").write_text(f"---\nname: {name}\ndescription: Fixture\n---\n")
@@ -72,8 +72,7 @@ class WorkerSetupTests(unittest.TestCase):
             self.assertFalse((bot / "node_modules").exists())
             config = json.loads((bot / ".pi/mcp.json").read_text())["mcpServers"]
             self.assertNotIn("linear", config)
-            self.assertEqual(config["memory"]["exposure"], "hidden")
-            self.assertNotIn("memory_remember", config["memory"]["toolExposure"])
+            self.assertNotIn("memory", config)
             self.assertNotIn("private-key", (bot / ".pi/mcp.json").read_text())
 
     def test_explicit_reconfiguration_preserves_private_settings_and_custom_resources(self):
@@ -102,7 +101,7 @@ class WorkerSetupTests(unittest.TestCase):
         self.assertFalse(self.bot.exists())
 
     def test_invalid_selection_fails_before_installation_or_configuration_writes(self):
-        (self.root / "skills-hub/memory/SKILL.md").unlink()
+        (self.root / "skills-hub/research/SKILL.md").unlink()
         with patch("bot_setup.configure.run") as run, self.assertRaises(Exception):
             configure_source(self.root, role="worker", env_file=self.env)
         run.assert_not_called()

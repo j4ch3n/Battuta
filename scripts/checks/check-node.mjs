@@ -11,8 +11,7 @@ function run(args) {
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
-const dependencies =
-  component === worker ? ["agent-mail"] : component === "memory-client" ? ["bots/cos-bot"] : [];
+const dependencies = component === worker ? ["agent-mail"] : [];
 for (const directory of [...dependencies, component])
   run(["--dir", directory, "install", "--frozen-lockfile"]);
 run(["exec", "eslint", component, "--max-warnings=0"]);

@@ -14,9 +14,11 @@ export class MemoryMcpClient {
     if (
       ![
         "memory_inventory",
+        "memory_recall",
         "memory_get",
         "memory_remember",
         "memory_update",
+        "memory_set_metadata",
         "memory_forget",
         "memory_consolidate_global",
         "memory_global_relationships",
@@ -28,7 +30,6 @@ export class MemoryMcpClient {
       await client.connect(new StreamableHTTPClientTransport(new URL(this.url)), { signal });
       const result = await client.callTool({ name, arguments: args }, undefined, {
         signal,
-        timeout: 30000,
       });
       const envelope = result.structuredContent as
         { ok?: boolean; data?: unknown; error?: { retryable?: boolean } } | undefined;

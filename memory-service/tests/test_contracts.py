@@ -36,7 +36,7 @@ class ContractTests(unittest.TestCase):
     def test_recall_limits_are_validated_not_truncated(self):
         for limit in (0, 101):
             with self.subTest(limit=limit), self.assertRaises(ValueError):
-                RecallRequest(query="hello", limit=limit)
+                RecallRequest(semantic_query="hello", limit=limit)
 
     def test_capture_rejects_foreign_session_citation(self):
         with self.assertRaises(ValueError):

@@ -10,40 +10,64 @@ interface Worker {
   notify: (message: string) => void;
 }
 export class CaptureRuntime {
-  private binding: string | null = null;
+  private requests = new Map<string, { capture: boolean; project: string | null }>();
   private active?: AbortController;
+  private recovery?: Promise<void>;
   constructor(
     readonly queue: CaptureQueue,
     private worker: Worker,
-    readonly threshold = 6,
   ) {}
   async initialize(session: string, entries: readonly unknown[]) {
+    this.requests.delete(session);
     await this.queue.track(session, entries, null, false);
     this.initialized.add(session);
   }
-  async startRequest(session: string, entries: readonly unknown[], project: string | null) {
-    this.binding = project;
+  async startRequest(
+    session: string,
+    entries: readonly unknown[],
+    options: { capture: boolean; project: string | null } = { capture: true, project: null },
+    signal?: AbortSignal,
+  ) {
     // Session initialization must precede the first persisted request.
     if (!this.initialized.has(session)) {
       await this.initialize(session, entries);
       this.initialized.add(session);
     }
-    await this.recover();
+    signal?.throwIfAborted();
+    this.requests.set(session, structuredClone(options));
   }
   private initialized = new Set<string>();
   async settle(session: string, entries: readonly unknown[]) {
-    await this.queue.track(session, entries, this.binding, false);
-    const count = this.queue.pending(session).reduce((n, s) => n + s.messages.length, 0);
-    if (count >= this.threshold) await this.queue.flush(session);
-    await this.recover();
+    const request = this.requests.get(session);
+    if (!request?.capture) {
+      await this.queue.track(session, entries, null, false, false);
+      return;
+    }
+    await this.queue.track(session, entries, request.project, false);
+    await this.queue.flush(session);
+    void this.recover().catch(() =>
+      this.worker.notify("Memory capture pending; retained for retry"),
+    );
   }
-  async flush(session: string, entries: readonly unknown[]) {
-    await this.queue.track(session, entries, this.binding, true);
+  async flush(session: string, entries: readonly unknown[], endRequest = false) {
+    const request = this.requests.get(session);
+    await this.queue.track(session, entries, request?.project ?? null, true, !!request?.capture);
+    if (endRequest) this.requests.delete(session);
   }
   shutdown() {
     this.active?.abort();
   }
-  async recover() {
+  hasPendingCapture() {
+    return this.queue.hasPending();
+  }
+  recover(): Promise<void> {
+    if (!this.recovery)
+      this.recovery = this.runRecovery().finally(() => {
+        this.recovery = undefined;
+      });
+    return this.recovery;
+  }
+  private async runRecovery() {
     for (const job of this.queue
       .jobs()
       .filter((j) => !j.blocked && j.nextAttempt <= this.worker.now())
