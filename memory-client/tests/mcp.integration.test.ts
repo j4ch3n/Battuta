@@ -130,7 +130,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
         origin: "owner" as const,
         admitted_at: "2026-11-06T10:00:00Z",
       };
-      await runtime.startRequest("session", [], binding);
+      await runtime.startRequest("session", [], {capture:true,project:null});
       await runtime.settle("session", [
         {
           id: "e0",

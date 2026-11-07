@@ -98,7 +98,7 @@ export default function memoryClient(pi: ExtensionAPI) {
         safe(ctx, async () => {
           const r = await getRuntime(ctx);
           if (active.get(session) === request)
-            await r.startRequest(session, entries, undefined, signal);
+            await r.startRequest(session, entries, {capture:false,project:null}, signal);
         }),
         signal,
       ).catch(() => {});
@@ -148,7 +148,7 @@ export default function memoryClient(pi: ExtensionAPI) {
         safe(ctx, async () => {
           const r = await getRuntime(ctx);
           if (active.get(session) !== request) return;
-          await r.startRequest(session, entries, binding, signal);
+          await r.startRequest(session, entries, {capture:true,project:binding!.project}, signal);
         }),
         signal,
       );
@@ -186,7 +186,7 @@ export default function memoryClient(pi: ExtensionAPI) {
           safe(ctx, async () => {
             const r = await getRuntime(ctx);
             if (active.get(session) === request)
-              await r.startRequest(session, entries, undefined, signal);
+              await r.startRequest(session, entries, {capture:false,project:null}, signal);
           }),
           signal,
         ).catch(() => {});

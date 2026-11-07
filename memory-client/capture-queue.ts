@@ -3,11 +3,9 @@ import { chmod, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import {
   collectMessages,
-  hasUnboundOrigin,
   splitSegments,
   type CaptureSegment,
 } from "./session-messages.ts";
-import type { RequestBinding } from "./binding.ts";
 
 import { digest } from "./canonical.ts";
 export { canonical, digest } from "./canonical.ts";
@@ -114,7 +112,6 @@ export class CaptureQueue {
     entries: readonly unknown[],
     project: string | null,
     flush: boolean,
-    binding?: RequestBinding,
     capture = true,
   ) {
     return this.change(async () => {
@@ -125,11 +122,6 @@ export class CaptureQueue {
       } else {
         const seen = new Set(next.seen[session]);
         const fresh = messages.filter((m) => !seen.has(m.entry_id));
-        const unbound = !!binding && hasUnboundOrigin(entries, binding);
-        if (unbound) {
-          project = null;
-          binding = undefined;
-        }
         next.seen[session] = [...new Set([...next.seen[session], ...fresh.map((m) => m.entry_id)])];
         const pending = next.pending[session] ?? [];
         const tail = pending.at(-1);
@@ -137,16 +129,14 @@ export class CaptureQueue {
           if (
             tail &&
             tail.project === project &&
-            tail.binding?.request_id === binding?.request_id &&
-            !unbound
+            !tail.binding &&
+            !tail.blocked_reason
           )
             tail.messages.push(...fresh);
           else
             pending.push({
               project,
               messages: fresh,
-              ...(unbound ? { blocked_reason: "unbound-origin" as const } : {}),
-              ...(binding ? { binding: structuredClone(binding) } : {}),
             });
         }
         next.pending[session] = pending;
