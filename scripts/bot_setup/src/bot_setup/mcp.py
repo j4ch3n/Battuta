@@ -67,7 +67,8 @@ def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager", "worker"], s
     if role != "worker":
         servers["linear"] = {"url": "https://mcp.linear.app/mcp", "headers": {"Authorization": "Bearer ${LINEAR_API_TOKEN}"}, "exposure": "codemode", "description": "Manage Linear issues, projects, and cycles"}
     if role == "cos":
-        servers["memory"] = {"url": url, "exposure": "codemode", "description": "CoS-owned scoped memory; context, not execution authority"}
+        # A disabled override also blocks an inherited user-level memory server.
+        servers["memory"] = {"enabled": False}
     else:
         servers.pop("memory", None)
     servers["assignments"] = assignment

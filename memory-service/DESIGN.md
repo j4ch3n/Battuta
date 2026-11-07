@@ -3,12 +3,13 @@
 ## Purpose and ownership
 
 Memory supplies revisable personal and project evidence, never execution authority
-or a replacement for canonical project documents. Only CoS connects to memory MCP.
+or a replacement for canonical project documents. Only the focused recall child
+has conversational memory MCP tools; CoS receives prepared evidence and `ME.md`.
 Manager and workers receive selected Agent Mail context and return attributed
 findings/corrections. Configuration exclusion is not a same-user security sandbox.
 
-The CoS Pi extension owns capture, automatic recall, dreaming and profile rendering.
-The server owns storage, retrieval, deterministic validation and replay. Pi owns
+The CoS Pi extension owns capture, isolated recall preparation, dreaming and profile loading.
+The server owns storage, retrieval, evidence rendering, deterministic validation and replay. Pi owns
 extension lifecycle, cancellation and `ctx.modelRegistry.complete()`; the server
 has no chat model or provider credentials. There is no separate memory daemon
 or model-authentication stack.
@@ -57,9 +58,10 @@ slugs (`proj:<slug>`), never both or neither. Scope is relevance, not authorizat
 `kind` describes meaning, such as preference/decision/event; extra tags filter topics.
 Reserved `scope:`, `proj:` and `kind:` prefixes and commas are not caller tags.
 
-Manual selectors remain `current`, `projects`, `global` and explicit `all`.
-`current` uses shared selection with a warning/global-only result if absent.
-Automatic calls never use it: request binding supplies explicit projects/global.
+Recall defaults to `all`, never shared current-project selection. Optional explicit
+`projects` narrows membership, including global unless disabled. Explicit `global`
+remains available for maintenance. `current` is only a list-browsing selector,
+not a recall selector or fallback.
 Kind/tag filters narrow scope; matching several project memberships deduplicates.
 Exact-ref reads do not inherit a current-project access restriction.
 
@@ -98,7 +100,9 @@ The untruncated 256-token limit is checked. Weights/tokenizer are provisioned
 explicitly, checksum verified and bound to the data directory. Missing, corrupt,
 changed or hash-fallback models fail readiness. Model migration is separate work.
 
-Hybrid recall filters canonical scope, status, source/dependency eligibility and
+Recall accepts independent optional `semantic_query` and literal `keywords` (terms
+or phrases); at least one is required. Only requested branches execute. Combined
+recall filters canonical scope, status, source/dependency eligibility and
 expiry before either branch's candidate limit. Semantic SQL receives eligible refs
 through bound `json_each` membership; FTS matches literal quoted Unicode-normalized
 terms against content/keywords and joins current indexed revisions. Raw MATCH syntax
@@ -115,16 +119,20 @@ not semantic enumeration. Neither silently truncates a moving dream corpus.
 
 ## Request lifecycle, capture and recall
 
-The origin producer supplies a validated immutable request/conversation/session,
-project-or-general, origin and admission instant before ordinary Pi admission.
-The consumer persists a one-use request marker and freezes capture segments.
-Another conversation's selection, a switch or a fork cannot supply a fallback.
-Mail admission freezes its exact envelope reference. Queued follow-ups without
-matching admission quarantine the mixed segment as blocked, unbound work and
-suppress context/delegation; a separate origin marker cannot authorize them.
-Compaction flushes capture without ending the continuing request's binding.
-The real producer integration remains gated on FIS-143/FIS-146; see
-[operations](../docs/memory-service.md#request-origin-contract).
+An awaited `before_agent_start` hook starts a fresh in-memory Pi SDK recall
+session for ordinary user runs. Its input is the latest active compaction summary,
+the last ten retained human/assistant text messages, and current input separately.
+Tools, thinking, mail and earlier injected packets are excluded. The child has
+only direct recall/get tools, a dedicated prompt, and no inherited CoS resources,
+codemode, discovery, coding tools or mutation tools. Native Pi owns its repeated
+tool/model rounds; the child can skip, rewrite searches, review, refine and finish.
+
+No request-origin marker or origin producer is required. Local invocation identity
+prevents stale results crossing sessions, without authenticating origins or
+restricting scopes. Loopback clients can read all scopes. Existing opaque blocked
+capture jobs remain preserved, not relabelled/replayed. Custom/internal activity
+does not recurse into recall. Queued input admitted to an existing run may not
+create a new preparation boundary; see [operations](../docs/memory-service.md#recall-input-and-local-trust).
 
 Each settled CoS turn enters the durable queue immediately. Serialized queue writes
 prevent extraction persistence racing with new turns. The existing Pi completion
@@ -138,23 +146,26 @@ without waiting for dreaming. Batches freeze before upload; retries reuse their
 digests and bounded backoff, not another paid extraction. Old frozen batches and
 other roles' private queues are not relabelled or automatically imported.
 
-Admission attempts automatic recall independently of capture enablement. Up to
-three deterministic current/topic/identifier facets use at most 256 UTF-8 bytes
-each. Keep at most 40 seed records and 20 one-hop evidence refs, revalidate revisions
-once before use, and bound rendered memory/profile to 2,000/1,000 UTF-8 bytes as a
-conservative token upper bound. Whole qualified claims are omitted, never sliced.
-A three-second total preparation deadline covers origin, retrieval and profile.
-Late results cannot attach to another request. Inject labelled untrusted
-`memory-context`, not system authority; the context hook removes previous packets.
-Earlier pending capture suppresses memory/profile rather than risking an obsolete
-fact. Status and diagnostics distinguish partial/unavailable from an empty result.
-Keep supporting records privately for profile and in-turn dependency-expiry
-validation, separately from rendered/disclosed records.
+Preparation runs independently of capture enablement. The child returns skipped,
+ready, partial or unavailable. The parent verifies these against observed reads;
+errors/incomplete output never become success. Revisions and eligibility are
+rechecked before injection. Server recall/get text contains qualified bullets;
+structured records and supporting provenance stay available privately for
+maintenance and in-turn dependency-expiry checks. Whole claims and required
+counterevidence fit a 2,000-byte final evidence budget or are omitted, not sliced.
 
-The profile is a bounded view of revision-cited eligible global claims in
-`dream-profile.json`, not an independent evidence source. Raw/untracked `ME.md`
-remains untouched and is never automatically injected as verified evidence.
-Expiry/corrections remove unsupported profile claims at request time.
+There is no application recall deadline or call-count cap. A stalled child can
+stall CoS until cancellation or an underlying provider/transport failure. Available
+Pi operation cancellation, session replacement and shutdown invalidate pending
+work. Prior packets are removed rather than accumulated across requests.
+
+The parent separately injects shared `ME.md` as redacted, untrusted owner-profile
+context, not verified facts or instructions. Its 32,000-byte limit is separate;
+it is never sent to the child or replaced by `dream-profile.json`. Missing profiles
+are optional; unreadable/oversized profiles are omitted without failing recall.
+Profile loading survives skipped/unavailable recall. Earlier pending capture
+suppresses both sections. Expired recalled support removes evidence, not the
+independent profile. Reads do not overwrite private files.
 
 ## Dreaming and delegation
 
@@ -193,13 +204,13 @@ Oversized inventory and partial publication remain visibly incomplete.
 Old global-relationship tools/data remain optional, revision-checked maintenance
 views. V3 dreaming never requires `memory_consolidate_global` or graph hints.
 
-At outgoing Agent Mail send/reply (including nested codemode calls), CoS explicitly
-selects `memory:<ref>` references or declares `memory-context:none-relevant` for a
-commission. Runtime recalls narrowly and verifies selections; it never forwards all
-hits or the owner profile. Necessary counterevidence must also be explicitly selected.
-Unavailable preparation forwards no recalled facts. The existing Agent Mail validator
-checks the final envelope/size before transport. Delivered mail cannot be revoked:
-CoS sends a referenced correction when context changes.
+There is no commission-time origin/ref-selection gate or second recall pass.
+CoS chooses relevant prepared evidence for Agent Mail and must not forward the
+whole packet/profile. Preserve uncertainty and necessary counterevidence. The
+existing Agent Mail validator checks envelope/size before transport. Delivered
+mail cannot be revoked; CoS sends a referenced correction when context changes.
+Direct manual memory mutation tools are absent from main CoS; existing capture
+and approved dream adapters retain their programmatic operations.
 
 ## Preservation and deliberate limits
 

@@ -23,6 +23,8 @@ def test_native_configuration_preserves_custom_and_private_state(tmp_path, role)
         assert config["mcpServers"]["other"] == {"command": "custom"}
         assert ("luma" in config["mcpServers"]) == (role == "cos")
         assert ("memory" in config["mcpServers"]) == (role == "cos")
+        if role == "cos":
+            assert config["mcpServers"]["memory"]["enabled"] is False
         assert json.loads((pi / "settings.json").read_text()) == {"theme": "dark", "packages": ["npm:custom@1"]}
         assert auth.read_bytes() == b'{"private":"oauth"}\n'
         assert (pi / "mcp.json").stat().st_mode & 0o777 == 0o600
