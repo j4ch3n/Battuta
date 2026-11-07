@@ -39,12 +39,12 @@ export async function prepareCorrectionCandidates(
       client.call(
         "memory_recall",
         {
-          query: boundedQuery(text),
+          semantic_query: boundedQuery(text),
+          keywords: [boundedQuery(text, 80)],
           selector: project ? "projects" : "global",
           projects: project ? [project] : [],
           include_global: true,
           include_expired: true,
-          mode: "hybrid",
           limit: 20,
         },
         signal,
@@ -162,7 +162,7 @@ export async function prepareRecall(
         abortable(
           client.call(
             "memory_recall",
-            { ...selector, query, limit: 20, mode: "hybrid", include_global: true },
+            { ...selector, semantic_query: query, keywords: [boundedQuery(query, 80)], limit: 20, include_global: true },
             signal,
           ),
           signal,

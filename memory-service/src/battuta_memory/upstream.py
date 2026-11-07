@@ -166,7 +166,7 @@ class UpstreamAdapter:
     async def search(self, request, resolved, eligible_refs=None):
         if eligible_refs == []:
             return []
-        vector = await asyncio.to_thread(self.embed, request.query)
+        vector = await asyncio.to_thread(self.embed, request.semantic_query)
         where, params = self._filters(request, resolved)
         if eligible_refs is not None:
             where += " AND m.content_hash IN (SELECT value FROM json_each(?))"

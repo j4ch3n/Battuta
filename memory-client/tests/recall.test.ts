@@ -128,9 +128,9 @@ test("follow-up recall uses recent topic with explicit frozen scope and revalida
       if (name === "memory_get") return Promise.resolve(r);
       expect(args.selector).toBe("projects");
       expect(args.projects).toEqual(["atlas"]);
-      expect(Buffer.byteLength(String(args.query))).toBeLessThanOrEqual(256);
+      expect(Buffer.byteLength(String(args.semantic_query))).toBeLessThanOrEqual(256);
       return Promise.resolve({
-        records: String(args.query).includes("Nintendo") ? [r] : [],
+        records: String(args.semantic_query).includes("Nintendo") ? [r] : [],
         incomplete: false,
       });
     },
@@ -229,7 +229,7 @@ test("three facets cap seeds, evidence expansion and packet bytes together", asy
         fetched.add(String(args.ref));
         return Promise.resolve(all.find((r) => r.ref === args.ref));
       }
-      expect(Buffer.byteLength(String(args.query))).toBeLessThanOrEqual(256);
+      expect(Buffer.byteLength(String(args.semantic_query))).toBeLessThanOrEqual(256);
       const records = all.slice(branch * 20, ++branch * 20);
       return Promise.resolve({ records });
     },

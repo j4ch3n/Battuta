@@ -161,10 +161,36 @@ class Selector(Tagged):
 
 
 class RecallRequest(Selector):
-    query: str = Field(min_length=1, max_length=16000)
+    selector: Literal["projects", "global", "all"] = "all"
+    semantic_query: str | None = Field(default=None, min_length=1, max_length=16000)
+    keywords: list[str] = Field(default_factory=list, max_length=32)
     limit: int = Field(default=10, ge=1, le=100)
-    mode: Literal["hybrid", "semantic"] = "hybrid"
     include_expired: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def explicit_projects(cls, value):
+        if isinstance(value, dict) and value.get("projects") and "selector" not in value:
+            value = {**value, "selector": "projects"}
+        return value
+
+    @field_validator("keywords")
+    @classmethod
+    def literal_keywords(cls, values):
+        terms = [unicodedata.normalize("NFKC", v).strip().casefold() for v in values]
+        if any(not v or len(v) > 80 or any(unicodedata.category(c).startswith("C") for c in v) for v in terms):
+            raise ValueError("Invalid keyword terms")
+        return list(dict.fromkeys(terms))
+
+    @model_validator(mode="after")
+    def usable_query(self):
+        if self.semantic_query is not None:
+            self.semantic_query = self.semantic_query.strip()
+            if not self.semantic_query:
+                raise ValueError("Blank semantic query")
+        if not self.semantic_query and not self.keywords:
+            raise ValueError("Provide semantic_query or keywords")
+        return self
 
 
 class ListRequest(Selector):

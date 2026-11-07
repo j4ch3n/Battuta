@@ -894,7 +894,7 @@ export async function runDream(
           await deps.call(
             "memory_recall",
             {
-              query: boundedQuery(proposal.content),
+              semantic_query: boundedQuery(proposal.content),
               selector: source.scope.global ? "global" : "projects",
               projects: source.scope.projects,
               include_global: false,

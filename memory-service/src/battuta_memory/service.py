@@ -35,17 +35,20 @@ class MemoryService:
             eligible = [r for r in eligible if (not request.kind or r["kind"] == request.kind) and
                 (not request.tags or (all(t in r["tags"] for t in request.tags) if request.tag_match == "all" else any(t in r["tags"] for t in request.tags)))]
             branches, semantic, lexical = {}, [], []
-            try:
-                semantic = await self.adapter.search(request.model_copy(update={"limit": min(request.limit, 20)}), selected, [r["ref"] for r in eligible])
-                branches["semantic"] = "ready"
-            except Exception:
-                branches["semantic"] = "unavailable"
-            if request.mode == "hybrid":
+            if request.semantic_query:
+                try:
+                    semantic = await self.adapter.search(request.model_copy(update={"limit": min(request.limit, 20)}), selected, [r["ref"] for r in eligible])
+                    branches["semantic"] = "ready"
+                except ValueError:
+                    raise
+                except Exception:
+                    branches["semantic"] = "unavailable"
+            if request.keywords:
                 try:
                     if self.state is None:
                         raise RuntimeError("Keyword index unavailable")
                     await self._reconcile_index()
-                    lexical = self.state.lexical_search(request.query, eligible, min(request.limit, 20))
+                    lexical = self.state.lexical_search(request.keywords, eligible, min(request.limit, 20))
                     branches["lexical"] = "ready"
                 except Exception:
                     branches["lexical"] = "unavailable"
