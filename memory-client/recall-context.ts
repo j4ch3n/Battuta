@@ -12,7 +12,7 @@ export function selectRecallInput(entries: readonly unknown[], current: string):
   const conversation = entries.filter((value) => {
     if (!value || typeof value !== "object") return false;
     const entry = value as { type?: string; summary?: unknown; message?: { role?: string } };
-    if (entry.type === "compaction" && typeof entry.summary === "string")
+    if (summary === undefined && entry.type === "compaction" && typeof entry.summary === "string")
       summary = redact(entry.summary);
     return (
       entry.type === "message" &&

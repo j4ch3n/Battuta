@@ -3,8 +3,8 @@ import { selectRecallInput } from "../recall-context.ts";
 
 test("selects latest summary and ten human/assistant texts, never tool or thinking blocks", () => {
   const entries = [
-    { type: "compaction", summary: "old" },
     { type: "compaction", summary: "latest summary" },
+    { type: "compaction", summary: "old retained summary" },
     ...Array.from({ length: 12 }, (_, i) => ({
       id: `e${i}`,
       type: "message",

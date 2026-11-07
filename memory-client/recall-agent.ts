@@ -17,6 +17,7 @@ const outcomeSchema = z
 export type RecallOutcome = z.infer<typeof outcomeSchema>;
 export interface PreparedRecall extends RecallOutcome {
   validationEvidence: MemoryRecord[];
+  currentRefs: string[];
   preparedAt: string;
 }
 export function unavailableRecall(): PreparedRecall {
@@ -24,6 +25,7 @@ export function unavailableRecall(): PreparedRecall {
     status: "unavailable",
     context: "Memory unavailable; this is not an empty memory inventory.",
     validationEvidence: [],
+    currentRefs: [],
     preparedAt: new Date().toISOString(),
   };
 }
@@ -79,6 +81,7 @@ export class RecallCollector {
         ...outcome,
         status: this.partial ? "partial" : outcome.status,
         validationEvidence: [...this.evidence.values()],
+        currentRefs: [...this.currentRefs],
         preparedAt: new Date().toISOString(),
       };
     } catch {
@@ -153,11 +156,8 @@ export async function runRecallAgent(
         }),
       );
       const now = new Date();
-      const before = new Set(
-        eligibleRecords(result.validationEvidence, new Date(result.preparedAt)).map((r) => r.ref),
-      );
       const after = new Set(eligibleRecords(fresh, now).map((r) => r.ref));
-      if ([...before].some((ref) => !after.has(ref))) return unavailableRecall();
+      if (result.currentRefs.some((ref) => !after.has(ref))) return unavailableRecall();
       result.validationEvidence = fresh;
       result.preparedAt = now.toISOString();
     }

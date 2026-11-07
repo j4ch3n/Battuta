@@ -168,12 +168,7 @@ export default function memoryClient(pi: ExtensionAPI) {
       const valid = new Set(
         eligibleRecords(request.packet.validationEvidence, new Date(Date.now())).map((r) => r.ref),
       );
-      if (
-        eligibleRecords(
-          request.packet.validationEvidence,
-          new Date(request.packet.preparedAt),
-        ).some((r) => !valid.has(r.ref))
-      )
+      if (request.packet.currentRefs.some((ref) => !valid.has(ref)))
         request.packet = unavailableRecall();
     }
     return {

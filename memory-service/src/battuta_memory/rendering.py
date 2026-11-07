@@ -40,6 +40,8 @@ def render_memories(seeds, evidence, now, max_bytes=2000):
         return _redact(text + f'  Reference: {record["ref"]}@{record["revision"]}; sources: {json.dumps(record["sources"], ensure_ascii=False)}\n')
 
     for seed in seeds:
+        if seed["ref"] in disclosed:
+            continue
         if seed["ref"] not in current:
             incomplete = True
             continue
@@ -53,9 +55,11 @@ def render_memories(seeds, evidence, now, max_bytes=2000):
             for link in (lookup[ref].get("memory_metadata") or {}).get("evidence", []):
                 pending.append(link["ref"])
                 if link["relation"] == "contradicts" and link["ref"] in historical:
-                    counters.append(lookup[link["ref"]])
-        group = {r["ref"]: r for r in [seed, *counters] if r["ref"] not in disclosed}
-        addition = "".join(render(r) for r in group.values())
+                    counters.append((ref, lookup[link["ref"]]))
+        group = {r["ref"]: r for r in [seed, *(r for _, r in counters)]}
+        addition = render(seed) + "".join(
+            f'  Counterevidence against {seed["ref"]} (contradicts {target}):\n' + render(counter)
+            for target, counter in counters)
         if len((content + addition).encode()) > max_bytes - 40:
             incomplete = True
             continue

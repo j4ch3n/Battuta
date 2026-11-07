@@ -67,6 +67,7 @@ test("our hook has no 3-second deadline and a switch discards late results", asy
       status: "ready",
       context: "late evidence",
       validationEvidence: [],
+      currentRefs: [],
       preparedAt: new Date().toISOString(),
     });
     expect(await pending).toBeUndefined();
@@ -84,6 +85,7 @@ test("expired recalled support drops only evidence, not the independent profile"
     status: "ready",
     context: "fresh evidence",
     validationEvidence: [r],
+    currentRefs: [r.ref],
     preparedAt: new Date().toISOString(),
   });
   try {
@@ -105,6 +107,50 @@ test("expired recalled support drops only evidence, not the independent profile"
   }
 });
 
+test("historical-only support may expire without withdrawing a current hypothesis", async () => {
+  const f = await fixture();
+  const support = record("b".repeat(64));
+  support.memory_metadata!.expires_at = new Date(Date.now() + 60000).toISOString();
+  const claim = record();
+  claim.memory_metadata = {
+    ...claim.memory_metadata!,
+    knowledge_type: "hypothesis",
+    confidence: "tentative",
+    rationale: "Possible pattern",
+    evidence: [
+      {
+        ref: support.ref,
+        revision: support.revision,
+        relation: "supports",
+        requirement: "historical",
+      },
+    ],
+  };
+  run.mockResolvedValue({
+    status: "ready",
+    context: "qualified historical pattern",
+    validationEvidence: [claim, support],
+    currentRefs: [claim.ref],
+    preparedAt: new Date().toISOString(),
+  });
+  try {
+    const result = (await f.hooks.get("before_agent_start")!(
+      { messageType: "user", prompt: "question" },
+      f.ctx,
+    )) as { message: object };
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse(support.memory_metadata!.expires_at) + 1);
+    const filtered = await f.hooks.get("context")!(
+      { messages: [{ role: "custom", ...result.message }] },
+      f.ctx,
+    );
+    expect(JSON.stringify(filtered)).toContain("qualified historical pattern");
+    expect(JSON.stringify(filtered)).toContain("memory-context:ready");
+  } finally {
+    vi.restoreAllMocks();
+    await f.close();
+  }
+});
+
 test.each(["missing", "oversized", "pending"])(
   "%s profile cannot leak or fail independent recall",
   async (condition) => {
@@ -113,6 +159,7 @@ test.each(["missing", "oversized", "pending"])(
       status: "ready",
       context: "evidence",
       validationEvidence: [],
+      currentRefs: [],
       preparedAt: new Date().toISOString(),
     });
     try {
@@ -149,6 +196,7 @@ test("next run reloads ME.md, redacts credentials and removes earlier packet", a
     status: "skipped",
     context: "",
     validationEvidence: [],
+    currentRefs: [],
     preparedAt: new Date().toISOString(),
   });
   try {
@@ -201,6 +249,7 @@ test.each(["skipped", "ready", "partial", "unavailable"] as const)(
         status,
         context: status === "skipped" ? "" : "evidence",
         validationEvidence: [],
+        currentRefs: [],
         preparedAt: new Date().toISOString(),
       } satisfies PreparedRecall);
       const ctx = {

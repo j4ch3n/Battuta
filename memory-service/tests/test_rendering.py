@@ -31,3 +31,21 @@ class RenderingTests(unittest.TestCase):
         self.assertNotIn("sk-abcdefghijklmnopqrstuv", view["context"])
         self.assertIn("REDACTED", view["context"])
         self.assertEqual(record["content"], "API token is sk-abcdefghijklmnopqrstuv")
+
+    def test_counterevidence_is_explicitly_related_to_the_claim(self):
+        for nested in (False, True):
+            with self.subTest(nested=nested):
+                support = fact()
+                counter = {**fact(), "ref": "b" * 64, "content": "Owner explicitly disliked that activity"}
+                claim = {**fact(), "ref": "c" * 64, "content": "Owner may like that activity"}
+                contrary = {"ref": counter["ref"], "revision": counter["revision"], "relation": "contradicts", "requirement": "historical"}
+                claim["memory_metadata"] = {**claim["memory_metadata"], "knowledge_type": "hypothesis", "confidence": "tentative",
+                    "rationale": "Possible pattern", "evidence": [{"ref": support["ref"], "revision": support["revision"], "relation": "supports", "requirement": "historical"}]}
+                if nested:
+                    support["memory_metadata"]["evidence"] = [contrary]
+                else:
+                    claim["memory_metadata"]["evidence"].append(contrary)
+                view = render_memories([claim], [support, counter, claim], datetime.now(timezone.utc))
+                self.assertIn("Counterevidence against " + claim["ref"], view["context"])
+                self.assertIn(counter["content"], view["context"])
+                self.assertFalse(view["incomplete"])
