@@ -1,11 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  collectMessages,
-  splitSegments,
-  type CaptureSegment,
-} from "./session-messages.ts";
+import { collectMessages, splitSegments, type CaptureSegment } from "./session-messages.ts";
 
 import { digest } from "./canonical.ts";
 export { canonical, digest } from "./canonical.ts";
@@ -126,12 +122,7 @@ export class CaptureQueue {
         const pending = next.pending[session] ?? [];
         const tail = pending.at(-1);
         if (capture && fresh.length) {
-          if (
-            tail &&
-            tail.project === project &&
-            !tail.binding &&
-            !tail.blocked_reason
-          )
+          if (tail && tail.project === project && !tail.binding && !tail.blocked_reason)
             tail.messages.push(...fresh);
           else
             pending.push({

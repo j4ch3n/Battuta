@@ -6,31 +6,61 @@ test.each(["ready", "partial", "skipped"])("cannot invent %s after failed reads"
   const collector = new RecallCollector();
   collector.attempt();
   collector.observe(undefined, true);
-  expect(collector.finish(JSON.stringify({status, context:"made up"})).status).toBe("unavailable");
+  expect(collector.finish(JSON.stringify({ status, context: "made up" })).status).toBe(
+    "unavailable",
+  );
 });
 
 test("accumulates repeated read evidence and keeps partial retrieval visible", () => {
   const collector = new RecallCollector();
   const r = record();
   collector.attempt();
-  collector.observe({structuredContent:{ok:true,data:{validation_evidence:[r], disclosed_refs:[r.ref], incomplete:true}}}, false);
+  collector.observe(
+    {
+      structuredContent: {
+        ok: true,
+        data: { validation_evidence: [r], disclosed_refs: [r.ref], incomplete: true },
+      },
+    },
+    false,
+  );
   collector.attempt();
-  collector.observe({structuredContent:{ok:true,data:{validation_evidence:[r], disclosed_refs:[r.ref], incomplete:false}}}, false);
-  const result = collector.finish(JSON.stringify({status:"ready", context:r.content}));
+  collector.observe(
+    {
+      structuredContent: {
+        ok: true,
+        data: { validation_evidence: [r], disclosed_refs: [r.ref], incomplete: false },
+      },
+    },
+    false,
+  );
+  const result = collector.finish(JSON.stringify({ status: "ready", context: r.content }));
   expect(result.status).toBe("partial");
-  expect(result.validationEvidence.map(v => v.ref)).toEqual([r.ref]);
+  expect(result.validationEvidence.map((v) => v.ref)).toEqual([r.ref]);
 });
 
-test.each(["not json", JSON.stringify({status:"ready",context:"x"}), JSON.stringify({status:"skipped",context:"x"})])(
-  "invalid or unsupported outcome is unavailable: %s", (text) => {
-    expect(new RecallCollector().finish(text).status).toBe("unavailable");
-  },
-);
+test.each([
+  "not json",
+  JSON.stringify({ status: "ready", context: "x" }),
+  JSON.stringify({ status: "skipped", context: "x" }),
+])("invalid or unsupported outcome is unavailable: %s", (text) => {
+  expect(new RecallCollector().finish(text).status).toBe("unavailable");
+});
 
 test("zero-call skip is valid; oversized UTF-8 packet is never sliced", () => {
   expect(new RecallCollector().finish('{"status":"skipped","context":""}').status).toBe("skipped");
   const collector = new RecallCollector();
   collector.attempt();
-  collector.observe({structuredContent:{ok:true,data:{validation_evidence:[], disclosed_refs:[], incomplete:false}}}, false);
-  expect(collector.finish(JSON.stringify({status:"ready",context:"遊".repeat(1000)})).status).toBe("unavailable");
+  collector.observe(
+    {
+      structuredContent: {
+        ok: true,
+        data: { validation_evidence: [], disclosed_refs: [], incomplete: false },
+      },
+    },
+    false,
+  );
+  expect(
+    collector.finish(JSON.stringify({ status: "ready", context: "遊".repeat(1000) })).status,
+  ).toBe("unavailable");
 });

@@ -72,7 +72,7 @@ class RealModelTests(unittest.IsolatedAsyncioTestCase):
                             ref = revised["ref"]
                             history = await call(cos, "get", ref=ref, include_history=True)
                             self.assertEqual(len(history["history"]), 2)
-                            recalled = await call(other_cos, "recall", query="Which database stores project data?", selector="projects", projects=["atlas"], include_global=False)
+                            recalled = await call(other_cos, "recall", semantic_query="Which database stores project data?", selector="projects", projects=["atlas"], include_global=False)
                             self.assertEqual([r["ref"] for r in recalled["records"]], [ref])
                             inventory = await call(cos, "list", selector="all")
                             self.assertEqual(inventory["total"], 3)

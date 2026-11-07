@@ -1,8 +1,16 @@
 """Model-facing, whole-claim evidence views; canonical records remain structured."""
 
 import json
+import re
 from datetime import datetime
 from .records import eligible_records
+
+
+def _redact(text):
+    text = re.sub(r"-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----", "[REDACTED:private-key]", text)
+    text = re.sub(r"\b(?:sk-[A-Za-z0-9_-]{16,}|sb_secret_[A-Za-z0-9_-]{8,}|[0-9]{6,}:[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|lin_api_[A-Za-z0-9]{16,}|xox[baprs]-[A-Za-z0-9-]+)\b", "[REDACTED:token]", text)
+    text = re.sub(r"\bBearer\s+[^\s\"']+", "Bearer [REDACTED]", text, flags=re.I)
+    return re.sub(r"\b(?:[A-Za-z][A-Za-z0-9_]*_)?(?:password|passwd|pwd|api[ _-]?key|api[ _-]?secret|access[ _-]?token|refresh[ _-]?token|auth[ _-]?token|client[ _-]?secret|private[ _-]?key|secret[ _-]?key|token)['\"]?\s*(?:(?:is(?: set to)?|was(?: set to)?|equals)\s+|[=:]\s*)[^\r\n]+", "[REDACTED:credential]", text, flags=re.I)
 
 
 def render_memories(seeds, evidence, now, max_bytes=2000):
@@ -29,7 +37,7 @@ def render_memories(seeds, evidence, now, max_bytes=2000):
         text = f'- {json.dumps(record["content"], ensure_ascii=False)}\n  {labels}.\n'
         if metadata and metadata.get("rationale"):
             text += "  Rationale: " + json.dumps(metadata["rationale"], ensure_ascii=False) + "\n"
-        return text + f'  Reference: {record["ref"]}@{record["revision"]}; sources: {json.dumps(record["sources"], ensure_ascii=False)}\n'
+        return _redact(text + f'  Reference: {record["ref"]}@{record["revision"]}; sources: {json.dumps(record["sources"], ensure_ascii=False)}\n')
 
     for seed in seeds:
         if seed["ref"] not in current:

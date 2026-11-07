@@ -28,3 +28,11 @@ class ProtocolTests(unittest.IsolatedAsyncioTestCase):
         # A separate client can reconnect to the same server.
         async with create_connected_server_and_client_session(server) as client:
             self.assertFalse((await client.call_tool("memory_health", {})).isError)
+
+    async def test_recall_text_is_rendered_and_machine_envelope_is_preserved(self):
+        service = SimpleNamespace(recall=AsyncMock(return_value={"context": "- Qualified attributed evidence", "records": [{"ref": "a" * 64}], "incomplete": False}))
+        async with create_connected_server_and_client_session(create_protocol_server(lambda: service)) as client:
+            result = await client.call_tool("memory_recall", {"keywords": ["console"]})
+            self.assertFalse(result.isError)
+            self.assertEqual(result.content[0].text, "- Qualified attributed evidence")
+            self.assertEqual(result.structuredContent["data"]["records"][0]["ref"], "a" * 64)

@@ -24,6 +24,18 @@ class RetrievalTests(StorageFixture):
             with self.subTest(args=args), self.assertRaises(ValueError):
                 RecallRequest(**args)
 
+    async def test_keyword_phrase_is_literal_and_semantic_only_never_queries_fts(self):
+        target = await self.note_with_metadata("Owner uses Nintendo Switch 2")
+        await self.note_with_metadata("Switch to unrelated option 2")
+        result = await self.service.recall(RecallRequest(keywords=["Switch 2"]))
+        self.assertEqual([r["ref"] for r in result["records"]], [target["ref"]])
+        from sqlite_vec import serialize_float32
+        self.adapter.embed = lambda _: serialize_float32([1.0] + [0.0] * 383)
+        with patch.object(self.state, "lexical_search", side_effect=AssertionError("not requested")) as lexical:
+            result = await self.service.recall(RecallRequest(semantic_query="console"))
+        lexical.assert_not_called()
+        self.assertEqual(result["branches"], {"semantic": "ready"})
+
     async def note_with_metadata(self, content, project=None, **metadata):
         return await self.service.remember(RememberRequest(content=content, scope={"global": project is None, "projects": [project] if project else []},
             sources=[SOURCE], memory_metadata=fact(**metadata)["memory_metadata"]))

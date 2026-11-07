@@ -24,3 +24,10 @@ class RenderingTests(unittest.TestCase):
         self.assertIn(record["content"], view["context"])
         self.assertIn(record["ref"], view["context"])
         self.assertNotIn('"memory_metadata"', view["context"])
+
+    def test_rendered_model_text_redacts_credentials_without_changing_canonical_record(self):
+        record = {**fact(), "content": "API token is sk-abcdefghijklmnopqrstuv"}
+        view = render_memories([record], [record], datetime.now(timezone.utc))
+        self.assertNotIn("sk-abcdefghijklmnopqrstuv", view["context"])
+        self.assertIn("REDACTED", view["context"])
+        self.assertEqual(record["content"], "API token is sk-abcdefghijklmnopqrstuv")

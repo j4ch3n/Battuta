@@ -128,7 +128,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
         origin: "owner" as const,
         admitted_at: "2026-11-06T10:00:00Z",
       };
-      await runtime.startRequest("session", [], {capture:true,project:null});
+      await runtime.startRequest("session", [], { capture: true, project: null });
       await runtime.settle("session", [
         {
           id: "e0",
@@ -196,8 +196,12 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       expect(promoted.ref).toBe(captured.ref);
       expect(promoted.revision).not.toBe(captured.revision);
       expect(promoted.memory_metadata).toMatchObject({ stage: "durable", confidence: "confirmed" });
-      const packet = await client.call("memory_recall", {semantic_query:"Nintendo console",keywords:["Nintendo"]},signal) as {records: {ref:string}[];context:string};
-      expect(packet.records.some(r=>r.ref === captured.ref)).toBe(true);
+      const packet = (await client.call(
+        "memory_recall",
+        { semantic_query: "Nintendo console", keywords: ["Nintendo"] },
+        signal,
+      )) as { records: { ref: string }[]; context: string };
+      expect(packet.records.some((r) => r.ref === captured.ref)).toBe(true);
       expect(packet.context).toContain("Owner reported buying an NS2.");
       const hypothesis = (await client.call(
         "memory_remember",

@@ -10,7 +10,7 @@ interface Worker {
   notify: (message: string) => void;
 }
 export class CaptureRuntime {
-  private requests = new Map<string, {capture: boolean; project: string | null}>();
+  private requests = new Map<string, { capture: boolean; project: string | null }>();
   private active?: AbortController;
   private recovery?: Promise<void>;
   constructor(
@@ -25,7 +25,7 @@ export class CaptureRuntime {
   async startRequest(
     session: string,
     entries: readonly unknown[],
-    options: {capture: boolean; project: string | null} = {capture: true, project: null},
+    options: { capture: boolean; project: string | null } = { capture: true, project: null },
     signal?: AbortSignal,
   ) {
     // Session initialization must precede the first persisted request.
