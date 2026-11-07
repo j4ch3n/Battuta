@@ -57,7 +57,8 @@ def render_memories(seeds, evidence, now, max_bytes=2000):
         content += "[Some memory evidence was omitted.]\n"
     elif not disclosed:
         content += "No relevant eligible records found.\n"
-    return {"context": content, "disclosed_refs": sorted(disclosed), "incomplete": incomplete}
+    return {"context": content, "disclosed_refs": sorted(disclosed),
+        "current_refs": [r["ref"] for r in seeds if r["ref"] in disclosed], "incomplete": incomplete}
 
 
 def evidence_closure(seeds, records):
