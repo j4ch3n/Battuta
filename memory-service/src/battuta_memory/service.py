@@ -7,6 +7,7 @@ from .scope import resolve_selector, resolve_scope, registered
 from .contracts import UpdateRequest, ListRequest
 from .records import eligible_records
 from .retrieval import fuse_ranks
+from .rendering import render_memories, evidence_closure
 from .upstream import TerminalMutationError
 from .consolidation import GlobalConsolidation
 
@@ -56,8 +57,12 @@ class MemoryService:
                 raise RuntimeError("Memory retrieval unavailable")
             lookup = {r["ref"]: r for r in eligible}
             refs = fuse_ranks([r["ref"] for r in semantic], lexical, request.limit)
-            incomplete = "unavailable" in branches.values()
-            return {"records": [lookup[ref] for ref in refs if ref in lookup], "incomplete": incomplete, "branches": branches,
+            seeds = [lookup[ref] for ref in refs if ref in lookup]
+            evidence = evidence_closure(seeds, records)
+            view = render_memories(seeds, evidence, datetime.now(timezone.utc))
+            incomplete = "unavailable" in branches.values() or view["incomplete"]
+            return {**view, "records": seeds, "validation_evidence": evidence,
+                "incomplete": incomplete, "branches": branches,
                 "warnings": selected.warnings + (["Memory retrieval is partial"] if incomplete else [])}
 
     async def _reconcile_index(self):
@@ -74,6 +79,10 @@ class MemoryService:
         return {"records": records[offset:offset + request.page_size], "total": len(records), "warnings": selected.warnings}
 
     async def get(self, request):
+        async with self.mutations:
+            return await self._get(request)
+
+    async def _get(self, request):
         record = await self.adapter.get(request.ref)
         if not record:
             raise ValueError("Memory not found")
@@ -81,7 +90,11 @@ class MemoryService:
             raise ValueError("Memory is inactive; request history explicitly")
         if request.include_history:
             record["history"] = await self.adapter.history(request.ref)
-        return record
+        all_request = ListRequest(selector="all")
+        records = await self.adapter.list(all_request, resolve_selector(all_request, self.config.registry_root))
+        evidence = evidence_closure([record], records)
+        view = render_memories([record], evidence, datetime.now(timezone.utc))
+        return {**record, **view, "validation_evidence": evidence}
 
     async def inventory(self, request):
         # Includes every scope explicitly; no selected-project fallback. Mutations
