@@ -58,7 +58,7 @@ for (const role of ["cos", "manager"]) {
     const result = await handler({ systemPrompt: "Original prompt" }, ctx);
     if (result?.systemPrompt) prompt = result.systemPrompt;
   }
-  assert.equal(prompt, undefined, "Missing origin must never inject personal context");
+  assert.equal(prompt, undefined, "Memory context must not replace the main system prompt");
   for (const event of [
     "session_start",
     "agent_settled",

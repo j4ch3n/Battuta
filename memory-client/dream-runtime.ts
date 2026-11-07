@@ -46,7 +46,7 @@ import {
   type MemoryRecord,
 } from "./records.ts";
 import { digest } from "./canonical.ts";
-import { boundedQuery } from "./recall.ts";
+import { boundedQuery } from "./correction-candidates.ts";
 
 export interface DreamDependencies {
   directory: string;
