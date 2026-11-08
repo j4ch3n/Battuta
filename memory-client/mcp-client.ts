@@ -102,11 +102,23 @@ export class MemoryMcpClient {
         { signal, timeout: 30000 },
       );
       const envelope = result.structuredContent as
-        { ok?: boolean; data?: { complete?: boolean; items?: { code?: string }[] } } | undefined;
-      if (result.isError || !envelope?.ok || !envelope.data?.complete)
+        | {
+            ok?: boolean;
+            data?: {
+              complete?: boolean;
+              items?: { code?: string; status?: string; item_id?: string }[];
+            };
+          }
+        | undefined;
+      if (result.isError || !envelope?.ok || !envelope.data?.complete) {
+        const failed = envelope?.data?.items?.filter((item) => item.status !== "completed") ?? [];
         throw Object.assign(new Error("Memory capture incomplete"), {
-          rephrase: envelope?.data?.items?.some((i) => i.code === "embedding_limit") ?? false,
+          rephrase: failed.length > 0 && failed.every((item) => item.code === "embedding_limit"),
+          rephrase_items: failed
+            .filter((item) => item.code === "embedding_limit")
+            .map((item) => item.item_id),
         });
+      }
       return envelope.data;
     } finally {
       await client.close();

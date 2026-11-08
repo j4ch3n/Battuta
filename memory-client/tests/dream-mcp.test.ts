@@ -107,6 +107,41 @@ test("new writes fail closed without a catalog provider", async () => {
   expect(transport.request).toBeUndefined();
 });
 
+test.each([false, true])(
+  "rephrases only embedding failures after other items are acknowledged (otherFailure=%s)",
+  async (otherFailure) => {
+    transport.result = {
+      structuredContent: {
+        ok: true,
+        data: {
+          complete: false,
+          items: [
+            { item_id: "long", status: "failed", code: "embedding_limit" },
+            {
+              item_id: "short",
+              status: otherFailure ? "failed" : "completed",
+              ...(otherFailure ? { code: "capture_failed" } : {}),
+            },
+          ],
+        },
+      },
+    };
+    const error: unknown = await new MemoryMcpClient("http://127.0.0.1:8901/mcp")
+      .capture(
+        {
+          items: [
+            { item_id: "long", projects: ["atlas"] },
+            { item_id: "short", projects: ["atlas"] },
+          ],
+        },
+        new AbortController().signal,
+        ["atlas", "global"],
+      )
+      .catch((error: unknown) => error);
+    expect(error).toMatchObject({ rephrase: !otherFailure, rephrase_items: ["long"] });
+  },
+);
+
 test.each(["memory_inventory", "memory_consolidate_global", "memory_global_relationships"])(
   "dispatches %s and closes the client",
   async (name) => {

@@ -5,6 +5,8 @@ import { expect, test, vi } from "vitest";
 import { CaptureQueue, type CaptureJob } from "../capture-queue.ts";
 import { CaptureRuntime } from "../lifecycle.ts";
 import type { RequestBinding } from "../binding.ts";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { extractMemories } from "../extract.ts";
 
 const binding = (project: string | null, session_id = "s"): RequestBinding => ({
   request_id: `${session_id}-${project}`,
@@ -15,6 +17,183 @@ const binding = (project: string | null, session_id = "s"): RequestBinding => ({
   admitted_at: "2026-11-06T10:00:00Z",
 });
 const prepare = () => Promise.resolve(["atlas", "beacon", "global"]);
+
+test("embedding rephrase retains project rejections and rewrites only the failed frozen item", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-rephrase-projects-"));
+  try {
+    let now = 0;
+    let calls = 0;
+    const complete = vi.fn((_model: unknown, request: { messages: { content: string }[] }) => {
+      calls++;
+      const input = JSON.parse(request.messages[0].content) as {
+        rejected_entries?: { index: number }[];
+      };
+      const items =
+        calls === 1
+          ? [
+              { content: "An oversized atlas fact", projects: ["atlas"], source_entry_ids: ["0"] },
+              {
+                content: "Already saved short fact",
+                projects: ["beacon"],
+                source_entry_ids: ["0"],
+              },
+              { content: "Wrong project fact", projects: ["unknown"], source_entry_ids: ["0"] },
+            ]
+          : calls === 2
+            ? [
+                {
+                  content: "Short atlas fact",
+                  projects: ["atlas"],
+                  source_entry_ids: ["0"],
+                  ...(input.rejected_entries?.length ? { retry_entry_id: 0 } : {}),
+                },
+              ]
+            : [
+                {
+                  content: "Corrected beacon fact",
+                  projects: ["beacon"],
+                  source_entry_ids: ["0"],
+                  retry_entry_id: 2,
+                },
+              ];
+      return Promise.resolve({
+        stopReason: "stop",
+        content: [{ type: "text", text: JSON.stringify({ items }) }],
+        usage: {},
+      });
+    });
+    const ctx = {
+      model: { id: "offline" },
+      modelRegistry: { complete },
+    } as unknown as ExtensionContext;
+    const uploads: { items: { content: string; item_id: string }[] }[] = [];
+    const queue = await CaptureQueue.open(dir, "cos");
+    const runtime = new CaptureRuntime(queue, {
+      prepare,
+      extract: (job, signal) => extractMemories(job, ctx, signal),
+      upload: (batch) => {
+        const delivery = batch as (typeof uploads)[number];
+        uploads.push(delivery);
+        return uploads.length === 1
+          ? Promise.reject(
+              Object.assign(new Error("embedding limit"), {
+                rephrase: true,
+                rephrase_items: [delivery.items[0].item_id],
+              }),
+            )
+          : Promise.resolve();
+      },
+      now: () => now,
+      notify: () => {},
+    });
+    await runtime.startRequest("s", [], binding("atlas"));
+    await runtime.settle("s", entries(1));
+    await runtime.recover();
+    now = 2000;
+    await runtime.recover();
+    expect(queue.jobs()[0]?.project_rejections).toMatchObject([
+      { index: 2, item: { projects: ["unknown"] } },
+    ]);
+    expect(uploads[1].items.map((item) => item.content)).toEqual(["Short atlas fact"]);
+    now = 10000;
+    await runtime.recover();
+    expect(calls).toBe(3);
+    expect(queue.jobs()).toEqual([]);
+    expect(
+      uploads
+        .flatMap((batch) => batch.items)
+        .filter((item) => item.content === "Already saved short fact"),
+    ).toHaveLength(1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("invalid correction completion consumes its single durable attempt across recovery and restart", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-correction-limit-"));
+  try {
+    let now = 0;
+    const rejected = [
+      { index: 1, item: { content: "Unresolved", projects: ["unknown"], source_entry_ids: ["0"] } },
+    ];
+    const extract = vi.fn((job: CaptureJob) =>
+      job.projectAttempts
+        ? Promise.reject(new Error("Invalid correction JSON"))
+        : Promise.resolve({ batch: { items: [] }, project_rejections: rejected }),
+    );
+    const worker = {
+      prepare,
+      extract,
+      upload: () => Promise.resolve(),
+      now: () => now,
+      notify: () => {},
+    };
+    const queue = await CaptureQueue.open(dir, "cos");
+    const runtime = new CaptureRuntime(queue, worker);
+    await runtime.startRequest("s", [], binding("atlas"));
+    await runtime.settle("s", entries(1));
+    await runtime.recover();
+    for (now of [2000, 10000, 50000]) await runtime.recover();
+    const restored = await CaptureQueue.open(dir, "cos");
+    now = 100000;
+    await new CaptureRuntime(restored, worker).recover();
+    expect(extract).toHaveBeenCalledTimes(2);
+    expect(restored.jobs()[0]).toMatchObject({ blocked: true, project_rejections: rejected });
+    expect(restored.jobs()[0].segment.messages[0].entry_id).toBe("0");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("a consumed correction attempt still retries its frozen upload without another completion", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-correction-upload-"));
+  try {
+    let now = 0,
+      uploads = 0;
+    const extract = vi.fn((job: CaptureJob) =>
+      Promise.resolve(
+        job.projectAttempts
+          ? { batch: { batch_id: "corrected", items: [] }, project_rejections: [] }
+          : {
+              batch: { batch_id: "accepted", items: [] },
+              project_rejections: [{ index: 1, item: { projects: ["unknown"] } }],
+            },
+      ),
+    );
+    const worker = {
+      prepare,
+      extract,
+      upload: (batch: Record<string, unknown>) => {
+        uploads++;
+        return batch.batch_id === "corrected" && uploads === 2
+          ? Promise.reject(new Error("lost ack"))
+          : Promise.resolve();
+      },
+      now: () => now,
+      notify: () => {},
+    };
+    const queue = await CaptureQueue.open(dir, "cos");
+    const runtime = new CaptureRuntime(queue, worker);
+    await runtime.startRequest("s", [], binding("atlas"));
+    await runtime.settle("s", entries(1));
+    await runtime.recover();
+    now = 2000;
+    await runtime.recover();
+    expect(queue.jobs()[0]).toMatchObject({
+      project_attempt_started: true,
+      batch: { batch_id: "corrected" },
+    });
+    expect(queue.jobs()[0].blocked).not.toBe(true);
+    now = 10000;
+    const restored = await CaptureQueue.open(dir, "cos");
+    await new CaptureRuntime(restored, worker).recover();
+    expect(extract).toHaveBeenCalledTimes(2);
+    expect(uploads).toBe(3);
+    expect(restored.jobs()).toEqual([]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 test("old frozen capture replays a copy with original digest and no catalog discovery", async () => {
   const dir = await mkdtemp(join(tmpdir(), "runtime-frozen-"));

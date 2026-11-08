@@ -154,6 +154,11 @@ entries save independently of project-invalid entries. The queue persists reject
 entries, accepted delivery acknowledgements and a bounded correction attempt;
 correction receives only rejected entries and cannot regenerate accepted entries.
 Unresolved entries remain visibly pending. Rephrasing retains the original catalog.
+An embedding-limit rephrase rewrites only failed frozen items after other items
+are acknowledged, keeping project rejections independent. Correction and rephrase
+attempts are consumed durably before completion; invalid output retains blocked
+work instead of triggering repeated paid corrections. Frozen upload retries do not
+consume another completion attempt.
 Persisted-only adapters translate old frozen deliveries without changing their
 batch/item IDs, replay keys, digest representations or acknowledged outcomes.
 

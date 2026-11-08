@@ -122,6 +122,10 @@ Queues freeze validated payloads before upload. At most two jobs run per recover
 attempt, with existing bounded retries/backoff. A token-limit failure permits one
 durable rephrase identity. Async recovery does not block automatic recall; serialized
 queue changes preserve both a new turn and a concurrently extracted frozen batch.
+Rephrasing targets only failed embedding-limit entries after other items are
+acknowledged; separately rejected project entries remain queued for correction.
+Correction attempts are persisted before completion and exhausted invalid output
+stays blocked, while frozen uploads remain retryable without another completion.
 Pre-compaction waits only for the durable flush, then starts the same background
 worker. Frozen retries and embedding rephrasing retain the original catalog; persisted
 pre-upgrade deliveries keep their original keys/digests through a narrow adapter.

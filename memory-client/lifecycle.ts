@@ -1,6 +1,7 @@
 import type { CaptureJob, CaptureQueue } from "./capture-queue.ts";
 import type { RequestBinding } from "./binding.ts";
 import { normalizePersistedCapture } from "./delivery-compat.ts";
+import { z } from "zod";
 
 interface Worker {
   prepare: (job: CaptureJob, signal: AbortSignal) => Promise<string[]>;
@@ -100,6 +101,7 @@ export class CaptureRuntime {
       const controller = new AbortController();
       this.active = controller;
       const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(30000)]);
+      let extractingCorrection = false;
       try {
         if (!job.batch) {
           if (!job.project_catalog) {
@@ -108,10 +110,26 @@ export class CaptureRuntime {
             await this.queue.update(job);
           }
           signal.throwIfAborted();
+          if (job.rephrase_inputs?.length || job.project_inputs?.length) {
+            const marker = job.rephrase_inputs?.length
+              ? "rephrase_started"
+              : "project_attempt_started";
+            if (job[marker]) {
+              job.blocked = true;
+              throw new Error("Capture correction attempt exhausted");
+            }
+            job[marker] = true;
+            await this.queue.update(job);
+            signal.throwIfAborted();
+            extractingCorrection = true;
+          }
           const result = await this.worker.extract(job, signal);
           signal.throwIfAborted();
+          extractingCorrection = false;
           job.batch = result.batch;
-          job.project_rejections = result.project_rejections;
+          job.project_rejections = job.rephrase_inputs?.length
+            ? [...(job.project_rejections ?? []), ...(result.project_rejections ?? [])]
+            : result.project_rejections;
           job.batch_uploaded = false;
           await this.queue.update(job);
         }
@@ -130,6 +148,7 @@ export class CaptureRuntime {
           await this.queue.update(job);
         }
         signal.throwIfAborted();
+        delete job.rephrase_inputs;
         if (job.project_rejections?.length) {
           if (job.projectAttempts) job.blocked = true;
           else {
@@ -146,9 +165,43 @@ export class CaptureRuntime {
           if (job.rephraseAttempts) job.blocked = true;
           else {
             job.rephraseAttempts = 1;
+            const batch =
+              job.legacy_delivery && job.batch ? normalizePersistedCapture(job.batch) : job.batch;
+            const items = z.array(z.record(z.string(), z.unknown())).parse(batch?.items ?? []);
+            const failed =
+              "rephrase_items" in error
+                ? z.array(z.string()).nonempty().parse(error.rephrase_items)
+                : items.map((item) => String(item.item_id));
+            if (failed.some((id) => !items.some((item) => item.item_id === id)))
+              throw new Error("Invalid embedding-limit receipt", { cause: error });
+            job.rephrase_inputs = items
+              .filter((item) => failed.includes(String(item.item_id)))
+              .map((item) => {
+                const index = Number(String(item.item_id).split(":").at(-1));
+                if (!Number.isInteger(index) || index < 0)
+                  throw new Error("Invalid capture item identity");
+                const metadata = z
+                  .record(z.string(), z.unknown())
+                  .nullish()
+                  .parse(item.memory_metadata);
+                return {
+                  index,
+                  item: {
+                    ...item,
+                    source_entry_ids: z
+                      .array(z.object({ entry_id: z.string() }))
+                      .parse(item.sources)
+                      .map((source) => source.entry_id),
+                    keywords: metadata?.keywords ?? [],
+                    confidence: metadata?.confidence ?? "tentative",
+                    expires_at: metadata?.expires_at ?? null,
+                  },
+                };
+              });
             delete job.batch;
           }
         }
+        if (extractingCorrection) job.blocked = true;
         job.attempts++;
         job.nextAttempt =
           this.worker.now() + Math.min(60000, 1000 * 2 ** Math.min(job.attempts - 1, 6));

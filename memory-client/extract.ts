@@ -37,6 +37,7 @@ export async function extractMemories(
 ) {
   signal.throwIfAborted();
   if (!job.project_catalog) throw new Error("Capture catalog unavailable");
+  const retryInputs = job.rephrase_inputs ?? job.project_inputs;
   if (!ctx.model) throw new Error("No configured extraction model");
   const response = await abortable(
     ctx.modelRegistry.complete(
@@ -49,9 +50,11 @@ export async function extractMemories(
             content: JSON.stringify({
               project: job.segment.project,
               available_projects: job.project_catalog,
-              rejected_entries: job.project_inputs?.map((rejection) => ({
+              rejected_entries: retryInputs?.map((rejection) => ({
                 ...rejection,
-                error: "Select projects only from available_projects",
+                error: job.rephrase_inputs
+                  ? "Shorten only this frozen fact for the embedding token limit"
+                  : "Select projects only from available_projects",
                 retry_entry_id: rejection.index,
               })),
               messages: job.segment.messages,
@@ -82,8 +85,8 @@ export async function extractMemories(
     if (item.tags.some((t) => t.includes(",") || /^(scope|proj|kind):/.test(t)))
       throw new Error("Invalid extracted memory tag");
     let index = i;
-    if (job.project_inputs?.length) {
-      const rejected = job.project_inputs.find((r) => r.index === item.retry_entry_id);
+    if (retryInputs?.length) {
+      const rejected = retryInputs.find((r) => r.index === item.retry_entry_id);
       if (
         !rejected ||
         retried.has(rejected.index) ||
@@ -163,7 +166,7 @@ export async function extractMemories(
       },
     ];
   });
-  if (job.project_inputs?.length && retried.size !== job.project_inputs.length)
+  if (retryInputs?.length && retried.size !== retryInputs.length)
     throw new Error("Project correction omitted rejected entries");
   const payload = {
     session_id: job.session_id,

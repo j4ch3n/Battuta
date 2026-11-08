@@ -16,6 +16,9 @@ export interface CaptureJob {
   project_catalog?: string[];
   project_rejections?: { index: number; item: Record<string, unknown> }[];
   project_inputs?: { index: number; item: Record<string, unknown> }[];
+  rephrase_inputs?: { index: number; item: Record<string, unknown> }[];
+  project_attempt_started?: boolean;
+  rephrase_started?: boolean;
   projectAttempts?: number;
   batch_uploaded?: boolean;
   legacy_delivery?: boolean;
