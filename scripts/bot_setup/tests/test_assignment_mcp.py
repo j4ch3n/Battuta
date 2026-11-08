@@ -29,7 +29,8 @@ def test_assignment_mcp_preserves_custom_auth_and_role_appropriate_access(tmp_pa
     if role == "worker":
         assert "claim_assignment" not in server["toolExposure"]
         assert "get_assignment" in server["toolExposure"]
-        assert set(data["mcpServers"]) == {"other", "assignments"}
+        assert data["mcpServers"]["memory"]["enabled"] is False
+        assert set(data["mcpServers"]) == {"other", "assignments", "memory"}
         assert not (pi / "settings.json").exists()
 
 

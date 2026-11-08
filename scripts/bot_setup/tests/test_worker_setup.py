@@ -72,7 +72,7 @@ class WorkerSetupTests(unittest.TestCase):
             self.assertFalse((bot / "node_modules").exists())
             config = json.loads((bot / ".pi/mcp.json").read_text())["mcpServers"]
             self.assertNotIn("linear", config)
-            self.assertNotIn("memory", config)
+            self.assertFalse(config["memory"]["enabled"])
             self.assertNotIn("private-key", (bot / ".pi/mcp.json").read_text())
 
     def test_explicit_reconfiguration_preserves_private_settings_and_custom_resources(self):
@@ -92,6 +92,7 @@ class WorkerSetupTests(unittest.TestCase):
         self.assertEqual((self.bot / ".pi/auth.json").read_text(), "private-auth")
         self.assertEqual((self.bot / ".pi/skills/custom/SKILL.md").read_text(), "private custom")
         self.assertIn("custom", json.loads((self.bot / ".pi/mcp.json").read_text())["mcpServers"])
+        self.assertFalse(json.loads((self.bot / ".pi/mcp.json").read_text())["mcpServers"]["memory"]["enabled"])
         self.assertEqual(json.loads((self.bot / ".pi/web-search.json").read_text()), {"fetchContent": {"userAgent": "private browser"}})
 
     def test_unprepared_profile_fails_without_writing_or_installing(self):
