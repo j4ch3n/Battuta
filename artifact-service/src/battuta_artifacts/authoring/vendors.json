@@ -1,0 +1,62 @@
+[
+  {
+    "name": "reveal",
+    "version": "6.0.2",
+    "purpose": "HTML slide decks, fragments, speaker notes, and PDF export.",
+    "imports": { "reveal.js": "https://cdn.jsdelivr.net/npm/reveal.js@6.0.2/dist/reveal.mjs" },
+    "stylesheets": [
+      "https://cdn.jsdelivr.net/npm/reveal.js@6.0.2/dist/reveal.css",
+      "https://cdn.jsdelivr.net/npm/reveal.js@6.0.2/dist/theme/white.css"
+    ]
+  },
+  {
+    "name": "chartjs",
+    "version": "4.6.1",
+    "purpose": "Standard charts with Chart.js components registered on import.",
+    "imports": { "chart.js/auto": "https://cdn.jsdelivr.net/npm/chart.js@4.6.1/auto/auto.js" },
+    "dependencies": {
+      "@kurkle/color": "https://cdn.jsdelivr.net/npm/@kurkle/color@0.3.4/dist/color.esm.js"
+    }
+  },
+  {
+    "name": "three",
+    "version": "0.187.0",
+    "purpose": "3D scenes and optional controls/loaders.",
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/"
+    }
+  },
+  {
+    "name": "mermaid",
+    "version": "12.3.0",
+    "purpose": "Text-defined flowcharts, sequence diagrams, and related diagrams.",
+    "imports": { "mermaid": "https://cdn.jsdelivr.net/npm/mermaid@12.3.0/dist/mermaid.esm.min.mjs" }
+  },
+  {
+    "name": "photoswipe",
+    "version": "5.4.4",
+    "purpose": "Zoomable image galleries.",
+    "imports": {
+      "photoswipe": "https://cdn.jsdelivr.net/npm/photoswipe@5.4.4/dist/photoswipe.esm.js",
+      "photoswipe/lightbox": "https://cdn.jsdelivr.net/npm/photoswipe@5.4.4/dist/photoswipe-lightbox.esm.js"
+    },
+    "stylesheets": ["https://cdn.jsdelivr.net/npm/photoswipe@5.4.4/dist/photoswipe.css"]
+  },
+  {
+    "name": "katex",
+    "version": "0.19.1",
+    "purpose": "TeX/LaTeX-style math expressions, inline and display rendering.",
+    "imports": {
+      "katex": "https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/katex.mjs",
+      "katex/contrib/auto-render": "https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/contrib/auto-render.mjs"
+    },
+    "stylesheets": ["https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/katex.min.css"]
+  },
+  {
+    "name": "animejs",
+    "version": "4.5.0",
+    "purpose": "DOM/SVG animation and explanatory sequences.",
+    "imports": { "animejs": "https://cdn.jsdelivr.net/npm/animejs@4.5.0/dist/modules/index.js" }
+  }
+]
