@@ -8,6 +8,10 @@ metadata:
 
 ## Context
 
+Manager uses this skill to develop and judge substantial requirements within CoS's
+commission. Consequential gaps go to CoS, not the owner. A Worker may draft from
+confirmed assignment inputs under the bound-worker rules below.
+
 For a bound worker assignment, author from the confirmed requirements and supplied
 template or fallback below. Use the commission's approved authoring scope rather
 than opening an owner conversation or inventing approvals. Complete the requested

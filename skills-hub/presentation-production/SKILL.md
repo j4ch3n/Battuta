@@ -51,7 +51,8 @@ CoS retains owner-facing editorial judgment and delivery authority.
 Return actual artifact paths/references and check results through execute-assignment
 for a bound worker. A local draft, tested render, published URL, Manager review,
 and owner acceptance are different outcomes. Do not send Telegram, claim owner
-delivery, or publish merely because production finished. Use present-to-owner
-only when acting within its owner-facing editorial role.
+delivery, or publish merely because production finished. Publish only when the
+assignment grants that authority and sharing scope; Manager reviews before CoS
+delivers.
 
 Adapted material retains its accompanying [NOTICE](NOTICE).

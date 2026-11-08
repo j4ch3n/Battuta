@@ -8,6 +8,9 @@ metadata:
 
 ## Context
 
+Manager uses this skill to specify and judge a bounded outcome within CoS's
+commission. Consequential gaps go to CoS, not the owner.
+
 For a bound worker assignment, use confirmed users/outcomes and the commissioned
 scope. Report unresolved consequential requirements through execute-assignment;
 do not contact the owner, invent acceptance, or require the interactive next-step

@@ -17,10 +17,10 @@ Use the `assignments` MCP service. Both tools require exact `project` and
 eight-character `assignment_id`; verify registration with `battuta-project list`.
 Every note requires an assignment; do not create general/unbound notebooks.
 
-| Tool | Additional input | Result |
-| --- | --- | --- |
+| Tool            | Additional input                                                  | Result                                                                     |
+| --------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | `prepare_notes` | `root`: absolute local Battuta root, with home directory expanded | Establish/reuse the shared path and return initialization/editing guidance |
-| `locate_notes` | None | Return the existing path and current editable/frozen guidance |
+| `locate_notes`  | None                                                              | Return the existing path and current editable/frozen guidance              |
 
 The root is normally the expanded `~/.battuta`, not its projects subdirectory.
 Use the returned `notes_path`; do not invent another location or role suffix.
@@ -52,5 +52,6 @@ problem; do not silently replace or repair another file.
   evidence that established it—not a troubleshooting transcript or credentials.
 
 Prefer specific findings, sources, decisions, and material limits over generic
-knowledge or tool-call logs. Use memory for confirmed enduring context. Notes
-must never contain credentials or unrelated private data.
+knowledge or tool-call logs. Use supplied context for confirmed enduring facts and
+return candidate durable findings to CoS. Notes must never contain credentials or
+unrelated private data.
