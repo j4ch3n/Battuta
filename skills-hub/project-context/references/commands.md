@@ -53,11 +53,14 @@ Linking records or replaces GitHub metadata for the selected project without a n
 
 ```sh
 battuta-project list
+battuta-project list --json [--root <absolute-path>]
 ```
 
 The command returns a numbered Markdown list sorted by project name. Each entry has a bold name followed by indented `Project Root` and `Code` lines: the managed project directory and repository checkout, respectively. Paths under the home directory are abbreviated with `~`; other paths remain absolute.
 
 Listing validates registrations and checkouts but does not require or change current selection, read spec inventories, or contact Linear. Hidden directories, symlinks, and non-directory entries are excluded. An absent store reports that no Battuta project store has been initialized; an existing empty registry reports `No registered projects.` Both suggest `battuta-project init <project-name>` and succeed without creating state. An invalid registration reports an error.
+
+For automation, `--json` writes only `{"projects":["atlas","beacon"]}` to stdout, preserving registered spelling and sorting names. A missing or empty registry returns `{"projects":[]}` without creating files. Invalid registrations fail with a nonzero exit and a diagnostic on stderr. `--root` selects the discovery registry without changing selection; omitting it uses the usual registry.
 
 ## Read the current selection
 

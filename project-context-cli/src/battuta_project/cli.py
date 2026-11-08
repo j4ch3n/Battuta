@@ -1,6 +1,8 @@
 """Installed battuta-project command."""
 
 import click
+import json
+from pathlib import Path
 import shlex
 
 from .explain import explain_project
@@ -57,10 +59,15 @@ def init(project_name: str, github: str | None, linear: LinearConfig | None):
 
 
 @main.command("list")
-def list_projects():
+@click.option("--json", "as_json", is_flag=True, help="Return a JSON project catalog.")
+@click.option("--root", type=click.Path(path_type=Path, file_okay=False), help="Discover projects in this registry root.")
+def list_projects(as_json: bool, root: Path | None):
     """List registered projects and their managed root and checkout paths."""
-    registry = ProjectRegistry()
+    registry = ProjectRegistry(root)
     projects = registry.list_projects()
+    if as_json:
+        click.echo(json.dumps({"projects": sorted(p.name for p in projects)}, ensure_ascii=False))
+        return
     click.echo(render("list.md.j2", ProjectList(projects=projects)) if projects else registry.discovery.unavailable_message())
 
 
