@@ -28,11 +28,6 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
         self.backend = UpstreamAdapter(SimpleNamespace(conn=self.conn, _execute_with_retry=execute))
         self.backend.embed = lambda text: b"0"
         self.service = MemoryService(self.backend, MemoryConfig(data_dir=self.root))
-        for name in ("atlas", "beacon"):
-            folder = self.root / name
-            (folder / "code").mkdir(parents=True)
-            (folder / "project.yaml").write_text(f"version: 1\nproject:\n  name: {name}\n  path: {folder}/code\n")
-        (self.root / ".config.json").write_text('{"currentProject":"atlas"}')
         self.add("a", "Atlas note", "proj:atlas,work", 3)
         self.add("b", "Global note", "scope:global,work", 2)
         self.add("c", "Beacon secret", "proj:beacon,work", 0)
@@ -75,14 +70,12 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(sqlite3.Error):
             await self.service.list(ListRequest(selector="all"))
 
-    async def test_corrupt_selection_does_not_affect_explicit_global(self):
-        (self.root / ".config.json").write_text("not JSON")
+    async def test_explicit_global_only_returns_global_records(self):
         result = await self.service.recall(RecallRequest(semantic_query="note", selector="global"))
         self.assertFalse(result["warnings"])
         self.assertEqual([r["content"] for r in result["records"]], ["Global note"])
 
-    async def test_missing_selection_still_searches_all(self):
-        (self.root / ".config.json").unlink()
+    async def test_default_recall_searches_all_scopes(self):
         result = await self.service.recall(RecallRequest(semantic_query="note"))
         self.assertFalse(result["warnings"])
         self.assertEqual([r["content"] for r in result["records"]], ["Beacon secret", "Global note", "Atlas note"])

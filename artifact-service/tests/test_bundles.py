@@ -56,14 +56,16 @@ class BundleTests(BundleFixture):
         self.assertIn("VRAM &lt;sizing&gt;", (directory / "index.html").read_text())
         self.assertFalse((self.project.parent / ".config.json").exists())
 
-    def test_explicit_project_never_uses_or_changes_selection(self):
-        state = self.project.parent / ".config.json"
-        state.write_text('{"currentProject":"battuta"}')
-        before = state.read_bytes()
+    def test_explicit_project_does_not_change_another_registration(self):
+        other = self.project.parent / "other"
+        (other / "code").mkdir(parents=True)
+        config = other / "project.yaml"
+        config.write_text("version: 1\n")
+        before = config.read_bytes()
         result = self.init("--slug", "procurement-sizing")
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(self.store.get("procurement-sizing")["source_root"], str(self.project / "artifacts/sizing"))
-        self.assertEqual(state.read_bytes(), before)
+        self.assertEqual(config.read_bytes(), before)
 
     def test_invalid_input_and_missing_schema_never_create_bundle(self):
         for args in [("--project", "unknown"), ("--template", "../report"), ("--slug", "../bad"), ("--title", " ")]:

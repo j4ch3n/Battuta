@@ -52,10 +52,12 @@ CoS loads the memory client, but its main session does not select the memory ski
 Source `--bot-dir` workspaces use their own manifest or the owning role's selection. Custom skill content and private queues/profiles remain preserved. CoS capture defaults on; non-CoS roles do not load the adapter. CoS's main MCP configuration has a disabled memory override to prevent inherited user-level exposure; managed Manager/worker entries remain absent. Unrelated servers/auth remain unchanged. This is configuration separation, not a same-user security sandbox. Setup does not edit private profiles, start bots, or invoke models. Recall needs no origin-producer integration and never restricts by selected project. Unknown write scope is omitted/deferred, not invented as global.
 
 CoS's launch environment must provide the updated `battuta-project` command with
-`list --json --root` support and its required `LINEAR_API_TOKEN` environment variable.
-Discovery does not contact Linear. Use the same registered-project root as CoS:
-`BATTUTA_PROJECTS_ROOT` defaults to `~/.battuta/projects` in the client only. The memory
-server does not need that command, environment variable or registry directory.
+`list --json` support and its required `LINEAR_API_TOKEN` environment variable.
+Discovery does not contact Linear. CoS and the CLI use the same fixed project root,
+`~/.battuta/projects`, derived from their OS user's home directory. Remove old
+project-root overrides and prepare existing configurations using the
+[project configuration contract](project-context.md). The memory server does not
+need the project command, token, or registry directory.
 Upgrade the memory client and server together; the public API now uses `projects`
 rather than `scope`, with explicit list selectors and all-scope recall by default. Existing storage and pending
 delivery identities are preserved without re-embedding.
@@ -64,7 +66,7 @@ With CoS stopped, check the CLI contract without a bot/model call:
 
 ```sh
 command -v battuta-project
-battuta-project list --json --root "${BATTUTA_PROJECTS_ROOT:-$HOME/.battuta/projects}"
+battuta-project list --json
 ```
 
 Stop if either command fails. Successful output is a JSON `projects` array, empty
