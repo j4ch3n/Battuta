@@ -167,11 +167,10 @@ test.each(["missing", "oversized", "pending"])(
       if (condition === "oversized") await writeFile(join(f.dir, "ME.md"), "private ".repeat(5000));
       if (condition === "pending") {
         const queue = await CaptureQueue.open(join(f.dir, "capture-queue/cos"), "cos");
-        await queue.track("earlier", [], null, false);
+        await queue.track("earlier", [], false);
         await queue.track(
           "earlier",
           [{ id: "e", type: "message", message: { role: "user", content: "correction" } }],
-          null,
           true,
         );
       }

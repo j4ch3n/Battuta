@@ -1,6 +1,7 @@
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { vi } from "vitest";
 import { ProjectSpecStore } from "../store/index.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
@@ -16,19 +17,25 @@ export function fakePi() {
 
 export async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "battuta-spec-"));
-  const projects = join(root, "projects");
+  const previousHome = process.env.HOME;
+  vi.stubEnv("HOME", root);
+  const projects = join(root, ".battuta", "projects");
   for (const name of ["atlas", "harbor"]) {
     const directory = join(projects, name);
     await mkdir(join(directory, "code"), { recursive: true });
+    await writeFile(join(directory, "project.yaml"), "version: 1\n");
   }
-  const cos = new ProjectSpecStore("cos", projects);
-  const manager = new ProjectSpecStore("manager", projects);
+  const cos = new ProjectSpecStore("cos");
+  const manager = new ProjectSpecStore("manager");
   return {
     root,
     projects,
     cos,
     manager,
-    cleanup: () => rm(root, { recursive: true, force: true }),
+    cleanup: async () => {
+      vi.stubEnv("HOME", previousHome);
+      await rm(root, { recursive: true, force: true });
+    },
   };
 }
 

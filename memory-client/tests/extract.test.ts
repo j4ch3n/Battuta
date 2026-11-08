@@ -7,7 +7,7 @@ const job: CaptureJob = {
   id: "job",
   project_catalog: ["atlas", "beacon", "My Project", "global"],
   session_id: "s",
-  segment: { project: "atlas", messages: [{ entry_id: "e", text: "Use SQLite, not Postgres" }] },
+  segment: { messages: [{ entry_id: "e", text: "Use SQLite, not Postgres" }] },
   attempts: 0,
   nextAttempt: 0,
 };
@@ -25,7 +25,7 @@ function context(content: string) {
     },
   } as unknown as ExtensionContext;
 }
-test("extracts cited facts with frozen binding and emits provider usage", async () => {
+test("extracts cited facts with explicit membership and emits provider usage", async () => {
   const result = await extractMemories(
     job,
     context(

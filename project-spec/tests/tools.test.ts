@@ -8,7 +8,7 @@ test("each runtime exposes shared reads and only its own authoring tools", async
   try {
     for (const role of ["cos", "manager"] as const) {
       const fake = fakePi();
-      register(fake.pi, { role, projectsRoot: f.projects });
+      register(fake.pi, { role });
       const common = ["inspect_specs", "describe_spec", "read_constitution"];
       const own =
         role === "cos"
@@ -33,8 +33,8 @@ test("all registered tool groups exercise the actual shared store", async () => 
   try {
     const cos = fakePi();
     const manager = fakePi();
-    register(cos.pi, { role: "cos", projectsRoot: f.projects });
-    register(manager.pi, { role: "manager", projectsRoot: f.projects });
+    register(cos.pi, { role: "cos" });
+    register(manager.pi, { role: "manager" });
     const call = async (tools: typeof cos.tools, name: string, args: unknown) => {
       const tool = tools.get(name)!;
       return tool.execute(
@@ -78,7 +78,7 @@ test("tool handlers save full text and return errors rather than a false success
   const f = await fixture();
   try {
     const fake = fakePi();
-    register(fake.pi, { role: "cos", projectsRoot: f.projects });
+    register(fake.pi, { role: "cos" });
     const tool = fake.tools.get("init_spec")!;
     const context = {} as Parameters<typeof tool.execute>[4];
     const result = await tool.execute("call-1", input, undefined, undefined, context);

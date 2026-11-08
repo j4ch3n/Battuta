@@ -102,9 +102,15 @@ Only `done`/`cancelled` freezes notes/drafts; active/in_process/blocked remain
 editable. Freezing is a team convention, not filesystem enforcement. Terminal
 notes cannot initialize a new path. No file locks, history, or undo are promised.
 
-The existing project CLI and global current-project value are unchanged.
+The project CLI uses explicit project names and filesystem-owned identity; see
+[project configuration](project-context.md). Assignment identity and ownership
+checks remain independent of conversation context.
 Historical/private material is neither imported nor rewritten. Assignment
 completion is execution state, not Manager verification or owner acceptance.
+
+Local TODO ledgers, role notebooks, current-notebook pointers, and local
+note/draft CLI commands are retired. Existing files, registered references, and
+historical metadata remain untouched; there is no automatic import or migration.
 
 ## Verification boundaries
 

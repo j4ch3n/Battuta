@@ -60,10 +60,10 @@ yield labelled partial results; both failing is unavailable, not empty memory.
 Omitting `keywords` runs semantic-only retrieval. Literal keyword matching,
 scope/eligibility-before-limit and dependency checks are described in the design.
 Recall defaults to every scope; only explicit project/global filters narrow it.
-The shared selected/current project never restricts recall.
+There is no shared selected/current project.
 List calls require explicit `projects`, `global` or `all` selectors; `current` is
-rejected. The server is independent of project files and `BATTUTA_PROJECTS_ROOT`;
-that environment setting belongs only to client discovery.
+rejected. The server is independent of project files. Client discovery uses only
+`~/.battuta/projects` through `battuta-project list --json`; no root override exists.
 
 ## Recall input and local trust
 
@@ -102,8 +102,8 @@ and selectors; names differing only by case share membership. It performs no reg
 lookup. `global` is reserved, including case variants of a registered project name.
 
 The existing Pi completion classifies concise temporal facts across the full catalog,
-including multi-project facts, and receives bounded correction candidates. The
-request project does not restrict classification. It cannot guess correction refs
+including multi-project facts, and receives bounded correction candidates. Requests
+and new capture segments carry no project hint or origin binding. It cannot guess correction refs
 or change a correction target's full project membership.
 Corrections upload through guarded version updates without waiting for dreaming.
 Unknown source timezone establishes no automatic expiry. Model output is checked

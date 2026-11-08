@@ -1,6 +1,7 @@
 """Jinja presentation from validated command models and packaged templates."""
 
 from pathlib import Path
+import shlex
 
 from jinja2 import Environment, PackageLoader, StrictUndefined
 from pydantic import BaseModel
@@ -21,4 +22,5 @@ def render(template: str, model: BaseModel) -> str:
         trim_blocks=True, lstrip_blocks=True,
     )
     environment.filters["display_path"] = display_path
+    environment.filters["shell_quote"] = shlex.quote
     return environment.get_template(template).render(**model.model_dump()).rstrip()

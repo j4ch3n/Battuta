@@ -1,4 +1,4 @@
-"""Project discovery and selection reporting without workspace changes."""
+"""Filesystem project discovery without workspace changes."""
 
 from click.testing import CliRunner
 import json
@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 from battuta_project.cli import main
 from battuta_project.models import ProjectList
-from battuta_project.registry import ProjectRegistry
 from battuta_project.presentation import render
 from linear_fixtures import linear_http
 from project_fixtures import ProjectTestCase
@@ -30,7 +29,6 @@ class DiscoveryTests(ProjectTestCase):
     def test_list_sorts_projects_and_renders_both_home_relative_paths(self):
         self.registry.init("harbor-web", github="https://github.com/team/harbor-web")
         self.registry.init("aardvark", github="https://github.com/team/aardvark")
-        selection = self.registry.state_path.read_bytes()
         with linear_http() as requests:
             output = self.invoke("list")
         self.assertEqual(output, (
@@ -44,17 +42,16 @@ class DiscoveryTests(ProjectTestCase):
             "   Project Root: ~/.battuta/projects/harbor-web\n"
             "   Code: ~/.battuta/projects/harbor-web/code\n"
         ))
-        self.assertEqual(self.registry.state_path.read_bytes(), selection)
         self.assertEqual(requests, [])
 
-    def test_list_does_not_require_selection_and_ignores_non_project_entries(self):
-        self.registry.state_path.unlink()
+    def test_discovery_requires_project_yaml(self):
+        (self.registry.root / "unregistered").mkdir()
         (self.registry.root / ".hidden").mkdir()
         (self.registry.root / "notes.txt").write_text("Notes")
         (self.registry.root / "alias").symlink_to(self.project.root, target_is_directory=True)
         self.assertIn("1. **atlas-api**", self.invoke("list"))
         self.assertNotIn("2.", self.invoke("list"))
-        self.assertFalse(self.registry.state_path.exists())
+        self.assertFalse((self.registry.root / ".config.json").exists())
 
     def test_list_empty_or_missing_registry_does_not_create_state(self):
         shutil.rmtree(self.registry.root)
@@ -66,20 +63,18 @@ class DiscoveryTests(ProjectTestCase):
                 self.assertIn("No registered projects" if exists else "No Battuta project store has been initialized", output)
                 self.assertIn("battuta-project init <project-name>", output)
                 self.assertEqual(self.registry.root.exists(), exists)
-                self.assertFalse(self.registry.state_path.exists())
+                self.assertFalse((self.registry.root / ".config.json").exists())
 
-    def test_list_reports_invalid_registration_without_changing_selection(self):
-        selection = self.registry.state_path.read_bytes()
+    def test_list_reports_invalid_registration_without_mutation(self):
         (self.project.root / "project.yaml").write_text("invalid: true")
         result = self.runner.invoke(main, ["list"])
         self.assertNotEqual(result.exit_code, 0)
         self.assertIn("project.yaml", result.output)
-        self.assertEqual(self.registry.state_path.read_bytes(), selection)
+        self.assertEqual((self.project.root / "project.yaml").read_text(), "invalid: true")
 
     def test_list_json_is_complete_and_non_mutating(self):
         for name in ("Atlas", "my project", "项目", "global"):
             self.registry.init(name)
-        self.registry.state_path.write_text("not valid selection JSON")
         before = {str(p): p.read_bytes() for p in self.home.rglob("*") if p.is_file()}
         self.assertEqual(json.loads(self.invoke("list", "--json")), {
             "projects": ["Atlas", "atlas-api", "global", "my project", "项目"],
@@ -94,7 +89,7 @@ class DiscoveryTests(ProjectTestCase):
                     self.registry.root.mkdir()
                 self.assertEqual(json.loads(self.invoke("list", "--json")), {"projects": []})
                 self.assertEqual(self.registry.root.exists(), exists)
-                self.assertFalse(self.registry.state_path.exists())
+                self.assertFalse((self.registry.root / ".config.json").exists())
 
     def test_list_json_rejects_invalid_registration(self):
         (self.project.root / "project.yaml").write_text("invalid: true")
@@ -102,12 +97,41 @@ class DiscoveryTests(ProjectTestCase):
         self.assertNotEqual(result.exit_code, 0)
         self.assertIn("project.yaml", result.output)
 
-    def test_list_json_respects_root(self):
+    def test_list_rejects_root_override(self):
         root = self.home / "custom"
-        ProjectRegistry(root).init("Beacon")
-        self.assertEqual(json.loads(self.invoke("list", "--json", "--root", str(root))), {
-            "projects": ["Beacon"],
-        })
+        result = self.runner.invoke(main, ["list", "--json", "--root", str(root)])
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("No such option", result.output)
+        self.assertFalse(root.exists())
+
+    def test_list_rejects_unsafe_markers_or_broken_checkouts(self):
+        path = self.project.root / "project.yaml"
+        config = path.read_bytes()
+        for state in ("directory", "symlink", "broken-symlink", "malformed", "missing-checkout", "symlink-checkout"):
+            with self.subTest(state=state):
+                if state == "directory":
+                    path.unlink()
+                    path.mkdir()
+                elif state in ("symlink", "broken-symlink"):
+                    path.unlink()
+                    path.symlink_to(self.project.root / ("SUMMARY.md" if state == "symlink" else "absent"))
+                elif state == "malformed":
+                    path.write_text("not: valid: yaml")
+                else:
+                    self.project.code.rmdir()
+                    if state == "symlink-checkout":
+                        self.project.code.symlink_to(self.home, target_is_directory=True)
+                result = self.runner.invoke(main, ["list", "--json"])
+                self.assertNotEqual(result.exit_code, 0)
+                self.assertIn(str(self.project.root), result.output)
+                if path.is_symlink() or path.is_file():
+                    path.unlink()
+                else:
+                    path.rmdir()
+                path.write_bytes(config)
+                if self.project.code.is_symlink():
+                    self.project.code.unlink()
+                self.project.code.mkdir(exist_ok=True)
 
     def test_list_preserves_absolute_paths_outside_home(self):
         with patch("pathlib.Path.home", return_value=self.home / "different-home"):
@@ -119,59 +143,12 @@ class DiscoveryTests(ProjectTestCase):
         ))
         self.assertNotIn("~", output)
 
-    def test_current_reads_selection_without_loading_checkout_or_calling_linear(self):
-        selection = self.registry.state_path.read_bytes()
-        (self.project.root / "project.yaml").unlink()
-        self.project.code.rmdir()
-        with linear_http() as requests:
-            self.assertEqual(self.invoke("current"), "Current Project: atlas-api\n")
-        self.assertEqual(self.registry.state_path.read_bytes(), selection)
-        self.assertEqual(requests, [])
-
-    def test_current_reports_switch_and_missing_selection(self):
-        self.registry.init("harbor-web", github="https://github.com/team/harbor-web")
-        self.assertEqual(self.invoke("current"), "Current Project: harbor-web\n")
-        self.registry.state_path.unlink()
-        result = self.runner.invoke(main, ["current"])
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("No current project", result.output)
-        self.assertIn("switch", result.output)
-        self.assertFalse(self.registry.state_path.exists())
-
     def test_discovery_commands_reject_project_arguments(self):
-        for command in ("list", "current"):
+        for command in ("list",):
             with self.subTest(command=command):
                 result = self.runner.invoke(main, [command, "atlas-api"])
                 self.assertNotEqual(result.exit_code, 0)
                 self.assertIn("unexpected extra argument", result.output)
-
-    def test_current_distinguishes_uninitialized_empty_and_unselected(self):
-        for state in ("missing parent", "missing store", "empty registry", "unselected"):
-            with self.subTest(state=state):
-                if self.registry.root.parent.exists():
-                    shutil.rmtree(self.registry.root.parent)
-                if state == "missing store":
-                    self.registry.root.parent.mkdir()
-                elif state == "empty registry":
-                    self.registry.root.mkdir(parents=True)
-                elif state == "unselected":
-                    self.registry.init("atlas-api")
-                    self.registry.state_path.unlink()
-                before = sorted(self.home.rglob("*"))
-                result = self.runner.invoke(main, ["current"])
-                self.assertNotEqual(result.exit_code, 0)
-                expected = {
-                    "missing parent": "No Battuta project store has been initialized",
-                    "missing store": "No Battuta project store has been initialized",
-                    "empty registry": "No registered projects",
-                    "unselected": "No current project is selected",
-                }[state]
-                self.assertIn(expected, result.output)
-                self.assertIn("battuta-project init <project-name>", result.output)
-                if state == "unselected":
-                    self.assertIn("battuta-project switch <project-name>", result.output)
-                self.assertNotIn("ENOENT", result.output)
-                self.assertEqual(sorted(self.home.rglob("*")), before)
 
     def test_named_project_errors_distinguish_store_empty_and_unknown(self):
         for state in ("missing store", "empty registry", "unknown"):
@@ -183,7 +160,7 @@ class DiscoveryTests(ProjectTestCase):
                 elif state == "unknown":
                     self.registry.init("atlas-api")
                 before = sorted(self.home.rglob("*"))
-                result = self.runner.invoke(main, ["switch", "Battuta"])
+                result = self.runner.invoke(main, ["explain", "Battuta"])
                 self.assertNotEqual(result.exit_code, 0)
                 expected = {
                     "missing store": "No Battuta project store has been initialized",

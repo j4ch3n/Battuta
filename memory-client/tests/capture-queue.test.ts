@@ -43,7 +43,7 @@ test("filters reasoning, tools and profile context; keeps labelled incoming mail
   ]);
 });
 test("large messages are fully split at bounded segment sizes", () => {
-  const segments = splitSegments([{ entry_id: "e", text: "x".repeat(25000) }], "atlas");
+  const segments = splitSegments([{ entry_id: "e", text: "x".repeat(25000) }]);
   expect(segments).toHaveLength(3);
   expect(segments.every((s) => s.messages.reduce((n, m) => n + m.text.length, 0) <= 12000)).toBe(
     true,
@@ -77,7 +77,7 @@ test("collection and splitting preserve speaker, time and original mail identity
   ]);
   expect(messages[0].speaker).toBe("owner");
   expect(messages[0].mentioned_at).toBe("2026-11-06T10:00:00+08:00");
-  expect(splitSegments(messages, null)[0].messages[1].original_mail).toEqual({
+  expect(splitSegments(messages)[0].messages[1].original_mail).toEqual({
     message_ref: ref,
     sender: "manager",
   });
@@ -86,13 +86,8 @@ test("durable accumulator survives a crash below threshold and redacts before st
   const dir = await mkdtemp(join(tmpdir(), "capture-test-"));
   dirs.push(dir);
   const queue = await CaptureQueue.open(dir, "cos");
-  await queue.track("s", [entry("old", "old history")], "atlas", false);
-  await queue.track(
-    "s",
-    [entry("old", "old history"), entry("new", "password is hunter2")],
-    "atlas",
-    false,
-  );
+  await queue.track("s", [entry("old", "old history")], false);
+  await queue.track("s", [entry("old", "old history"), entry("new", "password is hunter2")], false);
   const recovered = await CaptureQueue.open(dir, "cos");
   expect(recovered.pending("s")).toHaveLength(1);
   expect(recovered.pending("s")[0].messages[0].text).not.toContain("hunter2");
@@ -102,34 +97,36 @@ test("durable accumulator survives a crash below threshold and redacts before st
   expect((await stat(join(dir, "state.json"))).mode & 0o777).toBe(0o600);
   expect((await stat(dir)).mode & 0o777).toBe(0o700);
 });
-test("flush keeps original binding and a validated batch survives reconnect", async () => {
+test("mixed-project conversation stays neutral and a validated batch survives reconnect", async () => {
   const dir = await mkdtemp(join(tmpdir(), "capture-test-"));
   dirs.push(dir);
   const queue = await CaptureQueue.open(dir, "manager");
-  await queue.track("s", [], "atlas", false);
-  await queue.track("s", [entry("a", "Atlas fact")], "atlas", false);
-  await queue.track("s", [entry("a", "Atlas fact"), entry("b", "Beacon fact")], "beacon", true);
+  await queue.track("s", [], false);
+  await queue.track("s", [entry("a", "Atlas fact")], false);
+  await queue.track("s", [entry("a", "Atlas fact"), entry("b", "Beacon fact")], true);
   const jobs = queue.jobs();
-  expect(jobs.map((j) => j.segment.project)).toEqual(["atlas", "beacon"]);
+  expect(jobs).toHaveLength(1);
+  expect(Object.keys(jobs[0].segment)).toEqual(["messages"]);
+  expect(jobs[0].segment.messages.map((m) => m.text)).toEqual(["Atlas fact", "Beacon fact"]);
   jobs[0].batch = { items: [] };
   await queue.update(jobs[0]);
   const restored = await CaptureQueue.open(dir, "manager");
   expect(restored.jobs()[0].batch).toEqual({ items: [] });
   expect(restored.jobs()[0].id).toBe(jobs[0].id);
   await restored.markUploaded(jobs[0].id);
-  expect(restored.jobs().map((j) => j.id)).toEqual([jobs[1].id]);
+  expect(restored.jobs()).toEqual([]);
 });
 
 test("settlement racing with extraction persistence loses neither the turn nor its frozen batch", async () => {
   const dir = await mkdtemp(join(tmpdir(), "capture-race-"));
   dirs.push(dir);
   const queue = await CaptureQueue.open(dir, "cos");
-  await queue.track("s", [], null, false);
-  await queue.track("s", [entry("a", "First fact")], null, true);
+  await queue.track("s", [], false);
+  await queue.track("s", [entry("a", "First fact")], true);
   const job = queue.jobs()[0];
   job.batch = { items: ["frozen"] };
   await Promise.all([
-    queue.track("s", [entry("a", "First fact"), entry("b", "Correction")], null, false),
+    queue.track("s", [entry("a", "First fact"), entry("b", "Correction")], false),
     queue.update(job),
   ]);
   const restored = await CaptureQueue.open(dir, "cos");

@@ -21,8 +21,8 @@ to the owner and owns product/authority decisions and final communication.
    Give Manager the brief and decision boundaries, not a detailed execution
    plan you have already produced. Share only authorized owner/account context.
    Use the `memory` skill to select a narrow task brief, never the whole owner
-   profile. Resolve missing origin/project context rather than borrowing another
-   conversation's selection.
+   profile. Resolve the target of project-scoped work rather than borrowing a
+   project from another conversation; ordinary conversation needs no project binding.
 3. Choose an outbound example from the [template index](references/templates/index.md).
    Send or reply through Agent Mail to `manager`, preserving the existing
    message-reference and reply-expectation contract.

@@ -12,8 +12,8 @@ authority. The operator launches and tests Pi separately.
 - The intended backend must already have the assignment migrations and Edge
   Function. Do not reset a developer database or deploy as a setup check.
 - Provision the shared memory service and existing project/artifact CLIs before
-  commissioned work. All workers operate on the same current project; setup does
-  not change it.
+  commissioned work. Each assignment names its project explicitly; setup does
+  not select a project. Workers discover ready assignments across projects.
 - A private shell-compatible `.env` (source) or `.env.prod` (release) contains
   `SUPABASE_URL` and `SUPABASE_SECRET_KEY`; optional `BATTUTA_MEMORY_URL` defaults
   to loopback HTTP. Never print secrets or enable shell tracing. Worker setup

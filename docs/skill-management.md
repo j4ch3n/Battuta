@@ -37,8 +37,10 @@ The owning implementation is `scripts/bot_setup/`; packaging reuses it.
 
 Releases archive the catalog once, including nested resources and notices,
 alongside the profile manifests. They contain no generated per-agent skill
-discovery output. Installed configuration validates metadata, not a fixed
-per-agent bundle. Runtime skill loading is intentionally not configured yet.
+discovery output. Installed CoS/Manager configuration validates selections but
+does not configure runtime discovery from them. Worker configuration writes
+selected shared catalog paths into Pi's native `skills` settings; it does not
+copy the catalog into each instance.
 
 Source setup validates selections before configuration writes and does not wipe
 custom discovery content. When removing generated checkout links, inspect them first;

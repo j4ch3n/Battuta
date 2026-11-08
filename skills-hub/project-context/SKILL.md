@@ -1,15 +1,15 @@
 ---
 name: project-context
-description: Use when discovering or selecting a project, inspecting checkout context and repository guidance, associating Linear projects, or inspecting and authoring canonical project documents.
+description: Use when discovering or initializing a project, inspecting checkout context and repository guidance, associating Linear projects, or inspecting and authoring canonical project documents.
 ---
 
 # Project context
 
 ## Overview
 
-`battuta-project` owns project discovery, selection, checkout context, summaries, repository guidance, and Linear association—not delivery judgement. Use the memory skill for prior project facts, decisions, requirements, implementation context, and project-specific preferences. Personal owner understanding is separate; short project facts do not belong in the owner profile. Project-spec agent tools own spec inventory, versioned documents, checklists/reviews, and terminal decisions. Obtain project/checkout locations from the CLI and document references from spec tools rather than assuming storage layout. Run commands from any directory.
+`battuta-project` owns project discovery, checkout context, summaries, repository guidance, and Linear association—not delivery judgement. Use the memory skill for prior project facts, decisions, requirements, implementation context, and project-specific preferences. Personal owner understanding is separate; short project facts do not belong in the owner profile. Project-spec agent tools own spec inventory, versioned documents, checklists/reviews, and terminal decisions. Obtain project/checkout locations from the CLI and document references from spec tools rather than assuming storage layout. Run commands from any directory.
 
-Use `list` to discover projects, `current` to read the selected name, and `switch` to select the intended project. Run `explain` and read applicable README/AGENTS guidance before project work. Use `inspect_specs` with that exact name to discover documents, then `describe_spec` for a named document's details and content. Spec tools use explicit project names and do not change CLI selection.
+Use `list` to discover projects. Pass the exact project name to `explain` and read applicable README/AGENTS guidance before project work. Use `inspect_specs` with that name to discover documents, then `describe_spec` for a named document's details and content. Each project-scoped operation names its target; conversations do not select an execution project.
 
 ## Document responsibilities
 
@@ -36,7 +36,7 @@ The seven specification responsibilities preserve original Spec Kit 1.0.13 wordi
 
 This binding takes precedence over upstream runtime assumptions in the imported prompts and templates. It supplies locations and invocation context, not a replacement authoring methodology.
 
-1. Discover projects with `battuta-project list` and check selection with `current`. Select the intended registered project and run `battuta-project explain`. Read applicable checkout README/AGENTS guidance and relevant memory. Ask which project or feature if the request is ambiguous.
+1. Discover projects with `battuta-project list` and run `battuta-project explain <project-name>` for the intended project. Read applicable checkout README/AGENTS guidance and relevant memory. Ask which project or feature if a project-scoped operation is ambiguous; ordinary conversation needs no project.
 2. Use the CLI's returned checkout and summary locations. Resolve named documents through `inspect_specs` and `describe_spec`; use returned version/artifact references. Spec tools manage document naming and storage. Existing unregistered files are preserved, not silently imported.
 3. Treat the current natural-language request as `$ARGUMENTS`, `{ARGS}`, and “User Input.” Slash-command spellings and `__SPECKIT_COMMAND_<NAME>__` tokens name responsibilities in the table above; they are not required user syntax or shell commands. Read the corresponding prompt only when that next responsibility is requested. Implementation, convergence, and issue conversion are not active entries.
 4. Read the selected `template.md` and use its document methodology, but persist managed outputs through the owning role's project-spec tools with full content. Upstream instructions to write/patch fixed filenames or create checklist variants are overridden: CoS creates immutable named document versions; Manager fully replaces the single canonical checklist/review. For constitutions, both roles use `read_constitution`; CoS uses `init_constitution`/`update_constitution` for complete versions of the canonical `Constitution` document. The project summary can still use ordinary file tools at its CLI-reported location. Do not install Spec Kit, initialize its infrastructure, or create shared current-feature state.
@@ -74,18 +74,17 @@ Read the relevant [command reference](references/commands.md) section before inv
 | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | Start a named project, with or without GitHub              | [Initialize a project](references/commands.md#initialize-a-project)                                                                      |
 | Associate a repository later                               | [Link GitHub later](references/commands.md#link-github-later)                                                                            |
-| Discover projects or check selection                       | [List projects](references/commands.md#list-registered-projects), [current selection](references/commands.md#read-the-current-selection) |
-| Change the project for subsequent work                     | [Switch projects](references/commands.md#switch-projects)                                                                                |
+| Discover projects                                         | [List projects](references/commands.md#list-registered-projects)                                                                         |
 | Read summary, workspace locations, and repository guidance | [Inspect project context](references/commands.md#inspect-project-context)                                                                |
 | Associate an existing Linear project or create one         | [Linear projects](references/commands.md#linear-projects)                                                                                |
 
 ### Project and global memory
 
-Use the `memory` skill for recall and autonomous memory management. Project memory is bound at request start to the selected registered checkout. A selection change applies to memory on the next request; it does not rebind an in-progress request. Choose project scope for project-specific facts and global scope for personal/cross-project facts; owner approval is not required.
+Use the `memory` skill for recall and autonomous memory management. Project facts have explicit project memberships, not a conversation or checkout binding. Recall defaults to all scopes unless filtered; automatic capture classifies facts across the project catalog. Reserve global scope for genuinely non-project facts, never unknown attribution.
 
 ## Workflow example
 
-Use `list` to discover registrations or initialize a new project by name, with or without GitHub. Run `current` to confirm selection, then `explain` and retrieve relevant memory before working in the reported checkout. Use `inspect_specs` with the explicit project name for document discovery. Selection is shared by bots using the same OS account; reselect the intended project before commands if another session may have switched it.
+Use `list` to discover projects or initialize a new project by name, with or without GitHub. Run `explain <project-name>` and retrieve relevant memory before working in the reported checkout. Use `inspect_specs` with the explicit project name for document discovery. Operations on another project name their own target without changing shared selection state.
 
 ## Reference files
 

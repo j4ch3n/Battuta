@@ -107,7 +107,7 @@ test("dedicated tool handlers persist full documents and enforce their schemas",
   const f = await fixture();
   try {
     const fake = fakePi();
-    register(fake.pi, { role: "cos", projectsRoot: f.projects });
+    register(fake.pi, { role: "cos" });
     const call = (name: string, args: unknown) => {
       const tool = fake.tools.get(name)!;
       return tool.execute(

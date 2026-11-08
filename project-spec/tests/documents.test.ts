@@ -50,7 +50,6 @@ test("no-GitHub project supports spec authoring and retains documents after link
   try {
     const config = {
       version: 1,
-      project: { name: "atlas", path: join(f.projects, "atlas/code") },
       github: { repository: null as string | null },
       linear: { project_id: null, team_id: null },
     };

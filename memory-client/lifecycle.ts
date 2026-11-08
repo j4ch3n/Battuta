@@ -21,7 +21,7 @@ interface Worker {
   notify: (message: string) => void;
 }
 export class CaptureRuntime {
-  private requests = new Map<string, { capture: boolean; project: string | null }>();
+  private requests = new Map<string, { capture: boolean }>();
   private active?: AbortController;
   private recovery?: Promise<void>;
   private stopped = false;
@@ -31,13 +31,13 @@ export class CaptureRuntime {
   ) {}
   async initialize(session: string, entries: readonly unknown[]) {
     this.requests.delete(session);
-    await this.queue.track(session, entries, null, false);
+    await this.queue.track(session, entries, false);
     this.initialized.add(session);
   }
   async startRequest(
     session: string,
     entries: readonly unknown[],
-    options: { capture: boolean; project: string | null } = { capture: true, project: null },
+    options: { capture: boolean } = { capture: true },
     signal?: AbortSignal,
   ) {
     // Session initialization must precede the first persisted request.
@@ -52,10 +52,10 @@ export class CaptureRuntime {
   async settle(session: string, entries: readonly unknown[]) {
     const request = this.requests.get(session);
     if (!request?.capture) {
-      await this.queue.track(session, entries, null, false, false);
+      await this.queue.track(session, entries, false, false);
       return;
     }
-    await this.queue.track(session, entries, request.project, false);
+    await this.queue.track(session, entries, false);
     await this.queue.flush(session);
     void this.recover().catch(() =>
       this.worker.notify("Memory capture pending; retained for retry"),
@@ -63,7 +63,7 @@ export class CaptureRuntime {
   }
   async flush(session: string, entries: readonly unknown[], endRequest = false) {
     const request = this.requests.get(session);
-    await this.queue.track(session, entries, request?.project ?? null, true, !!request?.capture);
+    await this.queue.track(session, entries, true, !!request?.capture);
     if (endRequest) this.requests.delete(session);
   }
   async beforeCompact(session: string, entries: readonly unknown[]) {

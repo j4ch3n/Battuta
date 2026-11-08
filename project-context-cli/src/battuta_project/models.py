@@ -26,30 +26,6 @@ class LinearProject(Model):
     url: Text
 
 
-class CurrentConfig(Model):
-    model_config = ConfigDict(extra="allow")
-    current_project: str | None = Field(default=None, alias="currentProject")
-
-    @field_validator("current_project")
-    @classmethod
-    def selected_name(cls, value):
-        return project_name(value) if value is not None else None
-
-
-class ProjectMetadata(Model):
-    name: str
-    path: Path
-
-    _name = field_validator("name")(project_name)
-
-    @field_validator("path", mode="before")
-    @classmethod
-    def parse_path(cls, value):
-        if isinstance(value, str) and value.strip():
-            return Path(value).expanduser()
-        return value
-
-
 class LinearConfig(Model):
     project_id: Text | None = None
     team_id: Text | None = None
@@ -61,7 +37,6 @@ class GithubConfig(Model):
 
 class ProjectConfig(Model):
     version: Literal[1] = 1
-    project: ProjectMetadata
     linear: LinearConfig = Field(default_factory=LinearConfig)
     github: GithubConfig = Field(default_factory=GithubConfig)
 
