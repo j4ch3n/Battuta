@@ -266,4 +266,4 @@ No generalized graph retrieval, reranker/cache, background indexer, arbitrary
 retention TTL, automatic private-history import, expanded inventory capacity,
 remote authentication or per-agent sandbox is included. See
 [operations and verification](../docs/memory-service.md) and the
-[tool workflow](../skills-hub/memory/references/tools.md).
+[tool reference](../docs/memory-tools.md).

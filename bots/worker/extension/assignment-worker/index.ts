@@ -85,11 +85,6 @@ export default function worker(pi: ExtensionAPI) {
       "mcp__assignments__get_assignment",
       "mcp__assignments__prepare_notes",
       "mcp__assignments__locate_notes",
-      "mcp__memory__memory_recall",
-      "mcp__memory__memory_list",
-      "mcp__memory__memory_get",
-      "mcp__memory__memory_health",
-      "mcp__memory__memory_global_relationships",
     ]);
     const supabaseUrl = process.env.SUPABASE_URL ?? "",
       secretKey = process.env.SUPABASE_SECRET_KEY ?? "";

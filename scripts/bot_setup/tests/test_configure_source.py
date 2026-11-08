@@ -12,7 +12,7 @@ from skill_fixtures import skill_catalog
 
 @pytest.mark.parametrize("role", ["cos", "manager"])
 def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
-    skill_catalog(tmp_path, role)
+    names = skill_catalog(tmp_path, role)
     bot = tmp_path / f"bots/{role}-bot"
     (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
     (bot / "AGENTS_dedicated.md").write_text("Dedicated")
@@ -33,7 +33,7 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
         runtime.assert_not_called()
     pi = bot / ".pi"
     assert (pi / "telegram.json").exists() == (role == "cos")
-    assert (pi / "skills/memory").is_symlink()
+    assert all((pi / "skills" / name).is_symlink() for name in names)
     assert json.loads((pi / "settings.json").read_text())["battutaMemoryCapture"]["enabled"] == (role == "cos")
     assert "assignments" in json.loads((pi / "mcp.json").read_text())["mcpServers"]
     assert not (tmp_path / "bots/worker/.pi/mcp.json").exists()

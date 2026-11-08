@@ -70,7 +70,7 @@ def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager", "worker"], s
         # A disabled override also blocks an inherited user-level memory server.
         servers["memory"] = {"url": url, "enabled": False}
     else:
-        servers.pop("memory", None)
+        servers["memory"] = {"enabled": False}
     servers["assignments"] = assignment
     if role == "worker":
         assignment["exposure"] = "hidden"

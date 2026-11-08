@@ -12,17 +12,17 @@ from bot_setup import skills
 
 def catalog(tmp_path):
     hub = tmp_path / "skills-hub"
-    for name in ("memory", "note-taking"):
+    for name in ("research", "note-taking"):
         source = hub / name
         source.mkdir(parents=True)
         (source / "SKILL.md").write_text(f"---\nname: {name}\n---\n")
     manifest = tmp_path / "bots/example/skills.json"
     manifest.parent.mkdir(parents=True)
-    manifest.write_text('{"skills":["memory"]}')
+    manifest.write_text('{"skills":["research"]}')
     return hub, manifest
 
 
-@pytest.mark.parametrize("text", ["{", "null", "[]", "{}", '{"skills":[],"role":"cos"}', '{"skills":"memory"}', '{"skills":[1]}', '{"skills":["memory","memory"]}', '{"skills":["missing"]}', '{"skills":["../memory"]}', '{"skills":["/memory"]}', '{"skills":["Memory"]}'])
+@pytest.mark.parametrize("text", ["{", "null", "[]", "{}", '{"skills":[],"role":"cos"}', '{"skills":"research"}', '{"skills":[1]}', '{"skills":["research","research"]}', '{"skills":["missing"]}', '{"skills":["../research"]}', '{"skills":["/research"]}', '{"skills":["Research"]}'])
 def test_invalid_manifest_is_rejected(tmp_path, text):
     hub, manifest = catalog(tmp_path)
     manifest.write_text(text)
@@ -30,7 +30,7 @@ def test_invalid_manifest_is_rejected(tmp_path, text):
         skills.load_selection(manifest, hub)
 
 
-@pytest.mark.parametrize("names", [["note-taking", "memory"], []])
+@pytest.mark.parametrize("names", [["note-taking", "research"], []])
 def test_selection_preserves_order_and_accepts_empty(tmp_path, names):
     hub, manifest = catalog(tmp_path)
     manifest.write_text(json.dumps({"skills": names}))
@@ -39,7 +39,7 @@ def test_selection_preserves_order_and_accepts_empty(tmp_path, names):
 
 def test_escaping_or_missing_entry_is_rejected(tmp_path):
     hub, manifest = catalog(tmp_path)
-    entry = hub / "memory/SKILL.md"
+    entry = hub / "research/SKILL.md"
     entry.unlink()
     with pytest.raises(click.ClickException):
         skills.load_selection(manifest, hub)
@@ -58,13 +58,13 @@ def test_index_content_is_not_repaired_by_working_tree(tmp_path):
     manifest.write_text('{"skills":["missing"]}')
     skills.check_manifests(tmp_path, staged=True)
     git("add", ".")
-    manifest.write_text('{"skills":["memory"]}')
+    manifest.write_text('{"skills":["research"]}')
     with pytest.raises(click.ClickException):
         skills.check_manifests(tmp_path, staged=True)
     git("add", ".")
-    (hub / "memory/SKILL.md").unlink()
+    (hub / "research/SKILL.md").unlink()
     git("add", ".")
-    (hub / "memory/SKILL.md").write_text("unstaged repair")
+    (hub / "research/SKILL.md").write_text("unstaged repair")
     with pytest.raises(click.ClickException):
         skills.check_manifests(tmp_path, staged=True)
 
@@ -82,7 +82,7 @@ def test_all_profiles_include_worker(tmp_path):
 @pytest.mark.parametrize("target", ["manifest", "entry"])
 def test_staged_symlinks_are_not_regular_manifest_or_entry_files(tmp_path, target):
     hub, manifest = catalog(tmp_path)
-    file = manifest if target == "manifest" else hub / "memory/SKILL.md"
+    file = manifest if target == "manifest" else hub / "research/SKILL.md"
     saved = tmp_path / "saved"
     file.rename(saved)
     file.symlink_to(saved)

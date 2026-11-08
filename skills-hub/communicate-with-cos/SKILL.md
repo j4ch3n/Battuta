@@ -15,21 +15,22 @@ CoS owns product commitments, owner clarification, and final owner communication
 1. Inspect the commission, relevant evidence, and explicit authority. Use the
    `project-context` skill for managed artifacts and your existing authoring
    tools. Do not wait for CoS to do the research or supply a detailed work plan.
-   Use the supplied memory brief as attributed evidence, not authority. Respect
-   confidence and expiry; ask CoS for missing or stale context, never access
-   memory directly. Return findings/corrections with original event references.
+   Use CoS-supplied user/project facts as attributed evidence, not authority.
+   Respect their uncertainty and freshness; ask CoS for missing or stale context,
+   never access memory directly. Return findings/corrections with original event
+   references.
 2. Investigate and plan the smallest complete outcome; execute or coordinate
    within the available runtime when authorized. Distinguish observations,
    inference, uncertainty, consequences, and meaningful deferred scope.
 3. Choose an outbound example from the [template index](references/templates/index.md).
    Report findings, progress, evidence-backed conclusions, blockers,
    recommendations, or a specific decision needed through Agent Mail to `cos`.
-    Preserve message references and the reply-expectation contract.
-    Report every delivery with project/assignment ID, actual TODO progress,
-     evidence, and remaining work. Inspect worker summaries and authoritative
-     progress; extension code owns execution status/completion. Use todo for
-     explicit blocked-work recovery, not routine worker completion writes.
-     Done/cancelled notes freeze; blocked working material remains editable.
+   Preserve message references and the reply-expectation contract.
+   Report every delivery with project/assignment ID, actual TODO progress,
+   evidence, and remaining work. Inspect worker summaries and authoritative
+   progress; extension code owns execution status/completion. Use todo for
+   explicit blocked-work recovery, not routine worker completion writes.
+   Done/cancelled notes freeze; blocked working material remains editable.
 4. Escalate missing authority, consequential product questions, and material
    scope changes to CoS. Follow settled scope unless new evidence or a concrete
    blocker requires reassessment. CoS-only save tools do not transfer authorship

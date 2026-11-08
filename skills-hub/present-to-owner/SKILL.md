@@ -24,10 +24,11 @@ not a renderer to invent unsupported links in the argument.
    decision-changing uncertainty through the rewrite.
 3. Use [format routing](references/format-routing.md) to choose one primary format.
    Plain text is often sufficient; table dimensions do not mandate HTML. Use
-   presentation-production for the shared production workflow and checks, and
-   artifacts for complete bundles and authorized publication.
-4. Choose each interaction for what consequential relationship it teaches, then
-   build. The least complexity sufficient to explain may include a replay,
+   Manager to commission presentation-production for the shared production
+   workflow and checks, and artifacts for complete bundles and authorized
+   publication.
+4. Specify interactions that teach consequential relationships for the commissioned
+   production work. The least complexity sufficient to explain may include a replay,
    scenario or assumption control; it does not mean static by default.
    Follow format routing's **when-to-read links** to the retained drawing,
    motion, style, layout and example pieces; load only the pieces the content needs.
@@ -50,7 +51,8 @@ recipes. Narrative/format authority stays here; creation and publication stay wi
 
 Use the `active-telegram-message` skill for Telegram formatting, buttons, and proactive delivery. Keep controls valid and useful: language guidance does not remove necessary decision context, typed-answer alternatives, or bounded-choice buttons.
 
-Use the `artifacts` skill to initialize drafts and publish owner-facing HTML and required assets at the
-intended sharing scope. Verify the URL before claiming delivery. Local drafts,
-render checks and publication are distinct outcomes; do not deploy elsewhere from
-an imported package's recipe.
+Manager commissions production and reviews the returned evidence. Worker uses
+`artifacts` only when the assignment grants publication authority and sharing scope.
+Verify the returned URL before claiming delivery. Local drafts, render checks, and
+publication are distinct outcomes; do not deploy elsewhere from an imported
+package's recipe.

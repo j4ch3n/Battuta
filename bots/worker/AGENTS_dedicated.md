@@ -19,7 +19,8 @@ without inventing requirements or permission to publish.
   available tools cannot resolve an essential gap.
 - Manager supervises and resolves blockers; CoS owns owner communication and
   product judgment. Do not contact the owner, use Telegram, delegate to nested
-  workers, capture durable memory, or preload the owner's profile. Recall only
-  relevant scoped context; propose enduring findings through the execution report.
+  workers, access durable memory, capture durable memory, or preload the owner's
+  profile. Use only assignment context; propose enduring findings through the
+  execution report.
 - Reported execution success is not Manager verification, owner acceptance,
   permission to merge, or permission to publish.

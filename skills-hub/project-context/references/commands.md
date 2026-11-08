@@ -1,6 +1,6 @@
 # Command usage
 
-Run `battuta-project` from any directory. The CLI owns project discovery and workspace management; [project-spec tools](spec-tools.md) own spec discovery and lifecycle. Use `list` to discover projects and pass the exact project name to each project-scoped command. Conversations have no execution-project binding. Use the `memory` skill for explicit memory scopes. Obtain locations from command/tool results rather than assuming storage layout.
+Run `battuta-project` from any directory. The CLI owns project discovery and workspace management; [project-spec tools](spec-tools.md) own spec discovery and lifecycle. Use `list` to discover projects and pass the exact project name to each project-scoped command. Conversations have no execution-project binding. CoS supplies prepared relevant memory context; obtain locations from command/tool results rather than assuming storage layout.
 
 A bare `battuta-project` invocation displays command help.
 
@@ -113,7 +113,7 @@ CoS uses `finalize_spec` with explicit project/name, go/no-go, and full rational
 
 ## Recall project and global memory
 
-Use the `memory` skill for scoped tools and autonomous memory management. Recall searches all scopes unless explicitly filtered. Automatic capture classifies individual facts against the project catalog, not a conversation project. Use explicit project memberships for project facts and `global` for genuinely non-project facts; multi-project facts may name several projects. Unknown attribution is omitted/deferred, never made global. Confirm live facts against current evidence.
+CoS's extension handles scoped recall and autonomous capture. Recall searches all scopes unless explicitly filtered. Automatic capture classifies individual facts against the project catalog, not a conversation project. Use explicit project memberships for project facts and `global` for genuinely non-project facts; multi-project facts may name several projects. Unknown attribution is omitted/deferred, never made global. Confirm live facts against current evidence.
 
 ## Typical workflow
 

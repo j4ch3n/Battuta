@@ -55,6 +55,7 @@ def test_release_setup_is_repeatable_without_skill_output(release, capsys):
         assert settings["battutaMemoryCapture"]["enabled"] == (role == "cos")
         servers = json.loads((pi / "mcp.json").read_text())["mcpServers"]
         assert ("luma" in servers) == (role == "cos")
+        assert servers["memory"]["enabled"] is False
         assert servers["assignments"]["headers"] == {"apikey": "${SUPABASE_SECRET_KEY}"}
         assert (pi / "settings.json").stat().st_mode & 0o777 == 0o600
     output = capsys.readouterr()

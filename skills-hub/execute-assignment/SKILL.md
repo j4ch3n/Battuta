@@ -16,7 +16,7 @@ claims, ordered progress, assignment completion, and mandatory Manager mail.
    project is a blocker, not permission to switch global selection.
 2. Inspect relevant code, documents, and sources. Investigate beyond suggested
    keywords when evidence requires it. Use research for external investigation;
-   memory is scoped read-only context, not current truth or execution authority.
+   supplied assignment context is not current truth or execution authority.
 3. Perform the smallest complete change/deliverable. For executable changes, write
    a meaningful failing test first, implement the fix, and run relevant regression
    checks. A blocked check is not a passed check. Avoid unrelated features.

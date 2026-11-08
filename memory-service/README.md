@@ -7,4 +7,4 @@ A headless, framework-independent MCP server for shared scoped memories, wrappin
 - Evidence-backed lifecycle metadata, expiry filtering, and scoped hybrid retrieval.
 - One shared SQLite store and verified offline embedding model.
 
-See [design: memory layers, scope, and lifecycle](DESIGN.md), [release setup](../RELEASE.md#extension-and-skill-setup-index), [operations](../docs/memory-service.md), and [tool workflow](../skills-hub/memory/references/tools.md).
+See [design: memory layers, scope, and lifecycle](DESIGN.md), [release setup](../RELEASE.md#extension-and-skill-setup-index), [operations](../docs/memory-service.md), and the [tool reference](../docs/memory-tools.md).

@@ -1,20 +1,11 @@
 {
   "skills": [
     "active-telegram-message",
-    "artifacts",
     "communicate-with-manager",
-    "draft-writing",
     "manage-google",
-    "note-taking",
     "owner-coaching",
-    "prd",
     "present-to-owner",
-    "problem-framing",
     "project-context",
-    "project-management",
-    "research",
-    "ticket-writing",
-    "todo",
-    "user-story"
+    "project-management"
   ]
 }

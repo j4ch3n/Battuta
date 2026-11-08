@@ -11,10 +11,10 @@ not a research ceremony. Local-only requests stay local.
 
 ## Workflow
 
-1. **Frame the question.** Identify the owner's purpose, existing knowledge,
-   constraints and the answer needed. Use memory for relevant owner/project context;
-   verify stale facts. Let context change priorities and explanation, not decorate
-   a generic report. Keep unrelated personal information private.
+1. **Frame the question.** Identify the purpose, existing knowledge, constraints
+   and the answer needed. Use supplied relevant owner/project context; verify
+   stale facts. Let context change priorities and explanation, not decorate a
+   generic report. Keep unrelated personal information private.
 2. **Investigate.** Read [investigation](references/investigation.md). Start with a
    provisional frame, inspect sources, then choose distinct investigative lenses.
    Follow evidence-driven questions and counterevidence rather than filling an

@@ -16,13 +16,18 @@ to the owner and owns product/authority decisions and final communication.
    and result needed. A quick factual check may be answered directly; delegate
    deeper research, analysis, planning, and execution primarily to Manager.
 2. Distinguish an investigation request from confirmed execution authorization.
-    Include the confirmed project in the commission; Manager determines the
-    solution and creates complete assignments/TODOs before workers can claim them.
+   Include the confirmed project in the commission; Manager determines the
+   solution and creates complete assignments/TODOs before workers can claim them.
    Give Manager the brief and decision boundaries, not a detailed execution
-   plan you have already produced. Share only authorized owner/account context.
-   Use the `memory` skill to select a narrow task brief, never the whole owner
-   profile. Resolve the target of project-scoped work rather than borrowing a
-   project from another conversation; ordinary conversation needs no project binding.
+   plan you have already produced. Include only authorized, task-relevant user
+   and project facts from prepared context: confirmed goals/preferences,
+   constraints, settled decisions, and relevant prior lessons. Preserve available
+   attribution, uncertainty, and freshness. Never forward the whole owner profile
+   or recall packet, and do not treat remembered facts as execution authority.
+   Disclose unavailable essential context; correct delivered facts by citing the
+   earlier Agent Mail message. Resolve the target of project-scoped work rather
+   than borrowing a project from another conversation; ordinary conversation needs
+   no project binding.
 3. Choose an outbound example from the [template index](references/templates/index.md).
    Send or reply through Agent Mail to `manager`, preserving the existing
    message-reference and reply-expectation contract.
