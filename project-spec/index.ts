@@ -8,13 +8,10 @@ import { registerReviewTools } from "./tools/review.ts";
 import { registerDecisionTools } from "./tools/decision.ts";
 import { registerConstitutionTools } from "./tools/constitution.ts";
 
-export default function projectSpec(
-  pi: ExtensionAPI,
-  options?: { role: Role; projectsRoot?: string },
-) {
+export default function projectSpec(pi: ExtensionAPI, options?: { role: Role }) {
   const role = options?.role ?? process.env.AGENT_ROLE;
   if (role !== "cos" && role !== "manager") throw new Error("AGENT_ROLE must be cos or manager");
-  const store = new ProjectSpecStore(role, options?.projectsRoot);
+  const store = new ProjectSpecStore(role);
   registerReadTools(pi, store);
   registerConstitutionTools(pi, store);
   registerGuards(pi, store.root);

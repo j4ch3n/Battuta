@@ -21,7 +21,10 @@ test("managed write/edit targets are protected including relative paths and syml
     const alias = join(f.root, "alias");
     await symlink(join(f.projects, "atlas/specs"), alias, "dir");
     assert.equal(await managedPath(file.path, f.root, f.projects), true);
-    assert.equal(await managedPath("projects/atlas/specs/index.json", f.root, f.projects), true);
+    assert.equal(
+      await managedPath(".battuta/projects/atlas/specs/index.json", f.root, f.projects),
+      true,
+    );
     await assert.rejects(
       managedPath(join(alias, "api-design/spec-v1.md"), f.root, f.projects),
       /symlink/i,

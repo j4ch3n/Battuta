@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { writeSpec, writeArtifact, type DocumentInput, type ReviewInput } from "./documents.ts";
 import { finalize, type DecisionInput } from "./decisions.ts";
 import { directory, readOptional, sha256 } from "./files.ts";
@@ -11,12 +11,9 @@ export type ConstitutionInput = Omit<DocumentInput, "name">;
 const constitutionName = "Constitution";
 export class ProjectSpecStore {
   readonly root: string;
-  constructor(
-    readonly role: Role,
-    root = defaultProjectsRoot(),
-  ) {
+  constructor(readonly role: Role) {
     if (role !== "cos" && role !== "manager") throw new Error("AGENT_ROLE must be cos or manager");
-    this.root = resolve(root);
+    this.root = defaultProjectsRoot();
   }
   private allow(role: Role) {
     if (this.role !== role) throw new Error(`Only ${role.toUpperCase()} can author this artifact`);
