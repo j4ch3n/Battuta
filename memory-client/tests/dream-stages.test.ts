@@ -17,7 +17,7 @@ test.each(["unknown-source", "cross-scope", "confidence-boost", "stale-evidence"
   "cleanup rejects %s before publication",
   (failure) => {
     const a = record(),
-      b = { ...record("b".repeat(64)), scope: { global: false, projects: ["atlas"] } };
+      b = { ...record("b".repeat(64)), projects: ["atlas"] };
     if (failure === "confidence-boost") a.memory_metadata!.confidence = "tentative";
     const fact = {
       id: "replacement",
@@ -119,6 +119,7 @@ async function fixture() {
   const writes: string[] = [];
   let loseAck = false;
   const deps: DreamDependencies = {
+    prepareProjects: () => Promise.resolve(["atlas", "beacon", "global"]),
     directory,
     now: () => new Date("2026-11-06T04:00:00Z"),
     complete: (prompt, evidence) => {
@@ -169,7 +170,7 @@ async function fixture() {
           ref,
           revision: digest(args),
           content: args.content,
-          scope: args.scope,
+          projects: args.projects,
           kind: args.kind,
           tags: [],
           sources: args.sources,
@@ -397,6 +398,43 @@ test("lost acknowledgement replays frozen request across days, never repeats sta
   await runDream(f.deps, new AbortController().signal);
   expect(f.writes).toHaveLength(1);
   expect(f.calls).toEqual(["cleanup", "synthesis", "challenge", "reflection"]);
+});
+
+test("invalid project publication leaves its originals intact without blocking another project", async () => {
+  const f = await fixture();
+  const original = [...f.records.values()][0];
+  const atlas = { ...original, projects: ["atlas"] };
+  const beacon = { ...original, ref: "c".repeat(64), projects: ["beacon"] };
+  f.records.set(atlas.ref, atlas);
+  f.records.set(beacon.ref, beacon);
+  f.deps.prepareProjects = () => Promise.resolve(["beacon", "global"]);
+  const complete = f.deps.complete;
+  f.deps.complete = (prompt, evidence, signal) => {
+    if (prompt.includes("Stage: cleanup"))
+      return Promise.resolve(
+        JSON.stringify({
+          dispositions: [atlas, beacon].map((r) => ({
+            ref: r.ref,
+            disposition: "replace",
+            replacement_id: r.projects[0],
+            reason: "Clarified fact",
+          })),
+          facts: [atlas, beacon].map((r) => ({
+            id: r.projects[0],
+            content: `Clarified ${r.projects[0]} fact`,
+            kind: "event",
+            source_refs: [r.ref],
+            memory_metadata: r.memory_metadata,
+          })),
+        }),
+      );
+    return complete(prompt, evidence, signal);
+  };
+  expect((await runDream(f.deps, new AbortController().signal)).status).toBe("partial");
+  expect(f.records.has(atlas.ref)).toBe(true);
+  expect(f.records.has(beacon.ref)).toBe(false);
+  expect([...f.records.values()].some((r) => r.content === "Clarified beacon fact")).toBe(true);
+  expect([...f.records.values()].some((r) => r.content === "Clarified atlas fact")).toBe(false);
 });
 
 test("a journaled legacy publication finishes with its original identity before v3 review, without graph or owner-file writes", async () => {

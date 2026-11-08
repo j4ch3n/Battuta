@@ -7,7 +7,7 @@ const record = (ref = a, projects = ["atlas"]) => ({
   ref,
   revision: "c".repeat(64),
   content: "Existing fact",
-  scope: { global: projects.length === 0, projects },
+  projects: projects.length ? projects : ["global"],
   kind: "decision",
   tags: [],
   sources: [{ agent_id: "cos", session_id: "s", entry_id: "e" }],
@@ -82,7 +82,7 @@ test("builds versioned updates with snapshot preconditions and stable insert ide
     arguments: {
       content: "Combined fact",
       kind: "decision",
-      scope: { global: false, projects: ["atlas"] },
+      projects: ["atlas"],
       sources: record().sources,
       idempotency_key: "dream:run:merge",
       evidence: [{ ref: a, revision: "c".repeat(64) }],

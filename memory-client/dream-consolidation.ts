@@ -56,7 +56,7 @@ export async function readGlobalHints(
     signal.throwIfAborted();
     if (result.status !== "current") return [];
     const revisions = new Map(
-      records.filter((r) => r.scope.global).map((r) => [r.ref, r.revision]),
+      records.filter((r) => r.projects[0] === "global").map((r) => [r.ref, r.revision]),
     );
     return result.edges.filter(
       (edge) =>

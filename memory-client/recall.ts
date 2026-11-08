@@ -38,10 +38,7 @@ export async function prepareCorrectionCandidates(
   const names = projects.filter((p) => p !== "global");
   const allowed = (record: MemoryRecord) => {
     try {
-      validateMemoryProjects(
-        record.scope.global ? ["global"] : record.scope.projects,
-        normalizedProjects(projects),
-      );
+      validateMemoryProjects(record.projects, normalizedProjects(projects));
       return true;
     } catch {
       return false;

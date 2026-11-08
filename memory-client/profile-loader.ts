@@ -35,7 +35,7 @@ export async function readValidatedProfile(directory: string, records: MemoryRec
   if (!profile.success) return "";
   const eligible = new Map(
     eligibleRecords(records, now)
-      .filter((r) => r.scope.global)
+      .filter((r) => r.projects[0] === "global")
       .map((r) => [r.ref, r]),
   );
   let content = "";

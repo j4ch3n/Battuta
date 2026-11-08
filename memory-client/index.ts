@@ -27,7 +27,9 @@ export default function memoryClient(pi: ExtensionAPI) {
       const config = clientConfig();
       const settings = await captureSettings(config.directory, config.role);
       if (!settings.enabled) throw new Error("Capture disabled");
-      const client = new MemoryMcpClient(config.url);
+      const client = new MemoryMcpClient(config.url, (signal) =>
+        loadProjectCatalog(config.registry, signal),
+      );
       runtime = new CaptureRuntime(await CaptureQueue.open(config.queue, config.role), {
         prepare: (_job, signal) => loadProjectCatalog(config.registry, signal),
         extract: async (job, signal) => {
@@ -46,7 +48,7 @@ export default function memoryClient(pi: ExtensionAPI) {
             candidates,
           );
         },
-        upload: (batch, signal) => client.capture(batch, signal),
+        upload: (batch, signal, catalog) => client.capture(batch, signal, catalog),
         now: () => Date.now(),
         notify: (message) => context.ui.setStatus("memory-capture", message),
       });

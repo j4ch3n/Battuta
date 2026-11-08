@@ -90,7 +90,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
                 items: [
                   {
                     content: "Owner reported buying an NS2.",
-                    scope: { global: true },
+                    projects: ["global"],
                     source_entry_ids: ["e0"],
                     keywords: ["NS2", "Nintendo", "Nintendo Switch 2", "gaming"],
                   },
@@ -214,7 +214,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
         "memory_remember",
         {
           content: "Owner may want console game suggestions",
-          scope: promoted.scope,
+          projects: promoted.projects,
           kind: "observation",
           sources: promoted.sources,
           idempotency_key: "console-interest",
@@ -245,7 +245,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
                 items: [
                   {
                     content: "Owner reported returning the NS2; it is no longer owned.",
-                    scope: { global: true },
+                    projects: ["global"],
                     source_entry_ids: ["returned"],
                     keywords: ["NS2", "Nintendo"],
                     correction: { ref: promoted.ref, revision: promoted.revision },

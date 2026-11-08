@@ -84,7 +84,11 @@ export function recordFingerprint(record: MemoryRecord, records: MemoryRecord[])
     if (metadata) delete (metadata as Partial<typeof metadata>).stage;
     return {
       content: r.content,
-      scope: r.scope,
+      // Keep historical review fingerprints when only the public shape changes.
+      scope: {
+        global: r.projects[0] === "global",
+        projects: r.projects[0] === "global" ? [] : [...r.projects].sort(),
+      },
       sources: r.sources,
       kind: r.kind,
       tags: r.tags,
@@ -133,8 +137,7 @@ export function selectUnprocessed(records: unknown[], reviewed: Record<string, s
   };
 }
 
-const scopeKey = (r: MemoryRecord) =>
-  JSON.stringify({ global: r.scope.global, projects: [...r.scope.projects].sort() });
+const scopeKey = (r: MemoryRecord) => JSON.stringify([...r.projects].sort());
 
 function validateClaim(
   claim: z.infer<typeof proposedClaim>,

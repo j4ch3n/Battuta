@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
@@ -15,6 +15,63 @@ const binding = (project: string | null, session_id = "s"): RequestBinding => ({
   admitted_at: "2026-11-06T10:00:00Z",
 });
 const prepare = () => Promise.resolve(["atlas", "beacon", "global"]);
+
+test("old frozen capture replays a copy with original digest and no catalog discovery", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-frozen-"));
+  try {
+    const batch = {
+      batch_id: "original",
+      payload_digest: "unchanged",
+      items: [{ item_id: "original:0", scope: { global: false, projects: ["atlas"] } }],
+    };
+    const state = {
+      version: 1,
+      seen: {},
+      pending: {},
+      jobs: [
+        {
+          id: "frozen",
+          session_id: "s",
+          segment: { project: "atlas", messages: [] },
+          batch,
+          attempts: 0,
+          nextAttempt: 0,
+        },
+      ],
+    };
+    await writeFile(join(dir, "state.json"), JSON.stringify(state));
+    const prepare = vi.fn(() => Promise.reject(new Error("must not rediscover")));
+    const extract = vi.fn(() => Promise.reject(new Error("must not reextract")));
+    const upload = vi.fn(
+      (copy: Record<string, unknown>, _signal: AbortSignal, catalog?: readonly string[]) => {
+        expect(copy).toMatchObject({
+          batch_id: "original",
+          payload_digest: "unchanged",
+          items: [{ item_id: "original:0", projects: ["atlas"] }],
+        });
+        expect(catalog).toEqual(["atlas"]);
+        return Promise.reject(new Error("lost acknowledgement"));
+      },
+    );
+    const queue = await CaptureQueue.open(dir, "cos");
+    const runtime = new CaptureRuntime(queue, {
+      prepare,
+      extract,
+      upload,
+      now: () => 0,
+      notify: () => {},
+    });
+    await runtime.recover();
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(extract).not.toHaveBeenCalled();
+    expect(JSON.parse(await readFile(join(dir, "state.json"), "utf8"))).toMatchObject({
+      jobs: [{ batch }],
+    });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 const entries = (count: number) =>
   Array.from({ length: count }, (_, i) => ({

@@ -4,7 +4,7 @@ export const record = (ref = "a".repeat(64)): MemoryRecord => ({
   ref,
   revision: "f".repeat(64),
   content: "Owner bought an NS2",
-  scope: { global: true, projects: [] },
+  projects: ["global"],
   kind: "event",
   tags: [],
   sources: [{ agent_id: "cos", session_id: "s", entry_id: "e" }],

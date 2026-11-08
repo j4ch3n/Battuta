@@ -93,7 +93,7 @@ const record = (ref: string, content: string, global = false): MemoryRecord =>
     ref,
     revision: hash(content),
     content,
-    scope: { global, projects: global ? [] : ["atlas"] },
+    projects: global ? ["global"] : ["atlas"],
     kind: "observation",
     tags: [],
     sources: [],
@@ -120,7 +120,7 @@ async function fixture() {
     hash(
       JSON.stringify(
         [...records.values()]
-          .filter((r) => r.scope.global)
+          .filter((r) => r.projects[0] === "global")
           .map((r) => [r.ref, r.revision])
           .sort(),
       ),
@@ -128,6 +128,7 @@ async function fixture() {
   let planCalls = 0,
     loseAck = false;
   const dependencies: DreamDependencies = {
+    prepareProjects: () => Promise.resolve(["atlas", "beacon", "global"]),
     directory,
     now: () => new Date("2026-10-21T04:00:00Z"),
     call: (name, args) => {
@@ -195,8 +196,7 @@ async function fixture() {
         if (!existing)
           records.set(ref, {
             ...record(ref, String(args.content)),
-            scope:
-              name === "memory_remember" ? (args.scope as MemoryRecord["scope"]) : target!.scope,
+            projects: name === "memory_remember" ? (args.projects as string[]) : target!.projects,
           });
         if (name === "memory_update") {
           records.delete(String(args.ref));
@@ -762,7 +762,7 @@ test("next day revisits concurrent captures and membership revisions, not the fi
         f.records.set(external, record(external, "Concurrent capture", true));
         f.records.set(old, {
           ...f.records.get(old)!,
-          scope: { global: false, projects: ["atlas", "beacon"] },
+          projects: ["atlas", "beacon"],
           revision: hash("membership changed"),
         });
       }
@@ -1048,7 +1048,7 @@ test.each(["atlas", "beacon"])(
     const external = hash("after cutoff");
     f.records.set(external, {
       ...record(external, "Captured after frozen cutoff"),
-      scope: { global: false, projects: [project] },
+      projects: [project],
     });
     const call = f.dependencies.call;
     let day = 1,
@@ -1097,7 +1097,7 @@ test("only the acknowledged output revision is handled, not a later external mem
     if (prompt.startsWith("Refresh") && day === 1)
       f.records.set(output, {
         ...f.records.get(output)!,
-        scope: { global: false, projects: ["atlas", "beacon"] },
+        projects: ["atlas", "beacon"],
         revision: hash("edited output membership"),
       });
     if (prompt.startsWith("Write a private") && day === 2)

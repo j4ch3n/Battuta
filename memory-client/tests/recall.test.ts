@@ -90,7 +90,7 @@ test("undisclosed support remains available for dependency revalidation", async 
 test("corrections can target expired events behind live historical patterns, never foreign scope", async () => {
   const event = record("b".repeat(64)),
     pattern = record(),
-    foreign = { ...record("c".repeat(64)), scope: { global: false, projects: ["beacon"] } };
+    foreign = { ...record("c".repeat(64)), projects: ["beacon"] };
   event.memory_metadata!.expires_at = "2020-01-01T00:00:00Z";
   pattern.memory_metadata!.evidence = [
     { ref: event.ref, revision: event.revision, relation: "supports", requirement: "historical" },

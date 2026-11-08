@@ -49,7 +49,7 @@ export async function extractMemories(
             content: JSON.stringify({
               project: job.segment.project,
               available_projects: job.project_catalog,
-              rejected_entries: job.project_rejections?.map((rejection) => ({
+              rejected_entries: job.project_inputs?.map((rejection) => ({
                 ...rejection,
                 error: "Select projects only from available_projects",
                 retry_entry_id: rejection.index,
@@ -82,8 +82,8 @@ export async function extractMemories(
     if (item.tags.some((t) => t.includes(",") || /^(scope|proj|kind):/.test(t)))
       throw new Error("Invalid extracted memory tag");
     let index = i;
-    if (job.project_rejections?.length) {
-      const rejected = job.project_rejections.find((r) => r.index === item.retry_entry_id);
+    if (job.project_inputs?.length) {
+      const rejected = job.project_inputs.find((r) => r.index === item.retry_entry_id);
       if (
         !rejected ||
         retried.has(rejected.index) ||
@@ -116,7 +116,7 @@ export async function extractMemories(
         (r) =>
           r.ref === item.correction?.ref &&
           r.revision === item.correction.revision &&
-          JSON.stringify(normalizedProjects(r.scope.global ? ["global"] : r.scope.projects)) ===
+          JSON.stringify(normalizedProjects(r.projects)) ===
             JSON.stringify(normalizedProjects(projects)),
       )
     )
@@ -163,7 +163,7 @@ export async function extractMemories(
       },
     ];
   });
-  if (job.project_rejections?.length && retried.size !== job.project_rejections.length)
+  if (job.project_inputs?.length && retried.size !== job.project_inputs.length)
     throw new Error("Project correction omitted rejected entries");
   const payload = {
     session_id: job.session_id,

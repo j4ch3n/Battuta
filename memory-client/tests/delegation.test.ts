@@ -54,9 +54,7 @@ test.each(["stale", "scope"])("%s selection is rejected instead of widened", asy
         name === "memory_get"
           ? { ...r, revision: "c".repeat(64) }
           : {
-              records: [
-                failure === "scope" ? { ...r, scope: { global: false, projects: ["other"] } } : r,
-              ],
+              records: [failure === "scope" ? { ...r, projects: ["other"] } : r],
             },
       ),
   };

@@ -39,5 +39,4 @@ export function validateMemoryProjects(projects: unknown, catalog: readonly stri
   return result.data;
 }
 
-export const normalizedProjects = (projects: readonly string[]) =>
-  [...new Set(projects.map((p) => p.toLowerCase()))].sort();
+export { normalizedProjects } from "./canonical.ts";

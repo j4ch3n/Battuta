@@ -46,7 +46,7 @@ test.each(scenarios)(
         ref: ref(memory.id),
         revision: digest(memory),
         content: memory.content,
-        scope: { global: !memory.project, projects: memory.project ? [memory.project] : [] },
+        projects: memory.project ? [memory.project] : ["global"],
         kind: "observation",
         tags: [],
         active: true,

@@ -164,3 +164,36 @@ test("saves catalog-valid entries across projects and returns only invalid entri
   ]);
   expect(result.project_rejections).toMatchObject([{ index: 2, item: items[2] }]);
 });
+
+test("project correction and embedding rephrase never regenerate accepted entries", async () => {
+  const rejected = { content: "Wrong project", projects: ["unknown"], source_entry_ids: ["e"] };
+  const retry = {
+    ...job,
+    projectAttempts: 1,
+    rephraseAttempts: 1,
+    project_inputs: [{ index: 2, item: rejected }],
+  };
+  const corrected = {
+    content: "Beacon uses SQLite",
+    projects: ["beacon"],
+    source_entry_ids: ["e"],
+    retry_entry_id: 2,
+  };
+  const result = await extractMemories(
+    retry,
+    context(JSON.stringify({ items: [corrected] })),
+    new AbortController().signal,
+  );
+  expect(result.batch.items[0].item_id).toBe("job:projects:1:rephrase:2");
+  expect(result.project_rejections).toEqual([]);
+  await expect(
+    extractMemories(
+      retry,
+      context(JSON.stringify({ items: [{ ...corrected, retry_entry_id: 0 }] })),
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow("identity");
+  await expect(
+    extractMemories(retry, context('{"items":[]}'), new AbortController().signal),
+  ).rejects.toThrow("omitted");
+});

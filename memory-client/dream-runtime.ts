@@ -47,12 +47,20 @@ import {
 } from "./records.ts";
 import { digest } from "./canonical.ts";
 import { boundedQuery } from "./recall.ts";
+import { normalizePersistedCheckpoint } from "./delivery-compat.ts";
+import { normalizedProjects, validateMemoryProjects } from "./projects.ts";
 
 export interface DreamDependencies {
   directory: string;
   now: () => Date;
   complete: DreamComplete;
-  call: (name: string, args: Record<string, unknown>, signal: AbortSignal) => Promise<unknown>;
+  call: (
+    name: string,
+    args: Record<string, unknown>,
+    signal: AbortSignal,
+    catalog?: readonly string[],
+  ) => Promise<unknown>;
+  prepareProjects?: (signal: AbortSignal) => Promise<string[]>;
 }
 const ref = z.string().regex(/^[0-9a-f]{64}$/);
 const inventorySchema = z.object({
@@ -64,6 +72,7 @@ const inventorySchema = z.object({
 });
 const profileSchema = personalProfileSchema.extend({ content: z.string().max(32000) });
 const checkpointSchema = z.object({
+  project_catalog: z.array(z.string()).optional(),
   version: z.union([z.literal(1), z.literal(2)]),
   run_id: z.string().datetime(),
   window_start: z.number(),
@@ -176,10 +185,22 @@ async function prepare(
       ) as unknown)
     : { operations: [] };
   const plan = validateDreamPlan(input, inventory.records, recent);
+  const project_catalog = plan.operations.some((operation) => operation.type === "insert")
+    ? await deps.prepareProjects?.(signal)
+    : undefined;
   // Preflight every request before any writes (including citation count limits).
-  for (const operation of plan.operations)
-    mutationRequest(operation, inventory.records, dreamRunId(now));
+  for (const operation of plan.operations) {
+    const request = mutationRequest(operation, inventory.records, dreamRunId(now));
+    if (request.name === "memory_remember") {
+      if (!project_catalog) throw new Error("Dream project catalog unavailable");
+      validateMemoryProjects(
+        (request.arguments as Record<string, unknown>).projects,
+        normalizedProjects(project_catalog),
+      );
+    }
+  }
   return {
+    project_catalog,
     version: 2,
     run_id: dreamRunId(now),
     window_start: start,
@@ -209,7 +230,9 @@ async function refreshProfile(
   const current = (await readOwnerProfile(deps.directory)) ?? "";
   const inventory = await snapshot(deps, state.window_start, state.window_end, signal);
   const supported = (records: typeof inventory.records) => {
-    const active = new Map(records.filter((r) => r.scope.global).map((r) => [r.ref, r.revision]));
+    const active = new Map(
+      records.filter((r) => r.projects[0] === "global").map((r) => [r.ref, r.revision]),
+    );
     return (
       state.profile &&
       Object.values(state.profile.sections)
@@ -267,7 +290,7 @@ async function refreshProfile(
             current_profile: current,
             previous_evidence: previous,
             previously_tracked_statements: state.profile_tracking,
-            global_memories: inventory.records.filter((r) => r.scope.global),
+            global_memories: inventory.records.filter((r) => r.projects[0] === "global"),
             inactive_refs: inventory.inactive,
           }),
           signal,
@@ -360,7 +383,9 @@ export async function runLegacyDream(
   try {
     const path = join(deps.directory, "dream-state.json");
     const text = await optionalText(path);
-    const previous = text ? checkpointSchema.parse(JSON.parse(text)) : undefined;
+    const previous = text
+      ? checkpointSchema.parse(normalizePersistedCheckpoint(JSON.parse(text)))
+      : undefined;
     if (mutationsOnly && (!previous || previous.completed)) return { status: "already_completed" };
     if (previous?.completed && previous.run_id === dreamRunId(deps.now()))
       return publicOutcome(previous);
@@ -400,7 +425,14 @@ export async function runLegacyDream(
         const result = z
           .object({ ref })
           .passthrough()
-          .parse(await deps.call(request.name, request.arguments, signal));
+          .parse(
+            await deps.call(
+              request.name,
+              request.arguments,
+              signal,
+              state.project_catalog ? normalizedProjects(state.project_catalog) : undefined,
+            ),
+          );
         if (operation.type === "forget" && result.forgotten !== true)
           throw new Error("Forget not acknowledged");
         state.results.push({
@@ -492,7 +524,11 @@ const stageCheckpointSchema = z.object({
   }),
   requests: z.record(
     z.string(),
-    z.object({ name: z.string(), args: z.record(z.string(), z.unknown()) }),
+    z.object({
+      name: z.string(),
+      args: z.record(z.string(), z.unknown()),
+      catalog: z.array(z.string()).optional(),
+    }),
   ),
   results: z.array(
     z.object({ id: z.string(), result: z.object({ ref, revision: ref }).passthrough() }),
@@ -676,14 +712,29 @@ async function publishStages(
     if (!state.requests[id]) {
       const request = await build();
       if (!request) return;
-      state.requests[id] = request;
+      let catalog: string[] | undefined;
+      if (request.name === "memory_remember") {
+        catalog = await deps.prepareProjects?.(signal);
+        if (!catalog) throw new Error("Dream project catalog unavailable");
+        try {
+          validateMemoryProjects(request.args.projects, normalizedProjects(catalog));
+        } catch {
+          state.conflict = true;
+          await save();
+          return;
+        }
+      }
+      state.requests[id] = {
+        ...request,
+        ...(catalog ? { catalog: normalizedProjects(catalog) } : {}),
+      };
       await save();
     }
     const request = state.requests[id];
     const result = z
       .object({ ref, revision: ref })
       .passthrough()
-      .parse(await deps.call(request.name, request.args, signal));
+      .parse(await deps.call(request.name, request.args, signal, request.catalog));
     state.results.push({ id, result });
     await save();
   };
@@ -716,7 +767,7 @@ async function publishStages(
           name: "memory_remember",
           args: {
             content: fact.content,
-            scope: sources[0].scope,
+            projects: sources[0].projects,
             kind: fact.kind,
             sources: [
               ...new Map(
@@ -750,7 +801,7 @@ async function publishStages(
           name: "memory_remember",
           args: {
             content: proposal.content,
-            scope: sources[0].scope,
+            projects: sources[0].projects,
             kind: proposal.kind,
             sources: [
               ...new Map(
@@ -824,9 +875,13 @@ export async function runDream(
       ? z.object({ version: z.number() }).parse(JSON.parse(raw))
       : undefined;
     const previous =
-      previousHeader?.version === 3 ? stageCheckpointSchema.parse(JSON.parse(raw!)) : undefined;
+      previousHeader?.version === 3
+        ? stageCheckpointSchema.parse(normalizePersistedCheckpoint(JSON.parse(raw!)))
+        : undefined;
     const legacy =
-      raw && previousHeader?.version !== 3 ? checkpointSchema.parse(JSON.parse(raw)).results : [];
+      raw && previousHeader?.version !== 3
+        ? checkpointSchema.parse(normalizePersistedCheckpoint(JSON.parse(raw))).results
+        : [];
     if (previous?.completed && previous.run_id === dreamRunId(deps.now()))
       return previous.pending.length || previous.conflict
         ? { status: "partial" }
@@ -895,8 +950,8 @@ export async function runDream(
             "memory_recall",
             {
               query: boundedQuery(proposal.content),
-              selector: source.scope.global ? "global" : "projects",
-              projects: source.scope.projects,
+              selector: source.projects[0] === "global" ? "global" : "projects",
+              projects: source.projects[0] === "global" ? [] : source.projects,
               include_global: false,
               include_expired: true,
               limit: 20,
@@ -1005,7 +1060,7 @@ export async function runDream(
       })),
     ];
     const eligible = eligibleRecords(valid, deps.now()).filter(
-      (r) => r.scope.global && r.memory_metadata?.stage === "durable",
+      (r) => r.projects[0] === "global" && r.memory_metadata?.stage === "durable",
     );
     await atomicPrivateWrite(
       join(deps.directory, "dream-profile.json"),

@@ -37,7 +37,7 @@ const operationSchema = z.discriminatedUnion("type", [
 export const dreamPlanSchema = z.object({ operations: z.array(operationSchema).max(100) }).strict();
 export type DreamOperation = z.infer<typeof operationSchema>;
 export const scopeKey = (record: MemoryRecord) =>
-  record.scope.global ? "global" : [...record.scope.projects].sort().join(",");
+  record.projects[0] === "global" ? "global" : JSON.stringify([...record.projects].sort());
 
 // Call with preceding planned operations for preflight, and only acknowledged
 // operations for dispatch. Never substitute externally withdrawn citations.
@@ -110,7 +110,7 @@ export function mutationRequest(operation: DreamOperation, records: MemoryRecord
       arguments: {
         content: operation.content,
         kind: operation.kind,
-        scope: evidence[0].scope,
+        projects: evidence[0].projects,
         sources,
         evidence: guards,
         idempotency_key: `dream:${runId}:${operation.id}`,

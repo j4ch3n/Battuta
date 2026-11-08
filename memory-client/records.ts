@@ -83,10 +83,7 @@ export const memoryRecordSchema = z
       .min(1)
       .max(16000)
       .refine((v) => redact(v) === v, "Unsafe memory text"),
-    scope: z
-      .object({ global: z.boolean(), projects: z.array(z.string()) })
-      .strict()
-      .refine((s) => (s.global ? s.projects.length === 0 : s.projects.length > 0)),
+    projects: memoryProjectsSchema,
     kind: z.string(),
     tags: z.array(z.string()),
     sources: z.array(
@@ -116,7 +113,10 @@ export const memoryRecordSchema = z
 export type MemoryRecord = z.infer<typeof memoryRecordSchema>;
 
 export function inRequestScope(record: MemoryRecord, project: string | null) {
-  return record.scope.global || (project !== null && record.scope.projects.includes(project));
+  return (
+    record.projects[0] === "global" ||
+    (project !== null && record.projects.includes(project.toLowerCase()))
+  );
 }
 
 export function eligibleRecords(records: MemoryRecord[], now: Date, includeExpired = false) {
@@ -139,9 +139,7 @@ export function eligibleRecords(records: MemoryRecord[], now: Date, includeExpir
       const support = lookup.get(link.ref);
       return (
         support?.revision === link.revision &&
-        support.scope.global === r.scope.global &&
-        JSON.stringify([...support.scope.projects].sort()) ===
-          JSON.stringify([...r.scope.projects].sort()) &&
+        JSON.stringify([...support.projects].sort()) === JSON.stringify([...r.projects].sort()) &&
         valid(link.ref, link.requirement === "historical", new Set([...visiting, ref]))
       );
     });

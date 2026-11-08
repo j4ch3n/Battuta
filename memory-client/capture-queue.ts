@@ -8,14 +8,17 @@ import {
   type CaptureSegment,
 } from "./session-messages.ts";
 import type { RequestBinding } from "./binding.ts";
+import { normalizePersistedCapture } from "./delivery-compat.ts";
 
 import { digest } from "./canonical.ts";
 export { canonical, digest } from "./canonical.ts";
 export interface CaptureJob {
   project_catalog?: string[];
   project_rejections?: { index: number; item: Record<string, unknown> }[];
+  project_inputs?: { index: number; item: Record<string, unknown> }[];
   projectAttempts?: number;
   batch_uploaded?: boolean;
+  legacy_delivery?: boolean;
   rephraseAttempts?: number;
   blocked?: boolean;
   blocked_reason?: "unbound-origin";
@@ -73,6 +76,21 @@ export class CaptureQueue {
     }
     if (state.version !== 1 || !state.seen || !state.pending || !Array.isArray(state.jobs))
       throw new Error("Invalid capture queue");
+    for (const job of state.jobs) {
+      if (
+        job.batch &&
+        Array.isArray(job.batch.items) &&
+        job.batch.items.some(
+          (item: unknown) => !!item && typeof item === "object" && "scope" in item,
+        )
+      ) {
+        const copy = normalizePersistedCapture(job.batch);
+        job.project_catalog = [
+          ...new Set(copy.items.flatMap((item) => item.projects as string[])),
+        ].sort();
+        job.legacy_delivery = true;
+      }
+    }
     return new CaptureQueue(directory, role, state);
   }
   private async save(next: State) {

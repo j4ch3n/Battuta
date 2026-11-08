@@ -1,5 +1,6 @@
 import type { CaptureJob, CaptureQueue } from "./capture-queue.ts";
 import type { RequestBinding } from "./binding.ts";
+import { normalizePersistedCapture } from "./delivery-compat.ts";
 
 interface Worker {
   prepare: (job: CaptureJob, signal: AbortSignal) => Promise<string[]>;
@@ -104,7 +105,14 @@ export class CaptureRuntime {
           await this.queue.update(job);
         }
         if (!job.batch_uploaded) {
-          await this.worker.upload(job.batch, signal, job.project_catalog);
+          await this.worker.upload(
+            job.legacy_delivery ? normalizePersistedCapture(job.batch) : job.batch,
+            signal,
+            job.project_catalog ??
+              (Array.isArray(job.batch.items) && job.batch.items.length === 0
+                ? ["global"]
+                : undefined),
+          );
           signal.throwIfAborted();
           job.batch_uploaded = true;
           await this.queue.update(job);
@@ -114,6 +122,7 @@ export class CaptureRuntime {
           if (job.projectAttempts) job.blocked = true;
           else {
             job.projectAttempts = 1;
+            job.project_inputs = job.project_rejections;
             delete job.batch;
             delete job.batch_uploaded;
           }

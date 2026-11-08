@@ -11,11 +11,16 @@ export function canonical(value: unknown): string {
 export const digest = (value: unknown) =>
   createHash("sha256").update(canonical(value)).digest("hex");
 
+export const normalizedProjects = (projects: readonly string[]) =>
+  [...new Set(projects.map((p) => p.toLowerCase()))].sort((a, b) =>
+    Buffer.compare(Buffer.from(a), Buffer.from(b)),
+  );
+
 export function capturePayloadDigest(payload: Record<string, unknown>): string {
   const items = (payload.items as Record<string, unknown>[]).map((item) => {
     if (!Array.isArray(item.projects)) return item;
     const { projects: names, ...rest } = item;
-    const projects = [...new Set((names as string[]).map((p) => p.toLowerCase()))].sort();
+    const projects = normalizedProjects(names as string[]);
     return {
       ...rest,
       scope: {
