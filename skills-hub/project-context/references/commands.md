@@ -16,7 +16,7 @@ Use `init` once to register a named project, create its managed workspace, and r
 battuta-project init linth
 ```
 
-The project name must be a nonblank, nonhidden direct folder name without slashes, backslashes, or NUL. Quote names containing spaces. Memory uses explicit project labels in its shared store; no project-local memory store is created. Spec tools operate on managed project storage without requiring GitHub.
+The project name must be a nonblank, nonhidden direct folder name without slashes, backslashes, or NUL. Shell-quote names containing spaces or special characters. For names beginning with `-`, place command options first, then `--` before positional arguments, for example `battuta-project explain -- '-atlas'`. Memory uses explicit project labels in its shared store; no project-local memory store is created. Spec tools operate on managed project storage without requiring GitHub.
 
 The summary has Purpose, Users and use cases, Scope, Current capabilities, and Specifications sections with explicit unknowns. Initialization does not establish spec storage or a constitution. Managed documents are created by spec tools only when requested.
 

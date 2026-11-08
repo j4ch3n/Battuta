@@ -4,4 +4,5 @@ Initialized project: {{ name }}
 - Config: {{ root | display_path }}/project.yaml
 - Summary: {{ root | display_path }}/SUMMARY.md
 
-Next: battuta-project explain {{ name }}, then fill the project summary from confirmed context.
+Next: battuta-project explain -- {{ name | shell_quote }}
+Fill the project summary from confirmed context.

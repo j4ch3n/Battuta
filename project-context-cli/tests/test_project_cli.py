@@ -30,11 +30,20 @@ class CliTests(ProjectTestCase):
         self.assertIn("Initialized project: harbor-web", output)
         self.assertIn("~/.battuta/projects/harbor-web/code", output)
         self.assertNotIn("Current project:", output)
-        self.assertIn("battuta-project explain harbor-web", output)
         self.assertIn("Summary: ~/.battuta/projects/harbor-web/SUMMARY.md", output)
         self.assertNotIn("Specs Root:", output)
         self.assertNotIn("Constitution:", output)
         self.assertNotIn("Memory:", output)
+
+    def test_init_suggests_executable_command_for_exact_name(self):
+        for name in ("My 项目", "owner's $(printf injected); &", "-atlas"):
+            with self.subTest(name=name):
+                output = self.invoke("init", "--", name)
+                command = next(line.removeprefix("Next: ") for line in output.splitlines() if line.startswith("Next: "))
+                arguments = shlex.split(command)
+                self.assertEqual(arguments, ["battuta-project", "explain", "--", name])
+                explained = self.invoke(*arguments[1:])
+                self.assertIn(f".battuta/projects/{name}/code", explained)
 
     def test_selection_commands_are_removed(self):
         for command in ("current", "switch"):
@@ -217,22 +226,27 @@ class CliTests(ProjectTestCase):
             self.assertEqual(requests, [])
 
     def test_linear_create_recovery_names_exact_project(self):
-        self.registry.init("My 项目")
-        self.project = self.registry.load("My 项目")
-        path = self.project.root / "project.yaml"
-        original = path.read_text()
-        with linear_http(CREATED_PROJECT) as requests, patch("battuta_project.storage.os.replace", side_effect=OSError("disk full")):
-            result = self.runner.invoke(main, ["linear", "create", "My 项目", "Atlas", "--team-id", "team-1"])
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("created", result.output.lower())
-        self.assertIn("project-1", result.output)
-        self.assertIn("https://linear.app/team/project/atlas", result.output)
-        recovery = result.output.strip().splitlines()[-1]
-        self.assertEqual(shlex.split(recovery), ["battuta-project", "linear", "link", "My 项目", "project-1,team-1"])
-        self.assertNotIn("switch", result.output)
-        self.assertIn("disk full", result.output)
-        self.assertEqual(path.read_text(), original)
-        self.assertEqual(len(requests), 1)
+        for name in ("My 项目", "owner's $(printf injected); &", "-atlas"):
+            with self.subTest(name=name):
+                project = self.registry.init(name)
+                path = project.root / "project.yaml"
+                original = path.read_text()
+                with linear_http(CREATED_PROJECT) as requests, patch("battuta_project.storage.os.replace", side_effect=OSError("disk full")):
+                    result = self.runner.invoke(main, ["linear", "create", "--team-id", "team-1", "--", name, "Atlas"])
+                self.assertNotEqual(result.exit_code, 0)
+                self.assertIn("created", result.output.lower())
+                self.assertIn("project-1", result.output)
+                self.assertIn("https://linear.app/team/project/atlas", result.output)
+                recovery = shlex.split(result.output.strip().splitlines()[-1])
+                self.assertEqual(recovery, ["battuta-project", "linear", "link", "--", name, "project-1,team-1"])
+                self.assertNotIn("switch", result.output)
+                self.assertIn("disk full", result.output)
+                self.assertEqual(path.read_text(), original)
+                self.assertEqual(len(requests), 1)
+                with linear_http() as recovery_requests:
+                    self.invoke(*recovery[1:])
+                self.assertEqual(recovery_requests, [])
+                self.assertEqual(self.registry.load(name).config.linear.project_id, "project-1")
 
     def test_create_unreadable_local_config_reports_remote_success_and_recovery(self):
         def created(request):
@@ -245,7 +259,7 @@ class CliTests(ProjectTestCase):
         self.assertIn("project.yaml", result.output)
         self.assertIn("project-1", result.output)
         self.assertIn("https://linear.app/team/project/atlas", result.output)
-        self.assertIn("linear link atlas-api project-1,team-1", result.output)
+        self.assertIn("linear link -- atlas-api project-1,team-1", result.output)
         self.assertEqual(len(requests), 1)
 
     def test_name_only_init_creates_discoverable_project_without_github(self):

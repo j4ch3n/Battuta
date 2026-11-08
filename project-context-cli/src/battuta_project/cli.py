@@ -125,7 +125,7 @@ def create(token: str, project_name: str, name: str, team_id: str):
     try:
         linked = registry.link_linear(project, LinearConfig(project_id=remote.id, team_id=team_id))
     except click.ClickException as error:
-        recovery = shlex.join(["battuta-project", "linear", "link", project.name, f"{remote.id},{team_id}"])
+        recovery = shlex.join(["battuta-project", "linear", "link", "--", project.name, f"{remote.id},{team_id}"])
         raise click.ClickException(
             f"Linear project was created: {remote.id} ({remote.url}), but its local link could not be saved: {error}.\n"
             f"After fixing the local error, recover with:\n{recovery}"
