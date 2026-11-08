@@ -3,7 +3,30 @@ import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, expect, test, vi } from "vitest";
-import { runLegacyDream as runDream, type DreamDependencies } from "../dream-runtime.ts";
+import {
+  dreamRunId,
+  runLegacyDream as runDream,
+  type DreamDependencies,
+} from "../dream-runtime.ts";
+
+test.each([
+  [2026, 10, 8, 5, 29, 59, 999, 2026, 10, 7],
+  [2026, 10, 8, 5, 30, 0, 0, 2026, 10, 8],
+  [2026, 10, 8, 23, 59, 0, 0, 2026, 10, 8],
+  [2026, 10, 1, 0, 0, 0, 0, 2026, 9, 31],
+  [2027, 0, 1, 0, 0, 0, 0, 2026, 11, 31],
+  [2026, 2, 8, 5, 29, 0, 0, 2026, 2, 7],
+  [2026, 2, 8, 5, 30, 0, 0, 2026, 2, 8],
+  [2026, 10, 1, 5, 29, 0, 0, 2026, 9, 31],
+  [2026, 10, 1, 5, 30, 0, 0, 2026, 10, 1],
+])(
+  "latest due identity is local 05:30 across date and DST boundaries (%j)",
+  (year, month, day, hour, minute, second, ms, dueYear, dueMonth, dueDay) => {
+    expect(dreamRunId(new Date(year, month, day, hour, minute, second, ms))).toBe(
+      new Date(dueYear, dueMonth, dueDay, 5, 30).toISOString(),
+    );
+  },
+);
 import { memoryRecordSchema, type MemoryRecord } from "../dream-mutations.ts";
 import { validatePersonalProfile } from "../dream-personal.ts";
 

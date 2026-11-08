@@ -47,6 +47,7 @@ import {
 } from "./records.ts";
 import { digest } from "./canonical.ts";
 import { boundedQuery } from "./recall.ts";
+import { DREAM_HOUR, DREAM_MINUTE } from "./dream-schedule.ts";
 import { normalizePersistedCheckpoint } from "./delivery-compat.ts";
 import { normalizedProjects, validateMemoryProjects } from "./projects.ts";
 
@@ -119,7 +120,7 @@ type Checkpoint = z.infer<typeof checkpointSchema>;
 
 export function dreamRunId(now: Date): string {
   const due = new Date(now);
-  due.setHours(3, 0, 0, 0);
+  due.setHours(DREAM_HOUR, DREAM_MINUTE, 0, 0);
   if (due > now) due.setDate(due.getDate() - 1);
   return due.toISOString();
 }

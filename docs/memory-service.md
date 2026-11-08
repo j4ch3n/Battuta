@@ -146,9 +146,12 @@ Delivered mail cannot be revoked: send a correction citing the earlier message.
 ## Owner profile and nightly dream
 
 Unattended dreaming requires separate owner approval and explicit setup. The pinned
-CoS scheduler requests it at process-local 03:00; use consistent `TZ` configuration.
+CoS scheduler requests it at process-local 05:30; use consistent `TZ` configuration.
 While CoS is stopped no job runs. Startup catch-up uses the same latest-run identity,
 lock and checkpoint rather than a daemon or one job for every missed day.
+Before local 05:30 the latest due run is yesterday's 05:30; at or after it, today's.
+Existing 03:00 tasks are not migrated or removed. An old task with the owned ID/name
+conflicts with setup and requires explicit manual removal by the owner first.
 
 Missing-stage, temporal and changed durable evidence is pending regardless of age.
 The first-release guard is 500 stored records (including inactive history) and
