@@ -68,13 +68,14 @@ registration, including native MCP/codemode discovery. Shell and the backend
 secret still make this a trusted process, **not a security sandbox**. No Telegram,
 worker inbox, nested delegation, owner-profile preload, or memory capture runs.
 
-## Same-project boundary
+## Project targets and shared files
 
-Workers currently use the same project through existing `battuta-project`
-commands and paths. The runtime does not resolve workspaces, switch cwd/projects,
-or change global current-project configuration. The operator must commission
-only the intended project for this deployment; a discovered mismatch/missing
-context is a blocker, not an automatic unclaim.
+Workers discover ready assignments across projects and claim each using its
+explicit project and assignment ID. Project-context commands also require an
+explicit project target; there is no global current-project configuration.
+The runtime does not resolve workspaces or switch cwd to the project's checkout.
+Commission only approved work with accessible project inputs; a discovered
+mismatch or missing context is a blocker, not an automatic unclaim.
 
 Concurrent workers may share project files. Manager must choose non-conflicting
 boundaries or dependencies. No locking or file synchronization is added; missing

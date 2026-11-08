@@ -108,6 +108,10 @@ checks remain independent of conversation context.
 Historical/private material is neither imported nor rewritten. Assignment
 completion is execution state, not Manager verification or owner acceptance.
 
+Local TODO ledgers, role notebooks, current-notebook pointers, and local
+note/draft CLI commands are retired. Existing files, registered references, and
+historical metadata remain untouched; there is no automatic import or migration.
+
 ## Verification boundaries
 
 Database tests cover atomic plans, prerequisite gating, competing claims,
