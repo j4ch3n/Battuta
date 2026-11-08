@@ -146,6 +146,10 @@ membership and credential redaction before sending. Correction candidates includ
 expired active history and bounded supporting refs across catalog projects. A
 correction must preserve the target's complete project set. Unknown source timezone
 establishes no automatic expiry.
+The extraction prompt requests 0–50 facts and includes fictional project,
+multi-project and global-personal examples. Fact count is application guidance,
+not a client/server array-length validator. Structure, attribution, privacy and
+existing per-field/transport safety checks remain enforced.
 Corrections use guarded version updates immediately, invalidating dependent claims
 without waiting for dreaming. Batches freeze before upload; retries reuse their
 digests and bounded backoff, not another paid extraction. Old frozen batches and

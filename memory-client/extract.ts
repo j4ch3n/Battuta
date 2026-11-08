@@ -25,7 +25,7 @@ const itemSchema = z
     correction: z.object({ ref: memoryRefSchema, revision: memoryRefSchema }).strict().optional(),
   })
   .strict();
-const schema = z.object({ items: z.array(itemSchema).max(20) }).strict();
+const schema = z.object({ items: z.array(itemSchema) }).strict();
 
 export async function extractMemories(
   job: CaptureJob,
@@ -67,7 +67,7 @@ export async function extractMemories(
           },
         ],
       },
-      { signal, maxTokens: 4096 },
+      { signal },
     ),
     signal,
   );

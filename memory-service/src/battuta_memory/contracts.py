@@ -272,7 +272,7 @@ class CaptureBatch(Contract):
     batch_id: str = Field(min_length=1, max_length=200)
     agent_id: Literal["cos", "manager"]
     payload_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
-    items: list[CaptureItem] = Field(max_length=20)
+    items: list[CaptureItem]
 
     @model_validator(mode="after")
     def valid_sources(self):
