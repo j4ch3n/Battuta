@@ -211,7 +211,7 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"], "token": os.environ.get("LIN
                         result = json.loads(pane.stdout)
                         self.assertEqual(result["mode"], mode)
                         self.assertIn(str(self.root / "project-spec/index.ts"), result["args"])
-                        self.assertIn(str(self.root / "memory-client/index.ts"), result["args"])
+                        self.assertEqual(str(self.root / "memory-client/index.ts") in result["args"], "AGENT_ROLE=cos" in command[-1])
                 self.assertEqual(self.commands()[-1], ["attach-session", "-t", f"=battuta-{mode}"])
 
     def test_existing_session_only_attaches(self):

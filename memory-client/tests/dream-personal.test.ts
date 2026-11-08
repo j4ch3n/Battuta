@@ -14,7 +14,7 @@ const global = memoryRecordSchema.parse({
   ref,
   revision: ref,
   content: "Prefers concise replies.",
-  scope: { global: true, projects: [] },
+  projects: ["global"],
   kind: "preference",
   tags: [],
   sources: [],
@@ -55,12 +55,7 @@ test("accepts credential-like model output in a locally persisted profile", () =
 
 test("rejects project facts and forgotten personal sources", () => {
   expect(() =>
-    validatePersonalProfile(
-      { sections },
-      [{ ...global, scope: { global: false, projects: ["atlas"] } }],
-      "",
-      undefined,
-    ),
+    validatePersonalProfile({ sections }, [{ ...global, projects: ["atlas"] }], "", undefined),
   ).toThrow("personal evidence");
   expect(() => validatePersonalProfile({ sections }, [], "", undefined)).toThrow(
     "personal evidence",

@@ -14,7 +14,7 @@ The team consists of the human product owner, Chief of Staff (CoS), Manager, and
 
 ## Managed project information
 
-- The project CLI owns project discovery, selection, workspace context, and Linear association. The shared memory bridge owns project/global memory. Project-spec tools own managed specifications, versions, checklists, reviews, and product decisions.
+- The project CLI owns project discovery, selection, workspace context, and Linear association. CoS receives prepared personal/project memory; Manager and workers receive only selected relevant context and return evidence-backed findings through Agent Mail. Project-spec tools own managed specifications, versions, checklists, reviews, and product decisions.
 - Inspect the intended project and explicit document versions before affected work. Use role-specific project-spec tools to persist complete managed documents; never patch their files or JSON directly. Saved versions are immutable.
 - CoS persists versioned product content and terminal product decisions. Manager authors the canonical checklist and review, and sends proposed versioned technical content to CoS for persistence.
 - A canonical checklist applies across versions and a review records the assessed version and checklist fingerprint. A terminal go or no-go locks further specification, checklist, review, and decision authoring; it does not block read access.

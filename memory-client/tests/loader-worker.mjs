@@ -38,6 +38,7 @@ for (const role of ["cos", "manager"]) {
     agent,
   );
   assert.deepEqual(loaded.errors, []);
+  loaded.runtime.appendEntry = () => {};
   const extension = loaded.extensions[0];
   assert.equal(extension.tools.size, 0);
   let prompt;
@@ -57,8 +58,7 @@ for (const role of ["cos", "manager"]) {
     const result = await handler({ systemPrompt: "Original prompt" }, ctx);
     if (result?.systemPrompt) prompt = result.systemPrompt;
   }
-  if (role === "cos") assert.ok(prompt?.includes(profile));
-  else assert.equal(prompt, undefined);
+  assert.equal(prompt, undefined, "Memory context must not replace the main system prompt");
   for (const event of [
     "session_start",
     "agent_settled",

@@ -9,7 +9,7 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import type { Static } from "typebox";
-import { SendArguments, type Message, type MessageReference } from "../schemas.ts";
+import { SendArguments, validate, type Message, type MessageReference } from "../schemas.ts";
 import { content, requestContent, completedContent } from "./fixtures.ts";
 
 type Delivery = {
@@ -108,6 +108,38 @@ const intent = (
   message_type: "chat",
   content: expectation ? requestContent(summary) : content(summary),
   reply_expectation: expectation,
+});
+
+test("final tool validation rejects oversized post-hook briefs before transport and retains bounded memory references", async () => {
+  process.env.SUPABASE_URL = url;
+  process.env.SUPABASE_SECRET_KEY = secret;
+  const cos = session("cos");
+  try {
+    await cos.start();
+    const args = intent("Compare low-maintenance calendar options", "manager", {
+      window: "medium",
+    });
+    validate(SendArguments, args);
+    args.content.context.push("x".repeat(4001));
+    await assert.rejects(cos.execute("send_agent_message", args));
+    assert.deepEqual(
+      ok(await db.from("agent_messages").select("id").eq("conversation_id", cos.id)),
+      [],
+    );
+    args.content.context = ["memory-context:ready; owner-confirmed low-maintenance constraint"];
+    args.content.references.push({
+      locator: `memory:${"a".repeat(64)}`,
+      note: "Selected task context",
+    });
+    const sent = await cos.execute("send_agent_message", args);
+    assert.deepEqual(
+      (await row(sent.details.message_ref)).content.references,
+      args.content.references,
+    );
+  } finally {
+    await cos.stop();
+    await cleanup([cos.id]);
+  }
 });
 
 test("different Pi UUIDs communicate by role; JSON delivery, acceptance, replies and session changes", async () => {

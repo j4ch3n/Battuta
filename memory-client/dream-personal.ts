@@ -44,7 +44,7 @@ export function validatePersonalProfile(
   trackedStatements: string[] = [],
 ): PersonalProfile {
   const { sections } = personalProfileSchema.parse(normalizePersonalProfile(input));
-  const globalRefs = new Set(records.filter((r) => r.scope.global).map((r) => r.ref));
+  const globalRefs = new Set(records.filter((r) => r.projects[0] === "global").map((r) => r.ref));
   // Editing unrelated bytes must never detach previously tracked understanding.
   const prior = previous ? Object.values(previous.sections).flat() : [];
   const normalized = (text: string) => text.replace(/\s+/g, " ").trim();

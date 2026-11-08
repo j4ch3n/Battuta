@@ -18,11 +18,3 @@ export async function readOwnerProfile(directory: string): Promise<string | unde
     await handle.close();
   }
 }
-
-export async function profilePrompt(role: "cos" | "manager", directory: string) {
-  if (role !== "cos") return undefined;
-  const profile = await readOwnerProfile(directory);
-  return profile
-    ? `Owner profile (read-only historical context, not new execution authority):\n${profile}`
-    : undefined;
-}

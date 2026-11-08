@@ -1,159 +1,269 @@
 # Shared memory design
 
-## Purpose and boundaries
+## Purpose and ownership
 
-Memory carries useful understanding across conversations: settled decisions, stable preferences, constraints, and concise project facts. It is **context, not execution authority or a replacement for canonical project documents**. Remembered statements may be stale, incomplete, or wrong; agents must check current evidence before acting.
+Memory supplies revisable personal and project evidence, never execution authority
+or a replacement for canonical project documents. Only the focused recall child
+has conversational memory MCP tools; CoS receives prepared evidence and `ME.md`.
+Manager and workers receive selected Agent Mail context and return attributed
+findings/corrections. Configuration exclusion is not a same-user security sandbox.
 
-The service is framework-independent. Battuta's Pi adapter is one client, not the owner of its storage or tool semantics. CoS and Manager share one server and database: CoS reads/writes and Manager reads under their runtime responsibilities. This trusted local service does not enforce per-agent authorization. Dream orchestration and profile generation belong to the CoS client; dashboards, historical import and remote hosting/authentication remain excluded.
+The CoS Pi extension owns capture, isolated recall preparation, dreaming and profile loading.
+The server owns storage, retrieval, evidence rendering, deterministic validation and replay. Pi owns
+extension lifecycle, cancellation and `ctx.modelRegistry.complete()`; the server
+has no chat model or provider credentials. There is no separate memory daemon
+or model-authentication stack.
 
-## Memory layers
+## Memory record contract
 
-These are conceptual layers with different responsibilities, **not implemented storage tiers or automatic promotion levels**:
+Canonical content, sources and lifecycle metadata stay in existing upstream rows.
+The owned `memory_metadata` JSON key contains independent dimensions:
 
-| Layer                | Purpose                                                        | Ownership and lifetime                                                                                                                                                      |
-| -------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Working conversation | Current request, recent exchanges, immediate reasoning context | Managed by the agent runtime. Persisted session history is evidence for extraction, not a memory-server transcript archive.                                                 |
-| Durable fact memory  | Small, reusable facts retrieved across sessions                | Shared SQLite records exposed through MCP. Each has scope, kind, tags, and optional source references. Corrections create versions; explicit forgetting tombstones records. |
-| Owner profile        | High-level understanding of the human owner                    | Shared private `ME.md`, loaded by CoS and replaced as a whole by the dream worker using cited personal evidence. Manager does not preload it.                               |
+| Field            | Meaning                                                                                                                            |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `stage`          | `temporal`: not yet dream-reviewed; `durable`: reviewed, not permanent or certain.                                                 |
+| `knowledge_type` | `fact`, `synthesized-observation`, or `hypothesis`.                                                                                |
+| `confidence`     | `confirmed`, `supported`, `tentative`, or `disputed`; never a numerical belief probability.                                        |
+| `status`         | `active`, `stale`, `superseded`, or `rejected`. Existing physical tombstones remain separate.                                      |
+| `keywords`       | At most 20 unique terms, 80 characters each. Preserve display spelling; normalize Unicode/case for matching.                       |
+| `mentioned_at`   | Nullable source-statement instant, not extraction time.                                                                            |
+| `expires_at`     | Nullable exclusive current-recall boundary. Require an explicit timezone and normalize to UTC.                                     |
+| `rationale`      | Concise explanation; required for derived claims.                                                                                  |
+| `evidence`       | Links `{ref, revision, relation, requirement}`; relation is `supports` or `contradicts`, requirement is `historical` or `current`. |
 
-Canonical specifications, checklists, reviews, and project documents sit alongside these layers, not above them as another memory database. Use the project-context workflow for authoritative artifacts. A memory about an approval is not the approval itself.
+`confirmed` means explicitly stated/endorsed with attribution, not independently
+verified objective truth. A third-party report remains that speaker's report.
+Observations describe patterns; hypotheses explain possible causes or preferences.
+Neither age, repetition, review nor retrieval boosts confidence.
 
-Global and project memory are **scopes within the same durable-fact layer**. They do not have separate databases, retention levels, permissions, or priority ranks. A broadly relevant fact is not automatically more reliable than a project-specific one.
+Facts require identifiable sources for automatic personalization. Source identity
+remains `{agent_id, session_id, entry_id}`; optional `attribution` preserves speaker,
+source instant/timezone and original mail sender/reference. Assistant suggestions,
+forwarding and owner silence do not create owner confirmation or independent events.
+Missing lifecycle remains unprocessed; malformed/missing scope or attribution is
+preserved and deferred, never repaired by inventing global scope or sources.
 
-## Scope design
+At `now >= expires_at`, ordinary recall/profile/delegation omits the record. Explicit
+`include_expired:true` recall can return expired active history. Expiration is not
+withdrawal: expired historical evidence may support a pattern, while corrected,
+rejected, superseded or revision-mismatched essential evidence invalidates it.
+Current support must remain current. Dependency checks memoize visited states;
+cycles are rejected on writes. Known counterevidence must travel with an inference
+or the inference is omitted. No arbitrary TTL or physical deletion is automatic.
 
-### Explicit membership
+## Scope and identity
 
-Each record is either:
+Public writes and records use a required `projects` array of 1–100 strings:
+`["global"]` alone, or one or more project names. The client checks names against
+the complete `battuta-project list --json` catalog, without another name syntax or
+length restriction. The server trusts names, lowercases/deduplicates/sorts them,
+and never reads the registry or current selection. Lowercase-equivalent names
+share server membership; a registered case variant of `global` conflicts with the
+reserved option. Membership is relevance, not authorization or privacy isolation.
 
-- **Global:** applicable beyond a particular project, represented by `scope:global`.
-- **Project-scoped:** belongs to one or more registered project slugs, represented by `proj:<slug>` tags.
+Storage keeps `scope:global` and `proj:<name>` tags. Project tag values are
+percent-escaped for lossless comma-delimited storage; existing slug tags are
+unchanged. Internal records and canonical digest/revision inputs retain the old
+scope shape. Only typed public response locations translate to `projects`.
+`kind` describes meaning, such as preference/decision/event; extra tags filter topics.
+Reserved `scope:`, `proj:` and `kind:` prefixes and commas are not caller tags.
 
-Scope must not be empty or mix global with project membership. Project identities come from the shared registry, not repository paths, branch names, session IDs, or agent roles. Explicit project selections and membership changes validate registrations; corrupt registrations are errors rather than permission to search everything.
+Recall defaults to `all`, never shared current-project selection. Optional explicit
+`projects` narrows membership, including global unless disabled. Explicit `global`
+remains available for maintenance. Lists require explicit `projects`, `global` or
+`all`; `current` is rejected. Project selectors and membership mutations use the
+same server-side lowercase normalization as storage.
+Kind/tag filters narrow scope; matching several project memberships deduplicates.
+Exact-ref reads do not inherit a current-project access restriction.
 
-Examples of `memory_remember` arguments:
+Refs are upstream hashes of trimmed/lowercased content. Compatible identical-content
+retries reuse identity. Conflicting scope, attribution or lifecycle metadata is an
+error, not permission to broaden membership, confidence or expiry. Explicit
+`memory_link_projects` changes membership without re-embedding. Semantic merging
+and upstream automatic conflict-tag mutations are disabled; CoS proposes changes.
 
-```json
-{
-  "content": "The owner prefers concise replies.",
-  "scope": { "global": true, "projects": [] },
-  "kind": "preference"
-}
-```
+`memory_update` creates a version with predecessor/successor lineage.
+`memory_set_metadata` requires ref, expected revision, replay key and full owned
+metadata; it merges unrelated JSON fields and reuses content identity/embedding.
+Its optional `replacement_ref` records lifecycle supersession after the replacement
+is acknowledged. Sources and original content remain accessible through history.
+Status-only withdrawal may retain unchanged evidence links after their sources
+are corrected or forgotten; new claims and explicit mutation guards stay strict.
+`memory_forget` is an explicit tombstone, not secure erasure or bulk retirement.
 
-```json
-{
-  "content": "Atlas uses SQLite rather than Postgres.",
-  "scope": { "global": false, "projects": ["atlas"] },
-  "kind": "decision",
-  "tags": ["database"]
-}
-```
+Public revisions cover content, scope, source and lifecycle changes. Inventory also
+supplies a meaningful review fingerprint across reachable claim/evidence state,
+excluding stage/review bookkeeping. Stale dependency revisions separately remain
+pending. Unchanged durable metadata is not rewritten just to record another review.
 
-A fact evidenced to apply to Atlas and Beacon can have `projects:["atlas","beacon"]`. Multi-project membership does not make it global. Adding membership requires evidence of applicability, not merely similar wording or a nearby semantic-search result.
+## Storage and retrieval
 
-### Relevance, not authorization
+One server process owns the data-directory lock. Upstream owns `memory.db` and
+SQLite/sqlite-vec embeddings. Battuta owns `state.db`: mutation/capture receipts,
+recovery intents, a rebuildable FTS5 index with indexed revisions, and retained
+optional global-graph generations. These databases are not one transaction.
+CoS's private capture queue and dream checkpoint are delivery/review state, not
+another canonical store. No per-project database or `MEMORY.md` is created.
 
-Both bots may explicitly inspect any project or all memories. The selected project supplies a useful default, not an access boundary. `agent_id` identifies a source; it does not create a private CoS/Manager namespace. V1 relies on a trusted local, same-user deployment rather than per-agent access control.
+Embeddings use pinned ONNX all-MiniLM-L6-v2, 384 dimensions, CPUExecutionProvider.
+Content and queries share preprocessing; tags/keywords are not embedded into facts.
+The untruncated 256-token limit is checked. Weights/tokenizer are provisioned
+explicitly, checksum verified and bound to the data directory. Missing, corrupt,
+changed or hash-fallback models fail readiness. Model migration is separate work.
 
-Recall and inventory use these selectors:
+Recall accepts independent optional `semantic_query` and literal `keywords` (terms
+or phrases); at least one is required. Only requested branches execute. Combined
+recall filters canonical scope, status, source/dependency eligibility and
+expiry before either branch's candidate limit. Semantic SQL receives eligible refs
+through bound `json_each` membership; FTS matches literal quoted Unicode-normalized
+terms against content/keywords and joins current indexed revisions. Raw MATCH syntax
+is never interpolated. Reciprocal-rank fusion uses constant 60 and stable ref ties;
+ranking numbers are not belief confidence. Automatic calls cap each branch at 20.
+One failed branch gives labelled partial results; both unavailable is an error.
 
-| Selector            | Eligible scope                                                                               |
-| ------------------- | -------------------------------------------------------------------------------------------- |
-| `current` (default) | Selected project plus global by default; a missing selection produces a global-only warning. |
-| `projects`          | Union of the named registered projects, optionally including global.                         |
-| `global`            | Global records only.                                                                         |
-| `all`               | Every scope, explicitly requested.                                                           |
+Index reconciliation runs after journal recovery and canonical mutations, before
+receipts complete, and before lexical results are served. Metadata-only keyword
+changes need no embedding. Failed index/acknowledgement work is replayed through
+the original mutation identity, including already-applied supersession.
+`memory_list` is paginated browsing; bounded `memory_inventory` is all-scope review,
+not semantic enumeration. Neither silently truncates a moving dream corpus.
 
-`include_global:false` narrows a project selection. A multi-project record matching several selected projects is still returned once. Kind and extra-tag filters narrow the selected set with AND; `tag_match` controls all/any matching only within the extra tags. They never broaden scope. Reading an exact ref is not restricted by the current selection.
+## Request lifecycle, capture and recall
 
-### Scope, kind, and tags are independent
+An awaited `before_agent_start` hook starts a fresh in-memory Pi SDK recall
+session for ordinary user runs. Its input is the latest active compaction summary,
+the last ten retained human/assistant text messages, and current input separately.
+Tools, thinking, mail and earlier injected packets are excluded. The child has
+only direct recall/get tools, a dedicated prompt, and no inherited CoS resources,
+codemode, discovery, coding tools or mutation tools. Native Pi owns its repeated
+tool/model rounds; the child can skip, rewrite searches, review, refine and finish.
 
-- **Scope** answers where a fact is relevant.
-- **Kind** describes its meaning, such as `decision`, `preference`, or `observation`; it is not a reliability or memory-level score.
-- **Extra tags** support topic filtering, such as `database`.
+No request-origin marker or origin producer is required. Local invocation identity
+prevents stale results crossing sessions, without authenticating origins or
+restricting scopes. Loopback clients can read all scopes. Existing opaque blocked
+capture jobs remain preserved, not relabelled/replayed. Custom/internal activity
+does not recurse into recall. Queued input admitted to an existing run may not
+create a new preparation boundary; see [operations](../docs/memory-service.md#recall-input-and-local-trust).
 
-The wrapper owns `scope:`, `proj:`, and `kind:` metadata. Callers cannot supply those prefixes as extra tags or include commas, which would manufacture extra tags in upstream's CSV representation. Wrapper kinds remain intact in `kind:` tags even when upstream maps their underlying storage type to `observation`.
+Compaction durably flushes capture, then kicks the same single-flight background
+worker without awaiting extraction/upload or ending the continuing request.
 
-## Components and data ownership
+Each settled CoS turn enters the durable queue immediately. Serialized queue writes
+prevent extraction persistence racing with new turns. The existing Pi completion
+extracts bounded attributed temporal facts against a persisted full catalog plus
+`global`, independent of the request's project hint. Discovery failure retains
+sources, not global-only fallback. Validate source IDs, confidence, dates, project
+membership and credential redaction before sending. Correction candidates include
+expired active history and bounded supporting refs across catalog projects. A
+correction must preserve the target's complete project set. Unknown source timezone
+establishes no automatic expiry.
+The extraction prompt requests 0–50 facts and includes fictional project,
+multi-project and global-personal examples. Fact count is application guidance,
+not a client/server array-length validator. Structure, attribution, privacy and
+existing per-field/transport safety checks remain enforced.
+Corrections use guarded version updates immediately, invalidating dependent claims
+without waiting for dreaming. Batches freeze before upload; retries reuse their
+digests and bounded backoff, not another paid extraction. Old frozen batches and
+other roles' private queues are not relabelled or automatically imported. Valid
+entries save independently of project-invalid entries. The queue persists rejected
+entries, accepted delivery acknowledgements and a bounded correction attempt;
+correction receives only rejected entries and cannot regenerate accepted entries.
+Unresolved entries remain visibly pending. Rephrasing retains the original catalog.
+An embedding-limit rephrase rewrites only failed frozen items after other items
+are acknowledged, keeping project rejections independent. Correction and rephrase
+attempts are consumed durably before completion; invalid output retains blocked
+work instead of triggering repeated paid corrections. Frozen upload retries do not
+consume another completion attempt.
+Persisted-only adapters translate old frozen deliveries without changing their
+batch/item IDs, replay keys, digest representations or acknowledged outcomes.
 
-```text
-Persisted bot conversation
-  → Pi adapter: redact, accumulate, extract with the bot's configured model
-  → durable capture queue: validated facts, frozen scope, source IDs
-  → shared MCP service: validate, journal, apply, receipt
-  → upstream storage: SQLite + sqlite-vec + local ONNX embeddings
+Preparation runs independently of capture enablement. The child returns skipped,
+ready, partial or unavailable. The parent verifies these against observed reads;
+errors/incomplete output never become success. Revisions and eligibility are
+rechecked before injection. Server recall/get text contains qualified bullets;
+structured records and supporting provenance stay available privately for
+maintenance and in-turn dependency-expiry checks. Whole claims and required
+counterevidence fit a 2,000-byte final evidence budget or are omitted, not sliced.
 
-Any other MCP client → the same shared tools and storage
-```
+There is no application recall deadline or call-count cap. A stalled child can
+stall CoS until cancellation or an underlying provider/transport failure. Available
+Pi operation cancellation, session replacement and shutdown invalidate pending
+work. Prior packets are removed rather than accumulated across requests.
 
-| Component                              | Responsibility                                                                                                |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `memory-client/`                       | Pi lifecycle hooks, existing CoS profile loading, bounded conversation extraction, private queue, MCP upload. |
-| `contracts.py`, `scope.py`             | Public request validation, registry resolution, and relevance selection.                                      |
-| `service.py`, `capture.py`, `state.py` | Memory workflows, serialized mutations, durable intent/receipt state, capture deduplication.                  |
-| `upstream.py`                          | The pinned boundary to mcp-memory-service 12.1.1 storage, embeddings, schema, and read-only graph analysis.   |
-| `consolidation.py`                     | Snapshot-verified, recoverable publication of derived global clusters and relationships.                      |
-| `model_setup.py`                       | Explicit model provisioning, archive/file verification, and model identity.                                   |
-| `server.py`                            | Tailored tools over loopback Streamable HTTP; no upstream server/dashboard is exposed.                        |
+The parent separately injects shared `ME.md` as redacted, untrusted owner-profile
+context, not verified facts or instructions. Its 32,000-byte limit is separate;
+it is never sent to the child or replaced by `dream-profile.json`. Missing profiles
+are optional; unreadable/oversized profiles are omitted without failing recall.
+Profile loading survives skipped/unavailable recall. Earlier pending capture
+suppresses both sections. Expired recalled support removes evidence, not the
+independent profile. Reads do not overwrite private files.
 
-One process owns the shared data directory. Upstream owns `memory.db`; Battuta owns `state.db` for recovery, receipts, and derived global graph generations. These are **not a single transaction**. Per-role capture queues are delivery state, not separate memory stores. No per-project database or `MEMORY.md` is created, and no upstream source/schema is forked or patched.
+## Dreaming and delegation
 
-## Capture: conversation to durable facts
+CoS's existing scheduler requests the approved dream at local 05:30, with startup
+catch-up, the existing model selection and no tool-capable dream subagent.
+Missing-stage, temporal and changed durable evidence is pending regardless of age.
+Within the 500-record/200,000-byte guard, select at most 20 oldest-attempt inputs;
+deferred/unselected work remains explicit and cannot starve untouched inputs.
 
-1. Freeze the registered project at request start. Later selection changes must not relabel that request's conversation.
-2. Collect new persisted user/assistant text and labelled incoming inter-bot mail. Exclude reasoning, system/profile content, raw tool results, and attachments. Redact supported credential forms before queue persistence or model input.
-3. Persist the accumulator and seen entry IDs at settlement, even below the default six-message threshold. First-seen resumed history is not backfilled. Session boundaries flush smaller batches.
-4. Use the bot's existing model/provider to extract concise facts from bounded segments. Conversation text is untrusted data, not extraction instructions. Validate source IDs, scope, tags, and credentials again before upload. No useful facts is a valid empty result.
-5. Persist the validated batch before sending it through MCP. Source refs identify agent, session, and persisted entry. Batch/item identity and a canonical payload digest make retries distinguishable from conflicting requests.
-6. Acknowledge only confirmed complete batches. Retain incomplete work with bounded retry/backoff; a transport retry reuses the extracted batch rather than calling the LLM again. A token-limit rejection permits one rephrase under a distinct identity, not unbounded paid retries.
+The extension hard-codes cleanup → synthesis → challenge → publication. Each model
+stage returns validated structured artifacts, with one invalid-output retry.
+Every selected input needs retain/replace/merge/defer; every synthesis needs an
+accept/reject/defer challenge. Challenge uses original evidence and contrary
+scoped retrieval, not hidden reasoning. Empty synthesis is valid. With no eligible
+pending inputs, validated empty stages avoid unnecessary model calls.
 
-Automatic capture is enabled for CoS and disabled for Manager by default. It is best-effort understanding, not a guarantee that every fact is remembered correctly. CoS uses tools directly for important explicit corrections; Manager forwards findings to CoS. Capture failure must not prevent normal conversation. The server itself receives extracted facts, not a continuous transcript feed, and needs no model-provider credential.
+Publish facts/metadata, then challenged derived claims, then supersede only sources
+whose replacements were acknowledged. Replacement evidence must explicitly name
+the reviewed cleanup content, never blindly inherit lineage. Guard source coverage,
+scope, revisions, confidence, rejection history and metadata. Rejected hypotheses
+remain excluded from current recall. Deterministic checks cannot establish semantic
+truth or recognize every paraphrased rejected interpretation: owner evaluation remains
+necessary. Profile refresh uses actual eligible outputs, then the existing private
+reflection/public-summary boundary. `ME.md` is not rewritten.
 
-## Retrieval and embeddings
+New dream publications validate a fresh client catalog before requests are frozen;
+frozen retries retain their snapshot and identity even after registry changes.
+Invalid memberships cannot retire their originals or block independent valid
+publications. Ref-addressed corrections/metadata/forget preserve stored membership
+without requiring continued registration. Linking validates the resulting project
+set, allowing removal of a no-longer-registered label already attached to the record.
 
-The server embeds content locally using ONNX all-MiniLM-L6-v2: 384 dimensions, CPUExecutionProvider, the same model/preprocessing for storage and query. Scope is metadata, not text injected into the embedding. Token counting checks the untruncated input; inputs exceeding 256 tokenizer tokens are rejected rather than silently shortened.
+Scheduler setup and catch-up use the same local 05:30 boundary and owned job ID.
+Existing 03:00 tasks are not migrated: ownership conflicts require manual owner
+removal before setup. No live scheduler changes are part of this update.
 
-Provisioning is explicit and separate from startup. Weights and tokenizer are checksum verified, fingerprinted, and bound to the data directory. Readiness requires an actual loaded ONNX model/tokenizer/provider and a finite probe vector, even for an empty store. Missing, corrupt, or changed models fail closed; hash pseudo-vectors and runtime model downloads are not acceptable fallbacks. Model replacement needs an explicit re-embedding migration; V1 does not implement one.
+Checkpoint v3 persists stage, input fingerprint, schema/prompt versions, validated
+artifacts, frozen requests, acknowledgements, reviewed fingerprints and pending
+attempt progress. A cross-process lock prevents concurrent runs. Resume stale
+unpublished stages against fresh evidence; never regenerate acknowledged/uncertain
+requests. Finish legacy journaled operations using their original identities before
+v3, without rerunning old graph/profile reasoning or inventing review completion.
+On a later scheduled day, unpublished failed batches rotate by attempt order only
+when no mutation request is frozen; their pending work and legacy receipts remain.
+Oversized inventory and partial publication remain visibly incomplete.
 
-Recall filters scope/state before exact sqlite-vec distance ranking, so unrelated nearest neighbours cannot exhaust a global candidate limit and hide a scoped fact. This costs linear distance work within the eligible corpus; V1 favors complete, predictable scope behavior over premature indexing complexity. Inventory is paginated and not semantic; use it rather than recall to enumerate records. There is no automatic recall-to-system-prompt injection.
+Old global-relationship tools/data remain optional, revision-checked maintenance
+views. V3 dreaming never requires `memory_consolidate_global` or graph hints.
 
-Ordinary browsing uses paginated `memory_list`. Dream uses `memory_inventory`: one serialized, bounded all-scope snapshot with active records, inactive references/replacement lineage, recent-change refs and explicit half-open window bounds. Older active facts remain available as comparison context. A record revision covers content, membership and state, so client evidence and target preconditions can reject stale mutations. An oversized snapshot fails rather than paginating a changing corpus or truncating relevant evidence.
+There is no commission-time origin/ref-selection gate or second recall pass.
+CoS chooses relevant prepared evidence for Agent Mail and must not forward the
+whole packet/profile. Preserve uncertainty and necessary counterevidence. The
+existing Agent Mail validator checks envelope/size before transport. Delivered
+mail cannot be revoked; CoS sends a referenced correction when context changes.
+Direct manual memory mutation tools are absent from main CoS; existing capture
+and approved dream adapters retain their programmatic operations.
 
-## Identity, correction, and forgetting
+## Preservation and deliberate limits
 
-Content refs are upstream hashes of normalized text (trimmed and lowercased), not scope-specific IDs. Consequently:
+Intent/receipt replay preserves prior outcomes even after later corrections or
+forgetting. Tombstones, SQLite/WAL pages, transcripts, queues, receipts, checkpoints,
+logs and backups may retain text: no secure-erasure claim is made. Back up both
+databases consistently together with private client state. Do not downgrade a live
+store or delete pending work as a retry mechanism.
 
-- Exact text retries reuse identity. An evidenced project match can union membership and sources without another copy of the fact.
-- Similar but nonidentical facts remain separate; semantic deduplication/merging is disabled.
-- An exact global/project collision is a conflict, not implicit promotion or a second scope-specific copy.
-- `memory_update` creates a new ref with predecessor/successor lineage. Stale predecessors and existing-content collisions cannot be silently overwritten.
-- `memory_link_projects` changes membership without regenerating vectors; it cannot remove the final project or attach project membership to a global fact.
-- Default recall/list/get omit superseded versions. Explicit history includes retained predecessors, not deleted content.
-- `memory_forget` tombstones exactly one ref. It does not erase every version, transcript, profile, backup, or queue.
-
-Mutations journal intent before upstream changes, then store a receipt. Startup reconciles pending work before new mutations. Completed receipts preserve the original outcome even if the record was later forgotten; retries must not resurrect it. Recovery can repair the exact journal-owned orphan left by a crash during version linking. If upstream instead compensates by tombstoning the replacement, record a terminal failure and keep unrelated writes/startup usable—do not revive the failed target.
-
-Forgetting is **not secure erasure**. Tombstones retain upstream content; completed journal payloads are logically cleared, but old SQLite/WAL pages, transcripts, queues, dream checkpoints, logs, profiles and backups may still contain text. Dream may automatically retire obsolete or merged facts; no hard-erasure promise or TTL-based memory-level policy exists.
-
-Mutation receipts may retain before/after fact content so replay can distinguish a new write from a reused record or a historical acknowledgement whose record is now inactive. Clearing the intent payload does not erase these acknowledged outcomes.
-
-## CoS dream orchestration
-
-The CoS client uses the existing prompt scheduler for a daily isolated session. Its dedicated tool takes a bounded inventory, partitions exact scopes, asks the configured model for cited mutations, validates the whole plan and applies server operations under revision preconditions. It refreshes the complete canonical personal profile from global evidence, then obtains an LLM reflection grounded in confirmed changes. The service does not run a separate consolidation scheduler or accept model-authored arbitrary commands.
-
-Between canonical cleanup and profile publication, `memory_consolidate_global` derives clusters and relationships from all surviving active global memories, using the pinned upstream clustering, association, and relationship-inference components. The three-day window triggers LLM reconciliation; it does not replace accumulated historical state or limit graph inputs. Existing project-memory cleanup stays unchanged; project/multi-project records and upstream graph rows are excluded from the new analysis. No compression, forgetting, decay writes, automatic superseding, or synthetic association memories run. Upstream's full consolidation orchestrator and horizon schedules are not used.
-
-Analysis receives private in-memory values with stored embeddings, never a write-capable storage handle. It runs off the event loop without holding the canonical mutation lock. The server fingerprints active-global refs/revisions plus model/configuration identity, persists calculated results as a draft in `state.db`, then rechecks the snapshot under the mutation lock before atomic activation. A stale snapshot permits at most two analysis attempts; continued churn is retryable. Keep only an active generation and one draft. A global change invalidates the old generation rather than transferring relationships blindly to replacement hashes; project-only changes do not. This is a derived view, not another canonical memory database or a transaction spanning both databases.
-
-`memory_global_relationships` returns current hints capped at 100 edges with explicit truncation, or stale/unavailable status without edges. Future dream planning accepts only hints whose global endpoints/revisions match its canonical inventory. Relationships, including inferred contradictions, are heuristic context, never canonical evidence or mutation authority. Ordinary recall ranking and personal-profile citation rules remain unchanged. A small corpus may legitimately publish an empty graph.
-
-The client persists its immutable plan, acknowledgements, profile evidence and reflection in private atomic files under the shared data directory. A crash-released run lock prevents concurrent workers; replay resumes confirmed work rather than recomputing proposals. Log publication is idempotent by scheduled run identity. Failed or partial work is not described as fully applied. These files and server databases are not a single transaction; each boundary has its own recovery checks.
-
-Version-2 checkpoints add the acknowledged graph generation before profile publication. Lost graph acknowledgements reuse a matching published generation or saved draft without repeating canonical writes. Recovery rechecks graph currency; graph failure leaves the run incomplete, not silently completed. Legacy version-1 checkpoints preserve acknowledged operations and published profile/reflection artifacts; completed same-day runs are not forcibly repeated. Concurrent capture is not swept into the handled map merely because it appeared in a later graph/profile snapshot.
-
-## Deliberately deferred
-
-Upstream automatic semantic merging/compression/forgetting, confidence/importance-based tiers, automatic global promotion, project graphs, graph-based recall ranking, historical Stone import, multilingual-model adoption, model migration tooling, remote authentication, dashboards and per-agent permission boundaries are not implemented. Dream uses Battuta's validated server APIs and selected read-only upstream analysis components rather than enabling upstream's direct-storage consolidation engine.
-
-For operational configuration, recovery, and cutover, see [memory operations](../docs/memory-service.md). For invocation examples and user-visible tool behavior, see [tool workflow](../skills-hub/memory/references/tools.md).
+No generalized graph retrieval, reranker/cache, background indexer, arbitrary
+retention TTL, automatic private-history import, expanded inventory capacity,
+remote authentication or per-agent sandbox is included. See
+[operations and verification](../docs/memory-service.md) and the
+[tool workflow](../skills-hub/memory/references/tools.md).

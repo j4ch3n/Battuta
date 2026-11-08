@@ -32,7 +32,7 @@ test("provisions one native global dream prompt without release paths or unrelat
     id: "battuta-memory-dream",
     action: "prompt",
     type: "cron",
-    schedule: "0 0 3 * * *",
+    schedule: "0 30 5 * * *",
     scope: "global",
     enabled: true,
   });
@@ -65,6 +65,20 @@ test("rejects conflicting dream ownership", () => {
       now,
     ),
   ).toThrow("ownership");
+});
+
+test("old 03:00 task remains untouched and conflicts instead of being migrated", () => {
+  const store = reconcileDreamSchedule({ version: 2, revision: 0, tasks: [] }, now);
+  store.tasks[0] = {
+    ...store.tasks[0],
+    schedule: "0 0 3 * * *",
+    enabled: false,
+    runCount: 7,
+    lastRun: now,
+  };
+  const before = JSON.stringify(store);
+  expect(() => reconcileDreamSchedule(store, now)).toThrow("ownership conflict");
+  expect(JSON.stringify(store)).toBe(before);
 });
 test("offline reconciliation upgrades the owned legacy prompt without enabling or resetting the task", () => {
   const store = reconcileDreamSchedule({ version: 2, revision: 0, tasks: [] }, now);

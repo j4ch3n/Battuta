@@ -1,0 +1,152 @@
+[
+  {
+    "id": "console-alias",
+    "query": "Recommend Nintendo console games",
+    "project": null,
+    "memories": [
+      {
+        "id": "purchase",
+        "content": "Owner reported buying an NS2",
+        "keywords": ["NS2", "Nintendo", "gaming"],
+        "knowledge_type": "fact",
+        "confidence": "confirmed"
+      }
+    ],
+    "required": ["purchase"],
+    "selected": ["purchase"],
+    "excluded": []
+  },
+  {
+    "id": "expired-event",
+    "query": "Help prepare for the call",
+    "project": null,
+    "memories": [
+      {
+        "id": "call",
+        "content": "Owner reported a scheduled call",
+        "keywords": ["call", "preparation"],
+        "knowledge_type": "fact",
+        "confidence": "confirmed",
+        "expires_at": "2020-01-01T00:00:00Z"
+      }
+    ],
+    "required": [],
+    "selected": [],
+    "excluded": ["call"]
+  },
+  {
+    "id": "qualified-understanding",
+    "query": "Compare calendar maintenance costs",
+    "project": null,
+    "memories": [
+      {
+        "id": "pattern",
+        "content": "Across decisions owner favored less maintenance",
+        "keywords": ["maintenance", "calendar"],
+        "knowledge_type": "synthesized-observation",
+        "confidence": "supported",
+        "supports": ["decision"]
+      },
+      {
+        "id": "explanation",
+        "content": "Protecting attention may matter for routine tooling",
+        "keywords": ["attention", "calendar"],
+        "knowledge_type": "hypothesis",
+        "confidence": "tentative",
+        "supports": ["decision"]
+      },
+      {
+        "id": "decision",
+        "content": "Owner chose a managed calendar service to avoid upkeep",
+        "keywords": ["calendar", "maintenance"],
+        "knowledge_type": "fact",
+        "confidence": "confirmed"
+      }
+    ],
+    "required": ["pattern", "explanation"],
+    "selected": ["pattern"],
+    "excluded": []
+  },
+  {
+    "id": "project-correction",
+    "query": "Which calendar integration fits this personal project?",
+    "project": "atlas",
+    "memories": [
+      {
+        "id": "cost",
+        "content": "For Atlas owner requires near-zero recurring cost",
+        "keywords": ["calendar", "cost"],
+        "knowledge_type": "fact",
+        "confidence": "confirmed",
+        "project": "atlas"
+      },
+      {
+        "id": "preference",
+        "content": "Owner previously favored reducing routine maintenance",
+        "keywords": ["calendar", "maintenance"],
+        "knowledge_type": "fact",
+        "confidence": "confirmed"
+      },
+      {
+        "id": "rejected",
+        "content": "Owner does not care about recurring cost",
+        "keywords": ["calendar", "cost"],
+        "knowledge_type": "hypothesis",
+        "confidence": "tentative",
+        "status": "rejected",
+        "supports": ["preference"]
+      }
+    ],
+    "required": ["cost"],
+    "selected": ["cost"],
+    "excluded": ["rejected"]
+  },
+  {
+    "id": "selective-commission",
+    "query": "Ask Manager to compare calendar integrations",
+    "project": null,
+    "memories": [
+      {
+        "id": "constraint",
+        "content": "Owner requires low-maintenance calendar tooling",
+        "keywords": ["calendar", "maintenance"],
+        "knowledge_type": "fact",
+        "confidence": "confirmed"
+      },
+      {
+        "id": "private",
+        "content": "Owner reported stress about an unrelated personal call",
+        "keywords": ["stress", "call"],
+        "knowledge_type": "fact",
+        "confidence": "confirmed"
+      },
+      {
+        "id": "console",
+        "content": "Owner reported buying an NS2",
+        "keywords": ["Nintendo", "gaming"],
+        "knowledge_type": "fact",
+        "confidence": "confirmed"
+      }
+    ],
+    "required": ["constraint"],
+    "selected": ["constraint"],
+    "excluded": []
+  },
+  {
+    "id": "unknown-answer",
+    "query": "What is the owner's passport number?",
+    "project": null,
+    "memories": [
+      {
+        "id": "distractor",
+        "content": "Owner reported buying an NS2",
+        "keywords": ["Nintendo"],
+        "knowledge_type": "fact",
+        "confidence": "confirmed"
+      }
+    ],
+    "required": [],
+    "selected": [],
+    "excluded": []
+  }
+]

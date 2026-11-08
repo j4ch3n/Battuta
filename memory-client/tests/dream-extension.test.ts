@@ -56,7 +56,7 @@ async function harness(role = "cos", job: Record<string, unknown> | null = {}) {
             scope: "global",
             status: "pending",
             type: "cron",
-            schedule: "0 0 3 * * *",
+            schedule: "0 30 5 * * *",
             enabled: true,
             prompt: DREAM_PROMPT,
             ...job,

@@ -31,7 +31,11 @@ class UpstreamAdapter:
     @staticmethod
     def create_storage(config):
         from mcp_memory_service.storage.sqlite_vec import SqliteVecMemoryStorage
-        return SqliteVecMemoryStorage(str(config.database), embedding_model=MODEL)
+        class CanonicalStorage(SqliteVecMemoryStorage):
+            def _detect_conflicts(self, new_hash, new_content, embedding):
+                # Heuristic cross-record writes bypass scope, evidence guards and our journal.
+                return []
+        return CanonicalStorage(str(config.database), embedding_model=MODEL)
 
     @classmethod
     async def open(cls, config: MemoryConfig):
@@ -106,19 +110,32 @@ class UpstreamAdapter:
 
     @staticmethod
     def record(row):
+        from .scope import project_from_tag
         tags = row["tags"].split(",") if row["tags"] else []
-        metadata = json.loads(row["metadata"] or "{}")
+        try:
+            metadata = json.loads(row["metadata"] or "{}")
+            if not isinstance(metadata, dict):
+                raise ValueError("Invalid metadata object")
+            metadata_error = False
+        except ValueError:
+            metadata, metadata_error = {}, True
+        lifecycle = metadata.get("memory_metadata")
+        superseded = isinstance(lifecycle, dict) and lifecycle.get("status") == "superseded"
         record = {
             "ref": row["content_hash"], "content": row["content"],
-            "scope": {"global": "scope:global" in tags, "projects": sorted(t[5:] for t in tags if t.startswith("proj:"))},
+            "scope": {"global": "scope:global" in tags, "projects": sorted(project_from_tag(t) for t in tags if t.startswith("proj:"))},
             "tags": sorted(t for t in tags if not t.startswith(("scope:", "proj:", "kind:"))),
             "kind": next((t[5:] for t in tags if t.startswith("kind:")), row["memory_type"] or "observation"), "sources": metadata.get("sources", []),
             "created_at": row["created_at"], "updated_at": row["updated_at"],
-            "parent_ref": row.get("parent_id"), "superseded_by": row.get("superseded_by") or (metadata.get("replacement_ref") if row.get("deleted_at") is not None else None),
-            "active": not row.get("superseded_by") and row.get("deleted_at") is None,
+            "parent_ref": row.get("parent_id"), "superseded_by": row.get("superseded_by") or (metadata.get("replacement_ref") if row.get("deleted_at") is not None or superseded else None),
+            "active": not row.get("superseded_by") and row.get("deleted_at") is None and not superseded,
+            **({"metadata_error": True} if metadata_error else {}),
+            **({"memory_metadata": metadata["memory_metadata"]} if "memory_metadata" in metadata else {}),
             **({"distance": row["distance"]} if "distance" in row else {}),
         }
         record["revision"] = hashlib.sha256(json.dumps({k: v for k, v in record.items() if k != "distance"}, sort_keys=True).encode()).hexdigest()
+        from .records import decode_record
+        record = decode_record(record)
         return record
 
     @staticmethod
@@ -147,9 +164,14 @@ class UpstreamAdapter:
         rows = await self._rows(f"SELECT m.* FROM memories m WHERE {where} ORDER BY m.updated_at DESC, m.content_hash ASC", params)
         return [self.record(row) for row in rows]
 
-    async def search(self, request, resolved):
-        vector = await asyncio.to_thread(self.embed, request.query)
+    async def search(self, request, resolved, eligible_refs=None):
+        if eligible_refs == []:
+            return []
+        vector = await asyncio.to_thread(self.embed, request.semantic_query)
         where, params = self._filters(request, resolved)
+        if eligible_refs is not None:
+            where += " AND m.content_hash IN (SELECT value FROM json_each(?))"
+            params.append(json.dumps(eligible_refs))
         # Exact filtered distance search has no global-neighbour candidate cap.
         # sqlite-vec still computes distance; upstream owns all stored embeddings.
         rows = await self._rows(f"""SELECT m.*, vec_distance_l2(e.content_embedding, ?) AS distance
@@ -179,6 +201,10 @@ class UpstreamAdapter:
                 records.append(record)
             else:
                 inactive.append({"ref": record["ref"], "superseded_by": record["superseded_by"]})
+        from .records import review_fingerprint
+        for record in records:
+            if not record.get("metadata_error"):
+                record["review_fingerprint"] = review_fingerprint(record, records)
         return {"records": records, "inactive": inactive, "recent_refs": recent,
             "window_start": request.window_start, "window_end": request.window_end}
 
@@ -316,15 +342,22 @@ class UpstreamAdapter:
             # Only recovery of our journaled write may reach this branch.
             return
         ok, message = await self.storage.store(Memory(content=payload["content"], content_hash=payload["ref"],
-            tags=payload["tags"], memory_type=self.storage_kind(payload["kind"]), metadata={"sources": payload["sources"]}), skip_semantic_dedup=True)
+            tags=payload["tags"], memory_type=self.storage_kind(payload["kind"]), metadata={"sources": payload["sources"], **({"memory_metadata": payload["memory_metadata"]} if payload.get("memory_metadata") is not None else {})}), skip_semantic_dedup=True)
         if not ok:
             raise RuntimeError("Upstream memory store failed")
 
     async def metadata(self, payload):
         current = await self.get(payload["ref"], include_deleted=True)
+        if current and not current["active"] and payload.get("memory_metadata", {}).get("status") == "superseded":
+            from .scope import resolve_scope
+            from .contracts import Scope
+            tags = resolve_scope(Scope.model_validate(current["scope"])) + current["tags"] + [f"kind:{current['kind']}"]
+            if current.get("memory_metadata") == payload["memory_metadata"] and current["sources"] == payload["sources"] and current["superseded_by"] == payload.get("replacement_ref") and set(tags) == set(payload["tags"]):
+                return
         if not current or not current["active"]:
             raise ValueError("Memory is inactive")
-        ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"tags": payload["tags"], "metadata": {"sources": payload["sources"]}})
+        metadata = await self._merged_metadata(payload["ref"], payload)
+        ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"tags": payload["tags"], "metadata": metadata})
         if not ok:
             raise RuntimeError("Upstream metadata update failed")
 
@@ -362,15 +395,23 @@ class UpstreamAdapter:
 
     async def _evolve_sources(self, payload):
         if "sources" in payload:
-            ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"metadata": {"sources": payload["sources"]}})
+            metadata = await self._merged_metadata(payload["ref"], payload)
+            ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"metadata": metadata})
             if not ok:
                 raise RuntimeError("Upstream source update failed")
+
+    async def _merged_metadata(self, ref, payload):
+        rows = await self._rows("SELECT metadata FROM memories WHERE content_hash=?", (ref,))
+        metadata = json.loads(rows[0]["metadata"] or "{}")
+        metadata.update({key: payload[key] for key in ("sources", "memory_metadata", "replacement_ref") if key in payload})
+        return metadata
 
     async def delete(self, payload):
         if await self.get(payload["ref"]) is None:
             return
         if payload.get("replacement_ref"):
-            ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"metadata": {"replacement_ref": payload["replacement_ref"]}})
+            metadata = await self._merged_metadata(payload["ref"], payload)
+            ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"metadata": metadata})
             if not ok:
                 raise RuntimeError("Upstream replacement lineage update failed")
         ok, _ = await self.storage.delete(payload["ref"])

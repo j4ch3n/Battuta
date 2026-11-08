@@ -12,7 +12,7 @@ from bot_setup.mcp import configure_mcp
 def test_native_configuration_preserves_custom_and_private_state(tmp_path, role):
     pi = tmp_path / ".pi"
     pi.mkdir()
-    (pi / "mcp.json").write_text('{"custom":true,"mcpServers":{"other":{"command":"custom"}}}')
+    (pi / "mcp.json").write_text('{"custom":true,"mcpServers":{"other":{"command":"custom"},"memory":{"url":"http://localhost:8901/mcp","exposure":"codemode"}}}')
     (pi / "settings.json").write_text('{"theme":"dark","packages":["npm:custom@1","npm:pi-mcp-adapter@1"]}')
     auth = pi / "mcp-auth.json"
     auth.write_bytes(b'{"private":"oauth"}\n')
@@ -22,6 +22,10 @@ def test_native_configuration_preserves_custom_and_private_state(tmp_path, role)
         assert config["custom"] is True
         assert config["mcpServers"]["other"] == {"command": "custom"}
         assert ("luma" in config["mcpServers"]) == (role == "cos")
+        assert ("memory" in config["mcpServers"]) == (role == "cos")
+        if role == "cos":
+            assert config["mcpServers"]["memory"]["enabled"] is False
+            assert "url" in config["mcpServers"]["memory"]
         assert json.loads((pi / "settings.json").read_text()) == {"theme": "dark", "packages": ["npm:custom@1"]}
         assert auth.read_bytes() == b'{"private":"oauth"}\n'
         assert (pi / "mcp.json").stat().st_mode & 0o777 == 0o600

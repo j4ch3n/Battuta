@@ -9,15 +9,14 @@ DIMENSION = 384
 @dataclass(frozen=True)
 class MemoryConfig:
     data_dir: Path = field(default_factory=lambda: Path.home() / ".battuta/memory")
-    registry_root: Path = field(default_factory=lambda: Path.home() / ".battuta/projects")
     host: str = "127.0.0.1"
     port: int = 8901
 
     def __post_init__(self):
         if self.host not in ("127.0.0.1", "::1", "localhost"):
             raise ValueError("Only loopback hosts are supported")
-        if not self.data_dir.is_absolute() or not self.registry_root.is_absolute():
-            raise ValueError("Memory and registry paths must be absolute")
+        if not self.data_dir.is_absolute():
+            raise ValueError("Memory path must be absolute")
         if not 1 <= self.port <= 65535:
             raise ValueError("Invalid port")
 
@@ -29,7 +28,6 @@ class MemoryConfig:
     def from_env(cls):
         return cls(
             data_dir=Path(os.environ.get("BATTUTA_MEMORY_DATA_DIR", "~/.battuta/memory")).expanduser(),
-            registry_root=Path(os.environ.get("BATTUTA_PROJECTS_ROOT", "~/.battuta/projects")).expanduser(),
             host=os.environ.get("BATTUTA_MEMORY_HOST", "127.0.0.1"),
             port=int(os.environ.get("BATTUTA_MEMORY_PORT", "8901")),
         )

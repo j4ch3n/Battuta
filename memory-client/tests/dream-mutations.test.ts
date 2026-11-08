@@ -7,7 +7,7 @@ const record = (ref = a, projects = ["atlas"]) => ({
   ref,
   revision: "c".repeat(64),
   content: "Existing fact",
-  scope: { global: projects.length === 0, projects },
+  projects: projects.length ? projects : ["global"],
   kind: "decision",
   tags: [],
   sources: [{ agent_id: "cos", session_id: "s", entry_id: "e" }],
@@ -21,6 +21,25 @@ const update = {
   summary: "Corrected the fact using new evidence.",
   source_refs: [a],
 };
+
+test("record decoding retains lifecycle and rejects invalid evidence labels", () => {
+  const metadata = {
+    stage: "durable",
+    knowledge_type: "fact",
+    confidence: "confirmed",
+    status: "active",
+    keywords: ["NS2"],
+    mentioned_at: "2026-11-06T10:00:00Z",
+    expires_at: null,
+    evidence: [],
+  };
+  expect(
+    memoryRecordSchema.parse({ ...record(), memory_metadata: metadata }).memory_metadata?.keywords,
+  ).toEqual(["NS2"]);
+  expect(() =>
+    memoryRecordSchema.parse({ ...record(), memory_metadata: { ...metadata, confidence: "90%" } }),
+  ).toThrow();
+});
 
 test.each([undefined, "", "   ", "x".repeat(1001)])(
   "rejects missing or oversized operation summaries (%s)",
@@ -63,7 +82,7 @@ test("builds versioned updates with snapshot preconditions and stable insert ide
     arguments: {
       content: "Combined fact",
       kind: "decision",
-      scope: { global: false, projects: ["atlas"] },
+      projects: ["atlas"],
       sources: record().sources,
       idempotency_key: "dream:run:merge",
       evidence: [{ ref: a, revision: "c".repeat(64) }],

@@ -1,7 +1,8 @@
 """Validated, framework-neutral public requests. Reserved metadata is never caller-controlled."""
 
 import re
-from datetime import datetime
+import unicodedata
+from datetime import datetime, timezone
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -11,9 +12,9 @@ class Contract(BaseModel):
 
 
 def project_names(names):
-    if len(names) > 100 or any(not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", n) for n in names):
+    if len(names) > 100:
         raise ValueError("Invalid project name")
-    return sorted(set(names))
+    return sorted(set(n.lower() for n in names))
 
 
 class Scope(Contract):
@@ -28,10 +29,32 @@ class Scope(Contract):
         return self
 
 
+class OriginalMail(Contract):
+    message_ref: dict[str, str]
+    sender: str = Field(min_length=1, max_length=200)
+
+
+class SourceAttribution(Contract):
+    speaker: Literal["owner", "assistant", "agent"]
+    mentioned_at: str | None = None
+    timezone: str | None = None
+    original_mail: OriginalMail | None = None
+
+    @field_validator("mentioned_at")
+    @classmethod
+    def source_instant(cls, value):
+        utc_timestamp(value)
+        return value
+
+
 class SourceRef(Contract):
     agent_id: Literal["cos", "manager"]
     session_id: str = Field(min_length=1, max_length=200)
     entry_id: str = Field(min_length=1, max_length=200)
+    attribution: SourceAttribution | None = None
+
+    def wire(self):
+        return self.model_dump(exclude={"attribution"} if self.attribution is None else set())
 
 
 class Tagged(Contract):
@@ -55,12 +78,73 @@ class EvidenceGuard(Contract):
     evidence: list[EvidenceRef] = Field(default_factory=list, max_length=100)
 
 
+def utc_timestamp(value):
+    if value is None:
+        return None
+    instant = datetime.fromisoformat(value)
+    if "T" not in value or instant.utcoffset() is None:
+        raise ValueError("Timestamp needs an explicit timezone")
+    return instant.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+class EvidenceLink(EvidenceRef):
+    relation: Literal["supports", "contradicts"]
+    requirement: Literal["historical", "current"]
+
+
+class MemoryMetadata(Contract):
+    stage: Literal["temporal", "durable"]
+    knowledge_type: Literal["fact", "synthesized-observation", "hypothesis"]
+    confidence: Literal["confirmed", "supported", "tentative", "disputed"]
+    status: Literal["active", "stale", "superseded", "rejected"]
+    keywords: list[str] = Field(default_factory=list, max_length=20)
+    mentioned_at: str | None = None
+    expires_at: str | None = None
+    rationale: str | None = Field(default=None, min_length=1, max_length=1000)
+    evidence: list[EvidenceLink] = Field(default_factory=list, max_length=100)
+    _times = field_validator("mentioned_at", "expires_at")(utc_timestamp)
+
+    @field_validator("keywords")
+    @classmethod
+    def valid_keywords(cls, values):
+        values = [v.strip() for v in values]
+        if any(not v or len(v) > 80 or any(unicodedata.category(c).startswith("C") for c in v)
+                or re.search(r"(?i)(?:bearer\s|sk-[a-z0-9]{12}|(?:token|password|secret)\s*[:=])", v) for v in values):
+            raise ValueError("Invalid keyword")
+        if len({unicodedata.normalize("NFKC", v).casefold() for v in values}) != len(values):
+            raise ValueError("Duplicate keywords")
+        return values
+
+    @model_validator(mode="after")
+    def supported_claim(self):
+        if self.knowledge_type != "fact" and (not self.rationale or not any(e.relation == "supports" for e in self.evidence)):
+            raise ValueError("Derived claims require supporting evidence and rationale")
+        if self.knowledge_type != "fact" and self.confidence == "confirmed":
+            raise ValueError("Inference is not owner confirmation")
+        return self
+
+
 class RememberContent(Tagged):
     content: str = Field(min_length=1, max_length=16000)
-    scope: Scope
+    projects: list[str] = Field(min_length=1, max_length=100)
+    _projects = field_validator("projects")(project_names)
+
+    @field_validator("projects")
+    @classmethod
+    def exclusive_global(cls, names):
+        if "global" in names and names != ["global"]:
+            raise ValueError("Global membership must stand alone")
+        return names
+
+    @property
+    def scope(self):
+        return Scope.model_validate({"global": self.projects == ["global"],
+            "projects": [] if self.projects == ["global"] else self.projects})
+
     kind: str = Field(default="observation", pattern=r"^[a-z][a-z0-9_-]{0,39}$")
     sources: list[SourceRef] = Field(default_factory=list, max_length=200)
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
+    memory_metadata: MemoryMetadata | None = None
 
     @field_validator("content")
     @classmethod
@@ -75,7 +159,7 @@ class RememberRequest(RememberContent, EvidenceGuard):
 
 
 class Selector(Tagged):
-    selector: Literal["current", "projects", "global", "all"] = "current"
+    selector: Literal["projects", "global", "all"]
     projects: list[str] = Field(default_factory=list)
     include_global: bool = True
     include_history: bool = False
@@ -87,12 +171,42 @@ class Selector(Tagged):
     def projects_selector(self):
         if (self.selector == "projects") != bool(self.projects):
             raise ValueError("Projects required only for projects selector")
+        if "global" in self.projects:
+            raise ValueError("Use explicit global selection")
         return self
 
 
 class RecallRequest(Selector):
-    query: str = Field(min_length=1, max_length=16000)
+    selector: Literal["projects", "global", "all"] = "all"
+    semantic_query: str | None = Field(default=None, min_length=1, max_length=16000)
+    keywords: list[str] = Field(default_factory=list, max_length=32)
     limit: int = Field(default=10, ge=1, le=100)
+    include_expired: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def explicit_projects(cls, value):
+        if isinstance(value, dict) and value.get("projects") and "selector" not in value:
+            value = {**value, "selector": "projects"}
+        return value
+
+    @field_validator("keywords")
+    @classmethod
+    def literal_keywords(cls, values):
+        terms = [unicodedata.normalize("NFKC", v).strip().casefold() for v in values]
+        if any(not v or len(v) > 80 or any(unicodedata.category(c).startswith("C") for c in v) for v in terms):
+            raise ValueError("Invalid keyword terms")
+        return list(dict.fromkeys(terms))
+
+    @model_validator(mode="after")
+    def usable_query(self):
+        if self.semantic_query is not None:
+            self.semantic_query = self.semantic_query.strip()
+            if not self.semantic_query:
+                raise ValueError("Blank semantic query")
+        if not self.semantic_query and not self.keywords:
+            raise ValueError("Provide semantic_query or keywords")
+        return self
 
 
 class ListRequest(Selector):
@@ -130,6 +244,7 @@ class GetRequest(Contract):
 
 
 class UpdateRequest(GetRequest, EvidenceGuard):
+    memory_metadata: MemoryMetadata | None = None
     sources: list[SourceRef] = Field(default_factory=list, max_length=200)
     expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     content: str = Field(min_length=1, max_length=16000)
@@ -160,6 +275,13 @@ class LinkRequest(GetRequest):
         return self
 
 
+class SetMetadataRequest(GetRequest, EvidenceGuard):
+    expected_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+    idempotency_key: str = Field(min_length=1, max_length=200)
+    memory_metadata: MemoryMetadata
+    replacement_ref: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+
 class ForgetRequest(GetRequest, EvidenceGuard):
     expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     replacement_ref: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -168,6 +290,7 @@ class ForgetRequest(GetRequest, EvidenceGuard):
 
 class CaptureItem(RememberContent):
     item_id: str = Field(min_length=1, max_length=200)
+    correction: EvidenceRef | None = None
 
 
 class CaptureBatch(Contract):
@@ -175,7 +298,7 @@ class CaptureBatch(Contract):
     batch_id: str = Field(min_length=1, max_length=200)
     agent_id: Literal["cos", "manager"]
     payload_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
-    items: list[CaptureItem] = Field(max_length=20)
+    items: list[CaptureItem]
 
     @model_validator(mode="after")
     def valid_sources(self):

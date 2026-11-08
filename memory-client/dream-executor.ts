@@ -3,6 +3,7 @@ import { clientConfig } from "./config.ts";
 import { dreamCompletion } from "./dream-model.ts";
 import { runDream } from "./dream-runtime.ts";
 import { MemoryMcpClient } from "./mcp-client.ts";
+import { loadProjectCatalog } from "./projects.ts";
 import { abortable } from "./abortable.ts";
 import type { DreamOutcome } from "./dream-result.ts";
 
@@ -40,7 +41,8 @@ export async function executeDream(
   try {
     signal.throwIfAborted();
     const config = clientConfig();
-    const client = new MemoryMcpClient(config.url);
+    const prepareProjects = (signal: AbortSignal) => loadProjectCatalog(config.registry, signal);
+    const client = new MemoryMcpClient(config.url, prepareProjects);
     // Fixed model completions receive evidence, not CoS history or tool access.
     // The engine returns a separate public summary, never the private reflection.
     return await abortable(
@@ -49,7 +51,9 @@ export async function executeDream(
           directory: config.dataDirectory,
           now: () => new Date(),
           complete: dreamCompletion(ctx, options.onUsage, model),
-          call: (name, args, abort) => abortable(client.call(name, args, abort), abort),
+          prepareProjects,
+          call: (name, args, abort, catalog) =>
+            abortable(client.call(name, args, abort, catalog), abort),
         },
         signal,
       ),

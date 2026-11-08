@@ -19,6 +19,8 @@ class StateStore:
             CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS captures(key TEXT PRIMARY KEY, digest TEXT NOT NULL, result TEXT);
             CREATE TABLE IF NOT EXISTS global_graph(slot TEXT PRIMARY KEY CHECK(slot IN ('active','draft')), payload TEXT NOT NULL);
+            CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(ref UNINDEXED, content, keywords);
+            CREATE TABLE IF NOT EXISTS memory_fts_revisions(ref TEXT PRIMARY KEY, revision TEXT NOT NULL);
             PRAGMA user_version=1;
         """)
         return cls(conn)
@@ -66,6 +68,33 @@ class StateStore:
 
     def close(self):
         self.conn.close()
+
+    def reconcile_index(self, records):
+        import unicodedata
+        current = dict(self.conn.execute("SELECT ref,revision FROM memory_fts_revisions"))
+        canonical = {record["ref"]: record for record in records if record["active"]}
+        with self.conn:
+            for ref in current.keys() - canonical.keys():
+                self.conn.execute("DELETE FROM memory_fts WHERE ref=?", (ref,))
+                self.conn.execute("DELETE FROM memory_fts_revisions WHERE ref=?", (ref,))
+            for ref, record in canonical.items():
+                if current.get(ref) == record["revision"]:
+                    continue
+                keywords = " ".join(record["memory_metadata"].get("keywords", [])) if record.get("memory_metadata") and not record.get("metadata_error") else ""
+                self.conn.execute("DELETE FROM memory_fts WHERE ref=?", (ref,))
+                self.conn.execute("INSERT INTO memory_fts VALUES(?,?,?)", (ref, unicodedata.normalize("NFKC", record["content"]).casefold(), unicodedata.normalize("NFKC", keywords).casefold()))
+                self.conn.execute("INSERT OR REPLACE INTO memory_fts_revisions VALUES(?,?)", (ref, record["revision"]))
+
+    def lexical_search(self, query, records, limit):
+        from .retrieval import lexical_query
+        match = lexical_query(query)
+        if not match or not records:
+            return []
+        eligible = json.dumps({r["ref"]: r["revision"] for r in records})
+        return [row[0] for row in self.conn.execute("""SELECT memory_fts.ref FROM memory_fts
+            JOIN memory_fts_revisions r ON r.ref=memory_fts.ref
+            JOIN json_each(?) e ON e.key=r.ref AND e.value=r.revision
+            WHERE memory_fts MATCH ? ORDER BY bm25(memory_fts), memory_fts.ref LIMIT ?""", (eligible, match, limit))]
 
     def _graph(self, slot):
         row = self.conn.execute("SELECT payload FROM global_graph WHERE slot=?", (slot,)).fetchone()

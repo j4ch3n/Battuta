@@ -1,5 +1,9 @@
 import type { SchedulerStore } from "./scheduler-store.ts";
 
+export const DREAM_HOUR = 5;
+export const DREAM_MINUTE = 30;
+export const DREAM_CRON = "0 30 5 * * *";
+
 export const DREAM_JOB_ID = "battuta-memory-dream";
 export const DREAM_JOB_NAME = "nightly-memory-dream";
 export const DREAM_PROMPT =
@@ -13,7 +17,7 @@ export function ownedDreamTask(task: SchedulerStore["tasks"][number]): boolean {
     task.name === DREAM_JOB_NAME &&
     task.action === "prompt" &&
     task.type === "cron" &&
-    task.schedule === "0 0 3 * * *" &&
+    task.schedule === DREAM_CRON &&
     task.scope === "global" &&
     (task.prompt === DREAM_PROMPT || task.prompt === LEGACY_DREAM_PROMPT) &&
     task.cwd === undefined &&
@@ -51,7 +55,7 @@ export function reconcileDreamSchedule(store: SchedulerStore, now: string): Sche
         name: DREAM_JOB_NAME,
         action: "prompt",
         type: "cron",
-        schedule: "0 0 3 * * *",
+        schedule: DREAM_CRON,
         scope: "global",
         status: "pending",
         enabled: true,

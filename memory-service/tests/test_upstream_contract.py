@@ -32,10 +32,10 @@ class UpstreamContractTests(unittest.IsolatedAsyncioTestCase):
                 adapter = UpstreamAdapter(storage)
                 from sqlite_vec import serialize_float32
                 adapter.embed = lambda _: serialize_float32([1.0] + [0.0] * 383)
-                result = await adapter.search(RecallRequest(query="fact"), ResolvedSelector(["proj:atlas"]))
+                result = await adapter.search(RecallRequest(semantic_query="fact"), ResolvedSelector(["proj:atlas"]))
                 self.assertEqual([r["ref"] for r in result], [newer])
                 self.assertEqual([r["ref"] for r in await adapter.history(newer)], [ref, newer])
-                self.assertEqual(await adapter.search(RecallRequest(query="fact"), ResolvedSelector(["proj:beacon"])), [])
+                self.assertEqual(await adapter.search(RecallRequest(semantic_query="fact"), ResolvedSelector(["proj:beacon"])), [])
                 # The derived graph is global-only, uses surviving hashes, and
                 # must never write back through upstream consolidation storage.
                 self.assertEqual((await adapter.global_snapshot())["records"], [])

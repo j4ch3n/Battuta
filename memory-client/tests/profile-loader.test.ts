@@ -1,28 +1,18 @@
 import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, expect, test } from "vitest";
-import { readOwnerProfile, profilePrompt } from "../profile-loader.ts";
-
-const dirs: string[] = [];
-afterEach(async () => {
-  await Promise.all(dirs.splice(0).map((d) => rm(d, { recursive: true, force: true })));
-});
-test("CoS reads exact existing bytes and Manager does not load the profile", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "profile-test-"));
-  dirs.push(dir);
-  const content = "# About me\n\nLikes concise answers.\n";
-  await writeFile(join(dir, "ME.md"), content);
-  expect(await readOwnerProfile(dir)).toBe(content);
-  expect(await profilePrompt("manager", "/does/not/exist")).toBeUndefined();
-  expect(await profilePrompt("cos", dir)).toContain(content);
-  expect(await readFile(join(dir, "ME.md"), "utf8")).toBe(content);
-});
-test("missing profile is optional, oversized and unreadable profiles are rejected", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "profile-test-"));
-  dirs.push(dir);
-  expect(await readOwnerProfile(dir)).toBeUndefined();
-  await writeFile(join(dir, "ME.md"), "x".repeat(32001));
-  await expect(readOwnerProfile(dir)).rejects.toThrow("size");
-  await expect(readOwnerProfile(join(dir, "ME.md"))).rejects.toThrow();
+import { expect, test } from "vitest";
+import { readOwnerProfile } from "../profile-loader.ts";
+test("shared profile is optional, bounded, and read without changing private bytes", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "profile-"));
+  try {
+    expect(await readOwnerProfile(dir)).toBeUndefined();
+    await writeFile(join(dir, "ME.md"), "# Owner\nConcise replies.\n");
+    expect(await readOwnerProfile(dir)).toBe("# Owner\nConcise replies.\n");
+    expect(await readFile(join(dir, "ME.md"), "utf8")).toBe("# Owner\nConcise replies.\n");
+    await writeFile(join(dir, "ME.md"), "遊".repeat(11000));
+    await expect(readOwnerProfile(dir)).rejects.toThrow("size limit");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });

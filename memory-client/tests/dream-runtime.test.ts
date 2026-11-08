@@ -3,7 +3,30 @@ import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, expect, test, vi } from "vitest";
-import { runDream, type DreamDependencies } from "../dream-runtime.ts";
+import {
+  dreamRunId,
+  runLegacyDream as runDream,
+  type DreamDependencies,
+} from "../dream-runtime.ts";
+
+test.each([
+  [2026, 10, 8, 5, 29, 59, 999, 2026, 10, 7],
+  [2026, 10, 8, 5, 30, 0, 0, 2026, 10, 8],
+  [2026, 10, 8, 23, 59, 0, 0, 2026, 10, 8],
+  [2026, 10, 1, 0, 0, 0, 0, 2026, 9, 31],
+  [2027, 0, 1, 0, 0, 0, 0, 2026, 11, 31],
+  [2026, 2, 8, 5, 29, 0, 0, 2026, 2, 7],
+  [2026, 2, 8, 5, 30, 0, 0, 2026, 2, 8],
+  [2026, 10, 1, 5, 29, 0, 0, 2026, 9, 31],
+  [2026, 10, 1, 5, 30, 0, 0, 2026, 10, 1],
+])(
+  "latest due identity is local 05:30 across date and DST boundaries (%j)",
+  (year, month, day, hour, minute, second, ms, dueYear, dueMonth, dueDay) => {
+    expect(dreamRunId(new Date(year, month, day, hour, minute, second, ms))).toBe(
+      new Date(dueYear, dueMonth, dueDay, 5, 30).toISOString(),
+    );
+  },
+);
 import { memoryRecordSchema, type MemoryRecord } from "../dream-mutations.ts";
 import { validatePersonalProfile } from "../dream-personal.ts";
 
@@ -93,7 +116,7 @@ const record = (ref: string, content: string, global = false): MemoryRecord =>
     ref,
     revision: hash(content),
     content,
-    scope: { global, projects: global ? [] : ["atlas"] },
+    projects: global ? ["global"] : ["atlas"],
     kind: "observation",
     tags: [],
     sources: [],
@@ -120,7 +143,7 @@ async function fixture() {
     hash(
       JSON.stringify(
         [...records.values()]
-          .filter((r) => r.scope.global)
+          .filter((r) => r.projects[0] === "global")
           .map((r) => [r.ref, r.revision])
           .sort(),
       ),
@@ -128,6 +151,7 @@ async function fixture() {
   let planCalls = 0,
     loseAck = false;
   const dependencies: DreamDependencies = {
+    prepareProjects: () => Promise.resolve(["atlas", "beacon", "global"]),
     directory,
     now: () => new Date("2026-10-21T04:00:00Z"),
     call: (name, args) => {
@@ -195,8 +219,7 @@ async function fixture() {
         if (!existing)
           records.set(ref, {
             ...record(ref, String(args.content)),
-            scope:
-              name === "memory_remember" ? (args.scope as MemoryRecord["scope"]) : target!.scope,
+            projects: name === "memory_remember" ? (args.projects as string[]) : target!.projects,
           });
         if (name === "memory_update") {
           records.delete(String(args.ref));
@@ -762,7 +785,7 @@ test("next day revisits concurrent captures and membership revisions, not the fi
         f.records.set(external, record(external, "Concurrent capture", true));
         f.records.set(old, {
           ...f.records.get(old)!,
-          scope: { global: false, projects: ["atlas", "beacon"] },
+          projects: ["atlas", "beacon"],
           revision: hash("membership changed"),
         });
       }
@@ -1048,7 +1071,7 @@ test.each(["atlas", "beacon"])(
     const external = hash("after cutoff");
     f.records.set(external, {
       ...record(external, "Captured after frozen cutoff"),
-      scope: { global: false, projects: [project] },
+      projects: [project],
     });
     const call = f.dependencies.call;
     let day = 1,
@@ -1097,7 +1120,7 @@ test("only the acknowledged output revision is handled, not a later external mem
     if (prompt.startsWith("Refresh") && day === 1)
       f.records.set(output, {
         ...f.records.get(output)!,
-        scope: { global: false, projects: ["atlas", "beacon"] },
+        projects: ["atlas", "beacon"],
         revision: hash("edited output membership"),
       });
     if (prompt.startsWith("Write a private") && day === 2)

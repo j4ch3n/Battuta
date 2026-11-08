@@ -19,7 +19,7 @@ if (phase === "seed") {
   );
   await initializeSchedulerStore(store);
   await configureDream(workspace);
-  // Make the provisioned task due without waiting for local 03:00.
+  // Make the provisioned task due without waiting for local 05:30.
   const saved = JSON.parse(await readFile(store, "utf8"));
   saved.tasks[0].nextRun = new Date(Date.now() - 1000).toISOString();
   saved.tasks[0].dueAt = saved.tasks[0].nextRun;

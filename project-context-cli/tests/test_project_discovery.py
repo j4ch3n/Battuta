@@ -1,12 +1,14 @@
 """Project discovery and selection reporting without workspace changes."""
 
 from click.testing import CliRunner
+import json
 import os
 import shutil
 from unittest.mock import patch
 
 from battuta_project.cli import main
 from battuta_project.models import ProjectList
+from battuta_project.registry import ProjectRegistry
 from battuta_project.presentation import render
 from linear_fixtures import linear_http
 from project_fixtures import ProjectTestCase
@@ -73,6 +75,39 @@ class DiscoveryTests(ProjectTestCase):
         self.assertNotEqual(result.exit_code, 0)
         self.assertIn("project.yaml", result.output)
         self.assertEqual(self.registry.state_path.read_bytes(), selection)
+
+    def test_list_json_is_complete_and_non_mutating(self):
+        for name in ("Atlas", "my project", "项目", "global"):
+            self.registry.init(name)
+        self.registry.state_path.write_text("not valid selection JSON")
+        before = {str(p): p.read_bytes() for p in self.home.rglob("*") if p.is_file()}
+        self.assertEqual(json.loads(self.invoke("list", "--json")), {
+            "projects": ["Atlas", "atlas-api", "global", "my project", "项目"],
+        })
+        self.assertEqual({str(p): p.read_bytes() for p in self.home.rglob("*") if p.is_file()}, before)
+
+    def test_list_json_empty_registry(self):
+        shutil.rmtree(self.registry.root)
+        for exists in (False, True):
+            with self.subTest(exists=exists):
+                if exists:
+                    self.registry.root.mkdir()
+                self.assertEqual(json.loads(self.invoke("list", "--json")), {"projects": []})
+                self.assertEqual(self.registry.root.exists(), exists)
+                self.assertFalse(self.registry.state_path.exists())
+
+    def test_list_json_rejects_invalid_registration(self):
+        (self.project.root / "project.yaml").write_text("invalid: true")
+        result = self.runner.invoke(main, ["list", "--json"])
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("project.yaml", result.output)
+
+    def test_list_json_respects_root(self):
+        root = self.home / "custom"
+        ProjectRegistry(root).init("Beacon")
+        self.assertEqual(json.loads(self.invoke("list", "--json", "--root", str(root))), {
+            "projects": ["Beacon"],
+        })
 
     def test_list_preserves_absolute_paths_outside_home(self):
         with patch("pathlib.Path.home", return_value=self.home / "different-home"):

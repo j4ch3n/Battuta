@@ -99,7 +99,9 @@ case "${1:-}" in
       unset PI_SCHEDULER_STATE_FILE PI_SCHEDULER_CATCHUP_MAX
     fi
     cd "$bot_dir"
-    exec "$bot_dir/node_modules/.bin/pi" --approve --continue --session-dir "$bot_dir/.pi/mail-sessions" --extension "$root/agent-mail/index.ts" --extension "$root/project-spec/index.ts" --extension "$root/memory-client/index.ts"
+    extensions=(--extension "$root/agent-mail/index.ts" --extension "$root/project-spec/index.ts")
+    if [[ "$role" == cos ]]; then extensions+=(--extension "$root/memory-client/index.ts"); fi
+    exec "$bot_dir/node_modules/.bin/pi" --approve --continue --session-dir "$bot_dir/.pi/mail-sessions" "${extensions[@]}"
     ;;
   install-services)
     shift

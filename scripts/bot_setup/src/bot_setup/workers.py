@@ -68,6 +68,7 @@ def copy_worker_profile(profile: Path, bot_dir: Path) -> None:
         raise click.ClickException("mcpServers must be a JSON object")
     mcp.update(destination["mcp.json"])
     mcp["mcpServers"] = {**destination_servers, **source_servers}
+    mcp["mcpServers"].pop("memory", None)
     # Validate every input before creating or changing any instance files.
     bot_dir.mkdir(parents=True, exist_ok=True)
     write_config(bot_dir / ".pi/settings.json", settings, ".settings-")
