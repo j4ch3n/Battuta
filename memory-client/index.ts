@@ -307,7 +307,7 @@ export default function memoryClient(pi: ExtensionAPI) {
     safe(ctx, async () => {
       await (
         await getRuntime(ctx)
-      ).flush(ctx.sessionManager.getSessionId(), ctx.sessionManager.getBranch());
+      ).beforeCompact(ctx.sessionManager.getSessionId(), ctx.sessionManager.getBranch());
     }),
   );
   pi.on("session_shutdown", (_event, ctx) => {

@@ -80,6 +80,133 @@ const entries = (count: number) =>
     message: { role: i === 0 ? "user" : "assistant", content: `fact ${i}` },
   }));
 
+test("pre-compaction awaits durable persistence but not extraction or upload, sharing settled-turn recovery", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-before-compact-"));
+  let persist!: () => void,
+    extracted!: () => void,
+    finishExtraction!: () => void,
+    finishUpload!: () => void;
+  const persistence = new Promise<void>((resolve) => {
+    persist = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    extracted = resolve;
+  });
+  const extraction = new Promise<void>((resolve) => {
+    finishExtraction = resolve;
+  });
+  const uploading = new Promise<void>((resolve) => {
+    finishUpload = resolve;
+  });
+  try {
+    const queue = await CaptureQueue.open(dir, "cos");
+    const extract = vi.fn(async () => {
+      extracted();
+      await extraction;
+      return { batch: { items: [] } };
+    });
+    const runtime = new CaptureRuntime(queue, {
+      prepare,
+      extract,
+      upload: () => uploading,
+      now: () => 0,
+      notify: () => {},
+    });
+    await runtime.startRequest("s", [], binding("atlas"));
+    const track = queue.track.bind(queue);
+    vi.spyOn(queue, "track").mockImplementation(async (...args) => {
+      await persistence;
+      return track(...args);
+    });
+    let compacted = false;
+    const compact = runtime.beforeCompact("s", entries(2)).then(() => {
+      compacted = true;
+    });
+    await Promise.resolve();
+    expect(compacted).toBe(false);
+    expect(queue.jobs()).toEqual([]);
+    persist();
+    await compact;
+    await started;
+    expect(compacted).toBe(true);
+    await runtime.settle("s", entries(2));
+    expect(extract).toHaveBeenCalledTimes(1);
+    expect(queue.jobs().flatMap((j) => j.segment.messages.map((m) => m.entry_id))).toEqual([
+      "0",
+      "1",
+    ]);
+    expect(queue.jobs()[0].segment.binding).toEqual(binding("atlas"));
+    finishExtraction();
+    finishUpload();
+    await runtime.recover();
+    expect(queue.jobs()).toEqual([]);
+  } finally {
+    persist();
+    finishExtraction();
+    finishUpload();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("shutdown prevents pre-compaction from starting or continuing another queued job", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-compact-stop-"));
+  try {
+    const queue = await CaptureQueue.open(dir, "cos");
+    let started!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const extract = vi.fn(async (_job: CaptureJob, signal: AbortSignal) => {
+      started();
+      await new Promise<void>((_resolve, reject) =>
+        signal.addEventListener("abort", () => reject(new Error("cancelled")), { once: true }),
+      );
+      return { batch: {} };
+    });
+    const runtime = new CaptureRuntime(queue, {
+      prepare,
+      extract,
+      upload: () => Promise.resolve(),
+      now: () => 0,
+      notify: () => {},
+    });
+    await runtime.startRequest("s", [], binding("atlas"));
+    await runtime.flush("s", entries(2));
+    await runtime.startRequest("other", [], binding("beacon", "other"));
+    await runtime.flush("other", entries(2));
+    await runtime.beforeCompact("s", entries(2));
+    await ready;
+    runtime.shutdown();
+    await runtime.recover();
+    await runtime.beforeCompact("other", entries(2));
+    expect(extract).toHaveBeenCalledTimes(1);
+    expect(queue.jobs()).toHaveLength(2);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("failed pre-compaction persistence never starts recovery", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-compact-fail-"));
+  try {
+    const queue = await CaptureQueue.open(dir, "cos");
+    const extract = vi.fn(() => Promise.resolve({ batch: {} }));
+    const runtime = new CaptureRuntime(queue, {
+      prepare,
+      extract,
+      upload: () => Promise.resolve(),
+      now: () => 0,
+      notify: () => {},
+    });
+    await runtime.startRequest("s", [], binding("atlas"));
+    vi.spyOn(queue, "track").mockRejectedValue(new Error("disk full"));
+    await expect(runtime.beforeCompact("s", entries(2))).rejects.toThrow("disk full");
+    expect(extract).not.toHaveBeenCalled();
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("catalog and rejected work survive restart without rediscovering or regenerating accepted entries", async () => {
   const dir = await mkdtemp(join(tmpdir(), "runtime-projects-"));
   try {

@@ -24,6 +24,7 @@ export class CaptureRuntime {
   private bindings = new Map<string, RequestBinding>();
   private active?: AbortController;
   private recovery?: Promise<void>;
+  private stopped = false;
   constructor(
     readonly queue: CaptureQueue,
     private worker: Worker,
@@ -69,13 +70,21 @@ export class CaptureRuntime {
     await this.queue.track(session, entries, binding?.project ?? null, true, binding, !!binding);
     if (endRequest) this.bindings.delete(session);
   }
+  async beforeCompact(session: string, entries: readonly unknown[]) {
+    await this.flush(session, entries);
+    void this.recover().catch(() =>
+      this.worker.notify("Memory capture pending; retained for retry"),
+    );
+  }
   shutdown() {
+    this.stopped = true;
     this.active?.abort();
   }
   hasPendingCapture() {
     return this.queue.hasPending();
   }
   recover(): Promise<void> {
+    if (this.stopped) return this.recovery ?? Promise.resolve();
     if (!this.recovery)
       this.recovery = this.runRecovery().finally(() => {
         this.recovery = undefined;
@@ -87,6 +96,7 @@ export class CaptureRuntime {
       .jobs()
       .filter((j) => !j.blocked && j.nextAttempt <= this.worker.now())
       .slice(0, 2)) {
+      if (this.stopped) break;
       const controller = new AbortController();
       this.active = controller;
       const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(30000)]);
@@ -97,6 +107,7 @@ export class CaptureRuntime {
             signal.throwIfAborted();
             await this.queue.update(job);
           }
+          signal.throwIfAborted();
           const result = await this.worker.extract(job, signal);
           signal.throwIfAborted();
           job.batch = result.batch;
@@ -105,6 +116,7 @@ export class CaptureRuntime {
           await this.queue.update(job);
         }
         if (!job.batch_uploaded) {
+          signal.throwIfAborted();
           await this.worker.upload(
             job.legacy_delivery ? normalizePersistedCapture(job.batch) : job.batch,
             signal,
