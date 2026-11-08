@@ -48,7 +48,6 @@ export async function extractMemories(
           {
             role: "user",
             content: JSON.stringify({
-              project: job.segment.project,
               available_projects: job.project_catalog,
               rejected_entries: retryInputs?.map((rejection) => ({
                 ...rejection,

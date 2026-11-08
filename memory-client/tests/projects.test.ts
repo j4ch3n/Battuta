@@ -23,10 +23,10 @@ test.each([
     done(null, JSON.stringify({ projects: names })),
   );
   const signal = new AbortController().signal;
-  expect(await loadProjectCatalog("/custom/projects", signal)).toEqual(expected);
+  expect(await loadProjectCatalog(signal)).toEqual(expected);
   expect(execFile).toHaveBeenLastCalledWith(
     "battuta-project",
-    ["list", "--json", "--root", "/custom/projects"],
+    ["list", "--json"],
     expect.objectContaining({ signal, maxBuffer: 1048576 }),
     expect.any(Function),
   );
@@ -41,13 +41,13 @@ test.each([
   '{"projects":["Atlas","Atlas"]}',
 ])("rejects unusable discovery instead of authorizing global extraction: %s", async (stdout) => {
   execFile.mockImplementation((_cmd, _args, _options, done) => done(null, stdout));
-  await expect(loadProjectCatalog("/projects", new AbortController().signal)).rejects.toThrow();
+  await expect(loadProjectCatalog(new AbortController().signal)).rejects.toThrow();
 });
 test.each(["command failed", "stdout maxBuffer exceeded", "aborted"])(
   "propagates subprocess failure: %s",
   async (message) => {
     execFile.mockImplementation((_cmd, _args, _options, done) => done(new Error(message)));
-    await expect(loadProjectCatalog("/projects", new AbortController().signal)).rejects.toThrow(
+    await expect(loadProjectCatalog(new AbortController().signal)).rejects.toThrow(
       "Project catalog unavailable",
     );
   },

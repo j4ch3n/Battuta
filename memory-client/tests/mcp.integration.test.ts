@@ -41,7 +41,6 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
           env: {
             ...process.env,
             BATTUTA_MEMORY_DATA_DIR: join(directory, "data"),
-            BATTUTA_PROJECTS_ROOT: join(directory, "projects"),
           },
           stdio: ["ignore", "ignore", "pipe"],
         },
@@ -79,7 +78,6 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
     }
     try {
       const cliHome = join(directory, "cli-home");
-      const registry = join(cliHome, ".battuta/projects");
       const cli = resolve("../project-context-cli/.venv/bin/battuta-project");
       for (const name of ["Atlas", "Beacon", "My Project", "项目"])
         await promisify(execFile)(cli, ["init", name], {
@@ -87,7 +85,8 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
         });
       vi.stubEnv("PATH", `${resolve("../project-context-cli/.venv/bin")}:${process.env.PATH}`);
       vi.stubEnv("LINEAR_API_TOKEN", "offline-test");
-      expect(await loadProjectCatalog(registry, new AbortController().signal)).toEqual([
+      vi.stubEnv("HOME", cliHome);
+      expect(await loadProjectCatalog(new AbortController().signal)).toEqual([
         "Atlas",
         "Beacon",
         "My Project",
@@ -96,7 +95,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       ]);
       await start();
       const queue = await CaptureQueue.open(join(directory, "queue"), "cos");
-      const prepareProjects = (signal: AbortSignal) => loadProjectCatalog(registry, signal);
+      const prepareProjects = (signal: AbortSignal) => loadProjectCatalog(signal);
       const client = new MemoryMcpClient(`http://127.0.0.1:${address.port}/mcp`, prepareProjects);
       const complete = vi.fn(() =>
         Promise.resolve({
@@ -142,7 +141,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       let now = 0;
       const worker = {
         prepare: (_job: Parameters<typeof extractMemories>[0], signal: AbortSignal) =>
-          loadProjectCatalog(registry, signal),
+          loadProjectCatalog(signal),
         extract: (job: Parameters<typeof extractMemories>[0], signal: AbortSignal) =>
           extractMemories(job, context, signal),
         upload: async (
@@ -161,15 +160,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       };
       const runtime = new CaptureRuntime(queue, worker);
       await runtime.initialize("session", []);
-      const binding = {
-        request_id: "r1",
-        conversation_id: "conversation",
-        session_id: "session",
-        project: null,
-        origin: "owner" as const,
-        admitted_at: "2026-11-06T10:00:00Z",
-      };
-      await runtime.startRequest("session", [], { capture: true, project: null });
+      await runtime.startRequest("session", [], { capture: true });
       await runtime.settle("session", [
         {
           id: "e0",
@@ -349,8 +340,6 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
           attempts: 0,
           nextAttempt: 0,
           segment: {
-            project: null,
-            binding: { ...binding, request_id: "r2" },
             messages: [
               {
                 entry_id: "returned",

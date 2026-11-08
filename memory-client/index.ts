@@ -43,11 +43,9 @@ export default function memoryClient(pi: ExtensionAPI) {
       const config = clientConfig();
       const settings = await captureSettings(config.directory, config.role);
       if (!settings.enabled) throw new Error("Capture disabled");
-      const client = new MemoryMcpClient(config.url, (signal) =>
-        loadProjectCatalog(config.registry, signal),
-      );
+      const client = new MemoryMcpClient(config.url, (signal) => loadProjectCatalog(signal));
       runtime = new CaptureRuntime(await CaptureQueue.open(config.queue, config.role), {
-        prepare: (_job, signal) => loadProjectCatalog(config.registry, signal),
+        prepare: (_job, signal) => loadProjectCatalog(signal),
         extract: async (job, signal) => {
           const candidates = await prepareCorrectionCandidates(
             job.project_catalog!,
@@ -99,7 +97,6 @@ export default function memoryClient(pi: ExtensionAPI) {
       (await getRuntime(ctx)).startRequest(session, entries, {
         capture:
           ordinary || (event.messageType === "custom" && event.message.customType === "agent-mail"),
-        project: null,
       }),
     );
     if (!ordinary) return;

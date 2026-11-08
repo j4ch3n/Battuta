@@ -7,7 +7,6 @@ import { CaptureRuntime } from "../lifecycle.ts";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { extractMemories } from "../extract.ts";
 
-const binding = (project: string | null) => ({ capture: true, project });
 const prepare = () => Promise.resolve(["atlas", "beacon", "global"]);
 
 test("embedding rephrase retains project rejections and rewrites only the failed frozen item", async () => {
@@ -78,7 +77,7 @@ test("embedding rephrase retains project rejections and rewrites only the failed
       now: () => now,
       notify: () => {},
     });
-    await runtime.startRequest("s", [], binding("atlas"));
+    await runtime.startRequest("s", []);
     await runtime.settle("s", entries(1));
     await runtime.recover();
     now = 2000;
@@ -122,7 +121,7 @@ test("invalid correction completion consumes its single durable attempt across r
     };
     const queue = await CaptureQueue.open(dir, "cos");
     const runtime = new CaptureRuntime(queue, worker);
-    await runtime.startRequest("s", [], binding("atlas"));
+    await runtime.startRequest("s", []);
     await runtime.settle("s", entries(1));
     await runtime.recover();
     for (now of [2000, 10000, 50000]) await runtime.recover();
@@ -166,7 +165,7 @@ test("a consumed correction attempt still retries its frozen upload without anot
     };
     const queue = await CaptureQueue.open(dir, "cos");
     const runtime = new CaptureRuntime(queue, worker);
-    await runtime.startRequest("s", [], binding("atlas"));
+    await runtime.startRequest("s", []);
     await runtime.settle("s", entries(1));
     await runtime.recover();
     now = 2000;
@@ -250,7 +249,6 @@ const entries = (count: number) =>
     id: String(i),
     message: { role: i === 0 ? "user" : "assistant", content: `fact ${i}` },
   }));
-const request = (project: string | null) => ({ capture: true, project });
 
 test("pre-compaction awaits durable persistence but not extraction or upload, sharing settled-turn recovery", async () => {
   const dir = await mkdtemp(join(tmpdir(), "runtime-before-compact-"));
@@ -284,7 +282,7 @@ test("pre-compaction awaits durable persistence but not extraction or upload, sh
       now: () => 0,
       notify: () => {},
     });
-    await runtime.startRequest("s", [], binding("atlas"));
+    await runtime.startRequest("s", []);
     const track = queue.track.bind(queue);
     vi.spyOn(queue, "track").mockImplementation(async (...args) => {
       await persistence;
@@ -307,7 +305,7 @@ test("pre-compaction awaits durable persistence but not extraction or upload, sh
       "0",
       "1",
     ]);
-    expect(queue.jobs()[0].segment.project).toBe("atlas");
+    expect(Object.keys(queue.jobs()[0].segment)).toEqual(["messages"]);
     finishExtraction();
     finishUpload();
     await runtime.recover();
@@ -316,6 +314,55 @@ test("pre-compaction awaits durable persistence but not extraction or upload, sh
     persist();
     finishExtraction();
     finishUpload();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("a new settled turn survives while an earlier upload is pending", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-upload-race-"));
+  let release!: () => void;
+  let started!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const uploading = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  try {
+    const queue = await CaptureQueue.open(dir, "cos");
+    const runtime = new CaptureRuntime(queue, {
+      prepare,
+      extract: () => Promise.resolve({ batch: { items: [] } }),
+      upload: async () => {
+        started();
+        await pending;
+      },
+      now: () => 0,
+      notify: () => {},
+    });
+    await runtime.startRequest("s", []);
+    await runtime.settle("s", entries(1));
+    await uploading;
+    await runtime.startRequest("s", entries(1));
+    await runtime.settle("s", entries(2));
+    const restored = await CaptureQueue.open(dir, "cos");
+    expect(restored.jobs().flatMap((job) => job.segment.messages.map((m) => m.entry_id))).toEqual([
+      "0",
+      "1",
+    ]);
+    expect(restored.jobs().every((job) => Object.keys(job.segment).join() === "messages")).toBe(
+      true,
+    );
+    release();
+    await runtime.recover();
+    expect(queue.jobs().flatMap((job) => job.segment.messages.map((m) => m.entry_id))).toEqual([
+      "1",
+    ]);
+    await runtime.recover();
+    expect(queue.jobs()).toEqual([]);
+    runtime.shutdown();
+  } finally {
+    release();
     await rm(dir, { recursive: true, force: true });
   }
 });
@@ -342,9 +389,9 @@ test("shutdown prevents pre-compaction from starting or continuing another queue
       now: () => 0,
       notify: () => {},
     });
-    await runtime.startRequest("s", [], binding("atlas"));
+    await runtime.startRequest("s", []);
     await runtime.flush("s", entries(2));
-    await runtime.startRequest("other", [], binding("beacon"));
+    await runtime.startRequest("other", []);
     await runtime.flush("other", entries(2));
     await runtime.beforeCompact("s", entries(2));
     await ready;
@@ -358,7 +405,7 @@ test("shutdown prevents pre-compaction from starting or continuing another queue
   }
 });
 
-test("compaction preserves explicit scope, capture retries are frozen, and a fork does not backfill", async () => {
+test("compaction preserves sources, capture retries are frozen, and a fork does not backfill", async () => {
   const dir = await mkdtemp(join(tmpdir(), "runtime-"));
   try {
     const queue = await CaptureQueue.open(dir, "cos");
@@ -372,7 +419,7 @@ test("compaction preserves explicit scope, capture retries are frozen, and a for
       now: () => now,
       notify: () => {},
     });
-    await runtime.startRequest("s", [], request("atlas"));
+    await runtime.startRequest("s", []);
     await runtime.flush("s", entries(2));
     await runtime.settle("s", entries(4));
     await runtime.recover();
@@ -382,14 +429,14 @@ test("compaction preserves explicit scope, capture retries are frozen, and a for
       "2",
       "3",
     ]);
-    expect(queue.jobs().every((j) => j.segment.project === "atlas")).toBe(true);
+    expect(queue.jobs().every((j) => Object.keys(j.segment).join() === "messages")).toBe(true);
     expect(extract).toHaveBeenCalledTimes(2);
     now = 2000;
     await runtime.recover();
     expect(extract).toHaveBeenCalledTimes(2);
     expect(upload).toHaveBeenCalledTimes(4);
     await runtime.initialize("fork", entries(4));
-    await runtime.startRequest("fork", entries(4), request("beacon"));
+    await runtime.startRequest("fork", entries(4));
     await runtime.settle("fork", entries(4));
     expect(queue.jobs()).toHaveLength(2);
   } finally {
@@ -409,7 +456,7 @@ test("failed pre-compaction persistence never starts recovery", async () => {
       now: () => 0,
       notify: () => {},
     });
-    await runtime.startRequest("s", [], binding("atlas"));
+    await runtime.startRequest("s", []);
     vi.spyOn(queue, "track").mockRejectedValue(new Error("disk full"));
     await expect(runtime.beforeCompact("s", entries(2))).rejects.toThrow("disk full");
     expect(extract).not.toHaveBeenCalled();
@@ -453,7 +500,7 @@ test("catalog and rejected work survive restart without rediscovering or regener
     };
     const queue = await CaptureQueue.open(dir, "cos");
     const runtime = new CaptureRuntime(queue, worker);
-    await runtime.startRequest("s", [], binding("Atlas"));
+    await runtime.startRequest("s", []);
     await runtime.settle("s", entries(2));
     await runtime.recover();
     expect(uploaded).toEqual(["accepted"]);
@@ -482,7 +529,7 @@ test("catalog failure retains source messages and never starts extraction", asyn
       now: () => 0,
       notify: () => {},
     });
-    await runtime.startRequest("s", [], binding("atlas"));
+    await runtime.startRequest("s", []);
     await runtime.settle("s", entries(2));
     await runtime.recover();
     expect(extract).not.toHaveBeenCalled();
@@ -505,7 +552,7 @@ test("oversized memories allow one durable rephrase, not repeated paid extractio
       now: () => now,
       notify: () => {},
     });
-    await runtime.startRequest("s", [], request(null));
+    await runtime.startRequest("s", []);
     await runtime.settle("s", entries(2));
     await runtime.recover();
     now = 2000;
@@ -519,7 +566,7 @@ test("oversized memories allow one durable rephrase, not repeated paid extractio
   }
 });
 
-test("mail remains attributed while internal runs are excluded and sessions keep their scope", async () => {
+test("mail remains attributed while internal runs are excluded and sessions keep their sources", async () => {
   const dir = await mkdtemp(join(tmpdir(), "runtime-"));
   try {
     const queue = await CaptureQueue.open(dir, "cos");
@@ -530,8 +577,8 @@ test("mail remains attributed while internal runs are excluded and sessions keep
       now: () => 0,
       notify: () => {},
     });
-    await runtime.startRequest("s", [], request("atlas"));
-    await runtime.startRequest("other", [], request("beacon"));
+    await runtime.startRequest("s", []);
+    await runtime.startRequest("other", []);
     await runtime.flush("s", [
       {
         id: "mail",
@@ -545,12 +592,12 @@ test("mail remains attributed while internal runs are excluded and sessions keep
       },
     ]);
     await runtime.flush("other", entries(2));
-    expect(queue.jobs().map((j) => j.segment.project)).toEqual(["atlas", "beacon"]);
+    expect(queue.jobs().map((j) => j.session_id)).toEqual(["s", "other"]);
     expect(queue.jobs()[0].segment.messages[0]).toMatchObject({
       speaker: "agent",
       original_mail: { sender: "manager" },
     });
-    await runtime.startRequest("internal", [], { capture: false, project: null });
+    await runtime.startRequest("internal", [], { capture: false });
     await runtime.settle("internal", entries(2));
     expect(queue.jobs()).toHaveLength(2);
   } finally {
@@ -579,7 +626,7 @@ test("shutdown cancels extraction without acknowledging its queued batch", async
       now: () => 0,
       notify: () => {},
     });
-    await runtime.startRequest("s", [], request(null));
+    await runtime.startRequest("s", []);
     await runtime.settle("s", entries(2));
     await ready;
     runtime.shutdown();

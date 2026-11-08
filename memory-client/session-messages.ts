@@ -9,9 +9,6 @@ export interface SourceMessage {
   original_mail?: { message_ref: { conversation_id: string; id: string }; sender: string };
 }
 export interface CaptureSegment {
-  blocked_reason?: "unbound-origin";
-  binding?: unknown;
-  project: string | null;
   messages: SourceMessage[];
 }
 
@@ -95,7 +92,7 @@ export function collectMessages(entries: readonly unknown[]): SourceMessage[] {
   });
 }
 
-export function splitSegments(messages: SourceMessage[], project: string | null): CaptureSegment[] {
+export function splitSegments(messages: SourceMessage[]): CaptureSegment[] {
   const segments: CaptureSegment[] = [];
   let current: SourceMessage[] = [];
   let length = 0;
@@ -103,7 +100,7 @@ export function splitSegments(messages: SourceMessage[], project: string | null)
     for (let start = 0; start < message.text.length; start += 12000) {
       const part = message.text.slice(start, start + 12000);
       if (length + part.length > 12000) {
-        segments.push({ project, messages: current });
+        segments.push({ messages: current });
         current = [];
         length = 0;
       }
@@ -111,6 +108,6 @@ export function splitSegments(messages: SourceMessage[], project: string | null)
       length += part.length;
     }
   }
-  if (current.length) segments.push({ project, messages: current });
+  if (current.length) segments.push({ messages: current });
   return segments;
 }

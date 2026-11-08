@@ -30,7 +30,6 @@ export function clientConfig() {
     role,
     dataDirectory,
     directory: process.env.PI_CODING_AGENT_DIR ?? join(process.cwd(), ".pi"),
-    registry: process.env.BATTUTA_PROJECTS_ROOT ?? join(homedir(), ".battuta/projects"),
     queue: join(dataDirectory, "capture-queue", role),
     url: process.env.BATTUTA_MEMORY_URL ?? "http://127.0.0.1:8901/mcp",
   } as const;

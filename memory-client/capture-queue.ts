@@ -26,10 +26,16 @@ export interface CaptureJob {
   attempts: number;
   nextAttempt: number;
 }
+// Preserve historical pending metadata without attaching it to new turns.
+interface PendingSegment extends CaptureSegment {
+  project?: string | null;
+  binding?: unknown;
+  blocked_reason?: "unbound-origin";
+}
 interface State {
   version: 1;
   seen: Record<string, string[]>;
-  pending: Record<string, CaptureSegment[]>;
+  pending: Record<string, PendingSegment[]>;
   jobs: CaptureJob[];
 }
 
@@ -128,13 +134,7 @@ export class CaptureQueue {
       )
     );
   }
-  async track(
-    session: string,
-    entries: readonly unknown[],
-    project: string | null,
-    flush: boolean,
-    capture = true,
-  ) {
+  async track(session: string, entries: readonly unknown[], flush: boolean, capture = true) {
     return this.change(async () => {
       const next = structuredClone(this.state);
       const messages = collectMessages(entries);
@@ -147,11 +147,10 @@ export class CaptureQueue {
         const pending = next.pending[session] ?? [];
         const tail = pending.at(-1);
         if (capture && fresh.length) {
-          if (tail && tail.project === project && !tail.binding && !tail.blocked_reason)
+          if (tail && !("project" in tail) && !tail.binding && !tail.blocked_reason)
             tail.messages.push(...fresh);
           else
             pending.push({
-              project,
               messages: fresh,
             });
         }
@@ -167,8 +166,9 @@ export class CaptureQueue {
   private async flushNow(session: string) {
     const next = structuredClone(this.state);
     for (const pending of next.pending[session] ?? []) {
-      for (const segment of splitSegments(pending.messages, pending.project)) {
-        if (pending.binding) segment.binding = pending.binding;
+      const { blocked_reason, ...source } = pending;
+      for (const part of splitSegments(pending.messages)) {
+        const segment = { ...source, ...part };
         const id = digest([this.role, session, segment]);
         if (!next.jobs.some((j) => j.id === id))
           next.jobs.push({
@@ -177,9 +177,7 @@ export class CaptureQueue {
             segment,
             attempts: 0,
             nextAttempt: 0,
-            ...(pending.blocked_reason
-              ? { blocked: true, blocked_reason: pending.blocked_reason }
-              : {}),
+            ...(blocked_reason ? { blocked: true, blocked_reason } : {}),
           });
       }
     }

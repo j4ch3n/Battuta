@@ -41,7 +41,7 @@ export async function executeDream(
   try {
     signal.throwIfAborted();
     const config = clientConfig();
-    const prepareProjects = (signal: AbortSignal) => loadProjectCatalog(config.registry, signal);
+    const prepareProjects = (signal: AbortSignal) => loadProjectCatalog(signal);
     const client = new MemoryMcpClient(config.url, prepareProjects);
     // Fixed model completions receive evidence, not CoS history or tool access.
     // The engine returns a separate public summary, never the private reflection.

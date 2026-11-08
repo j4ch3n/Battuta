@@ -16,7 +16,7 @@ test("ordinary turns capture with real attribution and no origin marker", async 
       now: () => 0,
       notify: () => {},
     });
-    await runtime.startRequest("s", [], { capture: true, project: null });
+    await runtime.startRequest("s", [], { capture: true });
     await runtime.settle("s", [
       {
         id: "owner",
@@ -29,7 +29,7 @@ test("ordinary turns capture with real attribution and no origin marker", async 
       entry_id: "owner",
       speaker: "owner",
     });
-    expect(queue.jobs()[0].segment.project).toBeNull();
+    expect(Object.keys(queue.jobs()[0].segment)).toEqual(["messages"]);
     expect(queue.jobs()[0].blocked).not.toBe(true);
     runtime.shutdown();
   } finally {
