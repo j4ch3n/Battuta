@@ -2,6 +2,12 @@ import { z } from "zod";
 import { redact } from "./privacy.ts";
 
 export const memoryRefSchema = z.string().regex(/^[0-9a-f]{64}$/);
+export const memoryProjectsSchema = z
+  .array(z.string())
+  .min(1)
+  .max(100)
+  .transform((projects) => [...new Set(projects)].sort())
+  .refine((projects) => !projects.includes("global") || projects.length === 1);
 const timestamp = z
   .string()
   .datetime({ offset: true })

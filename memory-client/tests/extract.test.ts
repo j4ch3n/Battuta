@@ -5,6 +5,7 @@ import type { CaptureJob } from "../capture-queue.ts";
 
 const job: CaptureJob = {
   id: "job",
+  project_catalog: ["atlas", "beacon", "My Project", "global"],
   session_id: "s",
   segment: { project: "atlas", messages: [{ entry_id: "e", text: "Use SQLite, not Postgres" }] },
   attempts: 0,
@@ -32,7 +33,7 @@ test("extracts cited facts with frozen binding and emits provider usage", async 
         items: [
           {
             content: "Atlas uses SQLite",
-            scope: { global: false, projects: ["atlas"] },
+            projects: ["atlas"],
             source_entry_ids: ["e"],
           },
         ],
@@ -49,17 +50,10 @@ test("extracts cited facts with frozen binding and emits provider usage", async 
 test.each([
   "not json",
   JSON.stringify({
-    items: [
-      { content: "fact", scope: { global: false, projects: ["beacon"] }, source_entry_ids: ["e"] },
-    ],
+    items: [{ content: "fact", projects: ["global"], source_entry_ids: ["invented"] }],
   }),
   JSON.stringify({
-    items: [
-      { content: "fact", scope: { global: true, projects: [] }, source_entry_ids: ["invented"] },
-    ],
-  }),
-  JSON.stringify({
-    items: [{ content: "x".repeat(1001), scope: { global: true }, source_entry_ids: ["e"] }],
+    items: [{ content: "x".repeat(1001), projects: ["global"], source_entry_ids: ["e"] }],
   }),
 ])("rejects invalid, cross-project, uncited or oversized output", async (content) => {
   await expect(
@@ -89,7 +83,7 @@ test.each(["topic,scope:global", "topic,proj:other", "topic,kind:decision"])(
       items: [
         {
           content: "Atlas uses SQLite",
-          scope: { global: false, projects: ["atlas"] },
+          projects: ["atlas"],
           tags: [tag],
           source_entry_ids: ["e"],
         },
@@ -109,7 +103,7 @@ test.each([
     extractMemories(
       job,
       context(
-        JSON.stringify({ items: [{ content, scope: { global: true }, source_entry_ids: ["e"] }] }),
+        JSON.stringify({ items: [{ content, projects: ["global"], source_entry_ids: ["e"] }] }),
       ),
       new AbortController().signal,
     ),
@@ -133,7 +127,7 @@ test("assistant-only evidence is not owner confirmation; unknown timezone cannot
   };
   const item = {
     content: "Owner wants a console",
-    scope: { global: true },
+    projects: ["global"],
     source_entry_ids: ["e"],
     confidence: "confirmed",
   };
@@ -151,4 +145,22 @@ test("assistant-only evidence is not owner confirmation; unknown timezone cannot
       new AbortController().signal,
     ),
   ).rejects.toThrow();
+});
+
+test("saves catalog-valid entries across projects and returns only invalid entries for correction", async () => {
+  const items = [
+    { content: "Beacon uses SQLite", projects: ["beacon"], source_entry_ids: ["e"] },
+    { content: "Shared deployment", projects: ["atlas", "beacon"], source_entry_ids: ["e"] },
+    { content: "Unknown deployment", projects: ["atlas", "unknown"], source_entry_ids: ["e"] },
+  ];
+  const result = await extractMemories(
+    job,
+    context(JSON.stringify({ items })),
+    new AbortController().signal,
+  );
+  expect(result.batch.items.map((item) => item.projects)).toEqual([
+    ["beacon"],
+    ["atlas", "beacon"],
+  ]);
+  expect(result.project_rejections).toMatchObject([{ index: 2, item: items[2] }]);
 });

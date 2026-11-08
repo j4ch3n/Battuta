@@ -9,6 +9,10 @@ import { MemoryMcpClient } from "../mcp-client.ts";
 import { record } from "./fixtures/record.ts";
 import { CaptureQueue } from "../capture-queue.ts";
 import { requestContent } from "./fixtures/mail.ts";
+vi.mock("../projects.ts", async (original) => ({
+  ...(await original<typeof import("../projects.ts")>()),
+  loadProjectCatalog: () => Promise.resolve(["atlas", "beacon", "global"]),
+}));
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();

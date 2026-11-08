@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
-import { CaptureQueue } from "../capture-queue.ts";
+import { CaptureQueue, type CaptureJob } from "../capture-queue.ts";
 import { CaptureRuntime } from "../lifecycle.ts";
 import type { RequestBinding } from "../binding.ts";
 
@@ -14,6 +14,7 @@ const binding = (project: string | null, session_id = "s"): RequestBinding => ({
   origin: "owner",
   admitted_at: "2026-11-06T10:00:00Z",
 });
+const prepare = () => Promise.resolve(["atlas", "beacon", "global"]);
 
 const entries = (count: number) =>
   Array.from({ length: count }, (_, i) => ({
@@ -21,6 +22,80 @@ const entries = (count: number) =>
     id: String(i),
     message: { role: i === 0 ? "user" : "assistant", content: `fact ${i}` },
   }));
+
+test("catalog and rejected work survive restart without rediscovering or regenerating accepted entries", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-projects-"));
+  try {
+    let now = 0;
+    const prepare = vi.fn(() => Promise.resolve(["Atlas", "Beacon", "global"]));
+    const rejected = [
+      {
+        index: 1,
+        item: { content: "Wrong project", projects: ["unknown"], source_entry_ids: ["0"] },
+      },
+    ];
+    const extract = vi.fn(async (job: CaptureJob) => {
+      expect((await CaptureQueue.open(dir, "cos")).jobs()[0].project_catalog).toEqual([
+        "Atlas",
+        "Beacon",
+        "global",
+      ]);
+      if (!job.projectAttempts)
+        return { batch: { batch_id: "accepted", items: ["Atlas"] }, project_rejections: rejected };
+      expect(job.project_rejections).toEqual(rejected);
+      return { batch: { batch_id: "corrected", items: ["Beacon"] }, project_rejections: [] };
+    });
+    const uploaded: string[] = [];
+    const worker = {
+      prepare,
+      extract,
+      upload: (batch: Record<string, unknown>) => {
+        uploaded.push(String(batch.batch_id));
+        return Promise.resolve();
+      },
+      now: () => now,
+      notify: () => {},
+    };
+    const queue = await CaptureQueue.open(dir, "cos");
+    const runtime = new CaptureRuntime(queue, worker);
+    await runtime.startRequest("s", [], binding("Atlas"));
+    await runtime.settle("s", entries(2));
+    await runtime.recover();
+    expect(uploaded).toEqual(["accepted"]);
+    expect(queue.jobs()[0].project_rejections).toEqual(rejected);
+    now = 2000;
+    const resumed = new CaptureRuntime(await CaptureQueue.open(dir, "cos"), worker);
+    await resumed.recover();
+    expect(uploaded).toEqual(["accepted", "corrected"]);
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(extract).toHaveBeenCalledTimes(2);
+    expect(resumed.hasPendingCapture()).toBe(false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("catalog failure retains source messages and never starts extraction", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-catalog-"));
+  try {
+    const queue = await CaptureQueue.open(dir, "cos");
+    const extract = vi.fn();
+    const runtime = new CaptureRuntime(queue, {
+      prepare: () => Promise.reject(new Error("offline")),
+      extract,
+      upload: async () => {},
+      now: () => 0,
+      notify: () => {},
+    });
+    await runtime.startRequest("s", [], binding("atlas"));
+    await runtime.settle("s", entries(2));
+    await runtime.recover();
+    expect(extract).not.toHaveBeenCalled();
+    expect(queue.jobs()[0].segment.messages.map((m) => m.entry_id)).toEqual(["0", "1"]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 test.each([false, true])(
   "queued mail without matching admission is retained unbound, not captured under the active project (marker=%s)",
@@ -30,6 +105,7 @@ test.each([false, true])(
       const queue = await CaptureQueue.open(dir, "cos");
       const extract = vi.fn(() => Promise.resolve({ batch: { items: [] } }));
       const runtime = new CaptureRuntime(queue, {
+        prepare,
         extract,
         upload: async () => {},
         now: () => 0,
@@ -94,6 +170,7 @@ test("compaction flush preserves capture binding for the continued request", asy
   try {
     const queue = await CaptureQueue.open(dir, "cos");
     const runtime = new CaptureRuntime(queue, {
+      prepare,
       extract: () => Promise.reject(new Error("offline")),
       upload: async () => {},
       now: () => 0,
@@ -122,6 +199,7 @@ test.each([true, false])(
     try {
       const queue = await CaptureQueue.open(dir, "cos");
       const runtime = new CaptureRuntime(queue, {
+        prepare,
         extract: () => Promise.reject(new Error("offline")),
         upload: async () => {},
         now: () => 0,
@@ -160,6 +238,7 @@ test("oversized memories allow one durable rephrase, not repeated paid extractio
     const extract = vi.fn(() => Promise.resolve({ batch: { items: [] } }));
     let now = 0;
     const runtime = new CaptureRuntime(queue, {
+      prepare,
       extract,
       upload: () => Promise.reject(Object.assign(new Error("too long"), { rephrase: true })),
       now: () => now,
@@ -188,6 +267,7 @@ test("settled turn queues immediately with project freeze and bounded upload ret
     const upload = vi.fn(() => Promise.reject(new Error("offline")));
     let now = 1000;
     const runtime = new CaptureRuntime(queue, {
+      prepare,
       extract,
       upload,
       now: () => now,
@@ -222,6 +302,7 @@ test("boundary flush queues short batches; a fork does not backfill old history"
     const queue = await CaptureQueue.open(dir, "manager");
     const extract = vi.fn(() => Promise.reject(new Error("no model")));
     const runtime = new CaptureRuntime(queue, {
+      prepare,
       extract,
       upload: async () => {},
       now: () => 0,
@@ -248,6 +329,7 @@ test("shutdown aborts an active worker and never acknowledges its queued batch",
       started = resolve;
     });
     const runtime = new CaptureRuntime(queue, {
+      prepare,
       extract: async (_job, signal) => {
         started();
         await new Promise((_, reject) =>
@@ -278,6 +360,7 @@ test("interleaved sessions keep their own binding; unbound turns never become gl
   try {
     const queue = await CaptureQueue.open(dir, "cos");
     const runtime = new CaptureRuntime(queue, {
+      prepare,
       extract: () => Promise.reject(new Error("offline")),
       upload: async () => {},
       now: () => 0,

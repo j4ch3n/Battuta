@@ -102,7 +102,7 @@ test("corrections can target expired events behind live historical patterns, nev
     },
   ];
   const candidates = await prepareCorrectionCandidates(
-    "atlas",
+    ["atlas", "global"],
     "That event never happened",
     {
       call: (name, args) => {

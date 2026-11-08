@@ -9,6 +9,7 @@ import {
   type MemoryRecord,
 } from "./records.ts";
 import type { SourceMessage } from "./session-messages.ts";
+import { normalizedProjects, validateMemoryProjects } from "./projects.ts";
 
 export interface RecallPacket {
   request_id: string;
@@ -29,19 +30,31 @@ export function boundedQuery(text: string, bytes = 256) {
 }
 
 export async function prepareCorrectionCandidates(
-  project: string | null,
+  projects: readonly string[],
   text: string,
   client: Pick<MemoryMcpClient, "call">,
   signal: AbortSignal,
 ) {
+  const names = projects.filter((p) => p !== "global");
+  const allowed = (record: MemoryRecord) => {
+    try {
+      validateMemoryProjects(
+        record.scope.global ? ["global"] : record.scope.projects,
+        normalizedProjects(projects),
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  };
   const result = z.object({ records: z.array(memoryRecordSchema).max(20) }).parse(
     await abortable(
       client.call(
         "memory_recall",
         {
           query: boundedQuery(text),
-          selector: project ? "projects" : "global",
-          projects: project ? [project] : [],
+          selector: names.length ? "projects" : "global",
+          projects: names,
           include_global: true,
           include_expired: true,
           mode: "hybrid",
@@ -52,9 +65,7 @@ export async function prepareCorrectionCandidates(
       signal,
     ),
   );
-  const candidates = new Map(
-    result.records.filter((r) => inRequestScope(r, project)).map((r) => [r.ref, r]),
-  );
+  const candidates = new Map(result.records.filter(allowed).map((r) => [r.ref, r]));
   const refs = [
     ...new Set(
       [...candidates.values()].flatMap((r) => r.memory_metadata?.evidence.map((e) => e.ref) ?? []),
@@ -68,8 +79,9 @@ export async function prepareCorrectionCandidates(
   for (const value of evidence) {
     if (value.status !== "fulfilled") continue;
     const record = memoryRecordSchema.safeParse(value.value);
-    if (record.success && inRequestScope(record.data, project))
+    if (record.success && allowed(record.data)) {
       candidates.set(record.data.ref, record.data);
+    }
   }
   signal.throwIfAborted();
   return [...candidates.values()];

@@ -108,6 +108,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       let lostAcknowledgement = true;
       let now = 0;
       const worker = {
+        prepare: () => Promise.resolve(["atlas", "beacon", "global"]),
         extract: (job: Parameters<typeof extractMemories>[0], signal: AbortSignal) =>
           extractMemories(job, context, signal),
         upload: async (batch: Record<string, unknown>, signal: AbortSignal) => {

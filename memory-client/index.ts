@@ -5,6 +5,7 @@ import { resolveRequestBinding, type RequestBinding } from "./binding.ts";
 import { CaptureQueue, readCapturePending } from "./capture-queue.ts";
 import { CaptureRuntime } from "./lifecycle.ts";
 import { MemoryMcpClient } from "./mcp-client.ts";
+import { loadProjectCatalog } from "./projects.ts";
 import { extractMemories } from "./extract.ts";
 import { eligibleRecords } from "./records.ts";
 import { randomUUID } from "node:crypto";
@@ -28,9 +29,10 @@ export default function memoryClient(pi: ExtensionAPI) {
       if (!settings.enabled) throw new Error("Capture disabled");
       const client = new MemoryMcpClient(config.url);
       runtime = new CaptureRuntime(await CaptureQueue.open(config.queue, config.role), {
+        prepare: (_job, signal) => loadProjectCatalog(config.registry, signal),
         extract: async (job, signal) => {
           const candidates = await prepareCorrectionCandidates(
-            job.segment.project,
+            job.project_catalog!,
             job.segment.messages.map((m) => m.text).join(" "),
             client,
             signal,
@@ -119,7 +121,6 @@ export default function memoryClient(pi: ExtensionAPI) {
           origin?.type === "custom" && origin.customType === "memory-request-origin"
             ? origin.data
             : undefined,
-          config.registry,
         ),
         signal,
       );

@@ -12,6 +12,10 @@ import type { RequestBinding } from "./binding.ts";
 import { digest } from "./canonical.ts";
 export { canonical, digest } from "./canonical.ts";
 export interface CaptureJob {
+  project_catalog?: string[];
+  project_rejections?: { index: number; item: Record<string, unknown> }[];
+  projectAttempts?: number;
+  batch_uploaded?: boolean;
   rephraseAttempts?: number;
   blocked?: boolean;
   blocked_reason?: "unbound-origin";

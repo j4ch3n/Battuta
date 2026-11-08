@@ -2,11 +2,20 @@ import type { CaptureJob, CaptureQueue } from "./capture-queue.ts";
 import type { RequestBinding } from "./binding.ts";
 
 interface Worker {
+  prepare: (job: CaptureJob, signal: AbortSignal) => Promise<string[]>;
   extract: (
     job: CaptureJob,
     signal: AbortSignal,
-  ) => Promise<{ batch: Record<string, unknown>; usage?: unknown }>;
-  upload: (batch: Record<string, unknown>, signal: AbortSignal) => Promise<unknown>;
+  ) => Promise<{
+    batch: Record<string, unknown>;
+    project_rejections?: CaptureJob["project_rejections"];
+    usage?: unknown;
+  }>;
+  upload: (
+    batch: Record<string, unknown>,
+    signal: AbortSignal,
+    catalog?: readonly string[],
+  ) => Promise<unknown>;
   now: () => number;
   notify: (message: string) => void;
 }
@@ -82,13 +91,34 @@ export class CaptureRuntime {
       const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(30000)]);
       try {
         if (!job.batch) {
+          if (!job.project_catalog) {
+            job.project_catalog = await this.worker.prepare(job, signal);
+            signal.throwIfAborted();
+            await this.queue.update(job);
+          }
           const result = await this.worker.extract(job, signal);
           signal.throwIfAborted();
           job.batch = result.batch;
+          job.project_rejections = result.project_rejections;
+          job.batch_uploaded = false;
           await this.queue.update(job);
         }
-        await this.worker.upload(job.batch, signal);
+        if (!job.batch_uploaded) {
+          await this.worker.upload(job.batch, signal, job.project_catalog);
+          signal.throwIfAborted();
+          job.batch_uploaded = true;
+          await this.queue.update(job);
+        }
         signal.throwIfAborted();
+        if (job.project_rejections?.length) {
+          if (job.projectAttempts) job.blocked = true;
+          else {
+            job.projectAttempts = 1;
+            delete job.batch;
+            delete job.batch_uploaded;
+          }
+          throw new Error("Project correction pending");
+        }
         await this.queue.markUploaded(job.id);
       } catch (error) {
         if (error && typeof error === "object" && "rephrase" in error && error.rephrase) {
