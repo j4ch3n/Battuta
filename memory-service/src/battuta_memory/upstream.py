@@ -110,6 +110,7 @@ class UpstreamAdapter:
 
     @staticmethod
     def record(row):
+        from .scope import project_from_tag
         tags = row["tags"].split(",") if row["tags"] else []
         try:
             metadata = json.loads(row["metadata"] or "{}")
@@ -122,7 +123,7 @@ class UpstreamAdapter:
         superseded = isinstance(lifecycle, dict) and lifecycle.get("status") == "superseded"
         record = {
             "ref": row["content_hash"], "content": row["content"],
-            "scope": {"global": "scope:global" in tags, "projects": sorted(t[5:] for t in tags if t.startswith("proj:"))},
+            "scope": {"global": "scope:global" in tags, "projects": sorted(project_from_tag(t) for t in tags if t.startswith("proj:"))},
             "tags": sorted(t for t in tags if not t.startswith(("scope:", "proj:", "kind:"))),
             "kind": next((t[5:] for t in tags if t.startswith("kind:")), row["memory_type"] or "observation"), "sources": metadata.get("sources", []),
             "created_at": row["created_at"], "updated_at": row["updated_at"],
@@ -348,7 +349,9 @@ class UpstreamAdapter:
     async def metadata(self, payload):
         current = await self.get(payload["ref"], include_deleted=True)
         if current and not current["active"] and payload.get("memory_metadata", {}).get("status") == "superseded":
-            tags = (["scope:global"] if current["scope"]["global"] else [f"proj:{p}" for p in current["scope"]["projects"]]) + current["tags"] + [f"kind:{current['kind']}"]
+            from .scope import resolve_scope
+            from .contracts import Scope
+            tags = resolve_scope(Scope.model_validate(current["scope"])) + current["tags"] + [f"kind:{current['kind']}"]
             if current.get("memory_metadata") == payload["memory_metadata"] and current["sources"] == payload["sources"] and current["superseded_by"] == payload.get("replacement_ref") and set(tags) == set(payload["tags"]):
                 return
         if not current or not current["active"]:

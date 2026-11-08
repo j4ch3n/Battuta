@@ -3,7 +3,7 @@ import hashlib
 import json
 import uuid
 from datetime import datetime, timezone
-from .scope import resolve_selector, resolve_scope, registered
+from .scope import resolve_selector, resolve_scope, project_tag
 from .contracts import UpdateRequest, ListRequest
 from .records import eligible_records
 from .retrieval import fuse_ranks
@@ -26,7 +26,7 @@ class MemoryService:
         return await self.consolidation.relationships()
 
     async def recall(self, request):
-        selected = resolve_selector(request, self.config.registry_root)
+        selected = resolve_selector(request)
         async with self.mutations:
             if self.state is not None:
                 await self._recover()
@@ -59,11 +59,11 @@ class MemoryService:
 
     async def _reconcile_index(self):
         request = ListRequest(selector="all")
-        records = await self.adapter.list(request, resolve_selector(request, self.config.registry_root))
+        records = await self.adapter.list(request, resolve_selector(request))
         self.state.reconcile_index(records)
 
     async def list(self, request):
-        selected = resolve_selector(request, self.config.registry_root)
+        selected = resolve_selector(request)
         records = await self.adapter.list(request, selected)
         if not request.include_history:
             records = [r for r in records if r["active"]]
@@ -95,6 +95,9 @@ class MemoryService:
     @staticmethod
     def request_value(request, by_alias=True):
         value = request.model_dump(mode="json", by_alias=by_alias)
+        if hasattr(request, "projects"):
+            value.pop("projects")
+            value["scope"] = request.scope.model_dump(by_alias=by_alias)
         for source in value.get("sources", []):
             if source.get("attribution") is None:
                 source.pop("attribution", None)
@@ -153,7 +156,7 @@ class MemoryService:
 
     async def remember(self, request):
         async def plan():
-            tags = resolve_scope(request.scope, self.config.registry_root) + request.tags + [f"kind:{request.kind}"]
+            tags = resolve_scope(request.scope) + request.tags + [f"kind:{request.kind}"]
             await asyncio.to_thread(self.adapter.embed, request.content)
             ref = self.adapter.content_ref(request.content)
             current = await self.adapter.get(ref, include_deleted=True)
@@ -171,7 +174,7 @@ class MemoryService:
                     raise ValueError("Duplicate attribution or metadata conflict")
                 existing = current["scope"]["projects"]
                 projects = sorted(set(existing + request.scope.projects))
-                tags = (["scope:global"] if request.scope.global_ else [f"proj:{p}" for p in projects]) + sorted(set(current["tags"] + request.tags)) + [f"kind:{current['kind']}"]
+                tags = (["scope:global"] if request.scope.global_ else [project_tag(p) for p in projects]) + sorted(set(current["tags"] + request.tags)) + [f"kind:{current['kind']}"]
                 sources = list({self.digest(s): s for s in current["sources"] + sources}.values())
                 if len(sources) > 200:
                     raise ValueError("Too many source citations")
@@ -227,7 +230,7 @@ class MemoryService:
                 replacement = await self._active(request.replacement_ref)
                 if request.replacement_ref == request.ref or replacement["scope"] != current["scope"] or metadata["status"] != "superseded":
                     raise ValueError("Invalid lifecycle replacement")
-            tags = (["scope:global"] if current["scope"]["global"] else [f"proj:{p}" for p in current["scope"]["projects"]]) + current["tags"] + [f"kind:{current['kind']}"]
+            tags = (["scope:global"] if current["scope"]["global"] else [project_tag(p) for p in current["scope"]["projects"]]) + current["tags"] + [f"kind:{current['kind']}"]
             return {"operation": "metadata", "ref": request.ref, "tags": tags, "sources": current["sources"], "memory_metadata": metadata,
                 **({"replacement_ref": request.replacement_ref} if replacement else {}),
                 "result": {"ref": request.ref, "before": current["content"]}}
@@ -244,7 +247,7 @@ class MemoryService:
             ref = self.adapter.content_ref(request.content)
             if await self.adapter.get(ref, include_deleted=True):
                 raise ValueError("Version content already exists; explicit conflict resolution required")
-            scope_tags = ["scope:global"] if current["scope"]["global"] else [f"proj:{p}" for p in current["scope"]["projects"]]
+            scope_tags = ["scope:global"] if current["scope"]["global"] else [project_tag(p) for p in current["scope"]["projects"]]
             kind = request.kind or current["kind"]
             sources = list({self.digest(s): s for s in current["sources"] + [s.wire() for s in request.sources]}.values())
             if len(sources) > 200:
@@ -262,12 +265,12 @@ class MemoryService:
             current = await self._active(request.ref)
             if current["scope"]["global"]:
                 raise ValueError("Cannot link global memory to projects")
-            for name in request.add + request.remove:
-                registered(name, self.config.registry_root)
+            if "global" in request.add:
+                raise ValueError("Cannot promote project memory to global")
             names = sorted((set(current["scope"]["projects"]) | set(request.add)) - set(request.remove))
             if not names:
                 raise ValueError("Cannot remove final project")
-            return {"operation": "metadata", "ref": request.ref, "tags": [f"proj:{p}" for p in names] + current["tags"] + [f"kind:{current['kind']}"],
+            return {"operation": "metadata", "ref": request.ref, "tags": [project_tag(p) for p in names] + current["tags"] + [f"kind:{current['kind']}"],
                 "sources": current["sources"], "result": {"ref": request.ref, "projects": names}}
         return await self._mutation("link:" + uuid.uuid4().hex, request, plan)
 

@@ -24,7 +24,7 @@ class RealModelTests(unittest.IsolatedAsyncioTestCase):
                 folder = root / "projects" / name
                 (folder / "code").mkdir(parents=True)
                 (folder / "project.yaml").write_text(f"version: 1\nproject:\n  name: {name}\n  path: {folder}/code\n")
-            config = MemoryConfig(data_dir=root / "data", registry_root=root / "projects")
+            config = MemoryConfig(data_dir=root / "data")
             ref = None
             generation = None
             run_id = "2026-10-21T03:00:00Z"
@@ -55,9 +55,9 @@ class RealModelTests(unittest.IsolatedAsyncioTestCase):
                                 self.assertEqual((await call(cos, "global_relationships"))["status"], "current")
                                 continue
                             sources = [{"agent_id": "cos", "session_id": "synthetic-session", "entry_id": "owner-statement"}]
-                            first = await call(cos, "remember", content="Atlas stores project data in Postgres.", scope={"global": False, "projects": ["atlas"]}, sources=sources)
-                            personal = await call(cos, "remember", content="The owner prefers concise replies.", scope={"global": True}, sources=sources)
-                            await call(other_cos, "remember", content="Beacon stores project data in Postgres.", scope={"global": False, "projects": ["beacon"]}, sources=sources)
+                            first = await call(cos, "remember", content="Atlas stores project data in Postgres.", projects=["atlas"], sources=sources)
+                            personal = await call(cos, "remember", content="The owner prefers concise replies.", projects=["global"], sources=sources)
+                            await call(other_cos, "remember", content="Beacon stores project data in Postgres.", projects=["beacon"], sources=sources)
                             with sqlite3.connect(config.database) as db:
                                 db.enable_load_extension(True)
                                 sqlite_vec.load(db)
@@ -84,7 +84,7 @@ class RealModelTests(unittest.IsolatedAsyncioTestCase):
                             self.assertEqual(hints["status"], "current")
                             self.assertEqual(hints["edges"], [])  # A single global survivor has no pair.
                             self.assertEqual((await call(cos, "list", selector="all"))["total"], 3)
-                            too_long = await cos.call_tool("memory_remember", {"content": "word " * 300, "scope": {"global": True}})
+                            too_long = await cos.call_tool("memory_remember", {"content": "word " * 300, "projects": ["global"]})
                             self.assertTrue(too_long.isError)
                 finally:
                     server.should_exit = True

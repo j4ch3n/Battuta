@@ -27,7 +27,7 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
         async def execute(fn): return fn()
         self.backend = UpstreamAdapter(SimpleNamespace(conn=self.conn, _execute_with_retry=execute))
         self.backend.embed = lambda text: b"0"
-        self.service = MemoryService(self.backend, MemoryConfig(data_dir=self.root, registry_root=self.root))
+        self.service = MemoryService(self.backend, MemoryConfig(data_dir=self.root))
         for name in ("atlas", "beacon"):
             folder = self.root / name
             (folder / "code").mkdir(parents=True)
@@ -46,19 +46,19 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
     async def test_scoped_recall_filters_before_limit(self):
         for n in range(30):
             self.add(str(n), "Distractor", "proj:beacon", 0)
-        result = await self.service.recall(RecallRequest(query="note", limit=2, mode="semantic"))
+        result = await self.service.recall(RecallRequest(query="note", selector="projects", projects=["Atlas"], limit=2, mode="semantic"))
         self.assertEqual([r["content"] for r in result["records"]], ["Global note", "Atlas note"])
         self.assertFalse(result["incomplete"])
 
     async def test_scope_and_tag_and_kind_not_scope_or_tag(self):
-        result = await self.service.list(ListRequest(tags=["work"], kind="observation"))
+        result = await self.service.list(ListRequest(selector="projects", projects=["atlas"], tags=["work"], kind="observation"))
         self.assertEqual([r["ref"] for r in result["records"]], ["a" * 64, "b" * 64])
         self.assertEqual(result["total"], 2)
 
     async def test_history_and_inventory_agree(self):
         with self.assertRaisesRegex(ValueError, "inactive"):
             await self.service.get(GetRequest(ref="d" * 64))
-        result = await self.service.list(ListRequest(include_history=True))
+        result = await self.service.list(ListRequest(selector="projects", projects=["atlas"], include_history=True))
         self.assertEqual(result["total"], 3)
         record = await self.service.get(GetRequest(ref="d" * 64, include_history=True))
         self.assertFalse(record["active"])
@@ -73,12 +73,12 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
             await self.service.get(GetRequest(ref="f" * 64))
         self.conn.execute("DROP TABLE memories")
         with self.assertRaises(sqlite3.Error):
-            await self.service.list(ListRequest())
+            await self.service.list(ListRequest(selector="all"))
 
-    async def test_missing_selection_is_global_only(self):
-        (self.root / ".config.json").unlink()
-        result = await self.service.recall(RecallRequest(query="note", mode="semantic"))
-        self.assertTrue(result["warnings"])
+    async def test_corrupt_selection_does_not_affect_explicit_global(self):
+        (self.root / ".config.json").write_text("not JSON")
+        result = await self.service.recall(RecallRequest(query="note", selector="global", mode="semantic"))
+        self.assertFalse(result["warnings"])
         self.assertEqual([r["content"] for r in result["records"]], ["Global note"])
 
     async def test_inventory_keeps_older_context_and_recent_invalidations(self):

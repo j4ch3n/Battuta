@@ -1,55 +1,52 @@
-import json
-import tempfile
+import os
 import unittest
-from pathlib import Path
+from unittest.mock import patch
 
-from battuta_memory.contracts import Scope, Selector, RememberRequest
-from battuta_memory.scope import resolve_scope, resolve_selector
+from battuta_memory.config import MemoryConfig
+from battuta_memory.contracts import Selector, RememberRequest
+from battuta_memory.scope import resolve_scope, resolve_selector, scope_from_projects, projects_from_scope
 
 
 class ScopeTests(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
-        for name in ("atlas", "beacon"):
-            folder = self.root / name
-            (folder / "code").mkdir(parents=True)
-            (folder / "project.yaml").write_text(f"version: 1\nproject:\n  name: {name}\n  path: {folder}/code\n")
-
     def test_explicit_multi_project_membership(self):
-        self.assertEqual(resolve_scope(Scope.model_validate({"global": False, "projects": ["beacon", "atlas", "atlas"]}), self.root), ["proj:atlas", "proj:beacon"])
+        for names, expected in [
+            (["Beacon", "Atlas", "Atlas"], ["atlas", "beacon"]),
+            (["my project", "项目", "X" * 65], ["my project", "x" * 65, "项目"]),
+            (["one,two", "%2c"], ["%2c", "one,two"]),
+        ]:
+            with self.subTest(names=names):
+                request = RememberRequest(content="note", projects=names)
+                self.assertEqual(request.projects, expected)
+                scope = scope_from_projects(request.projects)
+                self.assertEqual(projects_from_scope(scope), expected)
+                self.assertEqual(len(resolve_scope(scope)), len(expected))
 
-    def test_global_and_missing_selection(self):
-        self.assertEqual(resolve_scope(Scope.model_validate({"global": True}), self.root), ["scope:global"])
-        selected = resolve_selector(Selector(), self.root)
-        self.assertEqual(selected.tags, ["scope:global"])
-        self.assertTrue(selected.warnings)
+    def test_explicit_selection_only(self):
+        self.assertEqual(resolve_selector(Selector(selector="global")).tags, ["scope:global"])
+        self.assertIsNone(resolve_selector(Selector(selector="all")).tags)
+        self.assertEqual(resolve_selector(Selector(selector="projects", projects=["Atlas"])).tags,
+            ["proj:atlas", "scope:global"])
+        for args in ({}, {"selector": "current"}, {"selector": "projects"},
+                     {"selector": "projects", "projects": ["global"]}):
+            with self.subTest(args=args), self.assertRaises(ValueError):
+                Selector(**args)
 
-    def test_current_plus_global(self):
-        (self.root / ".config.json").write_text(json.dumps({"currentProject": "atlas"}))
-        self.assertEqual(resolve_selector(Selector(), self.root).tags, ["proj:atlas", "scope:global"])
+    def test_invalid_membership_structure(self):
+        for names in ([], ["global", "atlas"], ["GLOBAL", "Atlas"], [42], ["x"] * 101):
+            with self.subTest(names=names), self.assertRaises(ValueError):
+                RememberRequest(content="note", projects=names)
+        for args in ({}, {"scope": {"global": True}}):
+            with self.subTest(args=args), self.assertRaises(ValueError):
+                RememberRequest(content="note", **args)
 
-    def test_invalid_scope_rejected(self):
-        for scope in ({"global": True, "projects": ["atlas"]}, {"global": False}, {}, {"global": False, "projects": ["../secret"]}):
-            with self.subTest(scope=scope), self.assertRaises(ValueError):
-                Scope.model_validate(scope)
-
-    def test_unknown_project_and_corrupt_registry_are_errors(self):
-        with self.assertRaises(ValueError):
-            resolve_scope(Scope.model_validate({"global": False, "projects": ["unknown"]}), self.root)
-        (self.root / ".config.json").write_text("not json")
-        with self.assertRaises(ValueError):
-            resolve_selector(Selector(), self.root)
+    def test_registry_environment_has_no_effect(self):
+        for root in ("relative", "/missing/projects"):
+            with self.subTest(root=root), patch.dict(os.environ, {"BATTUTA_PROJECTS_ROOT": root}):
+                self.assertFalse(hasattr(MemoryConfig.from_env(), "registry_root"))
+                self.assertEqual(resolve_scope(scope_from_projects(["unknown"])), ["proj:unknown"])
 
     def test_reserved_tags_cannot_widen_scope(self):
         for tag in ("proj:beacon", "SCOPE:global", "kind:decision"):
             with self.subTest(tag=tag), self.assertRaises(ValueError):
-                RememberRequest(content="note", scope={"global": True}, tags=[tag])
-        req = RememberRequest(content="note", scope={"global": True}, tags=[" Work ", "work"])
-        self.assertEqual(req.tags, ["work"])
-
-    def test_symlink_registration_refused(self):
-        (self.root / "alias").symlink_to(self.root / "atlas", target_is_directory=True)
-        with self.assertRaises(ValueError):
-            resolve_scope(Scope.model_validate({"global": False, "projects": ["alias"]}), self.root)
+                RememberRequest(content="note", projects=["global"], tags=[tag])
+        self.assertEqual(RememberRequest(content="note", projects=["global"], tags=[" Work ", "work"]).tags, ["work"])

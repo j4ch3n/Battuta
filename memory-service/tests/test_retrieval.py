@@ -8,7 +8,7 @@ from test_records import SOURCE, fact
 
 class RetrievalTests(StorageFixture):
     async def note_with_metadata(self, content, project=None, **metadata):
-        return await self.service.remember(RememberRequest(content=content, scope={"global": project is None, "projects": [project] if project else []},
+        return await self.service.remember(RememberRequest(content=content, projects=[project] if project else ["global"],
             sources=[SOURCE], memory_metadata=fact(**metadata)["memory_metadata"]))
 
     async def test_alias_lexical_retrieval_and_metadata_only_index_refresh(self):

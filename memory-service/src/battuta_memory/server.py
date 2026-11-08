@@ -10,6 +10,7 @@ from starlette.routing import Route
 from .capture import CaptureService
 from .contracts import Contract, RememberRequest, RecallRequest, ListRequest, GetRequest, UpdateRequest, LinkRequest, ForgetRequest, CaptureBatch, InventoryRequest, ConsolidateGlobalRequest, SetMetadataRequest
 from .service import MemoryService
+from .records import public_response
 from .state import StateStore
 from .upstream import UpstreamAdapter
 
@@ -54,6 +55,7 @@ def create_protocol_server(get_service):
                 data = await CaptureService(service).ingest(request)
             else:
                 data = await getattr(service, short)(request)
+            data = public_response(short, data)
             payload = {"ok": True, "data": data, "warnings": data.get("warnings", [])}
             return types.CallToolResult(content=[types.TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))], structuredContent=payload)
         except Exception as error:

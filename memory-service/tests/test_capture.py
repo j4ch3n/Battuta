@@ -11,11 +11,11 @@ class CaptureTests(StorageFixture):
         from battuta_memory.contracts import RememberRequest
         from battuta_memory.records import eligible_records
         from test_records import fact, SOURCE, NOW
-        old = await self.service.remember(RememberRequest(content="Owner owns an NS2", scope={"global": True}, sources=[SOURCE], memory_metadata=fact()["memory_metadata"]))
+        old = await self.service.remember(RememberRequest(content="Owner owns an NS2", projects=["global"], sources=[SOURCE], memory_metadata=fact()["memory_metadata"]))
         source = await self.adapter.get(old["ref"])
         link = {"ref": old["ref"], "revision": source["revision"], "relation": "supports", "requirement": "current"}
-        derived = await self.service.remember(RememberRequest(content="Owner may want console games", scope={"global": True}, sources=[SOURCE], memory_metadata=fact(knowledge_type="hypothesis", confidence="tentative", rationale="Possible interest", evidence=[link])["memory_metadata"]))
-        item = {"item_id": "correction", "content": "Owner returned the NS2", "scope": {"global": True}, "sources": [SOURCE], "memory_metadata": fact()["memory_metadata"], "correction": {"ref": old["ref"], "revision": source["revision"]}}
+        derived = await self.service.remember(RememberRequest(content="Owner may want console games", projects=["global"], sources=[SOURCE], memory_metadata=fact(knowledge_type="hypothesis", confidence="tentative", rationale="Possible interest", evidence=[link])["memory_metadata"]))
+        item = {"item_id": "correction", "content": "Owner returned the NS2", "projects": ["global"], "sources": [SOURCE], "memory_metadata": fact()["memory_metadata"], "correction": {"ref": old["ref"], "revision": source["revision"]}}
         batch = self.batch([item])
         capture = CaptureService(self.service)
         result = await capture.ingest(batch)
@@ -27,7 +27,7 @@ class CaptureTests(StorageFixture):
         self.assertEqual(eligible_records([replacement, await self.adapter.get(derived["ref"])], NOW), [replacement])
 
     def batch(self, items=None):
-        items = items if items is not None else [{"item_id": "fact-1", "content": "Useful fact", "scope": {"global": True},
+        items = items if items is not None else [{"item_id": "fact-1", "content": "Useful fact", "projects": ["global"],
             "sources": [{"agent_id": "cos", "session_id": "s", "entry_id": "entry-1"}]}]
         payload = {"session_id": "s", "batch_id": "batch", "agent_id": "cos", "items": items}
         # Digest canonicalization covers normalized item defaults in both clients.

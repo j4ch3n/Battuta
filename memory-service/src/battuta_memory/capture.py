@@ -11,6 +11,8 @@ class CaptureService:
     def digest(batch):
         value = batch.model_dump(mode="json", by_alias=True, exclude={"payload_digest"})
         for item in value["items"]:
+            projects = item.pop("projects")
+            item["scope"] = {"global": projects == ["global"], "projects": [] if projects == ["global"] else projects}
             if item.get("memory_metadata") is None:
                 item.pop("memory_metadata", None)
             if item.get("correction") is None:

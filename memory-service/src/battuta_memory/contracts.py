@@ -12,9 +12,9 @@ class Contract(BaseModel):
 
 
 def project_names(names):
-    if len(names) > 100 or any(not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", n) for n in names):
+    if len(names) > 100:
         raise ValueError("Invalid project name")
-    return sorted(set(names))
+    return sorted(set(n.lower() for n in names))
 
 
 class Scope(Contract):
@@ -126,7 +126,21 @@ class MemoryMetadata(Contract):
 
 class RememberContent(Tagged):
     content: str = Field(min_length=1, max_length=16000)
-    scope: Scope
+    projects: list[str] = Field(min_length=1, max_length=100)
+    _projects = field_validator("projects")(project_names)
+
+    @field_validator("projects")
+    @classmethod
+    def exclusive_global(cls, names):
+        if "global" in names and names != ["global"]:
+            raise ValueError("Global membership must stand alone")
+        return names
+
+    @property
+    def scope(self):
+        return Scope.model_validate({"global": self.projects == ["global"],
+            "projects": [] if self.projects == ["global"] else self.projects})
+
     kind: str = Field(default="observation", pattern=r"^[a-z][a-z0-9_-]{0,39}$")
     sources: list[SourceRef] = Field(default_factory=list, max_length=200)
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
@@ -145,7 +159,7 @@ class RememberRequest(RememberContent, EvidenceGuard):
 
 
 class Selector(Tagged):
-    selector: Literal["current", "projects", "global", "all"] = "current"
+    selector: Literal["projects", "global", "all"]
     projects: list[str] = Field(default_factory=list)
     include_global: bool = True
     include_history: bool = False
@@ -157,6 +171,8 @@ class Selector(Tagged):
     def projects_selector(self):
         if (self.selector == "projects") != bool(self.projects):
             raise ValueError("Projects required only for projects selector")
+        if "global" in self.projects:
+            raise ValueError("Use explicit global selection")
         return self
 
 

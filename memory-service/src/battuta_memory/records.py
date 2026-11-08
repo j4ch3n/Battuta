@@ -7,6 +7,24 @@ from datetime import datetime
 from .contracts import MemoryMetadata, Scope, SourceRef
 
 
+def public_record(record):
+    from .scope import projects_from_scope
+    result = dict(record)
+    if "scope" in result:
+        result["projects"] = projects_from_scope(Scope.model_validate(result.pop("scope")))
+    if "history" in result:
+        result["history"] = [public_record(r) for r in result["history"]]
+    return result
+
+
+def public_response(operation, data):
+    if operation in ("get", "forget"):
+        return public_record(data)
+    if operation in ("recall", "list", "inventory"):
+        return {**data, "records": [public_record(r) for r in data["records"]]}
+    return data
+
+
 def decode_record(record):
     result = dict(record)
     metadata = record.get("memory_metadata")
