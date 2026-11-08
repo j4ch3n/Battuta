@@ -29,7 +29,7 @@ class ReleaseInstallTests(ConfigFixture):
             result = subprocess.run(["bash", "-euo", "pipefail", "-c", command], cwd=self.root,
                                     env={**os.environ, "GIT_DIR": git_dir}, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-        for required in ("skills-hub/memory/SKILL.md", "bots/AGENTS_shared.md", "scripts/setup-memory.sh",
+        for required in ("skills-hub/research/SKILL.md", "bots/AGENTS_shared.md", "scripts/setup-memory.sh",
                          "scripts/setup-artifacts.sh", "scripts/bot_setup/run-dev.sh", "scripts/bot_setup/run-worker.sh",
                          "scripts/bot_setup/wait-for-assignments.mjs", "agent-mail/index.ts", "project-spec/index.ts", "memory-client/index.ts"):
             self.assertTrue((stage / required).is_file(), required)

@@ -30,14 +30,14 @@ def test_services_can_resolve_tools_without_shell_initialization(tmp_path, monke
         assert result.stdout == "installed"
 
 
-@pytest.mark.parametrize("names", [["memory"], []])
+@pytest.mark.parametrize("names", [["research"], []])
 def test_relocated_catalog_validates_without_discovery(tmp_path, names):
     root = tmp_path / "release"
     (root / "skills-hub").mkdir(parents=True)
     for role in ("cos", "manager"):
         skill_catalog(root, role, names)
     if names:
-        (root / "skills-hub/memory/LICENSE").write_text("Required notice")
+        (root / "skills-hub/research/LICENSE").write_text("Required notice")
     moved = tmp_path / "moved"
     root.rename(moved)
     result = CliRunner().invoke(main, ["validate-skills", str(moved)])
@@ -45,8 +45,8 @@ def test_relocated_catalog_validates_without_discovery(tmp_path, names):
     for role in ("cos", "manager"):
         assert not (moved / f"bots/{role}-bot/.pi").exists()
     if names:
-        assert (moved / "skills-hub/memory/references/tools.md").read_text() == "memory tools"
-        assert (moved / "skills-hub/memory/LICENSE").read_text() == "Required notice"
+        assert (moved / "skills-hub/research/references/tools.md").read_text() == "research tools"
+        assert (moved / "skills-hub/research/LICENSE").read_text() == "Required notice"
 
 
 def test_service_installation_preflights_all_owned_units(tmp_path, monkeypatch):

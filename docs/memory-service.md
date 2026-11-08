@@ -3,6 +3,8 @@
 The [component design](../memory-service/DESIGN.md) owns the record, retrieval,
 capture, recall and dream contracts. This reference covers operating the existing
 CoS Pi extension and loopback MCP service, not another daemon or model runtime.
+The [memory tool reference](memory-tools.md) documents isolated recall and
+authorized maintenance calls; it is not a conversational runtime skill.
 
 ## Storage and role boundaries
 
@@ -16,7 +18,7 @@ CoS Pi extension and loopback MCP service, not another daemon or model runtime.
 | `ME.md`              | Preserved private owner text; never automatically treated as verified evidence or overwritten by v3 dreams.  |
 
 Only the isolated recall agent has conversational memory MCP exposure. Main CoS
-receives prepared context without memory tools or the memory skill. Capture and
+receives prepared context without memory tools or a memory skill. Capture and
 approved dreaming retain programmatic access. Manager and workers receive
 selected Agent Mail context and return attributed findings/corrections. Same-user
 shell access still exists; this is not credential isolation or a security sandbox.
@@ -220,7 +222,7 @@ and existing ten-minute caller/shutdown cancellation. No provider fallback is ad
 Setup never starts bots, changes provider login, imports private history, or tests
 by writing production memory. Obtain approval before stopping a deployment; retain
 consistent data/client-state backups. Upgrade server and client together, configure
-isolated recall exposure, disable main CoS memory MCP and remove managed Manager/worker exposure, then use the
+isolated recall exposure, disable main CoS memory MCP and configure disabled Manager/worker overrides, then use the
 filesystem/CLI checks in the [setup guide](memory-service-setup.md). Do not start a
 second service on the same data/port. The unrelated exploration server on port 8900
 must not be stopped. Rollback is an operator-controlled restore, not live downgrade.

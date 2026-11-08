@@ -3,9 +3,14 @@
     "communicate-with-cos",
     "coordinate-workers",
     "define-implementation-tasks",
-    "draft-writing",
     "note-taking",
     "project-context",
-    "todo"
+    "todo",
+    "project-management",
+    "ticket-writing",
+    "research",
+    "problem-framing",
+    "prd",
+    "user-story"
   ]
 }

@@ -12,7 +12,7 @@ from skill_fixtures import skill_catalog
 
 
 @pytest.mark.parametrize("role", ["cos", "manager"])
-@pytest.mark.parametrize("names", [["memory", "note-taking"], []])
+@pytest.mark.parametrize("names", [["research", "note-taking"], []])
 def test_source_setup_links_selected_skills_idempotently(tmp_path, role, names):
     skill_catalog(tmp_path, role, names)
     bot = tmp_path / f"bots/{role}-bot"
@@ -64,7 +64,7 @@ def test_generated_discovery_paths_are_git_ignored(tmp_path, role):
 
 
 def test_reselection_removes_only_owned_links_and_preserves_custom_content(tmp_path):
-    skill_catalog(tmp_path, "manager", ["memory", "note-taking"])
+    skill_catalog(tmp_path, "manager", ["research", "note-taking"])
     bot = tmp_path / "bots/manager-bot"
     (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
     (bot / "AGENTS_dedicated.md").write_text("Dedicated")
@@ -72,16 +72,16 @@ def test_reselection_removes_only_owned_links_and_preserves_custom_content(tmp_p
     skills = bot / ".pi/skills"
     custom = skills / "custom"
     custom.write_text("Private content")
-    (bot / "skills.json").write_text('{"skills":["memory"]}')
+    (bot / "skills.json").write_text('{"skills":["research"]}')
     configure_instructions(bot, role="manager", root=tmp_path)
-    assert (skills / "memory").is_symlink()
+    assert (skills / "research").is_symlink()
     assert not (skills / "note-taking").exists()
     assert custom.read_text() == "Private content"
 
 
 @pytest.mark.parametrize("kind", ["file", "directory", "link", "root-link"])
 def test_custom_skill_content_is_never_replaced(tmp_path, kind):
-    skill_catalog(tmp_path, "manager", ["memory"])
+    skill_catalog(tmp_path, "manager", ["research"])
     bot = tmp_path / "bots/manager-bot"
     (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
     (bot / "AGENTS_dedicated.md").write_text("Dedicated")
@@ -94,7 +94,7 @@ def test_custom_skill_content_is_never_replaced(tmp_path, kind):
         skills.symlink_to(outside, target_is_directory=True)
     else:
         skills.mkdir()
-        target = skills / "memory"
+        target = skills / "research"
         if kind == "file":
             target.write_text("Preserve")
         elif kind == "directory":
@@ -105,8 +105,8 @@ def test_custom_skill_content_is_never_replaced(tmp_path, kind):
     with pytest.raises(click.ClickException):
         configure_instructions(bot, role="manager", root=tmp_path)
     assert (outside / "private").read_text() == "Preserve"
-    assert (tmp_path / "skills-hub/memory/SKILL.md").is_file()
+    assert (tmp_path / "skills-hub/research/SKILL.md").is_file()
     if kind == "file":
-        assert (skills / "memory").read_text() == "Preserve"
+        assert (skills / "research").read_text() == "Preserve"
     elif kind == "directory":
-        assert (skills / "memory/private").read_text() == "Preserve"
+        assert (skills / "research/private").read_text() == "Preserve"
