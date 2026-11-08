@@ -41,6 +41,12 @@ working template:
 8. Out of Scope (what we are explicitly not building)
 9. Open Questions & Risks
 
+### Focused user outcome (optional)
+
+When it improves clarity, include the persona, desired outcome, and optional
+Given/When/Then acceptance checks within the PRD. This is a section, not a
+separate artifact or required stage.
+
 Once you have a template, use its major sections as the working
 structure, in a multi-turn fashion.
 
@@ -92,7 +98,7 @@ Then append a closing self-critique:
 Offer exactly 4 next options:
 
 1. Generate a validation plan for the top assumptions (Recommended)
-2. Draft user stories with acceptance criteria from the PRD scope
+2. Draft a focused user outcome with acceptance checks from the PRD scope
 3. Create a one-page executive summary for stakeholder review
 4. Stress-test the PRD with a premortem on the launch
 

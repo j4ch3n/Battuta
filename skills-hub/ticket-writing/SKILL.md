@@ -34,6 +34,12 @@ Use the smallest structure that makes the work clear. Prefer an action-and-outco
 
 These are illustrative fragments, not facts to insert into another ticket. For bugs, retain essential reproduction steps, expected versus actual behaviour, and affected conditions. For features, identify who gains what capability and its boundaries. Leave routine implementation choices to engineering; include a technical constraint when it is established and consequential.
 
+### Focused user outcome (optional)
+
+When it clarifies the ticket, include the persona, desired outcome, and optional
+Given/When/Then acceptance checks. This is a section within the ticket, not a
+required template or separate artifact.
+
 An ordinary ticket often fits in 150–250 words with 3–5 short acceptance checks. These are guides, not limits. Keep essential uncertainty, safety/privacy restrictions, and requirements in the description. Link detailed investigation, logs, and plans instead of copying their history. Add exclusions, dependencies, or open questions only when they change the work. Remove repeated caveats, ceremonial prose, and routine authorisation disclaimers; never invent approval, cause, or successful verification.
 
 ## Organise the work
