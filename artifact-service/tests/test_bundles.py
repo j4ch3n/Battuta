@@ -27,7 +27,6 @@ class BundleFixture(unittest.TestCase):
         self.project = self.home / ".battuta/projects/procurement"
         (self.project / "code").mkdir(parents=True)
         (self.project / "project.yaml").write_text(json.dumps({"version": 1,
-            "project": {"name": "procurement", "path": str(self.project / "code")},
             "linear": {"project_id": None, "team_id": None}, "github": {"repository": None}}))
         self.store = Registry(self.home / "registry.db")
         migrate(self.store.path)

@@ -37,7 +37,6 @@ class AcceptanceTests(unittest.TestCase):
             project = root / ".battuta/projects/procurement"
             (project / "code").mkdir(parents=True)
             (project / "project.yaml").write_text(json.dumps({"version": 1,
-                "project": {"name": "procurement", "path": str(project / "code")},
                 "linear": {"project_id": None, "team_id": None}, "github": {"repository": None}}))
             initialized = cli("init", "demo", "--project", "procurement", "--title", "Demo", "--description", "Walkthrough")
             destination = Path(initialized["directory"])

@@ -68,16 +68,14 @@ class ExplainTests(ProjectTestCase):
             explain_project(self.project)
         self.assertEqual(outside.read_text(), "Outside project")
 
-    def test_summary_read_failure_preserves_content_and_selection(self):
+    def test_summary_read_failure_preserves_content(self):
         path = self.project.root / "SUMMARY.md"
         path.write_bytes(b"# Atlas\n\nMap imports.\n")
         original = path.read_bytes()
-        selection = self.registry.state_path.read_bytes()
         with patch("pathlib.Path.read_text", side_effect=PermissionError("access denied")):
             with self.assertRaisesRegex(click.ClickException, "SUMMARY.md.*access denied"):
                 explain_project(self.project)
         self.assertEqual(path.read_bytes(), original)
-        self.assertEqual(self.registry.state_path.read_bytes(), selection)
 
     def test_index_finds_deep_docs_but_limits_tree_to_two_directory_levels(self):
         for path in ("README.md", "AGENTS.md", "docs/README.md", "src/AGENTS.md", "src/api/README.md", "src/api/internal/AGENTS.md"):

@@ -2,7 +2,6 @@
 
 import click
 import json
-from pathlib import Path
 import shlex
 
 from .explain import explain_project
@@ -53,17 +52,16 @@ def main(ctx):
 @click.option("--github", help="GitHub repository URL to clone into the workspace.")
 @click.option("--linear", callback=_linear_pair, metavar="<project-id>,<team-id>", help="Existing Linear IDs to record locally.")
 def init(project_name: str, github: str | None, linear: LinearConfig | None):
-    """Create a named project, optionally clone GitHub, and select it."""
+    """Create a named project and optionally clone GitHub."""
     project = ProjectRegistry().init(project_name, github=github, linear=linear)
     click.echo(render("init.md.j2", project))
 
 
 @main.command("list")
 @click.option("--json", "as_json", is_flag=True, help="Return a JSON project catalog.")
-@click.option("--root", type=click.Path(path_type=Path, file_okay=False), help="Discover projects in this registry root.")
-def list_projects(as_json: bool, root: Path | None):
+def list_projects(as_json: bool):
     """List registered projects and their managed root and checkout paths."""
-    registry = ProjectRegistry(root)
+    registry = ProjectRegistry()
     projects = registry.list_projects()
     if as_json:
         click.echo(json.dumps({"projects": sorted(p.name for p in projects)}, ensure_ascii=False))
@@ -72,24 +70,11 @@ def list_projects(as_json: bool, root: Path | None):
 
 
 @main.command()
-def current():
-    """Report the selected project name without inspecting its checkout."""
-    click.echo(f"Current Project: {ProjectRegistry().current_name()}")
-
-
-@main.command()
 @click.argument("project_name")
-def switch(project_name: str):
-    """Select an existing project by its exact folder name."""
-    project = ProjectRegistry().switch(project_name)
-    click.echo(render("switch.md.j2", project))
-
-
-@main.command()
 @click.pass_obj
-def explain(token: str):
+def explain(token: str, project_name: str):
     """Show project summary, artifact paths, URLs, guidance, and checkout tree."""
-    project = ProjectRegistry().current()
+    project = ProjectRegistry().load(project_name)
     explanation = explain_project(project)
     if project.config.linear.project_id:
         remote = LinearClient(token).get_project(project.config.linear.project_id)
@@ -99,15 +84,16 @@ def explain(token: str):
 
 @main.group()
 def github():
-    """Associate a GitHub repository with the current project."""
+    """Associate a GitHub repository with an explicit project."""
 
 
 @github.command("link")
+@click.argument("project_name")
 @click.argument("repo_url")
-def github_link(repo_url: str):
+def github_link(project_name: str, repo_url: str):
     """Record a repository URL without cloning or modifying workspace files."""
     registry = ProjectRegistry()
-    project = registry.link_github(registry.current(), repo_url)
+    project = registry.link_github(registry.load(project_name), repo_url)
     click.echo(render("github.md.j2", project))
 
 
@@ -117,30 +103,31 @@ def linear():
 
 
 @linear.command()
+@click.argument("project_name")
 @click.argument("association", callback=_linear_pair, metavar="<project-id>,<team-id>")
-def link(association: LinearConfig):
-    """Record Linear IDs in the current project without an API request."""
+def link(project_name: str, association: LinearConfig):
+    """Record Linear IDs in an explicit project without an API request."""
     registry = ProjectRegistry()
-    project = registry.link_linear(registry.current(), association)
+    project = registry.link_linear(registry.load(project_name), association)
     click.echo(render("linear.md.j2", LinearResult(operation="link", project=project)))
 
 
 @linear.command()
+@click.argument("project_name")
 @click.argument("name", callback=_trimmed)
 @click.option("--team-id", required=True, callback=_trimmed, help="Team to associate with the new project.")
 @click.pass_obj
-def create(token: str, name: str, team_id: str):
-    """Create a Linear project and link it to the current local project."""
+def create(token: str, project_name: str, name: str, team_id: str):
+    """Create a Linear project and link it to an explicit local project."""
     registry = ProjectRegistry()
-    project = registry.current()
+    project = registry.load(project_name)
     remote = LinearClient(token).create_project(name, team_id)
     try:
         linked = registry.link_linear(project, LinearConfig(project_id=remote.id, team_id=team_id))
     except click.ClickException as error:
-        recovery = shlex.join(["battuta-project", "linear", "link", f"{remote.id},{team_id}"])
-        switch = shlex.join(["battuta-project", "switch", project.name])
+        recovery = shlex.join(["battuta-project", "linear", "link", project.name, f"{remote.id},{team_id}"])
         raise click.ClickException(
             f"Linear project was created: {remote.id} ({remote.url}), but its local link could not be saved: {error}.\n"
-            f"After fixing the local error, recover with:\n{switch}\n{recovery}"
+            f"After fixing the local error, recover with:\n{recovery}"
         ) from error
     click.echo(render("linear.md.j2", LinearResult(operation="create", project=linked, remote=remote)))
