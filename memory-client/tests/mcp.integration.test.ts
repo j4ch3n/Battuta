@@ -1,4 +1,5 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
+import { promisify } from "node:util";
 import { once } from "node:events";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
@@ -14,6 +15,7 @@ import { memoryRecordSchema } from "../records.ts";
 import { readValidatedProfile } from "../profile-loader.ts";
 import { prepareRecall } from "../recall.ts";
 import { runDream } from "../dream-runtime.ts";
+import { loadProjectCatalog } from "../projects.ts";
 
 test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
   "durable JS capture survives lost acknowledgement and server restart",
@@ -77,9 +79,26 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       server = undefined;
     }
     try {
+      const cliHome = join(directory, "cli-home");
+      const registry = join(cliHome, ".battuta/projects");
+      const cli = resolve("../project-context-cli/.venv/bin/battuta-project");
+      for (const name of ["Atlas", "Beacon", "My Project", "项目"])
+        await promisify(execFile)(cli, ["init", name], {
+          env: { PATH: process.env.PATH, HOME: cliHome, LINEAR_API_TOKEN: "offline-test" },
+        });
+      vi.stubEnv("PATH", `${resolve("../project-context-cli/.venv/bin")}:${process.env.PATH}`);
+      vi.stubEnv("LINEAR_API_TOKEN", "offline-test");
+      expect(await loadProjectCatalog(registry, new AbortController().signal)).toEqual([
+        "Atlas",
+        "Beacon",
+        "My Project",
+        "global",
+        "项目",
+      ]);
       await start();
       const queue = await CaptureQueue.open(join(directory, "queue"), "cos");
-      const client = new MemoryMcpClient(`http://127.0.0.1:${address.port}/mcp`);
+      const prepareProjects = (signal: AbortSignal) => loadProjectCatalog(registry, signal);
+      const client = new MemoryMcpClient(`http://127.0.0.1:${address.port}/mcp`, prepareProjects);
       const complete = vi.fn(() =>
         Promise.resolve({
           stopReason: "stop",
@@ -93,6 +112,21 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
                     projects: ["global"],
                     source_entry_ids: ["e0"],
                     keywords: ["NS2", "Nintendo", "Nintendo Switch 2", "gaming"],
+                  },
+                  {
+                    content: "Atlas and Beacon share PostgreSQL.",
+                    projects: ["Atlas", "Beacon"],
+                    source_entry_ids: ["e0"],
+                  },
+                  {
+                    content: "My Project and 项目 use SQLite.",
+                    projects: ["My Project", "项目"],
+                    source_entry_ids: ["e0"],
+                  },
+                  {
+                    content: "Atlas uses SQLite for local cache.",
+                    projects: ["unknown"],
+                    source_entry_ids: ["e0"],
                   },
                 ],
               }),
@@ -108,11 +142,16 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       let lostAcknowledgement = true;
       let now = 0;
       const worker = {
-        prepare: () => Promise.resolve(["atlas", "beacon", "global"]),
+        prepare: (_job: Parameters<typeof extractMemories>[0], signal: AbortSignal) =>
+          loadProjectCatalog(registry, signal),
         extract: (job: Parameters<typeof extractMemories>[0], signal: AbortSignal) =>
           extractMemories(job, context, signal),
-        upload: async (batch: Record<string, unknown>, signal: AbortSignal) => {
-          await client.capture(batch, signal);
+        upload: async (
+          batch: Record<string, unknown>,
+          signal: AbortSignal,
+          catalog?: readonly string[],
+        ) => {
+          await client.capture(batch, signal, catalog);
           if (lostAcknowledgement) {
             lostAcknowledgement = false;
             throw new Error("Lost acknowledgement");
@@ -137,7 +176,11 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
           id: "e0",
           type: "message",
           timestamp: "2026-11-06T10:00:00Z",
-          message: { role: "user", content: "I bought an NS2, the Nintendo console." },
+          message: {
+            role: "user",
+            content:
+              "I bought an NS2, the Nintendo console. Atlas and Beacon share PostgreSQL. My Project and 项目 use SQLite. Atlas uses SQLite for local cache.",
+          },
         },
       ]);
       await runtime.recover();
@@ -147,10 +190,48 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       await start();
       now = 2000;
       const restored = await CaptureQueue.open(join(directory, "queue"), "cos");
-      await new CaptureRuntime(restored, worker).recover();
-      expect(restored.jobs()).toEqual([]);
+      const resumed = new CaptureRuntime(restored, worker);
+      await resumed.recover();
+      expect(restored.jobs()).toHaveLength(1);
       expect(complete).toHaveBeenCalledTimes(1);
+      complete.mockResolvedValueOnce({
+        stopReason: "stop",
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              items: [
+                {
+                  content: "Atlas uses SQLite for local cache.",
+                  projects: ["Atlas"],
+                  source_entry_ids: ["e0"],
+                  retry_entry_id: 3,
+                },
+              ],
+            }),
+          },
+        ],
+        usage: {},
+      });
+      now = 5000;
+      await resumed.recover();
+      expect(restored.jobs()).toEqual([]);
+      expect(complete).toHaveBeenCalledTimes(2);
       const signal = AbortSignal.timeout(15000);
+      const inventory = (await client.call(
+        "memory_inventory",
+        { window_start: 0, window_end: Date.now() / 1000 },
+        signal,
+      )) as { records: unknown[] };
+      const stored = inventory.records.map((r) => memoryRecordSchema.parse(r));
+      expect(stored).toHaveLength(4);
+      expect(stored.some((r) => r.projects.includes("unknown"))).toBe(false);
+      expect(
+        stored.find((r) => r.content === "Atlas and Beacon share PostgreSQL.")?.projects,
+      ).toEqual(["atlas", "beacon"]);
+      expect(stored.find((r) => r.content === "My Project and 项目 use SQLite.")?.projects).toEqual(
+        ["my project", "项目"],
+      );
       const recalled = (await client.call(
         "memory_recall",
         { query: "Nintendo", selector: "global", limit: 20 },
@@ -167,8 +248,9 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       await runDream(
         {
           directory: profileDirectory,
+          prepareProjects,
           now: () => new Date(),
-          call: (name, args, abort) => client.call(name, args, abort),
+          call: (name, args, abort, catalog) => client.call(name, args, abort, catalog),
           complete: (prompt, evidence) => {
             if (prompt.includes("Stage: cleanup")) {
               const input = JSON.parse(evidence) as { inputs: { ref: string }[] };
@@ -260,6 +342,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       const correction = await extractMemories(
         {
           id: "correction",
+          project_catalog: ["global"],
           session_id: "session",
           attempts: 0,
           nextAttempt: 0,
@@ -303,8 +386,9 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       ]);
     } finally {
       await stop();
+      vi.unstubAllEnvs();
       await rm(directory, { recursive: true, force: true });
     }
   },
-  30000,
+  60000,
 );

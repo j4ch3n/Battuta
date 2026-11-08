@@ -1,6 +1,6 @@
 # Tech stack
 
-Shared memory uses an isolated Python 3.12 MCP service with pinned mcp-memory-service 12.1.1, SQLite/sqlite-vec and local ONNX MiniLM CPU embeddings. A TypeScript Pi adapter performs configurable conversation capture, CoS-only profile loading and scheduled dream consolidation through CoS's model. See [memory architecture](memory-service.md).
+Shared memory uses an isolated Python 3.12 MCP service with pinned mcp-memory-service 12.1.1, SQLite/sqlite-vec and local ONNX MiniLM CPU embeddings. A TypeScript Pi adapter owns project-catalog discovery/validation, conversation capture, CoS-only profile loading and local 05:30 dream consolidation through CoS's model. The server accepts opaque lowercase-normalized project names without registry dependencies. See [memory architecture](memory-service.md).
 
 ## Main application and support tooling
 

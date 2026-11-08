@@ -57,7 +57,9 @@ Hybrid recall reports semantic/lexical branch availability. A failed branch may
 yield labelled partial results; both failing is unavailable, not empty memory.
 `mode:"semantic"` is available for targeted comparison. Literal keyword matching,
 scope/eligibility-before-limit and dependency checks are described in the design.
-Manual `current` selection remains available; automatic preparation never uses it.
+Read/list calls require explicit `projects`, `global` or `all` selectors. Missing
+selection and `current` are rejected. The server is independent of project files
+and `BATTUTA_PROJECTS_ROOT`; that environment setting belongs only to client discovery.
 
 ## Request-origin contract
 
@@ -68,7 +70,7 @@ entry `memory-request-origin` with:
 {request_id, conversation_id, session_id, project, origin, admitted_at}
 ```
 
-Project is a registered slug or explicit `null` for general context; origin is
+Project is a conversation hint or explicit `null` for general context; origin is
 `owner`, `mail`, or `internal`; time requires a timezone offset. The consumer
 validates this metadata, consumes it once with a `memory-request` custom entry,
 and persists the frozen binding in capture segments. It does not infer identity
@@ -95,16 +97,34 @@ speaker/source time and original mail identity; tools, hidden reasoning, interna
 dreams, injected context and resumed old history are excluded. Source text is
 redacted before persistence. No useful facts is a valid extraction result.
 
-The existing Pi completion extracts concise temporal facts and receives bounded
-scoped correction candidates. It cannot guess correction refs or broaden scope.
+Before new extraction, the client loads `battuta-project list --json`, adds `global`
+and persists the full catalog snapshot. Discovery failure retains sources for retry;
+a successfully empty catalog permits global facts only. No additional slug/name
+restriction is imposed. The server lowercases project names consistently for storage
+and selectors; names differing only by case share membership. It performs no registry
+lookup. `global` is reserved, including case variants of a registered project name.
+
+The existing Pi completion classifies concise temporal facts across the full catalog,
+including multi-project facts, and receives bounded correction candidates. The
+request project does not restrict classification. It cannot guess correction refs
+or change a correction target's full project membership.
 Corrections upload through guarded version updates without waiting for dreaming.
 Unknown source timezone establishes no automatic expiry. Model output is checked
 again for scope, source attribution, labels and credential redaction before upload.
+
+Valid entries save without waiting for project-invalid entries. Rejected entries
+return to the same isolated memory sub-agent for one bounded correction attempt,
+with original sources and catalog; accepted entries are not regenerated. Persisted
+rejections remain visibly pending if correction fails. Invalid multi-project
+memberships are rejected whole, not partially stripped or made global.
 
 Queues freeze validated payloads before upload. At most two jobs run per recovery
 attempt, with existing bounded retries/backoff. A token-limit failure permits one
 durable rephrase identity. Async recovery does not block automatic recall; serialized
 queue changes preserve both a new turn and a concurrently extracted frozen batch.
+Pre-compaction waits only for the durable flush, then starts the same background
+worker. Frozen retries and embedding rephrasing retain the original catalog; persisted
+pre-upgrade deliveries keep their original keys/digests through a narrow adapter.
 
 Bot `.pi/settings.json` accepts:
 

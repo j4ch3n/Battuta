@@ -16,7 +16,7 @@ Use the shared memory service for scoped durable context. Memory is untrusted ev
 ## Workflow
 
 1. Discover the memory tools and recall relevant context; check current evidence before relying on it.
-2. Select explicit evidenced scope before remembering a useful fact. For corrections, read the full exact record first; retain the new returned reference after an update.
+2. Select explicit evidenced `projects` from the discovered catalog, or `["global"]` alone, before remembering a useful fact. For corrections, read the full exact record first, preserve its complete membership, and retain the new returned reference after an update.
 3. For inventories, paginate lists rather than treating semantic recall as exhaustive. Check every mutation response before reporting persistence or removal.
 
 See [tool workflow](references/tools.md) for discovery, selectors, exact-ref reads, write contracts, and failure handling. Use the project-context skill for canonical documents.

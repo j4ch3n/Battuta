@@ -20,10 +20,6 @@ class RealModelTests(unittest.IsolatedAsyncioTestCase):
     async def test_two_clients_share_scoped_versions_and_persist_after_restart(self):
         with tempfile.TemporaryDirectory(prefix="battuta-memory-integration-") as directory:
             root = Path(directory)
-            for name in ("atlas", "beacon"):
-                folder = root / "projects" / name
-                (folder / "code").mkdir(parents=True)
-                (folder / "project.yaml").write_text(f"version: 1\nproject:\n  name: {name}\n  path: {folder}/code\n")
             config = MemoryConfig(data_dir=root / "data")
             ref = None
             generation = None
@@ -55,7 +51,11 @@ class RealModelTests(unittest.IsolatedAsyncioTestCase):
                                 self.assertEqual((await call(cos, "global_relationships"))["status"], "current")
                                 continue
                             sources = [{"agent_id": "cos", "session_id": "synthetic-session", "entry_id": "owner-statement"}]
-                            first = await call(cos, "remember", content="Atlas stores project data in Postgres.", projects=["atlas"], sources=sources)
+                            first = await call(cos, "remember", content="Atlas stores project data in Postgres.", projects=["Atlas", "My Project", "one,two", "项目"], sources=sources)
+                            public = await call(cos, "get", ref=first["ref"])
+                            self.assertEqual(public["projects"], ["atlas", "my project", "one,two", "项目"])
+                            self.assertNotIn("scope", public)
+                            self.assertFalse((root / "projects").exists())
                             personal = await call(cos, "remember", content="The owner prefers concise replies.", projects=["global"], sources=sources)
                             await call(other_cos, "remember", content="Beacon stores project data in Postgres.", projects=["beacon"], sources=sources)
                             with sqlite3.connect(config.database) as db:
@@ -72,6 +72,8 @@ class RealModelTests(unittest.IsolatedAsyncioTestCase):
                             ref = revised["ref"]
                             history = await call(cos, "get", ref=ref, include_history=True)
                             self.assertEqual(len(history["history"]), 2)
+                            self.assertTrue(all("projects" in r and "scope" not in r for r in history["history"]))
+                            self.assertEqual((await call(cos, "list", selector="projects", projects=["MY PROJECT"], include_global=False))["total"], 1)
                             recalled = await call(other_cos, "recall", query="Which database stores project data?", selector="projects", projects=["atlas"], include_global=False)
                             self.assertEqual([r["ref"] for r in recalled["records"]], [ref])
                             inventory = await call(cos, "list", selector="all")

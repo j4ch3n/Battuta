@@ -1,4 +1,6 @@
 import unittest
+import hashlib
+import json
 from unittest.mock import patch
 from test_mutations import StorageFixture
 from battuta_memory.capture import CaptureService
@@ -7,6 +9,22 @@ from battuta_memory.service import MemoryService
 
 
 class CaptureTests(StorageFixture):
+    async def test_new_wire_replays_a_historical_capture_receipt_without_embedding(self):
+        legacy = {"session_id": "s", "batch_id": "batch", "agent_id": "cos", "items": [{
+            "item_id": "fact-1", "content": "Useful fact", "scope": {"global": True, "projects": []},
+            "tags": [], "kind": "observation", "idempotency_key": None,
+            "sources": [{"agent_id": "cos", "session_id": "s", "entry_id": "entry-1"}],
+        }]}
+        historical_digest = hashlib.sha256(json.dumps(legacy, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+        batch = self.batch()
+        self.assertEqual(batch.payload_digest, historical_digest)
+        key = self.service.digest(["cos", "s", "batch"])
+        self.state.capture_receipt(key, historical_digest)
+        receipt = {"batch_id": "batch", "complete": True, "items": [{"item_id": "fact-1", "status": "completed", "ref": "a" * 64}]}
+        self.state.complete_capture(key, receipt)
+        with patch.object(self.adapter, "embed", side_effect=AssertionError("must not embed on replay")):
+            self.assertEqual(await CaptureService(self.service).ingest(batch), receipt)
+
     async def test_owner_correction_versions_old_fact_and_invalidates_dependents_on_upload(self):
         from battuta_memory.contracts import RememberRequest
         from battuta_memory.records import eligible_records

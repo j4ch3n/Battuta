@@ -52,14 +52,24 @@ or the inference is omitted. No arbitrary TTL or physical deletion is automatic.
 
 ## Scope and identity
 
-Each memory is global (`scope:global`) or belongs to one or more registered project
-slugs (`proj:<slug>`), never both or neither. Scope is relevance, not authorization.
+Public writes and records use a required `projects` array of 1–100 strings:
+`["global"]` alone, or one or more project names. The client checks names against
+the complete `battuta-project list --json` catalog, without another name syntax or
+length restriction. The server trusts names, lowercases/deduplicates/sorts them,
+and never reads the registry or current selection. Lowercase-equivalent names
+share server membership; a registered case variant of `global` conflicts with the
+reserved option. Membership is relevance, not authorization or privacy isolation.
+
+Storage keeps `scope:global` and `proj:<name>` tags. Project tag values are
+percent-escaped for lossless comma-delimited storage; existing slug tags are
+unchanged. Internal records and canonical digest/revision inputs retain the old
+scope shape. Only typed public response locations translate to `projects`.
 `kind` describes meaning, such as preference/decision/event; extra tags filter topics.
 Reserved `scope:`, `proj:` and `kind:` prefixes and commas are not caller tags.
 
-Manual selectors remain `current`, `projects`, `global` and explicit `all`.
-`current` uses shared selection with a warning/global-only result if absent.
-Automatic calls never use it: request binding supplies explicit projects/global.
+Selectors require explicit `projects`, `global` or `all`; missing selection and
+`current` are rejected. Project selectors and membership mutations use the same
+server-side lowercase normalization as storage.
 Kind/tag filters narrow scope; matching several project memberships deduplicates.
 Exact-ref reads do not inherit a current-project access restriction.
 
@@ -122,21 +132,30 @@ Another conversation's selection, a switch or a fork cannot supply a fallback.
 Mail admission freezes its exact envelope reference. Queued follow-ups without
 matching admission quarantine the mixed segment as blocked, unbound work and
 suppress context/delegation; a separate origin marker cannot authorize them.
-Compaction flushes capture without ending the continuing request's binding.
+Compaction durably flushes capture, then kicks the same single-flight background
+worker without awaiting extraction/upload or ending the request's binding.
 The real producer integration remains gated on FIS-143/FIS-146; see
 [operations](../docs/memory-service.md#request-origin-contract).
 
 Each settled CoS turn enters the durable queue immediately. Serialized queue writes
 prevent extraction persistence racing with new turns. The existing Pi completion
-extracts bounded attributed temporal facts and scoped correction targets supplied
-by recall. Validate source IDs, confidence, dates, scope and credential redaction
-before sending. Correction candidates include expired active history and bounded
-supporting refs within the frozen scope. Unknown source timezone establishes no
-automatic expiry.
+extracts bounded attributed temporal facts against a persisted full catalog plus
+`global`, independent of the request's project hint. Discovery failure retains
+sources, not global-only fallback. Validate source IDs, confidence, dates, project
+membership and credential redaction before sending. Correction candidates include
+expired active history and bounded supporting refs across catalog projects. A
+correction must preserve the target's complete project set. Unknown source timezone
+establishes no automatic expiry.
 Corrections use guarded version updates immediately, invalidating dependent claims
 without waiting for dreaming. Batches freeze before upload; retries reuse their
 digests and bounded backoff, not another paid extraction. Old frozen batches and
-other roles' private queues are not relabelled or automatically imported.
+other roles' private queues are not relabelled or automatically imported. Valid
+entries save independently of project-invalid entries. The queue persists rejected
+entries, accepted delivery acknowledgements and a bounded correction attempt;
+correction receives only rejected entries and cannot regenerate accepted entries.
+Unresolved entries remain visibly pending. Rephrasing retains the original catalog.
+Persisted-only adapters translate old frozen deliveries without changing their
+batch/item IDs, replay keys, digest representations or acknowledged outcomes.
 
 Admission attempts automatic recall independently of capture enablement. Up to
 three deterministic current/topic/identifier facets use at most 256 UTF-8 bytes
@@ -158,7 +177,7 @@ Expiry/corrections remove unsupported profile claims at request time.
 
 ## Dreaming and delegation
 
-CoS's existing scheduler requests the approved dream at local 03:00, with startup
+CoS's existing scheduler requests the approved dream at local 05:30, with startup
 catch-up, the existing model selection and no tool-capable dream subagent.
 Missing-stage, temporal and changed durable evidence is pending regardless of age.
 Within the 500-record/200,000-byte guard, select at most 20 oldest-attempt inputs;
@@ -179,6 +198,17 @@ remain excluded from current recall. Deterministic checks cannot establish seman
 truth or recognize every paraphrased rejected interpretation: owner evaluation remains
 necessary. Profile refresh uses actual eligible outputs, then the existing private
 reflection/public-summary boundary. `ME.md` is not rewritten.
+
+New dream publications validate a fresh client catalog before requests are frozen;
+frozen retries retain their snapshot and identity even after registry changes.
+Invalid memberships cannot retire their originals or block independent valid
+publications. Ref-addressed corrections/metadata/forget preserve stored membership
+without requiring continued registration. Linking validates the resulting project
+set, allowing removal of a no-longer-registered label already attached to the record.
+
+Scheduler setup and catch-up use the same local 05:30 boundary and owned job ID.
+Existing 03:00 tasks are not migrated: ownership conflicts require manual owner
+removal before setup. No live scheduler changes are part of this update.
 
 Checkpoint v3 persists stage, input fingerprint, schema/prompt versions, validated
 artifacts, frozen requests, acknowledgements, reviewed fingerprints and pending

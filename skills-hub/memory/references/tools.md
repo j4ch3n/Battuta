@@ -7,14 +7,14 @@ Discover the `memory` MCP server's tools through native tool discovery. Only CoS
 ```json
 {
   "content": "The owner prefers concise replies.",
-  "scope": { "global": true, "projects": [] },
+  "projects": ["global"],
   "kind": "preference"
 }
 ```
 
-Pass this to `memory_remember`. For Atlas's database choice, instead use `content:"Atlas uses SQLite rather than Postgres."`, `scope:{"global":false,"projects":["atlas"]}` and `kind:"decision"`. A fact can belong to multiple evidenced registered project slugs. Extra `tags` cannot use reserved `scope:`, `proj:` or `kind:` prefixes.
+Pass this to `memory_remember`. For Atlas's database choice, instead use `content:"Atlas uses SQLite rather than Postgres."`, `projects:["atlas"]` and `kind:"decision"`. A fact can belong to multiple evidenced projects from the catalog returned by `battuta-project list --json`; preserve registered spelling when selecting new labels. Use `["global"]` alone for genuinely non-project facts, never as an unknown-project fallback. The server returns lowercase memberships. Extra `tags` cannot use reserved `scope:`, `proj:` or `kind:` prefixes.
 
-`memory_recall({"query":"database choice"})` uses hybrid semantic/keyword retrieval in current project plus global. Choose `selector:"projects",projects:["atlas"],include_global:false` for Atlas only, `selector:"global"` for general facts, or `selector:"all"` for explicitly cross-project recall. Automatic preparation always uses its frozen explicit scope. Kind/tag filters narrow selection. Check branch availability and `incomplete`; unavailable is not empty memory. `mode:"semantic"` is an explicit comparison mode. `include_expired:true` retrieves labelled expired active history, not rejected/deleted records.
+`memory_recall({"query":"database choice","selector":"projects","projects":["atlas"]})` uses hybrid semantic/keyword retrieval for Atlas plus global. Choose `include_global:false` for Atlas only, `selector:"global"` for general facts, or `selector:"all"` for explicitly cross-project recall. Missing selectors and `selector:"current"` are rejected; selection is never inferred. Kind/tag filters narrow selection. Check branch availability and `incomplete`; unavailable is not empty memory. `mode:"semantic"` is an explicit comparison mode. `include_expired:true` retrieves labelled expired active history, not rejected/deleted records.
 
 For source-backed writes, supply `sources` and `memory_metadata`; capture normally
 builds these rather than asking the conversational model to reconstruct them.
@@ -29,7 +29,7 @@ Use `memory_list({"selector":"all","page":1,"page_size":20})` for inventory; inc
 
 After reading an incorrect record, call `memory_update({"ref":"<old ref>","content":"Atlas uses SQLite.","reason":"Owner corrected the database decision"})`. This creates a new version and returns a new ref. It inherits scope unless changed through the membership tool; default recall/list omit the predecessor. Existing-content collisions and stale refs are conflicts, not permission to overwrite unrelated history.
 
-`memory_link_projects({"ref":"<ref>","add":["beacon"],"remove":[]})` adds evidence-backed membership without recomputing embeddings. Removing the final project or attaching projects to a global record is rejected. Compatible exact-content retries reuse a record; conflicting membership needs an explicit evidenced link, not silent broadening.
+`memory_link_projects({"ref":"<ref>","add":["beacon"],"remove":[]})` adds evidence-backed membership without recomputing embeddings. New memberships must be in the catalog; an attached label may be removed after its project disappears. Removing the final project or attaching projects to a global record is rejected. Compatible exact-content retries reuse a record; conflicting membership needs an explicit evidenced link, not silent broadening.
 
 `memory_set_metadata` takes `{ref,expected_revision,idempotency_key,memory_metadata,evidence}`
 to change lifecycle/keywords without changing content or embedding. Read the full
@@ -53,7 +53,7 @@ Preview with `memory_forget({"ref":"<ref>","dry_run":true})`, then omit dry_run 
 
 ## Background capture
 
-`memory_capture` is normally called by the lifecycle adapter, not manually reconstructed by the agent. It uploads validated extracted facts with frozen scope, source entry refs, batch/item IDs and payload digest. Replays resume partial batches without recreating forgotten records. An empty extraction is valid. The model runs in the bot; the memory server embeds locally and never needs model-provider credentials.
+`memory_capture` is normally called by the lifecycle adapter, not manually reconstructed by the agent. It classifies against the full prepared catalog, then uploads validated entries with frozen `projects`, source entry refs, batch/item IDs and payload digest. Project-invalid entries return for correction without blocking valid entries; unresolved work remains pending. Replays retain the original snapshot and do not recreate forgotten records. An empty extraction is valid. The model runs in the bot; the memory server embeds locally and never needs model-provider credentials.
 
 Conversation tools do not directly edit the owner profile. When a request includes both “remember this” and “update ME.md”, perform the supported server-memory operation and report its confirmed result separately from profile maintenance. Never edit ME.md directly or claim its contents changed without confirmation from the dedicated dream workflow.
 

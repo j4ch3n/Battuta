@@ -51,6 +51,26 @@ Only the CoS manifest selects the `skills-hub/memory/` skill and managed memory 
 
 Source `--bot-dir` workspaces use their own manifest or the owning role's selection. Custom skill content and private queues/profiles remain preserved. CoS capture defaults on; non-CoS roles do not load the adapter. Managed Manager/worker memory MCP entries are removed while unrelated servers/auth remain. This is configuration separation, not a same-user security sandbox. Setup does not edit private profiles or start bots. Automatic CoS preparation also needs the [request-origin integration](memory-service.md#request-origin-contract); missing metadata never implies global capture.
 
+CoS's launch environment must provide the updated `battuta-project` command with
+`list --json --root` support and its required `LINEAR_API_TOKEN` environment variable.
+Discovery does not contact Linear. Use the same registered-project root as CoS:
+`BATTUTA_PROJECTS_ROOT` defaults to `~/.battuta/projects` in the client only. The memory
+server does not need that command, environment variable or registry directory.
+Upgrade the memory client and server together; the public API now uses `projects`
+rather than `scope`, with explicit read selectors. Existing storage and pending
+delivery identities are preserved without re-embedding.
+
+With CoS stopped, check the CLI contract without a bot/model call:
+
+```sh
+command -v battuta-project
+battuta-project list --json --root "${BATTUTA_PROJECTS_ROOT:-$HOME/.battuta/projects}"
+```
+
+Stop if either command fails. Successful output is a JSON `projects` array, empty
+when no projects are registered. Names retain registered spelling; any case variant
+of `global` conflicts with the reserved memory label and must be resolved by the owner.
+
 ## Services
 
 `bin/battuta install-services` writes five user units (CoS, Manager, Worker, memory, and artifacts) without enabling/restarting them. It refuses conflicting existing units before writing anything unless the operator explicitly uses `--replace` after stopping the old deployment; symlinked units are always refused. Check custom unit edits and drop-ins before replacement. Then enable `battuta-memory.service` with `systemctl --user`. All three bots want the memory unit but do not require it: memory failure must not kill conversations. Use `journalctl --user -u battuta-memory` for diagnostics. Only one server owns the shared data directory; occupied ports are errors, not permission to connect to an unknown backend.
