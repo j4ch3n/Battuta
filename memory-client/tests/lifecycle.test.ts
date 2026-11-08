@@ -4,18 +4,10 @@ import { join } from "node:path";
 import { expect, test, vi } from "vitest";
 import { CaptureQueue, type CaptureJob } from "../capture-queue.ts";
 import { CaptureRuntime } from "../lifecycle.ts";
-import type { RequestBinding } from "../binding.ts";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { extractMemories } from "../extract.ts";
 
-const binding = (project: string | null, session_id = "s"): RequestBinding => ({
-  request_id: `${session_id}-${project}`,
-  conversation_id: session_id,
-  session_id,
-  project,
-  origin: "owner",
-  admitted_at: "2026-11-06T10:00:00Z",
-});
+const binding = (project: string | null) => ({ capture: true, project });
 const prepare = () => Promise.resolve(["atlas", "beacon", "global"]);
 
 test("embedding rephrase retains project rejections and rewrites only the failed frozen item", async () => {
@@ -258,6 +250,7 @@ const entries = (count: number) =>
     id: String(i),
     message: { role: i === 0 ? "user" : "assistant", content: `fact ${i}` },
   }));
+const request = (project: string | null) => ({ capture: true, project });
 
 test("pre-compaction awaits durable persistence but not extraction or upload, sharing settled-turn recovery", async () => {
   const dir = await mkdtemp(join(tmpdir(), "runtime-before-compact-"));
@@ -314,7 +307,7 @@ test("pre-compaction awaits durable persistence but not extraction or upload, sh
       "0",
       "1",
     ]);
-    expect(queue.jobs()[0].segment.binding).toEqual(binding("atlas"));
+    expect(queue.jobs()[0].segment.project).toBe("atlas");
     finishExtraction();
     finishUpload();
     await runtime.recover();
@@ -351,7 +344,7 @@ test("shutdown prevents pre-compaction from starting or continuing another queue
     });
     await runtime.startRequest("s", [], binding("atlas"));
     await runtime.flush("s", entries(2));
-    await runtime.startRequest("other", [], binding("beacon", "other"));
+    await runtime.startRequest("other", [], binding("beacon"));
     await runtime.flush("other", entries(2));
     await runtime.beforeCompact("s", entries(2));
     await ready;
@@ -359,6 +352,45 @@ test("shutdown prevents pre-compaction from starting or continuing another queue
     await runtime.recover();
     await runtime.beforeCompact("other", entries(2));
     expect(extract).toHaveBeenCalledTimes(1);
+    expect(queue.jobs()).toHaveLength(2);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("compaction preserves explicit scope, capture retries are frozen, and a fork does not backfill", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-"));
+  try {
+    const queue = await CaptureQueue.open(dir, "cos");
+    const extract = vi.fn(() => Promise.resolve({ batch: { items: [] } }));
+    const upload = vi.fn(() => Promise.reject(new Error("offline")));
+    let now = 0;
+    const runtime = new CaptureRuntime(queue, {
+      prepare,
+      extract,
+      upload,
+      now: () => now,
+      notify: () => {},
+    });
+    await runtime.startRequest("s", [], request("atlas"));
+    await runtime.flush("s", entries(2));
+    await runtime.settle("s", entries(4));
+    await runtime.recover();
+    expect(queue.jobs().flatMap((j) => j.segment.messages.map((m) => m.entry_id))).toEqual([
+      "0",
+      "1",
+      "2",
+      "3",
+    ]);
+    expect(queue.jobs().every((j) => j.segment.project === "atlas")).toBe(true);
+    expect(extract).toHaveBeenCalledTimes(2);
+    now = 2000;
+    await runtime.recover();
+    expect(extract).toHaveBeenCalledTimes(2);
+    expect(upload).toHaveBeenCalledTimes(4);
+    await runtime.initialize("fork", entries(4));
+    await runtime.startRequest("fork", entries(4), request("beacon"));
+    await runtime.settle("fork", entries(4));
     expect(queue.jobs()).toHaveLength(2);
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -460,76 +492,35 @@ test("catalog failure retains source messages and never starts extraction", asyn
   }
 });
 
-test.each([false, true])(
-  "queued mail without matching admission is retained unbound, not captured under the active project (marker=%s)",
-  async (marker) => {
-    const dir = await mkdtemp(join(tmpdir(), "runtime-unbound-"));
-    try {
-      const queue = await CaptureQueue.open(dir, "cos");
-      const extract = vi.fn(() => Promise.resolve({ batch: { items: [] } }));
-      const runtime = new CaptureRuntime(queue, {
-        prepare,
-        extract,
-        upload: async () => {},
-        now: () => 0,
-        notify: () => {},
-      });
-      const owner = binding("atlas");
-      await runtime.startRequest("s", [], owner);
-      const branch = [
-        { type: "custom", customType: "memory-request", data: owner },
-        ...entries(2),
-        ...(marker
-          ? [
-              {
-                type: "custom",
-                customType: "memory-request-origin",
-                data: {
-                  ...owner,
-                  request_id: "mail",
-                  conversation_id: "beacon-mail",
-                  project: "beacon",
-                  origin: "mail",
-                },
-              },
-            ]
-          : []),
-        {
-          id: "mail",
-          type: "custom_message",
-          customType: "agent-mail",
-          content: JSON.stringify({
-            message_ref: { conversation_id: "beacon-mail", id: "abcdef123456" },
-            sender: "manager",
-            content: { summary: "Beacon uses Postgres" },
-          }),
-        },
-      ];
-      await runtime.settle("s", branch);
-      await runtime.recover();
-      expect(extract).not.toHaveBeenCalled();
-      expect(queue.jobs()[0]).toMatchObject({
-        blocked: true,
-        blocked_reason: "unbound-origin",
-        segment: { project: null },
-      });
-      expect(queue.jobs()[0].segment.binding).toBeUndefined();
-      expect(
-        queue
-          .jobs()[0]
-          .segment.messages.some(
-            (m) => m.original_mail?.message_ref.conversation_id === "beacon-mail",
-          ),
-      ).toBe(true);
-      expect(runtime.hasPendingCapture()).toBe(true);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  },
-);
+test("oversized memories allow one durable rephrase, not repeated paid extraction", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-"));
+  try {
+    const queue = await CaptureQueue.open(dir, "cos");
+    const extract = vi.fn(() => Promise.resolve({ batch: { items: [] } }));
+    let now = 0;
+    const runtime = new CaptureRuntime(queue, {
+      prepare,
+      extract,
+      upload: () => Promise.reject(Object.assign(new Error("long"), { rephrase: true })),
+      now: () => now,
+      notify: () => {},
+    });
+    await runtime.startRequest("s", [], request(null));
+    await runtime.settle("s", entries(2));
+    await runtime.recover();
+    now = 2000;
+    await runtime.recover();
+    now = 100000;
+    await runtime.recover();
+    expect(extract).toHaveBeenCalledTimes(2);
+    expect(queue.jobs()[0].blocked).toBe(true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
-test("compaction flush preserves capture binding for the continued request", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "runtime-compact-"));
+test("mail remains attributed while internal runs are excluded and sessions keep their scope", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-"));
   try {
     const queue = await CaptureQueue.open(dir, "cos");
     const runtime = new CaptureRuntime(queue, {
@@ -539,152 +530,36 @@ test("compaction flush preserves capture binding for the continued request", asy
       now: () => 0,
       notify: () => {},
     });
-    await runtime.startRequest("s", [], binding("atlas"));
-    await runtime.flush("s", entries(2));
-    await runtime.settle("s", entries(4));
-    await runtime.recover();
-    expect(
-      queue
-        .jobs()
-        .flatMap((j) => j.segment.messages)
-        .map((m) => m.entry_id),
-    ).toEqual(["0", "1", "2", "3"]);
-    expect(queue.jobs().every((j) => j.segment.project === "atlas")).toBe(true);
+    await runtime.startRequest("s", [], request("atlas"));
+    await runtime.startRequest("other", [], request("beacon"));
+    await runtime.flush("s", [
+      {
+        id: "mail",
+        type: "custom_message",
+        customType: "agent-mail",
+        content: JSON.stringify({
+          message_ref: { conversation_id: "c", id: "m" },
+          sender: "manager",
+          content: { summary: "Report" },
+        }),
+      },
+    ]);
+    await runtime.flush("other", entries(2));
+    expect(queue.jobs().map((j) => j.segment.project)).toEqual(["atlas", "beacon"]);
+    expect(queue.jobs()[0].segment.messages[0]).toMatchObject({
+      speaker: "agent",
+      original_mail: { sender: "manager" },
+    });
+    await runtime.startRequest("internal", [], { capture: false, project: null });
+    await runtime.settle("internal", entries(2));
+    expect(queue.jobs()).toHaveLength(2);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
 });
 
-test.each([true, false])(
-  "only the exact admitted mail envelope may share a binding (same=%s)",
-  async (same) => {
-    const dir = await mkdtemp(join(tmpdir(), "runtime-mail-"));
-    try {
-      const queue = await CaptureQueue.open(dir, "cos");
-      const runtime = new CaptureRuntime(queue, {
-        prepare,
-        extract: () => Promise.reject(new Error("offline")),
-        upload: async () => {},
-        now: () => 0,
-        notify: () => {},
-      });
-      const admitted = {
-        ...binding("atlas"),
-        origin: "mail" as const,
-        mail_ref: { conversation_id: "s", id: "admitted" },
-      };
-      await runtime.startRequest("s", [], admitted);
-      await runtime.flush("s", [
-        { type: "custom", customType: "memory-request", data: admitted },
-        {
-          id: "mail",
-          type: "custom_message",
-          customType: "agent-mail",
-          content: JSON.stringify({
-            message_ref: { ...admitted.mail_ref, id: same ? "admitted" : "queued" },
-            sender: "manager",
-            content: { summary: "Report" },
-          }),
-        },
-      ]);
-      expect(queue.jobs()[0].blocked ?? false).toBe(!same);
-      expect(queue.jobs()[0].segment.project).toBe(same ? "atlas" : null);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  },
-);
-test("oversized memories allow one durable rephrase, not repeated paid extraction", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "runtime-test-"));
-  try {
-    const queue = await CaptureQueue.open(dir, "cos");
-    const extract = vi.fn(() => Promise.resolve({ batch: { items: [] } }));
-    let now = 0;
-    const runtime = new CaptureRuntime(queue, {
-      prepare,
-      extract,
-      upload: () => Promise.reject(Object.assign(new Error("too long"), { rephrase: true })),
-      now: () => now,
-      notify: () => {},
-    });
-    await runtime.initialize("s", []);
-    await runtime.startRequest("s", [], binding("atlas"));
-    await runtime.settle("s", entries(6));
-    await runtime.recover();
-    now = 2000;
-    await runtime.recover();
-    now = 100000;
-    await runtime.recover();
-    expect(extract).toHaveBeenCalledTimes(2);
-    expect(queue.jobs()).toHaveLength(1);
-    expect(queue.jobs()[0].blocked).toBe(true);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-test("settled turn queues immediately with project freeze and bounded upload retry", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "runtime-test-"));
-  try {
-    const queue = await CaptureQueue.open(dir, "cos");
-    const extract = vi.fn(() => Promise.resolve({ batch: { items: [] }, usage: { input: 2 } }));
-    const upload = vi.fn(() => Promise.reject(new Error("offline")));
-    let now = 1000;
-    const runtime = new CaptureRuntime(queue, {
-      prepare,
-      extract,
-      upload,
-      now: () => now,
-      notify: () => {},
-    });
-    await runtime.initialize("s", []);
-    await runtime.startRequest("s", [], binding("atlas"));
-    await runtime.settle("s", entries(2));
-    await runtime.recover();
-    expect(extract).toHaveBeenCalledTimes(1);
-    expect(runtime.hasPendingCapture()).toBe(true);
-    await runtime.settle("s", entries(6));
-    await runtime.recover();
-    expect(extract).toHaveBeenCalledTimes(2);
-    expect(queue.jobs()[0].segment.project).toBe("atlas");
-    expect(queue.jobs()[0].batch).toEqual({ items: [] });
-    now += 2000;
-    await runtime.startRequest("s", entries(6), binding("beacon"));
-    expect(extract).toHaveBeenCalledTimes(2);
-    expect(upload).toHaveBeenCalledTimes(2);
-    await runtime.recover();
-    expect(upload).toHaveBeenCalledTimes(4);
-    await runtime.settle("s", entries(6));
-    expect(queue.pending("s")).toEqual([]);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-test("boundary flush queues short batches; a fork does not backfill old history", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "runtime-test-"));
-  try {
-    const queue = await CaptureQueue.open(dir, "manager");
-    const extract = vi.fn(() => Promise.reject(new Error("no model")));
-    const runtime = new CaptureRuntime(queue, {
-      prepare,
-      extract,
-      upload: async () => {},
-      now: () => 0,
-      notify: () => {},
-    });
-    await runtime.initialize("s", []);
-    await runtime.startRequest("s", [], binding("atlas"));
-    await runtime.flush("s", entries(2));
-    expect(queue.jobs()).toHaveLength(1);
-    await runtime.initialize("fork", entries(2));
-    expect(queue.pending("fork")).toEqual([]);
-    await runtime.startRequest("fork", entries(2), binding("beacon", "fork"));
-    expect(queue.jobs()[0].segment.project).toBe("atlas");
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-test("shutdown aborts an active worker and never acknowledges its queued batch", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "runtime-test-"));
+test("shutdown cancels extraction without acknowledging its queued batch", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-"));
   try {
     const queue = await CaptureQueue.open(dir, "cos");
     let started!: () => void;
@@ -704,43 +579,13 @@ test("shutdown aborts an active worker and never acknowledges its queued batch",
       now: () => 0,
       notify: () => {},
     });
-    await runtime.initialize("s", []);
-    await runtime.startRequest("s", [], binding("atlas"));
-    const settling = runtime.settle("s", entries(6));
+    await runtime.startRequest("s", [], request(null));
+    await runtime.settle("s", entries(2));
     await ready;
     runtime.shutdown();
-    await settling;
     await runtime.recover();
     expect(queue.jobs()).toHaveLength(1);
     expect(queue.jobs()[0].batch).toBeUndefined();
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-test("interleaved sessions keep their own binding; unbound turns never become global facts", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "runtime-binding-"));
-  try {
-    const queue = await CaptureQueue.open(dir, "cos");
-    const runtime = new CaptureRuntime(queue, {
-      prepare,
-      extract: () => Promise.reject(new Error("offline")),
-      upload: async () => {},
-      now: () => 0,
-      notify: () => {},
-    });
-    await runtime.startRequest("s", [], binding("atlas"));
-    await runtime.startRequest("other", [], binding("beacon", "other"));
-    await runtime.flush("s", entries(2));
-    await runtime.flush("other", entries(2));
-    expect(queue.jobs().map((j) => j.segment.project)).toEqual(["atlas", "beacon"]);
-    expect(queue.jobs()[0].segment.binding?.request_id).toBe("s-atlas");
-    await runtime.startRequest("unknown", [], undefined);
-    await runtime.flush("unknown", entries(2));
-    expect(queue.jobs()).toHaveLength(2);
-    await runtime.startRequest("general", [], binding(null, "general"));
-    await runtime.flush("general", entries(2));
-    expect(queue.jobs().at(-1)?.segment.project).toBeNull();
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

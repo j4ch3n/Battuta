@@ -12,6 +12,7 @@ def fuse_ranks(semantic_refs, lexical_refs, limit):
     return sorted(scores, key=lambda ref: (-scores[ref], ref))[:limit]
 
 
-def lexical_query(text):
-    terms = list(dict.fromkeys(re.findall(r"\w+", unicodedata.normalize("NFKC", text).casefold())))[:32]
+def lexical_query(terms):
+    terms = list(dict.fromkeys(" ".join(re.findall(r"\w+", unicodedata.normalize("NFKC", term).casefold())) for term in terms))
+    terms = [term for term in terms if term]
     return " OR ".join('"' + term.replace('"', '""') + '"' for term in terms)

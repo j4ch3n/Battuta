@@ -1,5 +1,4 @@
 import type { CaptureJob, CaptureQueue } from "./capture-queue.ts";
-import type { RequestBinding } from "./binding.ts";
 import { normalizePersistedCapture } from "./delivery-compat.ts";
 import { z } from "zod";
 
@@ -22,7 +21,7 @@ interface Worker {
   notify: (message: string) => void;
 }
 export class CaptureRuntime {
-  private bindings = new Map<string, RequestBinding>();
+  private requests = new Map<string, { capture: boolean; project: string | null }>();
   private active?: AbortController;
   private recovery?: Promise<void>;
   private stopped = false;
@@ -31,14 +30,14 @@ export class CaptureRuntime {
     private worker: Worker,
   ) {}
   async initialize(session: string, entries: readonly unknown[]) {
-    this.bindings.delete(session);
+    this.requests.delete(session);
     await this.queue.track(session, entries, null, false);
     this.initialized.add(session);
   }
   async startRequest(
     session: string,
     entries: readonly unknown[],
-    binding?: RequestBinding,
+    options: { capture: boolean; project: string | null } = { capture: true, project: null },
     signal?: AbortSignal,
   ) {
     // Session initialization must precede the first persisted request.
@@ -47,29 +46,25 @@ export class CaptureRuntime {
       this.initialized.add(session);
     }
     signal?.throwIfAborted();
-    this.bindings.delete(session);
-    if (binding && binding.session_id !== session)
-      throw new Error("Memory binding session mismatch");
-    if (binding && binding.origin !== "internal")
-      this.bindings.set(session, structuredClone(binding));
+    this.requests.set(session, structuredClone(options));
   }
   private initialized = new Set<string>();
   async settle(session: string, entries: readonly unknown[]) {
-    const binding = this.bindings.get(session);
-    if (!binding) {
-      await this.queue.track(session, entries, null, false, undefined, false);
+    const request = this.requests.get(session);
+    if (!request?.capture) {
+      await this.queue.track(session, entries, null, false, false);
       return;
     }
-    await this.queue.track(session, entries, binding.project, false, binding);
+    await this.queue.track(session, entries, request.project, false);
     await this.queue.flush(session);
     void this.recover().catch(() =>
       this.worker.notify("Memory capture pending; retained for retry"),
     );
   }
   async flush(session: string, entries: readonly unknown[], endRequest = false) {
-    const binding = this.bindings.get(session);
-    await this.queue.track(session, entries, binding?.project ?? null, true, binding, !!binding);
-    if (endRequest) this.bindings.delete(session);
+    const request = this.requests.get(session);
+    await this.queue.track(session, entries, request?.project ?? null, true, !!request?.capture);
+    if (endRequest) this.requests.delete(session);
   }
   async beforeCompact(session: string, entries: readonly unknown[]) {
     await this.flush(session, entries);

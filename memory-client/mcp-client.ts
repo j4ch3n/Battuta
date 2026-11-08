@@ -71,7 +71,6 @@ export class MemoryMcpClient {
       await client.connect(new StreamableHTTPClientTransport(new URL(this.url)), { signal });
       const result = await client.callTool({ name, arguments: args }, undefined, {
         signal,
-        timeout: 30000,
       });
       const envelope = result.structuredContent as
         { ok?: boolean; data?: unknown; error?: { retryable?: boolean } } | undefined;

@@ -1,6 +1,6 @@
 # CoS memory tool workflow
 
-Discover the `memory` MCP server's tools through native tool discovery. Only CoS accesses them; Manager/workers use selected Agent Mail context. Calls use flat JSON arguments, not a nested `request`. Successful responses have `ok:true`, `data` and `warnings`; failures have `ok:false` and MCP `isError:true`. Read those results before claiming persistence. Report actual confirmed scope, refs, warnings and partial failures. Never overwrite unrelated records to resolve a conflict.
+The recall agent has direct `memory_recall` and `memory_get` tools, without codemode or discovery. Main CoS has no memory MCP tools; capture and approved dream extensions retain programmatic access. Maintenance examples below apply only to an explicitly authorized maintenance client. Calls use flat JSON arguments, not a nested `request`. Successful machine responses have `ok:true`, `data` and `warnings`; failures have `ok:false` and MCP `isError:true`. Recall/get also return readable evidence text with explained qualifications. Read actual results before claiming persistence; never overwrite unrelated records to resolve a conflict.
 
 ## Remember and recall
 
@@ -14,7 +14,9 @@ Discover the `memory` MCP server's tools through native tool discovery. Only CoS
 
 Pass this to `memory_remember`. For Atlas's database choice, instead use `content:"Atlas uses SQLite rather than Postgres."`, `projects:["atlas"]` and `kind:"decision"`. A fact can belong to multiple evidenced projects from the catalog returned by `battuta-project list --json`; preserve registered spelling when selecting new labels. Use `["global"]` alone for genuinely non-project facts, never as an unknown-project fallback. The server returns lowercase memberships. Extra `tags` cannot use reserved `scope:`, `proj:` or `kind:` prefixes.
 
-`memory_recall({"query":"database choice","selector":"projects","projects":["atlas"]})` uses hybrid semantic/keyword retrieval for Atlas plus global. Choose `include_global:false` for Atlas only, `selector:"global"` for general facts, or `selector:"all"` for explicitly cross-project recall. Missing selectors and `selector:"current"` are rejected; selection is never inferred. Kind/tag filters narrow selection. Check branch availability and `incomplete`; unavailable is not empty memory. `mode:"semantic"` is an explicit comparison mode. `include_expired:true` retrieves labelled expired active history, not rejected/deleted records.
+`memory_recall({"semantic_query":"previous database decisions and constraints","keywords":["SQLite","Postgres"]})` searches all projects and global memory. Either input can be omitted; at least one is required. Semantic-only uses embedding distance; keywords-only uses literal text/alias matching; both combine ranked results. Rewrite using conversation history, review results, and revise/repeat queries as useful. Keywords may be phrases, never raw query syntax. An oversized semantic query must be shortened or split, not silently truncated.
+
+Use explicit `projects:["atlas"],include_global:false` for Atlas only or `selector:"global"` for global facts. There is no current-project recall selector or implicit selected-project restriction. Kind/tag filters narrow selection. Preserve the server-rendered confidence, provenance and counterevidence. Branch failure/omission is partial, not complete; unavailable is not empty memory. Explicit maintenance `include_expired:true` retrieves active expired history, not rejected/deleted records.
 
 For source-backed writes, supply `sources` and `memory_metadata`; capture normally
 builds these rather than asking the conversational model to reconstruct them.

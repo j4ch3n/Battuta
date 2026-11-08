@@ -46,7 +46,7 @@ import {
   type MemoryRecord,
 } from "./records.ts";
 import { digest } from "./canonical.ts";
-import { boundedQuery } from "./recall.ts";
+import { boundedQuery } from "./correction-candidates.ts";
 import { DREAM_HOUR, DREAM_MINUTE } from "./dream-schedule.ts";
 import { normalizePersistedCheckpoint } from "./delivery-compat.ts";
 import { normalizedProjects, validateMemoryProjects } from "./projects.ts";
@@ -950,7 +950,7 @@ export async function runDream(
           await deps.call(
             "memory_recall",
             {
-              query: boundedQuery(proposal.content),
+              semantic_query: boundedQuery(proposal.content),
               selector: source.projects[0] === "global" ? "global" : "projects",
               projects: source.projects[0] === "global" ? [] : source.projects,
               include_global: false,

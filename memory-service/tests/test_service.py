@@ -46,7 +46,7 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
     async def test_scoped_recall_filters_before_limit(self):
         for n in range(30):
             self.add(str(n), "Distractor", "proj:beacon", 0)
-        result = await self.service.recall(RecallRequest(query="note", selector="projects", projects=["Atlas"], limit=2, mode="semantic"))
+        result = await self.service.recall(RecallRequest(semantic_query="note", selector="projects", projects=["Atlas"], limit=2))
         self.assertEqual([r["content"] for r in result["records"]], ["Global note", "Atlas note"])
         self.assertFalse(result["incomplete"])
 
@@ -77,9 +77,15 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
 
     async def test_corrupt_selection_does_not_affect_explicit_global(self):
         (self.root / ".config.json").write_text("not JSON")
-        result = await self.service.recall(RecallRequest(query="note", selector="global", mode="semantic"))
+        result = await self.service.recall(RecallRequest(semantic_query="note", selector="global"))
         self.assertFalse(result["warnings"])
         self.assertEqual([r["content"] for r in result["records"]], ["Global note"])
+
+    async def test_missing_selection_still_searches_all(self):
+        (self.root / ".config.json").unlink()
+        result = await self.service.recall(RecallRequest(semantic_query="note"))
+        self.assertFalse(result["warnings"])
+        self.assertEqual([r["content"] for r in result["records"]], ["Beacon secret", "Global note", "Atlas note"])
 
     async def test_inventory_keeps_older_context_and_recent_invalidations(self):
         self.conn.execute("UPDATE memories SET updated_at=10 WHERE content_hash=?", ("a" * 64,))

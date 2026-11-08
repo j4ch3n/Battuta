@@ -12,10 +12,9 @@ import { CaptureRuntime } from "../lifecycle.ts";
 import { extractMemories } from "../extract.ts";
 import { MemoryMcpClient } from "../mcp-client.ts";
 import { memoryRecordSchema } from "../records.ts";
-import { readValidatedProfile } from "../profile-loader.ts";
-import { prepareRecall } from "../recall.ts";
 import { runDream } from "../dream-runtime.ts";
 import { loadProjectCatalog } from "../projects.ts";
+import { prepareCorrectionCandidates } from "../correction-candidates.ts";
 
 test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
   "durable JS capture survives lost acknowledgement and server restart",
@@ -170,7 +169,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
         origin: "owner" as const,
         admitted_at: "2026-11-06T10:00:00Z",
       };
-      await runtime.startRequest("session", [], binding);
+      await runtime.startRequest("session", [], { capture: true, project: null });
       await runtime.settle("session", [
         {
           id: "e0",
@@ -232,9 +231,16 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       expect(stored.find((r) => r.content === "My Project and 项目 use SQLite.")?.projects).toEqual(
         ["my project", "项目"],
       );
+      const candidates = await prepareCorrectionCandidates(
+        ["Atlas", "Beacon", "My Project", "global", "项目"],
+        "PostgreSQL",
+        client,
+        signal,
+      );
+      expect(candidates.some((r) => r.content === "Atlas and Beacon share PostgreSQL.")).toBe(true);
       const recalled = (await client.call(
         "memory_recall",
-        { query: "Nintendo", selector: "global", limit: 20 },
+        { keywords: ["Nintendo"], selector: "global", limit: 20 },
         signal,
       )) as { records: unknown[]; branches: { lexical: string } };
       expect(recalled.branches.lexical).toBe("ready");
@@ -281,17 +287,13 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       expect(promoted.ref).toBe(captured.ref);
       expect(promoted.revision).not.toBe(captured.revision);
       expect(promoted.memory_metadata).toMatchObject({ stage: "durable", confidence: "confirmed" });
-      const packet = await prepareRecall(
-        binding,
-        "Nintendo console",
-        [],
-        client,
-        AbortSignal.timeout(3000),
-      );
+      const packet = (await client.call(
+        "memory_recall",
+        { semantic_query: "Nintendo console", keywords: ["Nintendo"] },
+        signal,
+      )) as { records: { ref: string }[]; context: string };
       expect(packet.records.some((r) => r.ref === captured.ref)).toBe(true);
-      expect(await readValidatedProfile(profileDirectory, packet.records, new Date())).toContain(
-        "Owner reported buying an NS2.",
-      );
+      expect(packet.context).toContain("Owner reported buying an NS2.");
       const hypothesis = (await client.call(
         "memory_remember",
         {
@@ -368,13 +370,12 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       await client.capture(correction.batch, signal);
       const current = (await client.call(
         "memory_recall",
-        { query: "Nintendo", selector: "global", limit: 20 },
+        { keywords: ["Nintendo"], selector: "global", limit: 20 },
         signal,
       )) as { records: unknown[] };
       const records = current.records.map((r) => memoryRecordSchema.parse(r));
       expect(records.some((r) => r.ref === promoted.ref || r.ref === hypothesis.ref)).toBe(false);
       expect(records.some((r) => r.content.includes("returning"))).toBe(true);
-      expect(await readValidatedProfile(profileDirectory, records, new Date())).toBe("");
       const historical = (await client.call(
         "memory_get",
         { ref: promoted.ref, include_history: true },

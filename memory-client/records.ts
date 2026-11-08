@@ -112,13 +112,6 @@ export const memoryRecordSchema = z
   .strip();
 export type MemoryRecord = z.infer<typeof memoryRecordSchema>;
 
-export function inRequestScope(record: MemoryRecord, project: string | null) {
-  return (
-    record.projects[0] === "global" ||
-    (project !== null && record.projects.includes(project.toLowerCase()))
-  );
-}
-
 export function eligibleRecords(records: MemoryRecord[], now: Date, includeExpired = false) {
   const lookup = new Map(records.map((r) => [r.ref, r]));
   const checked = new Map<string, boolean>();
