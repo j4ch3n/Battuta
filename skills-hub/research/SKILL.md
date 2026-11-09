@@ -28,7 +28,7 @@ not a research ceremony. Local-only requests stay local.
    discoveries change the question, outline and provisional answer.
 5. **Stop and hand off.** Answer when evidence is sufficient for the stated purpose,
    the bounded budget is exhausted, or remaining evidence is inaccessible. State
-   material gaps. Use present-to-owner for narrative and format when needed; hand
+    material gaps. Use artifacts for commissioned narrative and visual production; hand
    over the question, takeaway, mechanism, changed understanding, owner relevance,
    strongest alternative, uncertainties and sources—not a search transcript.
 
@@ -38,6 +38,6 @@ definition and communicate-with-manager for a technical assessment. Learning can
 outcome; do not manufacture a recommendation or owner action.
 
 For a bound worker assignment, investigate within the supplied question/authority
-and report through execute-assignment. Use presentation-production for requested
+and report through execute-assignment. Use artifacts for requested
 deliverables; do not take over owner-facing editorial judgment or send mandatory
 Manager mail yourself. Missing essential evidence becomes an honest blocker.

@@ -185,7 +185,8 @@ def initialize(store, *, project: str, name: str, slug: str, title: str, descrip
     selected = set(vendors)
     return {"artifact": item, "directory": str(directory), "files": [entry.model_dump() for entry in bundle.files],
             "vendors": [vendor.summary(selected=vendor.name in selected) for vendor in resolved],
-            "guidance": "Draft initialized with local extension CSS. JavaScript remains available through the import map "
+            "guidance": "Draft initialized with local extension CSS, which may fetch upstream CSS/fonts eagerly. "
+                        "JavaScript remains available through the import map "
                         "until you author an import. Use the artifacts skill for lifecycle and dependency guidance. "
                         f"Status: draft — not publicly visible. Publish when ready: battuta-artifact publish --project "
                         f"{project} --artifact {name}"}

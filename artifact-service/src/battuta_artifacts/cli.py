@@ -52,10 +52,11 @@ def output(ctx, json_output, **payload):
         from .bundles import file_tree
         vendors = "\n".join(
             f"- {vendor['name']} ({'selected' if vendor['selected'] else 'required'}): "
-            f"imports {', '.join(vendor['imports'])}; styles {', '.join(vendor['stylesheets'])}"
+            f"{vendor['purpose']} imports {', '.join(vendor['imports'])}; styles {', '.join(vendor['stylesheets'])}"
             for vendor in payload["vendors"]
         )
-        click.echo(payload["guidance"] + "\n\nConfigured vendors:\n" + vendors + "\n\nFiles and purposes:\n" +
+        click.echo(payload["guidance"] + f"\nDirectory: {payload['directory']}" +
+                   "\n\nConfigured vendors:\n" + vendors + "\n\nFiles and purposes:\n" +
                    file_tree(payload["files"]))
     elif "artifact" in payload:
         item = payload["artifact"]

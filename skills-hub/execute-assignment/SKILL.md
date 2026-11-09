@@ -23,8 +23,8 @@ claims, ordered progress, assignment completion, and mandatory Manager mail.
 4. Use assignment MCP to inspect TODO/context and prepare/locate notes. Use built-in
    file tools to inspect/edit safe local paths, preserving existing material.
    Record concise findings, actual verification, and real evidence references,
-   not a tool-call diary. Use draft-writing or presentation-production for longer
-   deliverables and artifacts for authorized artifact operations.
+   not a tool-call diary. Use draft-writing for text drafts and artifacts for
+   commissioned HTML/visual deliverables and authorized publication.
 5. Submit `report_execution_result` for this TODO. Correct malformed input if the
    tool rejects it. Acceptance awaits final turn settlement and persistence;
    it does not itself prove assignment completion or mail delivery.

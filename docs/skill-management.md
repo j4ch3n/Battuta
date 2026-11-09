@@ -49,6 +49,10 @@ into the catalog.
 
 ## Maintaining skills
 
+The Worker profile selects `artifacts` for commissioned creation and authorized
+publication; Manager selects `artifact-review` for independent editorial judgment.
+CoS retains final owner communication and intent/authority, not production tooling.
+
 - Add or edit complete skill sources in the hub, never generated bot output.
 - Rename directory, frontmatter, selections, owned links, callers, and maintained
   references together; do not keep duplicate instruction copies.

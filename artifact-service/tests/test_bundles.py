@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -63,13 +64,12 @@ class BundleTests(BundleFixture):
         self.assertFalse((self.project / "artifacts/sizing").exists())
         self.assertEqual(self.store.list(), [])
 
-    def test_unknown_vendors_and_template_mode_do_not_create_a_draft(self):
-        for args in (("--vendor", "unknown"), ("--vendor", "mermaid", "--template", "report")):
-            with self.subTest(args=args):
-                result = self.init(*args)
-                self.assertNotEqual(result.exit_code, 0, result.output)
-                self.assertFalse((self.project / "artifacts/sizing").exists())
-                self.assertEqual(self.store.list(), [])
+    def test_unknown_vendors_do_not_create_a_draft(self):
+        result = self.init("--vendor", "unknown")
+
+        self.assertNotEqual(result.exit_code, 0, result.output)
+        self.assertFalse((self.project / "artifacts/sizing").exists())
+        self.assertEqual(self.store.list(), [])
 
     def test_load_bundle_requires_at_least_one_vendor(self):
         with self.assertRaisesRegex(ArtifactError, "vendor"):
@@ -109,6 +109,41 @@ class BundleTests(BundleFixture):
         self.assertNotEqual(result.exit_code, 0, result.output)
         self.assertEqual(list(outside.iterdir()), [])
         self.assertEqual(self.store.list(), [])
+
+    def test_existing_destination_is_preserved(self):
+        destination = self.project / "artifacts/sizing"
+        destination.mkdir(parents=True)
+        marker = destination / "working.txt"
+        marker.write_text("keep this work")
+
+        result = self.init("--vendor", "mermaid")
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(marker.read_text(), "keep this work")
+        self.assertEqual(self.store.list(), [])
+
+    def test_write_and_registration_failures_remove_only_incomplete_draft(self):
+        real_open = os.open
+
+        def fail_style_write(path, flags, *args, **kwargs):
+            if path == "mermaid.css" and flags & os.O_WRONLY:
+                raise OSError("style write failed")
+            return real_open(path, flags, *args, **kwargs)
+
+        failures = (
+            patch("battuta_artifacts.bundles.os.open", side_effect=fail_style_write),
+            patch.object(Registry, "register", side_effect=sqlite3.OperationalError("registration failed")),
+        )
+        sibling = self.project / "artifacts/other.txt"
+        sibling.parent.mkdir()
+        sibling.write_text("keep")
+        for failure in failures:
+            with self.subTest(failure=failure), failure:
+                result = self.init("--vendor", "mermaid")
+                self.assertEqual(result.exit_code, 5, result.output)
+                self.assertFalse((self.project / "artifacts/sizing").exists())
+                self.assertEqual(self.store.list(), [])
+                self.assertEqual(sibling.read_text(), "keep")
 
     def test_live_diagram_bundle_links_resolved_css_and_matching_import_maps(self):
         result = self.init("--vendor", "live-diagram")
@@ -163,3 +198,5 @@ class BundleTests(BundleFixture):
         self.assertIn("mermaid (required)", result.output)
         self.assertIn("live-diagram (selected)", result.output)
         self.assertIn("vendor/live-diagram.css", result.output)
+        self.assertIn(str(self.project / "artifacts/sizing"), result.output)
+        self.assertIn("Interactive flowchart", result.output)
