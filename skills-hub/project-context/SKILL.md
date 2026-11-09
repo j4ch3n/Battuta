@@ -98,6 +98,10 @@ Project facts supplied by CoS retain their explicit project membership and quali
 
 Use `list` to discover projects or initialize a new project by name, with or without GitHub. Run `explain <project-name>` before working in the reported checkout. Use `inspect_specs` with the explicit project name for document discovery. Operations on another project name their own target without changing shared selection state.
 
+For example, resolve a named project's spec through `inspect_specs` and its
+returned references before reading or authoring it. **Why:** the explicit target
+keeps its context and version separate from similarly named work.
+
 Avoid inferring project ownership from the current directory or writing a managed
 spec directly. **Why:** the returned checkout/document references are the
 authoritative route and preserve project and version boundaries.

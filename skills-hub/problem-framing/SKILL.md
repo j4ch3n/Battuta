@@ -25,11 +25,11 @@ For a commissioned or bound task with sufficient supplied material, draft the
 requested canvas directly, label assumptions/open questions, and do not wait at
 conversation gates. This distinction is task context, not invoker identity.
 
-Your job is to run a short guided loop through the canvas territory,
-then generate the completed canvas, a problem statement, and a "How
-might we..." question. Guard the problem/solution boundary
-throughout: if an answer smuggles in a solution, say so and reframe
-it as the underlying difficulty.
+In an interactive setting, run a short guided loop through the canvas territory;
+for a commissioned draft, use the supplied answers directly. Then generate the
+completed canvas, a problem statement, and a "How might we..." question. Guard
+the problem/solution boundary throughout: if an answer smuggles in a solution,
+say so and reframe it as the underlying difficulty.
 
 ## Facilitation Rules (Generative Guidance v2)
 
