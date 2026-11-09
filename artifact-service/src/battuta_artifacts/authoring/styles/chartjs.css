@@ -1,0 +1,13 @@
+.artifact-chart {
+  max-width: 100%;
+  min-height: 18rem;
+}
+.artifact-chart canvas {
+  display: block;
+  max-width: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .artifact-chart {
+    scroll-behavior: auto;
+  }
+}

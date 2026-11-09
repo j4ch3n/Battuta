@@ -1,0 +1,9 @@
+.artifact-motion {
+  will-change: transform, opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .artifact-motion {
+    animation: none !important;
+    transition: none !important;
+  }
+}

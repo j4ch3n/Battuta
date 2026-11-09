@@ -1,8 +1,0 @@
-{
-  "illustrative": true,
-  "unit": "GB",
-  "values": [
-    { "label": "Plan A", "value": 24 },
-    { "label": "Plan B", "value": 48 }
-  ]
-}

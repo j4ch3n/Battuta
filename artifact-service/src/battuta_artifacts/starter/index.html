@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="{{ description }}" />
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="styles.css" />
+    {% for stylesheet in stylesheets %}
+    <link rel="stylesheet" href="{{ stylesheet }}" />
+    {% endfor %}
+    <script type="importmap">
+      {{ import_map }}
+    </script>
+    <script type="module" src="index.js"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>{{ title }}</h1>
+        <p>{{ description }}</p>
+      </header>
+      <section aria-labelledby="start-here">
+        <h2 id="start-here">Start here</h2>
+        <p>Replace this placeholder with the explanation your reader needs.</p>
+      </section>
+    </main>
+  </body>
+</html>

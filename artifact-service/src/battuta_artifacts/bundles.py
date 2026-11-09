@@ -1,16 +1,19 @@
-"""Copy complete, metadata-declared examples into an explicitly owned project."""
+"""Generate a minimal, vendor-selected HTML starter in an explicitly owned project."""
 
+import json
 import os
 import shutil
 from pathlib import Path
 
 from battuta_project.registry import ProjectRegistry
 from jinja2 import Environment, StrictUndefined
+from markupsafe import Markup
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
 from .files import open_source
 from .models import Metadata, assemble_files, relative_path
 from .registry import ArtifactError, Conflict
+from .vendors import Vendor, import_map, select_vendors
 
 
 class BundleFile(BaseModel):
@@ -40,28 +43,61 @@ class Bundle(BaseModel):
     files: list[BundleFile] = Field(min_length=1)
 
 
-def load_bundle(template: str, scaffolds: Path | None = None):
-    relative_path(template)
-    if "/" in template:
-        raise ArtifactError("Invalid template name.")
-    root = (scaffolds or Path(__file__).parent / "scaffolds") / template
+def _resource(root: Path, path: str) -> bytes:
+    try:
+        with open_source(str(root.absolute()), path) as source:
+            return source.read()
+    except OSError as exc:
+        raise ArtifactError(f"Starter resource is unavailable: {path}") from exc
+
+
+def _style(vendor: Vendor) -> bytes:
+    root = Path(__file__).parent / "authoring"
+    imports = "".join(f'@import url("{url}");\n' for url in vendor.stylesheets)
+    return (imports + ("\n" if imports else "")).encode() + _resource(root, vendor.style)
+
+
+def _notice(vendors: tuple[Vendor, ...]) -> bytes:
+    root = Path(__file__).parent / "authoring"
+    sections = ["Third-party dependencies\n"]
+    included = set()
+    for vendor in vendors:
+        sections.append(f"{vendor.name} {vendor.version}\nSource: {vendor.source}\n")
+        for license_path in vendor.licenses:
+            if license_path not in included:
+                sections.append(_resource(root, license_path).decode("utf-8").strip() + "\n")
+                included.add(license_path)
+    return "\n".join(sections).encode()
+
+
+def load_bundle(vendors: tuple[str, ...], *, starter: Path | None = None):
+    if not vendors:
+        raise ArtifactError("Select at least one vendor.")
+    resolved = select_vendors(vendors)
+    root = starter or Path(__file__).parent / "starter"
     try:
         with open_source(str(root.absolute()), "file-meta.json") as source:
             bundle = Bundle.model_validate_json(source.read())
     except OSError as exc:
-        raise ArtifactError(f"Template is unavailable: {template}") from exc
+        raise ArtifactError("Starter is unavailable.") from exc
     paths = [entry.path for entry in bundle.files]
     if bundle.entry != "index.html" or len(set(paths)) != len(paths) or not any(
             entry.path == bundle.entry and entry.serve for entry in bundle.files):
-        raise ArtifactError("Invalid template entry or duplicate paths.")
+        raise ArtifactError("Invalid starter entry or duplicate paths.")
     inventory = {str(path.relative_to(root)) for path in root.rglob("*") if not path.is_dir()}
     if inventory != {*paths, "file-meta.json"} or any(path.is_symlink() for path in root.rglob("*")):
-        raise ArtifactError("Template inventory does not match its descriptor.")
+        raise ArtifactError("Starter inventory does not match its descriptor.")
     contents = {}
     for entry in bundle.files:
-        with open_source(str(root.absolute()), entry.path) as source:
-            contents[entry.path] = source.read()
-    return bundle, contents
+        contents[entry.path] = _resource(root, entry.path)
+    extension_files = [
+        BundleFile(path=f"vendor/{vendor.name}.css", purpose=f"{vendor.name} display styles.", serve=True)
+        for vendor in resolved
+    ]
+    contents.update({entry.path: _style(vendor) for entry, vendor in zip(extension_files, resolved, strict=True)})
+    contents["NOTICE.txt"] = _notice(resolved)
+    notice = BundleFile(path="NOTICE.txt", purpose="Selected dependency provenance and licenses.", serve=False)
+    return Bundle(entry=bundle.entry, files=[*bundle.files, notice, *extension_files]), contents
 
 
 def open_directory(path: Path):
@@ -79,16 +115,24 @@ def open_directory(path: Path):
         raise
 
 
-def initialize(store, *, project: str, name: str, slug: str, template: str, title: str, description: str,
-               scaffolds: Path | None = None) -> dict:
+def initialize(store, *, project: str, name: str, slug: str, title: str, description: str, vendors: tuple[str, ...],
+               starter: Path | None = None) -> dict:
     metadata = Metadata(slug=slug, title=title, description=description)
     Metadata(slug=name, title=title, description=description)
     store.check_schema()
     owner = ProjectRegistry().load(project)
-    bundle, contents = load_bundle(template, scaffolds)
-    # Render only the designated HTML entry, never JavaScript or arbitrary user data.
+    resolved = select_vendors(vendors)
+    bundle, contents = load_bundle(vendors, starter=starter)
+    mapping = import_map(resolved)
+    serialized_map = json.dumps(mapping, separators=(",", ":")).replace("<", "\\u003c")
     contents[bundle.entry] = Environment(autoescape=True, undefined=StrictUndefined).from_string(
-        contents[bundle.entry].decode("utf-8")).render(title=title, description=description).encode("utf-8")
+        contents[bundle.entry].decode("utf-8")).render(
+            title=title,
+            description=description,
+            import_map=Markup(serialized_map),
+            stylesheets=[f"vendor/{vendor.name}.css" for vendor in resolved],
+        ).encode("utf-8")
+    contents["vendor/importmap.json"] = json.dumps(mapping, indent=2).encode() + b"\n"
     if any(item["slug"] == slug or (item["project"], item["name"]) == (project, name) for item in store.list()):
         raise Conflict("Artifact identity is already registered.")
     directory = owner.root / "artifacts" / name
@@ -128,8 +172,8 @@ def initialize(store, *, project: str, name: str, slug: str, template: str, titl
                         os.close(parent_fd)
                 served = tuple(entry.path for entry in bundle.files if entry.serve and entry.path != bundle.entry)
                 mapping = assemble_files(directory, bundle.entry, served)
-                item = store.register(**metadata.model_dump(), **mapping, status="draft", template=template,
-                                      project=project, name=name)
+                item = store.register(**metadata.model_dump(), **mapping, status="draft", template=None,
+                                       project=project, name=name)
             finally:
                 os.close(target_fd)
         except BaseException:
@@ -138,10 +182,14 @@ def initialize(store, *, project: str, name: str, slug: str, template: str, titl
             raise
     finally:
         os.close(artifacts_fd)
+    selected = set(vendors)
     return {"artifact": item, "directory": str(directory), "files": [entry.model_dump() for entry in bundle.files],
-            "guidance": f"{template} template initialized at {directory}. These files are working reference examples; "
-                        "adapt, replace, remove or extend them to present your content. Status: draft — not publicly visible. "
-                        f"Publish when ready: battuta-artifact publish --project {project} --artifact {name}"}
+            "vendors": [vendor.summary(selected=vendor.name in selected) for vendor in resolved],
+            "guidance": "Draft initialized with local extension CSS, which may fetch upstream CSS/fonts eagerly. "
+                        "JavaScript remains available through the import map "
+                        "until you author an import. Use the artifacts skill for lifecycle and dependency guidance. "
+                        f"Status: draft — not publicly visible. Publish when ready: battuta-artifact publish --project "
+                        f"{project} --artifact {name}"}
 
 
 def file_tree(entries: list[dict]) -> str:

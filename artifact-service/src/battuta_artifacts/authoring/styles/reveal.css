@@ -1,0 +1,12 @@
+.artifact-reveal {
+  margin-block: 2rem;
+  min-height: 24rem;
+}
+.artifact-reveal .reveal {
+  font-size: 1rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .artifact-reveal * {
+    transition: none !important;
+  }
+}

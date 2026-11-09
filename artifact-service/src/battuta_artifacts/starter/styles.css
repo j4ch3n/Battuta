@@ -1,0 +1,35 @@
+:root {
+  color: #1d1b20;
+  background: #fff;
+  font:
+    18px/1.6 system-ui,
+    sans-serif;
+}
+body {
+  margin: 0;
+}
+main {
+  box-sizing: border-box;
+  margin: auto;
+  max-width: 72ch;
+  padding: 2rem 1.25rem 4rem;
+}
+h1,
+h2 {
+  line-height: 1.15;
+}
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid #005fcc;
+  outline-offset: 3px;
+}
+img,
+video {
+  height: auto;
+  max-width: 100%;
+}
+@media (max-width: 40rem) {
+  main {
+    padding-inline: 1rem;
+  }
+}

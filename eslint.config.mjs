@@ -24,7 +24,7 @@ export default defineConfig(
   {
     files: [
       "artifact-service/src/battuta_artifacts/assets/*.js",
-      "artifact-service/src/battuta_artifacts/scaffolds/**/*.js",
+      "artifact-service/src/battuta_artifacts/starter/**/*.js",
     ],
     languageOptions: { globals: globals.browser },
   },
