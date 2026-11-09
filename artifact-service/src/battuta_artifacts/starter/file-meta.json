@@ -12,11 +12,6 @@
       "path": "vendor/importmap.json",
       "purpose": "Editable import-map companion.",
       "serve": false
-    },
-    {
-      "path": "NOTICE.txt",
-      "purpose": "Selected dependency provenance and licenses.",
-      "serve": false
     }
   ]
 }

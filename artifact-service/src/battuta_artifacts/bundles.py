@@ -96,7 +96,8 @@ def load_bundle(vendors: tuple[str, ...], *, starter: Path | None = None):
     ]
     contents.update({entry.path: _style(vendor) for entry, vendor in zip(extension_files, resolved, strict=True)})
     contents["NOTICE.txt"] = _notice(resolved)
-    return Bundle(entry=bundle.entry, files=[*bundle.files, *extension_files]), contents
+    notice = BundleFile(path="NOTICE.txt", purpose="Selected dependency provenance and licenses.", serve=False)
+    return Bundle(entry=bundle.entry, files=[*bundle.files, notice, *extension_files]), contents
 
 
 def open_directory(path: Path):

@@ -1,24 +1,24 @@
 # Artifact commands
 
-Run `battuta-artifact` from any directory. Flags are the input contract; there is no JSON/manifest input. `--json` works before or after management subcommands. Use the artifacts skill for template selection and ownership decisions.
+Run `battuta-artifact` from any directory. Flags are the input contract; there is no JSON/manifest input. `--json` works before or after management subcommands.
 
 ## Initialize and publish
 
 ```sh
 battuta-artifact init sizing --project procurement --title "VRAM sizing" \
-  --description "Sizing assumptions and evidence" --slug procurement-sizing --json
+  --description "Sizing assumptions and evidence" --vendor chartjs --slug procurement-sizing --json
 ```
 
-`init NAME` requires `--project`, `--title` and `--description`. `--slug` defaults to NAME; `--template` chooses a packaged reference. Names/slugs use lowercase letters/digits separated by single hyphens. Titles/descriptions must be nonblank. Unknown projects, duplicate identities and existing destinations fail without overwriting work. The local registry must be initialized, but no server, public base URL, selection, network or Linear access is needed.
+`init NAME` requires `--project`, `--title`, `--description` and at least one repeated `--vendor NAME`. `--slug` defaults to NAME. Names/slugs use lowercase letters/digits separated by single hyphens. Titles/descriptions must be nonblank. Unknown projects/vendors, duplicate identities and existing destinations fail without overwriting work. The local registry must be initialized, but no server, public base URL, project selection, network or Linear access is needed.
 
-Success returns `artifact` (identity, `status: draft`, template, revision and runtime allowlist), `directory` (actual absolute location), `guidance` and `files` (relative path, purpose and initial sharing flag). Human output combines guidance with the annotated tree. Edit freely using ordinary file tools at the returned directory. The packaged descriptor is not copied. Drafts have no delivery URLs and cannot be accessed through the public catalog or file routes.
+Success returns `artifact` (identity, `status: draft`, revision and runtime allowlist), `directory` (actual absolute location), `guidance`, `vendors` (purpose, imports, local stylesheets, selected/required status) and `files` (relative path, purpose and sharing flag). The bundle contains HTML, base CSS, inert JS, private map companion/notices and one linked CSS per resolved extension. Required capabilities are included once; live-diagram includes Mermaid. No usage guide is generated: dependency references own activation examples. CSS/fonts may load eagerly; JS stays lazy. Manually synchronize inline and companion import maps after edits. Drafts have no public delivery URLs.
 
 ```sh
 battuta-artifact publish --project procurement --artifact sizing \
   --expected-revision 1 --json
 ```
 
-`publish` uses the existing project's artifact name, not its optional public slug. It validates all current runtime mappings and atomically publishes that same record. Repeat `--file relative/path` for explicit additional assets. It never recopies the template or resets content. Missing files fail without publication. An unchanged repeated publication does not increment revision; stale expected revisions still conflict.
+`publish` uses the existing project's artifact name, not its optional public slug. It validates all current runtime mappings and atomically publishes that same record. Repeat `--file relative/path` for explicit additional assets. It never resets content. Missing files fail without publication. An unchanged repeated publication does not increment revision; stale expected revisions still conflict.
 
 Published results include `artifact.url`, `artifact.local_url`, status and revision. A configured public base URL is required before publication, not proof of delivery. Check the local URL for the host service; do not fetch the public URL as a setup/publication check or assume external accessibility from a successful local response.
 
@@ -41,7 +41,7 @@ battuta-artifact replace-files procurement-sizing --root "<returned-directory>" 
   --entry index.html --file styles.css --file custom.js --expected-revision 3 --json
 ```
 
-These commands use the **public slug**. Local inspection includes drafts. `update` changes supplied metadata only. `replace-files` replaces the complete file configuration, including unchanged desired assets; omitted files lose HTTP access. Project presentations retain their managed directory and `index.html` entry, but no original template asset is mandatory. No file operation changes draft/publication status.
+These commands use the **public slug**. Local inspection includes drafts. `update` changes supplied metadata only. `replace-files` replaces the complete file configuration, including unchanged desired assets and extension CSS; omitted files lose HTTP access. Project artifacts retain their managed directory and `index.html` entry. No file operation changes draft/publication status.
 
 With `--root`, entry/assets are exact relative files; the entry is included automatically. Without `--root`, provide an absolute `--entry` and no additional files. Entry extensions are `.html`, `.htm`, `.md` or `.markdown`; paths reject traversal, symlinks, directories and globs. Original-file edits need no command and are live once published. Metadata/file replacement increments revision; use `show`'s revision for guarded changes and inspect again on conflict.
 
