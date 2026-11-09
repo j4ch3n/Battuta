@@ -1,0 +1,22 @@
+{
+  "entry": "index.html",
+  "files": [
+    { "path": "index.html", "purpose": "Semantic reading page and import map.", "serve": true },
+    {
+      "path": "styles.css",
+      "purpose": "Base reading layout and accessibility styles.",
+      "serve": true
+    },
+    { "path": "index.js", "purpose": "Inert module entry for authored imports.", "serve": true },
+    {
+      "path": "vendor/importmap.json",
+      "purpose": "Editable import-map companion.",
+      "serve": false
+    },
+    {
+      "path": "NOTICE.txt",
+      "purpose": "Selected dependency provenance and licenses.",
+      "serve": false
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+.artifact-mermaid {
+  margin-block: 2rem;
+  overflow-x: auto;
+}
+.artifact-mermaid > svg {
+  min-width: 32rem;
+}
+@media (max-width: 40rem) {
+  .artifact-mermaid > svg {
+    min-width: 24rem;
+  }
+}

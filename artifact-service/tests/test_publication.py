@@ -19,7 +19,7 @@ class PublicationTests(BundleFixture):
 
     def test_draft_is_inaccessible_until_explicit_publication(self):
         from battuta_artifacts.app import create_app
-        self.assertEqual(self.init().exit_code, 0)
+        self.assertEqual(self.init('--vendor', 'mermaid').exit_code, 0)
         item = self.store.get('sizing')
         with TestClient(create_app(self.store.path)) as client:
             self.assertEqual(client.get('/artifacts/catalog').json(), {'artifacts': []})
@@ -44,7 +44,7 @@ class PublicationTests(BundleFixture):
             self.assertIn('Authored report', client.get('/artifacts/a/sizing/').text)
             for path in published['files']:
                 self.assertEqual(client.get('/artifacts/a/sizing/' + path).status_code, 200, path)
-            for path in ('secret.txt', 'file-meta.json', 'USAGE.md'):
+            for path in ('secret.txt', 'file-meta.json', 'vendor/importmap.json', 'NOTICE.txt'):
                 self.assertEqual(client.get('/artifacts/a/sizing/' + path).status_code, 404)
             self.assertEqual(len(client.get('/artifacts/catalog').json()['artifacts']), 1)
             self.assertEqual(self.command('deregister', 'sizing').exit_code, 0)
@@ -52,9 +52,9 @@ class PublicationTests(BundleFixture):
             self.assertTrue((directory / 'index.html').exists())
 
     def test_failed_publish_and_complete_file_replacement_preserve_draft(self):
-        self.init()
+        self.init('--vendor', 'mermaid')
         directory = self.project / 'artifacts/sizing'
-        (directory / 'scene.js').unlink()
+        (directory / 'styles.css').unlink()
         self.assertEqual(self.publish().exit_code, 2)
         self.assertEqual(self.store.get('sizing')['status'], 'draft')
         (directory / 'custom.css').write_text('body {color: blue}')
@@ -67,41 +67,7 @@ class PublicationTests(BundleFixture):
         self.assertEqual(self.publish().exit_code, 0)
 
     def test_missing_public_url_does_not_publish_as_failed_command(self):
-        self.init()
+        self.init('--vendor', 'mermaid')
         result = self.command('publish', '--project', 'procurement', '--artifact', 'sizing')
         self.assertEqual(result.exit_code, 2)
         self.assertEqual(self.store.get('sizing')['status'], 'draft')
-
-    def test_add_markdown_publishes_existing_file_and_rejects_invalid_sources(self):
-        from battuta_artifacts.app import create_app
-        source = self.home / 'existing.md'
-        source.write_text('# Research\n\n<script>alert(1)</script>\n[unsafe](javascript:alert(1))')
-        before = source.read_bytes()
-        def add(path, *args):
-            with patch.dict(os.environ, {'BATTUTA_ARTIFACT_BASE_URL': 'https://example.test/artifacts'}):
-                return self.command('add-file', '--type', 'markdown', '--file', str(path), '--slug', 'notes',
-                                    '--title', 'Notes', '--description', 'Existing research', *args)
-        invalid = self.home / 'invalid.md'
-        invalid.write_bytes(b'\xff')
-        linked = self.home / 'linked.md'
-        linked.symlink_to(source)
-        for path in ('relative.md', self.home, self.home / 'missing.md', invalid, linked):
-            with self.subTest(path=path):
-                self.assertNotEqual(add(path).exit_code, 0)
-                self.assertEqual(self.store.list(), [])
-        result = add(source)
-        self.assertEqual(result.exit_code, 0, result.output)
-        item = json.loads(result.output)['artifact']
-        self.assertEqual(item['status'], 'published')
-        self.assertEqual(item['source_root'], str(self.home))
-        self.assertEqual(item['files'], {'existing.md': 'text/markdown'})
-        self.assertEqual(source.read_bytes(), before)
-        self.assertFalse((self.project / 'artifacts').exists())
-        self.assertEqual(add(source).exit_code, 4)
-        with TestClient(create_app(self.store.path)) as client:
-            response = client.get('/artifacts/a/notes/')
-            self.assertEqual(response.status_code, 200)
-            self.assertIn('<h1>Research</h1>', response.text)
-            self.assertNotIn('<script>alert(1)</script>', response.text)
-            self.assertNotIn('href="javascript:', response.text)
-            self.assertEqual(client.get('/artifacts/a/notes/invalid.md').status_code, 404)

@@ -1,0 +1,13 @@
+.artifact-three {
+  min-height: 20rem;
+  overflow: hidden;
+}
+.artifact-three > canvas {
+  display: block;
+  max-width: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .artifact-three {
+    scroll-behavior: auto;
+  }
+}

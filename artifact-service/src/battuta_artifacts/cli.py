@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from .config import database_path, public_base_url
 from .models import Metadata, assemble_files
 from .registry import ArtifactError, Registry, migrate
+from .vendors import load_vendors
 
 
 class ArtifactGroup(click.Group):
@@ -49,7 +50,13 @@ def output(ctx, json_output, **payload):
         click.echo(json.dumps({"ok": True, **payload}))
     elif "directory" in payload:
         from .bundles import file_tree
-        click.echo(payload["guidance"] + "\n\nFiles and purposes:\n" + file_tree(payload["files"]))
+        vendors = "\n".join(
+            f"- {vendor['name']} ({'selected' if vendor['selected'] else 'required'}): "
+            f"imports {', '.join(vendor['imports'])}; styles {', '.join(vendor['stylesheets'])}"
+            for vendor in payload["vendors"]
+        )
+        click.echo(payload["guidance"] + "\n\nConfigured vendors:\n" + vendors + "\n\nFiles and purposes:\n" +
+                   file_tree(payload["files"]))
     elif "artifact" in payload:
         item = payload["artifact"]
         click.echo(f"{item['slug']} — {item['status']} (revision {item['revision']})")
@@ -100,16 +107,17 @@ def setup(ctx, json_output):
 @click.argument("name")
 @click.option("--project", required=True)
 @click.option("--slug")
-@click.option("--template", default="report", help="Packaged reference template; see the artifacts skill for selection guidance.")
+@click.option("--vendor", "vendors", multiple=True, required=True,
+              type=click.Choice([vendor.name for vendor in load_vendors()]))
 @click.option("--title", required=True)
 @click.option("--description", required=True)
 @json_option
 @click.pass_context
-def init(ctx, name, project, slug, template, title, description, json_output):
-    """Initialize a project-owned reference bundle as a private draft."""
+def init(ctx, name, project, slug, vendors, title, description, json_output):
+    """Initialize a vendor-selected HTML starter as a private draft."""
     from .bundles import initialize
     output(ctx, json_output, **initialize(registry(), project=project, name=name, slug=slug or name,
-                                         template=template, title=title, description=description))
+                                          vendors=vendors, title=title, description=description))
 
 
 @main.command()

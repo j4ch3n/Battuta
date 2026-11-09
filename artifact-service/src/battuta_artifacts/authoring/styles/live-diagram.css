@@ -1,0 +1,13 @@
+.artifact-live-diagram {
+  margin-block: 2rem;
+  min-height: 20rem;
+  overflow: auto;
+}
+.artifact-live-diagram [data-live-diagram] {
+  min-width: 32rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .artifact-live-diagram * {
+    transition: none !important;
+  }
+}

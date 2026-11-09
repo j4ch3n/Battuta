@@ -7,10 +7,7 @@
     "source": "https://github.com/hakimel/reveal.js/tree/6.0.2",
     "style": "styles/reveal.css",
     "licenses": ["licenses/reveal-MIT.txt"],
-    "stylesheets": [
-      "https://cdn.jsdelivr.net/npm/reveal.js@6.0.2/dist/reveal.css",
-      "https://cdn.jsdelivr.net/npm/reveal.js@6.0.2/dist/theme/white.css"
-    ]
+    "stylesheets": ["https://cdn.jsdelivr.net/npm/reveal.js@6.0.2/dist/reveal.css"]
   },
   {
     "name": "chartjs",

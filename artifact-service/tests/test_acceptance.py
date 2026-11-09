@@ -38,7 +38,8 @@ class AcceptanceTests(unittest.TestCase):
             (project / "code").mkdir(parents=True)
             (project / "project.yaml").write_text(json.dumps({"version": 1,
                 "linear": {"project_id": None, "team_id": None}, "github": {"repository": None}}))
-            initialized = cli("init", "demo", "--project", "procurement", "--title", "Demo", "--description", "Walkthrough")
+            initialized = cli("init", "demo", "--project", "procurement", "--title", "Demo", "--description", "Walkthrough",
+                              "--vendor", "mermaid")
             destination = Path(initialized["directory"])
             for file in source.iterdir():
                 (destination / file.name).write_bytes(file.read_bytes())
