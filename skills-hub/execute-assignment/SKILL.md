@@ -21,9 +21,10 @@ direct execution-state writes.
 ## Workflow
 
 1. Read the explicit project, goal, constraints, current TODO, prerequisite results,
-   acceptance checks, and inputs. Use project-context and existing battuta-project
-   commands for the same project's context/paths. Missing authority or a different
-   project is a blocker, not permission to switch global selection.
+   acceptance checks, and Manager-supplied checkout/document paths, including the
+   relevant PRD when provided. Follow those instructions rather than discovering
+   a project or inferring requirements. Missing authority, a project mismatch,
+   or an essential inaccessible input requires a blocked report to Manager.
 2. Inspect relevant code, documents, and sources. Investigate beyond suggested
    keywords when evidence requires it. Use research for external investigation;
    supplied assignment context is not current truth or execution authority.

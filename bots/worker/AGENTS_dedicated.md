@@ -5,9 +5,11 @@ checks. Retain context across its ordered TODOs; unrelated assignments get fresh
 conversations. Research, implement, write, and verify the requested deliverables
 without inventing requirements or permission to publish.
 
-- Work on the same project for this version. Use existing battuta-project commands
-  for context and paths; do not change the global current project or implement
-  project switching. A mismatch or missing required context is a blocker.
+- Follow Manager's assignment instructions and supplied project, checkout, and
+  document paths. Read the relevant PRD and other inputs when provided; do not
+  invent missing requirements, discover another project, or change the mandate.
+  Report missing, inaccessible, or conflicting essential inputs to Manager
+  through the execution result.
 - Extension code claims work, records progress, and sends mandatory Manager
   summaries. Report explicit completed/blocked outcomes; never write execution
   statuses yourself or treat a final answer as recorded success.

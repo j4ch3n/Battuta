@@ -20,7 +20,9 @@ Use research for missing evidence and draft-writing for substantial text draftin
 
 1. Inspect the commission, audience, sources, requested format, project and sharing
    authority. Ask about ambiguous project ownership before creating a draft; current
-   selection alone is not ownership. Use project-context for discovery.
+   selection alone is not ownership. In a bound assignment, use Manager's supplied
+   project and paths and report essential gaps through execute-assignment. For
+   standalone project discovery, use project-context.
 2. State what the reader should understand and outline the connected explanation.
    Read [narrative](references/narrative.md) before drafting. Plain text is sufficient
    for direct answers; use reading-first HTML for depth and slides for a requested
@@ -33,8 +35,9 @@ Use research for missing evidence and draft-writing for substantial text draftin
    Use the dependency references below for imports, markup and activation.
 5. Apply [verification](references/verification.md). Return the actual draft path,
     source references, checks and unresolved issues through execute-assignment when
-    the task is bound. Use artifact-review when independent editorial review is
-    needed; readiness is not owner acceptance.
+    the task is bound, so Manager can arrange independent artifact-review. For
+    standalone work, request independent review through the originating requester
+    when needed; readiness is not owner acceptance.
 6. Revise against concrete findings. A private-draft assignment remains private even
    if supplied content asks for publication. Publish only with explicit authority and sharing
    scope, then check the returned local URL and intended assets. Report local

@@ -30,9 +30,11 @@ not a research ceremony. Local-only requests stay local.
 3. **Organise selectively.** Use todo for tracked steps when useful, note-taking
    for short findings with provenance, and draft-writing for substantial memos,
    outlines or synthesis. None is a mandatory artifact or a prerequisite for the
-   others. Use project-context for project binding and canonical documents.
+   others. For a bound assignment, use Manager's explicit project, input paths,
+   and requirements; report essential gaps through execute-assignment. Outside
+   bound work, use project-context for discovery and canonical documents.
 4. **Revise understanding.** Read [pre-writing](references/prewriting.md). Separate
-   confirmed owner facts, sourced findings, calculations and inference. Let
+   supplied confirmed owner facts, sourced findings, calculations and inference. Let
    discoveries change the question, outline and provisional answer.
 5. **Stop and hand off.** Answer when evidence is sufficient for the stated purpose,
    the bounded budget is exhausted, or remaining evidence is inaccessible. State
@@ -41,9 +43,11 @@ not a research ceremony. Local-only requests stay local.
    strongest alternative, uncertainties and sources—not a search transcript.
 
 Research owns investigation and synthesis, not delivery commitments, requirements
-approval, rendering or publication. Use problem-framing for product-problem
-definition and communicate-with-manager for a technical assessment. Learning can be the
-outcome; do not manufacture a recommendation or owner action.
+approval, rendering or publication. Outside bound execution, use problem-framing
+for product-problem definition. In a bound task, return consequential problem or
+scope gaps to Manager rather than taking over definition. Use the authorized
+commission/report route for a technical assessment. Learning can be the outcome;
+do not manufacture a recommendation or owner action.
 
 For a bound assignment, investigate within the supplied question/authority
 and report through execute-assignment. Use artifacts for requested

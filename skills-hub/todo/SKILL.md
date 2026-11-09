@@ -21,10 +21,12 @@ who can use the skill or grant tools. A recorded result is not product acceptanc
 ## Identity and creation
 
 Keep explicit project and returned eight-character assignment ID on targeted
-calls. Use project-context and existing battuta-project commands to inspect
-registered context; ask the responsible requester when the commission lacks its
-project. Do not silently substitute global selection. Workers currently stay on
-the same project; this workflow does not change global project configuration.
+calls. For bound execution, use Manager's supplied identity and inputs; report
+missing context through execute-assignment. For planning outside a bound task,
+use project-context to inspect registered context and ask the responsible requester
+when the commission lacks its project. Do not silently substitute global selection.
+Workers currently stay on the same project; this workflow does not change global
+project configuration.
 
 Inspect related work before creating duplicates. Multiple assignments may be open
 per project. Create the entire initial TODO list atomically, with goal, authority,
