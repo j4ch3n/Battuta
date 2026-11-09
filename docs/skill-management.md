@@ -54,6 +54,18 @@ publication; Manager selects `artifact-review` for independent editorial judgmen
 CoS retains final owner communication and intent/authority, not production tooling.
 
 - Add or edit complete skill sources in the hub, never generated bot output.
+- Describe **when to use** a skill through the task or situation, never the
+  identity of its invoker. Each `SKILL.md` states its objective, capabilities,
+  boundaries, workflow, practical rationale, and a concise positive/negative
+  example pair. Reuse an equivalent existing section rather than adding headings
+  mechanically.
+- Define roles only where they are recipients, authorities, subjects, or evidence
+  sources. Loading a skill neither assigns that role nor grants its tools,
+  permissions, or publication authority. Preserve literal routes such as
+  `manager` and `cos` and state the real authorization prerequisite instead.
+- Keep command detail, storage mechanics, and large templates in the skill's
+  owned references. Link to the owning technical documentation rather than
+  copying implementation details into workflow rationale.
 - Rename directory, frontmatter, selections, owned links, callers, and maintained
   references together; do not keep duplicate instruction copies.
 - Remove affected selections and callers before removing a source. Never
