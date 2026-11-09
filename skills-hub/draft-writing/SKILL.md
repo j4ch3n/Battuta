@@ -5,6 +5,13 @@ description: Use when saving, finding, reading, or revising a complete working d
 
 # Shared working drafts
 
+## Objective
+
+Maintain one discoverable, complete working document for an assignment without
+overwriting shared material or implying publication.
+
+## Capabilities and boundaries
+
 Use note-taking to prepare/locate the shared assignment note file and check whether
 editing is allowed. Every draft belongs to that project assignment. CoS, Manager,
 and workers have equal access; there is no role-owned notebook or draft registry.
@@ -21,3 +28,7 @@ shared edits; built-in tools provide no promised revision history or undo.
 Keep missing-file references and report storage failures without silently
 replacing originals. Draft creation is not publication, product acceptance,
 execution authority, a Linear update, or a memory write.
+
+Revise the inspected shared path and record it in notes for later discovery.
+Avoid role-suffixed copies or silently recreating a missing source. **Why:** one
+known draft prevents divergence, while an overwrite can erase shared evidence.

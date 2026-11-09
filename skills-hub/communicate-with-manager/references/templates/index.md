@@ -1,6 +1,10 @@
-# CoS → Manager templates
+# Messages to `manager`
 
-Select the message that advances the commission. CoS supplies intent, constraints, authority, acceptance, and the result needed; Manager owns substantive investigation, breakdown, planning, and execution/coordination. Read one template; adapt its JSON rather than sending fictional evidence unchanged.
+Select the message that advances the commission. CoS is the product-authority
+source of intent, constraints, acceptance, and the result needed; `manager` owns
+substantive investigation, breakdown, planning, and execution/coordination.
+This route description does not limit who may use the template. Read one template;
+adapt its JSON rather than sending fictional evidence unchanged.
 
 | Situation                                            | Template                                              | Expected next step                                              |
 | ---------------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------- |

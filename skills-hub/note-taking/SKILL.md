@@ -5,6 +5,13 @@ description: Use when retaining, finding, reading, or revising shared findings a
 
 # Shared working notes
 
+## Objective
+
+Keep recoverable assignment findings and provenance that another participant can
+locate and trust.
+
+## Capabilities and boundaries
+
 Keep findings and provenance that would be costly to reconstruct. Notes are
 provisional working material, not canonical specifications, commitments,
 publication approval, or automatic durable memory. All bots use the same file
@@ -55,3 +62,7 @@ Prefer specific findings, sources, decisions, and material limits over generic
 knowledge or tool-call logs. Use supplied context for confirmed enduring facts and
 return candidate durable findings to CoS. Notes must never contain credentials or
 unrelated private data.
+
+For example, retain a measured parsing result with workload, source, and limit.
+Avoid a diary of commands or credentials. **Why:** provenance lets another reader
+judge a finding; a tool transcript is noisy and private data must not be shared.

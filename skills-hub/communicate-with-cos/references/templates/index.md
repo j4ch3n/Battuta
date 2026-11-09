@@ -1,6 +1,11 @@
-# Manager → CoS templates
+# Messages to `cos`
 
-Manager owns the substantive investigation, breakdown, plan, execution/coordination, progress evaluation, and result judgment. Select the message that answers the commission or presents new evidence. Return evidence and conclusions to CoS without making product commitments or contacting the owner directly. Adapt the JSON to actual findings and references.
+Manager is an evidence source for substantive investigation, breakdown, planning,
+execution/coordination, progress evaluation, and result judgment. Select the
+message that answers the commission or presents new evidence. Return evidence and
+conclusions to `cos` without making product commitments or contacting the owner
+directly. This route description does not limit who may use the template. Adapt
+the JSON to actual findings and references.
 
 | Situation                                             | Template                                                          | Expected next step                                             |
 | ----------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------- |

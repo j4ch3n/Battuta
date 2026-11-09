@@ -1,12 +1,22 @@
 ---
 name: execute-assignment
-description: Use when a worker receives a bound assignment TODO, needs to report its verified outcome, or encounters an execution blocker.
+description: Use when a bound assignment TODO needs execution, a verified outcome report, or a truthful execution blocker.
 ---
 
 # Execute an assignment
 
-Execute the current TODO within the assignment's commission. Extension code owns
-claims, ordered progress, assignment completion, and mandatory Manager mail.
+## Objective
+
+Produce the bound TODO's verified deliverable, or an honest blocker, through
+`report_execution_result`.
+
+## Capabilities and boundaries
+
+This workflow requires a bound assignment TODO and the assignment runtime/tool.
+Extension code owns claims, ordered progress, assignment completion, and
+mandatory Manager mail; Manager receives the result and decides recovery. Using
+this skill does not create a bound task, authorize a different project, or permit
+direct execution-state writes.
 
 ## Workflow
 
@@ -57,3 +67,13 @@ claim tokens are bound by code, not tool arguments.
   reclaim, or stop solely because it elapsed.
 - Notes/drafts are editable while active/in_process/blocked and freeze only on
   done/cancelled. Another machine may lack them; report missing inputs honestly.
+
+## Why and examples
+
+Report a completed result with actual checks and evidence, or report `blocked`
+with the nonblank blocker and partial progress. **Why:** persistence, settlement,
+and delivery are separate outcomes that final prose cannot prove.
+
+Avoid a duplicate Manager mail or “done” final answer instead of
+`report_execution_result`. **Why:** neither reaches the runtime contract that
+records evidence and enables recovery.
