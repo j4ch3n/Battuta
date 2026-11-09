@@ -4,6 +4,9 @@
     "version": "6.0.2",
     "purpose": "HTML slide decks, fragments, speaker notes, and PDF export.",
     "imports": { "reveal.js": "https://cdn.jsdelivr.net/npm/reveal.js@6.0.2/dist/reveal.mjs" },
+    "source": "https://github.com/hakimel/reveal.js/tree/6.0.2",
+    "style": "styles/reveal.css",
+    "licenses": ["licenses/reveal-MIT.txt"],
     "stylesheets": [
       "https://cdn.jsdelivr.net/npm/reveal.js@6.0.2/dist/reveal.css",
       "https://cdn.jsdelivr.net/npm/reveal.js@6.0.2/dist/theme/white.css"
@@ -16,7 +19,10 @@
     "imports": { "chart.js/auto": "https://cdn.jsdelivr.net/npm/chart.js@4.6.1/auto/auto.js" },
     "dependencies": {
       "@kurkle/color": "https://cdn.jsdelivr.net/npm/@kurkle/color@0.3.4/dist/color.esm.js"
-    }
+    },
+    "source": "https://github.com/chartjs/Chart.js/tree/v4.6.1",
+    "style": "styles/chartjs.css",
+    "licenses": ["licenses/chartjs-MIT.txt"]
   },
   {
     "name": "three",
@@ -25,13 +31,21 @@
     "imports": {
       "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js",
       "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/"
-    }
+    },
+    "source": "https://github.com/mrdoob/three.js/tree/r187",
+    "style": "styles/three.css",
+    "licenses": ["licenses/three-MIT.txt"]
   },
   {
     "name": "mermaid",
     "version": "12.3.0",
     "purpose": "Text-defined flowcharts, sequence diagrams, and related diagrams.",
-    "imports": { "mermaid": "https://cdn.jsdelivr.net/npm/mermaid@12.3.0/dist/mermaid.esm.min.mjs" }
+    "imports": {
+      "mermaid": "https://cdn.jsdelivr.net/npm/mermaid@12.3.0/dist/mermaid.esm.min.mjs"
+    },
+    "source": "https://github.com/mermaid-js/mermaid/tree/mermaid%4012.3.0",
+    "style": "styles/mermaid.css",
+    "licenses": ["licenses/mermaid-MIT.txt"]
   },
   {
     "name": "photoswipe",
@@ -41,6 +55,9 @@
       "photoswipe": "https://cdn.jsdelivr.net/npm/photoswipe@5.4.4/dist/photoswipe.esm.js",
       "photoswipe/lightbox": "https://cdn.jsdelivr.net/npm/photoswipe@5.4.4/dist/photoswipe-lightbox.esm.js"
     },
+    "source": "https://github.com/dimsemenov/PhotoSwipe/tree/v5.4.4",
+    "style": "styles/photoswipe.css",
+    "licenses": ["licenses/photoswipe-MIT.txt"],
     "stylesheets": ["https://cdn.jsdelivr.net/npm/photoswipe@5.4.4/dist/photoswipe.css"]
   },
   {
@@ -51,12 +68,30 @@
       "katex": "https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/katex.mjs",
       "katex/contrib/auto-render": "https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/contrib/auto-render.mjs"
     },
+    "source": "https://github.com/KaTeX/KaTeX/tree/v0.19.1",
+    "style": "styles/katex.css",
+    "licenses": ["licenses/katex-MIT.txt"],
     "stylesheets": ["https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/katex.min.css"]
   },
   {
     "name": "animejs",
     "version": "4.5.0",
     "purpose": "DOM/SVG animation and explanatory sequences.",
-    "imports": { "animejs": "https://cdn.jsdelivr.net/npm/animejs@4.5.0/dist/modules/index.js" }
+    "imports": { "animejs": "https://cdn.jsdelivr.net/npm/animejs@4.5.0/dist/modules/index.js" },
+    "source": "https://github.com/juliangarnier/anime/tree/v4.5.0",
+    "style": "styles/animejs.css",
+    "licenses": ["licenses/animejs-MIT.txt"]
+  },
+  {
+    "name": "live-diagram",
+    "version": "0.4.2",
+    "purpose": "Interactive flowchart and state-machine explanations with replayable state.",
+    "imports": {
+      "live-diagram": "https://cdn.jsdelivr.net/npm/live-diagram@0.4.2/src/index.js"
+    },
+    "requires": ["mermaid"],
+    "source": "https://github.com/Jedi-On-the-Fly/live-diagram/tree/v0.4.2",
+    "style": "styles/live-diagram.css",
+    "licenses": ["licenses/live-diagram-MIT.txt"]
   }
 ]
