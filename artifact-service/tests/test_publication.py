@@ -17,6 +17,24 @@ class PublicationTests(BundleFixture):
         with patch.dict(os.environ, {'BATTUTA_ARTIFACT_BASE_URL': 'https://example.test/artifacts'}):
             return self.command('publish', '--project', 'procurement', '--artifact', 'sizing', *args)
 
+    def test_publication_allows_only_the_generated_runtime_files(self):
+        from battuta_artifacts.app import create_app
+        self.assertEqual(self.init('--vendor', 'live-diagram').exit_code, 0)
+
+        result = self.publish()
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        published = json.loads(result.output)['artifact']
+        self.assertEqual(
+            set(published['files']),
+            {'index.html', 'styles.css', 'index.js', 'vendor/mermaid.css', 'vendor/live-diagram.css'},
+        )
+        with TestClient(create_app(self.store.path)) as client:
+            for path in published['files']:
+                self.assertEqual(client.get('/artifacts/a/sizing/' + path).status_code, 200, path)
+            for path in ('NOTICE.txt', 'vendor/importmap.json'):
+                self.assertEqual(client.get('/artifacts/a/sizing/' + path).status_code, 404, path)
+
     def test_draft_is_inaccessible_until_explicit_publication(self):
         from battuta_artifacts.app import create_app
         self.assertEqual(self.init('--vendor', 'mermaid').exit_code, 0)

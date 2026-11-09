@@ -79,6 +79,37 @@ class BundleTests(BundleFixture):
         with self.assertRaisesRegex(ArtifactError, "Starter is unavailable"):
             load_bundle(("mermaid",), starter=self.home)
 
+    def test_each_selection_generates_only_its_resolved_extension_styles(self):
+        expected = {
+            "reveal": {"reveal"},
+            "chartjs": {"chartjs"},
+            "three": {"three"},
+            "mermaid": {"mermaid"},
+            "photoswipe": {"photoswipe"},
+            "katex": {"katex"},
+            "animejs": {"animejs"},
+            "live-diagram": {"mermaid", "live-diagram"},
+        }
+
+        for selection, names in expected.items():
+            with self.subTest(selection=selection):
+                bundle, _ = load_bundle((selection,))
+                self.assertEqual(
+                    {entry.path for entry in bundle.files if entry.path.startswith("vendor/") and entry.path.endswith(".css")},
+                    {f"vendor/{name}.css" for name in names},
+                )
+
+    def test_symlinked_artifact_directory_is_not_followed(self):
+        outside = self.home / "outside"
+        outside.mkdir()
+        (self.project / "artifacts").symlink_to(outside, target_is_directory=True)
+
+        result = self.init("--vendor", "mermaid")
+
+        self.assertNotEqual(result.exit_code, 0, result.output)
+        self.assertEqual(list(outside.iterdir()), [])
+        self.assertEqual(self.store.list(), [])
+
     def test_live_diagram_bundle_links_resolved_css_and_matching_import_maps(self):
         result = self.init("--vendor", "live-diagram")
 
