@@ -7,9 +7,21 @@ description: Use when discovering or initializing a project, inspecting checkout
 
 ## Overview
 
+### Objective
+
+Resolve the intended project's current context and authoritative document
+references, then perform only the requested authorized discovery or authoring
+operation.
+
 `battuta-project` owns project discovery, checkout context, summaries, repository guidance, and Linear association—not delivery judgement. Use prepared CoS context or assignment inputs for relevant prior project facts, decisions, requirements, implementation context, and project-specific preferences. Personal owner understanding is separate; short project facts do not belong in the owner profile. Project-spec agent tools own spec inventory, versioned documents, checklists/reviews, and terminal decisions. Obtain project/checkout locations from the CLI and document references from spec tools rather than assuming storage layout. Run commands from any directory.
 
 Use `list` to discover projects. Pass the exact project name to `explain` and read applicable README/AGENTS guidance before project work. Use `inspect_specs` with that name to discover documents, then `describe_spec` for a named document's details and content. Each project-scoped operation names its target; conversations do not select an execution project.
+
+The CLI can discover context and the spec tools can persist managed documents only
+when the available tool and authorization permit it. CoS/Manager responsibilities
+describe document authority and evidence sources, not who may invoke this skill.
+Explicit project names and returned references prevent cross-project mistakes and
+bypassed immutable persistence.
 
 ## Document responsibilities
 
@@ -85,6 +97,10 @@ Project facts supplied by CoS retain their explicit project membership and quali
 ## Workflow example
 
 Use `list` to discover projects or initialize a new project by name, with or without GitHub. Run `explain <project-name>` before working in the reported checkout. Use `inspect_specs` with the explicit project name for document discovery. Operations on another project name their own target without changing shared selection state.
+
+Avoid inferring project ownership from the current directory or writing a managed
+spec directly. **Why:** the returned checkout/document references are the
+authoritative route and preserve project and version boundaries.
 
 ## Reference files
 

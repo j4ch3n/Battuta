@@ -7,6 +7,14 @@ metadata:
 
 # Project management
 
+## Objective and boundaries
+
+Produce a credible delivery decision or update with evidence, explicit
+commitments, authority, and residual ownership. The skill supports delivery
+judgement and coordination, not requirements templates, research methodology,
+working-material commands, or presentation construction. CoS, Manager, and owner
+describe authority and audiences; loading this skill grants none of their powers.
+
 Help a team make and maintain credible delivery commitments. Start at the user's current decision; do not restart a healthy project or impose a new methodology. Follow the approval and cycle-start rules in AGENTS.md.
 
 ## First move
@@ -58,5 +66,10 @@ This skill owns delivery judgement and coordination, not research methodology,
 requirements templates, working-material commands, or presentation construction.
 Use ticket-writing for bounded issue authoring and communicate-with-manager for technical
 assessment exchanges. TODO completion is not acceptance of a delivery milestone.
+
+For example, report a slipping cycle with evidence-backed scope/date tradeoffs and
+an accountable next decision. Avoid treating an approved issue or forecast as a
+commitment. **Why:** explicit acceptance and retained variance prevent misleading
+green reports.
 
 Complete a requested review when the update is delivered, claims have evidence or explicit uncertainty, and unresolved decisions have an accountable route and next review trigger. Do not imply ongoing monitoring without an authorized mechanism.

@@ -5,6 +5,14 @@ description: Use when investigating a business, market, product, technical space
 
 # Research
 
+## Objective and boundaries
+
+Answer the actual question with traceable evidence, alternatives, changed
+understanding, and honest uncertainty. Research can investigate and synthesize;
+it does not authorize delivery commitments, requirement approval, rendering, or
+publication. CoS/Manager are recipients where authority matters, not invoker
+requirements.
+
 Build an evidence-backed understanding before choosing how to present it. Scale
 the investigation to the question: a narrow source check needs a direct answer,
 not a research ceremony. Local-only requests stay local.
@@ -37,7 +45,12 @@ approval, rendering or publication. Use problem-framing for product-problem
 definition and communicate-with-manager for a technical assessment. Learning can be the
 outcome; do not manufacture a recommendation or owner action.
 
-For a bound worker assignment, investigate within the supplied question/authority
+For a bound assignment, investigate within the supplied question/authority
 and report through execute-assignment. Use artifacts for requested
 deliverables; do not take over owner-facing editorial judgment or send mandatory
 Manager mail yourself. Missing essential evidence becomes an honest blocker.
+
+For example, compare alternatives with inspected sources and counterevidence,
+then explain how the evidence changed the provisional frame. Avoid a search
+transcript or recommendation unsupported by inspected sources. **Why:** learning
+is useful even when it does not justify an action.

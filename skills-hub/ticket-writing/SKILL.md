@@ -5,6 +5,14 @@ description: Use when creating or substantially rewriting a Linear ticket, or or
 
 # Ticket writing and organisation
 
+## Objective and boundaries
+
+Save a bounded, understandable, verifiable ticket with correct native
+project/issue relationships while preserving unrelated metadata. Linear MCP can
+read and make only the authorized change; owner and engineering are audiences,
+not required invokers. A ticket draft or save does not establish product approval
+or delivery acceptance.
+
 Write a bounded outcome that the owner and engineering can understand and verify. Organise it so its place in the work is explicit. Use the existing Linear MCP; follow the authority and communication rules in AGENTS.md.
 
 ## Inspect existing work
