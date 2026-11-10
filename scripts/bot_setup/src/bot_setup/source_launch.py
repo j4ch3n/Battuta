@@ -6,11 +6,13 @@ from pathlib import Path
 import click
 
 from .env import read_env, required
-from .instances import acquire_instance_lock
+from .instances import acquire_instance_lock, worker_names
 
 
 def run_source_worker(root: Path, *, bot_dir: Path, env_file: Path, node: Path) -> None:
     values = read_env(env_file)
+    if bot_dir.name not in worker_names(values, env_file):
+        raise click.ClickException("Worker is outside the configured WORKER_BOT_COUNT")
     for key in ("SUPABASE_URL", "SUPABASE_SECRET_KEY"):
         required(values, key, env_file)
     cli = root / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"

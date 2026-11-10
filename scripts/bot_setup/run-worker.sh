@@ -15,6 +15,12 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -n "$bot_dir" && -f "$env_file" ]] || { printf 'Worker directory and environment file are required\n' >&2; exit 1; }
 [[ ! -L "$bot_dir" && ! -L "$bot_dir/.pi" ]] || { printf 'Worker home must be a private local directory\n' >&2; exit 1; }
+workers="$(uv run --project "$root/scripts/bot_setup" --locked battuta-bot-setup workers --env-file "$env_file")"
+selected=false
+while IFS= read -r worker; do
+  [[ "$worker" != "$(basename "$bot_dir")" ]] || selected=true
+done <<< "$workers"
+[[ "$selected" == true ]] || { printf 'Worker is outside the configured WORKER_BOT_COUNT\n' >&2; exit 1; }
 cli="$root/bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
 [[ -f "$cli" ]] || { printf 'Prepare the source worker profile and shared dependencies first\n' >&2; exit 1; }
 set -a

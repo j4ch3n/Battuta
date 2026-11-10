@@ -136,7 +136,9 @@ battuta-packaging validate-bundle --root "$install_path"
 Extraction refuses nonempty/symlink destinations, archive traversal, links, and
 special files. Dependency installation uses frozen production lockfiles and exact
 Pi package versions. It does not launch a bot or install packages into private
-agent directories. Ordinary bot startup does not install dependencies.
+agent directories. Ordinary bot startup rejects incomplete installation or missing
+and mismatched Pi packages; rerun `install-runtime` before proceeding. Pi runs with
+`--offline` to disable startup downloads and update checks, not provider requests.
 
 Expected: validation succeeds; all compiled entry points and selected skills exist.
 The selected absolute Node executable is recorded in `bots/runtime.json`. Services

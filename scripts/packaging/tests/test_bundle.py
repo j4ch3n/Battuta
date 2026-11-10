@@ -16,6 +16,7 @@ def source(tmp_path, monkeypatch):
     root = tmp_path / "source"
     root.mkdir()
     (root / ".node-version").write_text("24.21.0\n")
+    (root / "LICENSE").write_text("repository license")
     (root / "package.json").write_text('{"packageManager":"pnpm@10.20.0"}')
     (root / "bots").mkdir()
     (root / "bots/AGENTS_shared.md").write_text("shared")
@@ -50,6 +51,7 @@ def test_staged_archive_is_bot_only(source, tmp_path):
     target = tmp_path / "release"
     bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
     assert {p.name for p in target.iterdir()} == {"bots"}
+    assert (target / "bots/LICENSE").read_text() == "repository license"
     for profile in ("cos-bot", "manager-bot", "worker"):
         bot = target / "bots" / profile
         assert (bot / "AGENTS.md").is_file()

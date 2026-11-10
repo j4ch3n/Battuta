@@ -19,7 +19,7 @@ class WorkerLauncherTests(unittest.TestCase):
             scripts = root / "scripts/bot_setup"
             scripts.mkdir(parents=True)
             shutil.copy2(ROOT / "scripts/bot_setup/run-worker.sh", scripts / "run-worker.sh")
-            bot = root / "private worker"
+            bot = root / "private workers/worker-1"
             (bot / ".pi").mkdir(parents=True)
             (bot / ".pi/settings.json").write_text("{}")
             (bot / ".pi/mcp.json").write_text("{}")
@@ -33,7 +33,7 @@ class WorkerLauncherTests(unittest.TestCase):
             node.write_text("#!/usr/bin/env python3\nimport json,os,sys\nprint(json.dumps({'args':sys.argv[1:],'role':os.environ.get('AGENT_ROLE'),'agentDir':os.environ.get('PI_CODING_AGENT_DIR'),'private':[key for key in os.environ if 'TELEGRAM' in key or key.startswith('PI_SCHEDULER')]}))\n")
             node.chmod(0o755)
             env_file = root / ".env"
-            env_file.write_text("SUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n")
+            env_file.write_text("WORKER_BOT_COUNT=1\nSUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n")
             env = {**os.environ, "PATH":f"{binary}:{os.environ['PATH']}", "COS_TELEGRAM_TOKEN":"private-sentinel", "PI_SCHEDULER_STATE_FILE":"private-sentinel"}
             args = ["bash", str(scripts / "run-worker.sh"), "--bot-dir", str(bot), "--env-file", str(env_file)]
             result = subprocess.run(args, env=env, text=True, capture_output=True)
@@ -75,8 +75,8 @@ class WorkerLauncherTests(unittest.TestCase):
             real_node = shutil.which("node")
             node.write_text(f'#!/bin/sh\nif [ "$1" = "--input-type=module" ]; then exec "{real_node}" "$@"; fi\nprintf "%s\\n" "$PI_CODING_AGENT_DIR" "$PWD"\n')
             node.chmod(0o755)
-            (root / ".env").write_text("SUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n")
-            bot = root / "new private instance"
+            (root / ".env").write_text("WORKER_BOT_COUNT=1\nSUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n")
+            bot = root / "new private instances/worker-1"
             env = {**os.environ, "PATH": f"{binary}:{os.environ['PATH']}"}
             args = ["bash", str(scripts / "run-worker.sh"), "--bot-dir", str(bot)]
             first = subprocess.run(args, env=env, capture_output=True, text=True)
@@ -116,11 +116,11 @@ class WorkerLauncherTests(unittest.TestCase):
             cli = root / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
             cli.parent.mkdir(parents=True)
             cli.write_text("fixture")
-            bot = root / "private worker"
+            bot = root / "private workers/worker-1"
             (bot / ".pi").mkdir(parents=True)
             (bot / ".pi/settings.json").write_text("{}")
             env_file = root / ".env"
-            env_file.write_text("SUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n")
+            env_file.write_text("WORKER_BOT_COUNT=1\nSUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n")
             binary = root / "bin"
             binary.mkdir()
             node = binary / "node"

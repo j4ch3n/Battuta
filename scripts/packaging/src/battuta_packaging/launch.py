@@ -9,7 +9,7 @@ from bot_setup.env import read_env, required
 from bot_setup.instances import acquire_instance_lock, instance_paths, worker_names
 from bot_setup.release import validate_private_home
 
-from .runtime import check_node
+from .runtime import check_node, check_packages
 
 
 def service_name(bot: str) -> str:
@@ -30,7 +30,8 @@ def run_bot(root: Path, *, bot: str, env_file: Path, node: Path, mode: str) -> N
         result = subprocess.run(["systemctl", "--user", "show", service_name(bot), "--property=ActiveState", "--value"], capture_output=True, text=True)
         if result.returncode != 0 or result.stdout.strip() not in {"inactive", "failed"}:
             raise click.ClickException("Stop the named service and verify it is inactive before foreground maintenance")
-    check_node(root, node)
+    metadata = check_node(root, node)
+    check_packages(root, profile, metadata)
     validate_private_home(private)
     for key in ("SUPABASE_URL", "SUPABASE_SECRET_KEY", *(["LINEAR_API_TOKEN"] if role != "worker" else [])):
         required(values, key, env_file)
@@ -57,7 +58,8 @@ def run_bot(root: Path, *, bot: str, env_file: Path, node: Path, mode: str) -> N
     acquire_instance_lock(private)
     os.umask(0o077)
     os.chdir(profile)
-    args = [str(node), str(cli), "--approve", "--session-dir", str(private / ".pi" / ("sessions" if role == "worker" else "mail-sessions"))]
+    # Pi's offline flag prevents startup package installs, not provider requests.
+    args = [str(node), str(cli), "--approve", "--offline", "--session-dir", str(private / ".pi" / ("sessions" if role == "worker" else "mail-sessions"))]
     if role != "worker":
         args.append("--continue")
     os.execve(str(node), args, env)

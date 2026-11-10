@@ -28,8 +28,12 @@ def installed(tmp_path):
         cli = bot / "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
         cli.parent.mkdir(parents=True)
         cli.write_text('console.log(JSON.stringify({cwd:process.cwd(),env:process.env,args:process.argv.slice(2)}))')
+        package = bot / ".pi/npm/node_modules/@example/extension/package.json"
+        package.parent.mkdir(parents=True)
+        package.write_text('{"name":"@example/extension","version":"1.2.3"}')
     version = subprocess.check_output([str(node), "--version"], text=True).strip().removeprefix("v")
-    (root / "bots/release.json").write_text(json.dumps({"node": version, "skills": {p: [] for p in ("cos-bot", "manager-bot", "worker")}}))
+    (root / "bots/release.json").write_text(json.dumps({"node": version, "skills": {p: [] for p in ("cos-bot", "manager-bot", "worker")}, "packages": {p: ["npm:@example/extension@1.2.3"] for p in ("cos-bot", "manager-bot", "worker")}}))
+    (root / "bots/runtime.json").write_text(json.dumps({"node": str(node)}))
     env = tmp_path / ".env.prod"
     env.write_text("WORKER_BOT_COUNT=2\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=private-key\nLINEAR_API_TOKEN=private-linear\nCOS_TELEGRAM_TOKEN=private-telegram\n")
     for name in ("cos-bot", "manager-bot", "worker-1", "worker-2"):
@@ -53,6 +57,24 @@ def test_launch_cwd_private_state_and_credentials(installed, bot):
     assert any("TELEGRAM" in key for key in output["env"]) == (bot == "cos-bot")
     assert output["env"]["LINEAR_API_TOKEN"] == "private-linear"
     assert "--session-dir" in output["args"]
+    assert "--offline" in output["args"]
+
+
+@pytest.mark.parametrize("damage", ["incomplete", "missing", "wrong-version"])
+def test_launch_rejects_incomplete_packages_without_installing(installed, damage):
+    root, home, env_file, node = installed
+    package = root / "bots/worker/.pi/npm/node_modules/@example/extension/package.json"
+    if damage == "incomplete":
+        (root / "bots/runtime.json").unlink()
+    elif damage == "missing":
+        package.unlink()
+    else:
+        package.write_text('{"name":"@example/extension","version":"0.0.1"}')
+    result = subprocess.run([sys.executable, "-m", "battuta_packaging.cli", "run-bot", "--root", str(root), "--bot", "worker-1", "--env-file", str(env_file), "--node", str(node), "--mode", "service"], env={**os.environ, "HOME": str(home)}, capture_output=True, text=True)
+    assert result.returncode != 0
+    assert "install-runtime" in result.stderr
+    assert result.stdout == ""
+    assert package.exists() == (damage != "missing")
 
 
 def test_maintenance_refuses_active_service(installed, monkeypatch):

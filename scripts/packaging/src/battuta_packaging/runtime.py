@@ -25,6 +25,7 @@ def check_node(root: Path, node: Path) -> dict:
 def install_runtime(root: Path, *, node: Path) -> None:
     node = node.resolve()
     metadata = check_node(root, node)
+    (root / "bots/runtime.json").unlink(missing_ok=True)
     env = {**os.environ, "PATH": str(node.parent) + os.pathsep + os.environ.get("PATH", "")}
     pnpm = shutil.which("pnpm", path=env["PATH"])
     if not pnpm:
@@ -45,3 +46,13 @@ def install_runtime(root: Path, *, node: Path) -> None:
             settings.setdefault("subagents", {})["defaultExtensions"] = [str(bot / ".pi/npm/node_modules/pi-web-access/dist")]
             write_json(bot / ".pi/settings.json", settings)
     write_json(root / "bots/runtime.json", {"node": str(node)})
+
+
+def check_packages(root: Path, profile: Path, metadata: dict) -> None:
+    if not (root / "bots/runtime.json").is_file():
+        raise click.ClickException("Run install-runtime before launching bots")
+    for source in metadata["packages"][profile.name]:
+        name, version = source.removeprefix("npm:").rsplit("@", 1)
+        package = read_config(profile / ".pi/npm/node_modules" / name / "package.json")
+        if package.get("name") != name or package.get("version") != version:
+            raise click.ClickException(f"Run install-runtime to restore {source} before launching bots")

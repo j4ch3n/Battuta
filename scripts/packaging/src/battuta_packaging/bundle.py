@@ -100,6 +100,7 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         shutil.copy2(original / ".pi/web-search.json", bot / ".pi/web-search.json")
     for relative in ENTRY_OUTPUTS:
         (destination / relative).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source / "LICENSE", destination / "bots/LICENSE")
     compile_bots(source, destination)
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip()
     write_json(destination / "bots/release.json", {"tag": tag, "commit": commit, "toolVersion": tool_version, "node": node_version, "packageManager": package_manager, "skills": selections, "packages": packages})
