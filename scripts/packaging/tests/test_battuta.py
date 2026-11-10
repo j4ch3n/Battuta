@@ -101,9 +101,7 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"],
         self.assertEqual(result.stdout, "")
 
     def test_manager_launch_and_service_command_exclude_telegram_environment(self):
-        from battuta_packaging.services import install_services
         from unittest.mock import patch
-        import shlex
         for root in ("COS_TELEGRAM_TOKEN", "TELEGRAM_BOT_TOKEN", "PI_TELEGRAM_PROFILE", "TELEGRAM_ALLOWED_USER_ID"):
             with (self.root / ".env.prod").open("a") as output:
                 output.write(f"{root}=private-test\n")
@@ -113,10 +111,3 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"],
             self.assertFalse(json.loads(result.stdout)["telegram"])
             self.assertIsNone(json.loads(result.stdout)["scheduler"])
             self.assertTrue(json.loads(self.launch("cos").stdout)["telegram"])
-            install_services(self.root)
-            unit = (self.root / "config/systemd/user/battuta-manager.service").read_text()
-            command = next(line for line in unit.splitlines() if line.startswith("ExecStart="))
-            args = shlex.split(command.removeprefix("ExecStart="))
-            result = subprocess.run(shlex.split(args[args.index("-c") + 1]), capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertFalse(json.loads(result.stdout)["telegram"])

@@ -1,6 +1,8 @@
 """Installed release packaging commands."""
 
 from pathlib import Path
+import os
+import shutil
 
 import click
 
@@ -9,6 +11,7 @@ from .services import install_services
 from .bundle import stage_bots, validate_bundle
 from .runtime import install_runtime
 from .launch import run_bot
+from bot_setup.env import read_env
 
 
 @click.group()
@@ -61,10 +64,27 @@ def validate(root):
 
 @main.command("install-services")
 @click.option("--root", required=True, type=click.Path(file_okay=False, path_type=Path))
+@click.option("--env-file", required=True, type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--node", required=True, type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--replace", is_flag=True, help="Replace existing regular unit files with this release's definitions. Stop services first.")
-def services(root, replace):
+def services(root, env_file, node, replace):
     """Install user service units, never start or restart them."""
-    install_services(root, replace=replace)
+    install_services(root, env_file=env_file, node=node, replace=replace)
+
+
+@main.command("run-component")
+@click.option("--component", required=True, type=click.Choice(["memory", "artifacts"]))
+@click.option("--env-file", required=True, type=click.Path(exists=True, dir_okay=False, path_type=Path))
+def component(component, env_file):
+    """Run an installed application server with its private environment."""
+    command = "battuta-memory" if component == "memory" else "battuta-artifact"
+    executable = shutil.which(command)
+    if not executable:
+        raise click.ClickException(f"Install {command} from the matching release wheel first")
+    env = {**os.environ, **read_env(env_file)}
+    env = {key: value for key, value in env.items() if "TELEGRAM" not in key}
+    os.umask(0o077)
+    os.execve(executable, [executable, "serve"], env)
 
 
 if __name__ == "__main__":

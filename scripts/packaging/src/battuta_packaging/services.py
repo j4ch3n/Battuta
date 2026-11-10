@@ -1,44 +1,57 @@
-"""Install owned user units; replacement requires explicit operator approval."""
+"""Generate explicit user units without starting or enabling any service."""
 
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
 
 import click
+from bot_setup.env import read_env
+from bot_setup.instances import worker_names
+
+from .runtime import check_node
 
 
-def install_services(root: Path, *, replace: bool = False) -> None:
-    root = root.resolve()
-    home = Path.home()
+def install_services(root: Path, *, env_file: Path, node: Path, replace: bool = False) -> None:
+    root, env_file, node = root.resolve(), env_file.resolve(), node.resolve()
+    workers = worker_names(read_env(env_file), env_file)
+    check_node(root, node)
     try:
-        tool_bin = subprocess.check_output(["uv", "tool", "dir", "--bin"], text=True).strip()
-    except (OSError, subprocess.CalledProcessError) as error:
-        raise click.ClickException("uv tool dir --bin must succeed before installing services") from error
-    uv_bin = str(Path(shutil.which("uv")).parent)
-    if not Path(tool_bin).is_absolute() or any(re.search(r"[^a-zA-Z0-9_./-]", str(path)) for path in (root, home, tool_bin, uv_bin)):
-        raise click.ClickException("Install path must not contain spaces or systemd special characters")
-    service_path = f'{tool_bin}:{uv_bin}:/usr/local/bin:/usr/bin:/bin'
-    directory = Path(os.environ.get("XDG_CONFIG_HOME", home / ".config")) / "systemd/user"
+        tools = Path(subprocess.check_output(["uv", "tool", "dir", "--bin"], text=True).strip())
+        uv = shutil.which("uv")
+        if not uv or not tools.is_absolute():
+            raise ValueError("uv")
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        raise click.ClickException("Resolve uv and its tool directory before installing services") from error
+    for path in (root, env_file, node, tools, Path(uv).parent, Path.home()):
+        if re.search(r"[^a-zA-Z0-9_./-]", str(path)):
+            raise click.ClickException("Service paths must not contain spaces or systemd special characters")
+    active = subprocess.run(["systemctl", "--user", "list-units", "battuta-worker@*.service", "--all", "--plain", "--no-legend"], capture_output=True, text=True)
+    if active.returncode:
+        raise click.ClickException("Cannot inspect existing worker services")
+    expected = {f"battuta-worker@{name.removeprefix('worker-')}.service" for name in workers}
+    for line in active.stdout.splitlines():
+        fields = line.split()
+        if len(fields) >= 3 and fields[2] in {"active", "activating", "deactivating"} and fields[0] not in expected:
+            raise click.ClickException("A running worker is outside WORKER_BOT_COUNT; ask the owner before changing services")
+    path_value = os.pathsep.join(map(str, (node.parent, tools, Path(uv).parent, Path("/usr/local/bin"), Path("/usr/bin"), Path("/bin"))))
+    executable = tools / "battuta-packaging"
     units = {}
-    for role in ("cos", "manager", "worker"):
-        bot_dir = root / ("bots/worker" if role == "worker" else f"bots/{role}-bot")
-        command = f"{root}/bin/battuta {role}"
-        if role == "worker":
-            command += f" --bot-dir {bot_dir}"
-        units[f"battuta-{role}.service"] = f'''[Unit]
-Description=Battuta {role.upper()} bot
+    for name, bot, profile in (("cos", "cos-bot", "cos-bot"), ("manager", "manager-bot", "manager-bot"), ("worker@", "worker-%i", "worker")):
+        command = shlex.join([str(executable), "run-bot", "--root", str(root), "--bot", bot, "--env-file", str(env_file), "--node", str(node), "--mode", "service"])
+        units[f"battuta-{name}.service"] = f'''[Unit]
+Description=Battuta {name} bot
 After=network-online.target battuta-memory.service
 Wants=network-online.target battuta-memory.service
 
 [Service]
 Type=simple
-WorkingDirectory={bot_dir}
-Environment="PATH={service_path}"
+WorkingDirectory={root}/bots/{profile}
+Environment="PATH={path_value}"
 UMask=0077
-# Pi needs a terminal even when supervised by systemd.
 ExecStart=/usr/bin/script -q -e -c "{command}" /dev/null
 Restart=on-failure
 RestartSec=5
@@ -46,70 +59,43 @@ RestartSec=5
 [Install]
 WantedBy=default.target
 '''
-    units["battuta-memory.service"] = f'''[Unit]
-Description=Battuta shared memory MCP
+    for component in ("memory", "artifacts"):
+        extra = "Environment=MCP_MEMORY_ONNX_ALLOW_DOWNLOAD=false\n" if component == "memory" else "NoNewPrivileges=true\nProtectSystem=strict\nProtectHome=read-only\n"
+        units[f"battuta-{component}.service"] = f'''[Unit]
+Description=Battuta {component}
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory={root}
-Environment="PATH={service_path}"
-Environment=HOME={home}
-Environment=MCP_MEMORY_ONNX_ALLOW_DOWNLOAD=false
-UMask=0077
-ExecStart={root}/bin/battuta memory
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=default.target
-'''
-    units["battuta-artifacts.service"] = f'''[Unit]
-Description=Battuta artifact catalog
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-WorkingDirectory={root}
-Environment="PATH={service_path}"
-Environment=HOME={home}
+Environment="PATH={path_value}"
+Environment=HOME={Path.home()}
 Environment=PYTHONDONTWRITEBYTECODE=1
 UMask=0077
-ExecStart={root}/bin/battuta artifacts
+ExecStart={executable} run-component --component {component} --env-file {env_file}
 Restart=on-failure
 RestartSec=5
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=read-only
-
+{extra}
 [Install]
 WantedBy=default.target
 '''
+    directory = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "systemd/user"
+    for parent in (directory.parent.parent, directory.parent, directory):
+        if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
+            raise click.ClickException(f"Unsafe service directory: {parent}")
     for name, content in units.items():
-        path = directory / name
-        if path.is_symlink() or (path.exists() and (not path.is_file() or (not replace and path.read_text() != content))):
-            raise click.ClickException(f"{path} already exists with different contents; move it aside before reinstalling")
+        target = directory / name
+        if target.is_symlink() or (target.exists() and (not target.is_file() or (not replace and target.read_text() != content))):
+            raise click.ClickException(f"Conflicting service file: {target}; ask the owner before replacement")
     directory.mkdir(parents=True, exist_ok=True)
     for name, content in units.items():
-        path = directory / name
-        if replace:
-            with tempfile.NamedTemporaryFile(mode="w", dir=directory, delete=False) as output:
-                temporary = Path(output.name)
-                try:
-                    output.write(content)
-                    output.close()
-                    temporary.replace(path)
-                finally:
-                    temporary.unlink(missing_ok=True)
-            click.echo(path)
-            continue
-        try:
-            with path.open("x") as output:
+        with tempfile.NamedTemporaryFile(mode="w", dir=directory, delete=False) as output:
+            temporary = Path(output.name)
+            try:
                 output.write(content)
-        except FileExistsError:
-            if path.is_symlink() or path.read_text() != content:
-                raise click.ClickException(f"Refusing to replace existing service: {path}")
-        click.echo(path)
-    click.echo("Run systemctl --user daemon-reload, then enable the services you want.")
+                output.close()
+                temporary.replace(directory / name)
+            finally:
+                temporary.unlink(missing_ok=True)
+    selected = ["battuta-memory.service", "battuta-artifacts.service", "battuta-cos.service", "battuta-manager.service", *sorted(expected)]
+    click.echo("Installed units without activation. After owner approval:\nsystemctl --user daemon-reload\nsystemctl --user enable --now " + " ".join(selected))
