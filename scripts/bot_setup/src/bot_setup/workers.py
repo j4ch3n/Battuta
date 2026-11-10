@@ -5,6 +5,7 @@ from pathlib import Path
 
 import click
 
+from .browser import browser_settings, configure_browser
 from .json_config import read_config, write_config
 
 
@@ -61,6 +62,7 @@ def copy_worker_profile(profile: Path, bot_dir: Path) -> None:
         settings[key] = entries
     settings["battutaWorkerResources"] = owned
     settings["battutaMemoryCapture"] = {"enabled": False}
+    settings["pi-browser-use"] = {**source["settings.json"].get("pi-browser-use", {}), **browser_settings(profile, bot_dir, home=Path.home(), bot=bot_dir.name)["pi-browser-use"]}
     mcp = deepcopy(source["mcp.json"])
     source_servers = mcp.get("mcpServers", {})
     destination_servers = destination["mcp.json"].get("mcpServers", {})
@@ -72,6 +74,7 @@ def copy_worker_profile(profile: Path, bot_dir: Path) -> None:
     # Validate every input before creating or changing any instance files.
     bot_dir.mkdir(parents=True, exist_ok=True)
     write_config(bot_dir / ".pi/settings.json", settings, ".settings-")
+    configure_browser(profile, bot_dir, home=Path.home(), bot=bot_dir.name)
     write_config(bot_dir / ".pi/mcp.json", mcp, ".mcp-")
     if "web-search.json" in names and not (bot_dir / ".pi/web-search.json").exists():
         write_config(bot_dir / ".pi/web-search.json", source["web-search.json"], ".web-")

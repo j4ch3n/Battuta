@@ -5,6 +5,7 @@ from pathlib import Path
 import click
 
 from . import skills
+from .browser import configure_browser, validate_browser
 from .configure import configure_source, configure_worker
 from .release import configure_release
 from .env import read_env
@@ -48,6 +49,24 @@ def env_example():
 def run_worker(root, bot_dir, env_file, node):
     """Run a prepared source worker under its private instance lock."""
     run_source_worker(root, bot_dir=bot_dir, env_file=env_file, node=node)
+
+
+@main.command("configure-browser")
+@click.option("--profile", type=DIRECTORY, required=True)
+@click.option("--bot-dir", type=DIRECTORY, required=True)
+@click.option("--bot", required=True)
+def browser_config(profile, bot_dir, bot):
+    """Configure one source bot's private browser settings without launching it."""
+    configure_browser(profile, bot_dir, home=Path.home(), bot=bot)
+
+
+@main.command("browser-executable")
+@click.option("--profile", type=DIRECTORY, required=True)
+@click.option("--bot-dir", type=DIRECTORY, required=True)
+@click.option("--bot", required=True)
+def browser_executable(profile, bot_dir, bot):
+    """Validate private browser settings and print the launch executable."""
+    click.echo(validate_browser(profile, bot_dir, home=Path.home(), bot=bot)["CHROME_PATH"])
 
 
 @main.command()

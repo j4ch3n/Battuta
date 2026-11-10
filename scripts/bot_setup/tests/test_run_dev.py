@@ -80,7 +80,7 @@ class RunDevTests(LauncherFixture):
     def test_dev_worker_command_requires_readiness_and_passes_private_paths(self):
         result = self.run_launcher("dev", existing=False)
         self.assertEqual(result.returncode, 0, result.stderr)
-        command = next(c[-1] for c in self.commands() if "--bot-dir" in c[-1])
+        command = next(c[-1] for c in self.commands() if c[0] == "split-window" and "--bot-dir" in c[-1])
         (self.root / "scripts/bot_setup/run-worker.sh").write_text('printf "%s\\n" "$@"\n')
         for ready in (False, True):
             with self.subTest(ready=ready):
@@ -146,7 +146,7 @@ class RunDevTests(LauncherFixture):
 print(json.dumps({"role": os.environ["AGENT_ROLE"], "token": os.environ.get("LINEAR_API_TOKEN"),
     "telegram": any("TELEGRAM" in key for key in os.environ),
     "memory": os.environ.get("BATTUTA_MEMORY_URL"), "scheduler": os.environ.get("PI_SCHEDULER_STATE_FILE"),
-    "catchup": os.environ.get("PI_SCHEDULER_CATCHUP_MAX"), "umask": os.umask(0)}))
+    "catchup": os.environ.get("PI_SCHEDULER_CATCHUP_MAX"), "browser": os.environ.get("CHROME_PATH"), "umask": os.umask(0)}))
 ''')
         result = self.run_launcher("prod", existing=False)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -167,6 +167,7 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"], "token": os.environ.get("LIN
         self.assertEqual(outputs[0]["scheduler"], str(self.scheduler))
         self.assertEqual(outputs[0]["catchup"], "0")
         self.assertEqual(outputs[0]["umask"], 0o77)
+        self.assertEqual(outputs[0]["browser"], str(self.bin / "chromium-browser"))
         self.assertTrue(outputs[0]["telegram"])
         self.assertFalse(outputs[1]["telegram"])
         self.assertIsNone(outputs[1]["scheduler"])

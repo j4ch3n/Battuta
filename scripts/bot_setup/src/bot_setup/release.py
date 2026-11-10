@@ -5,6 +5,7 @@ from pathlib import Path
 
 import click
 
+from .browser import browser_settings, configure_browser
 from .env import read_env, required
 from .instances import instance_paths, worker_names
 from .install import run
@@ -45,11 +46,15 @@ def configure_release(root: Path, *, env_file: Path, home: Path) -> None:
     telegram = telegram_payload(env_file, "COS", values)
     telegram["profiles"]["default"]["botToken"] = "${COS_TELEGRAM_TOKEN}"
     outputs = []
+    browsers = []
     for bot in names:
         role, profile, private = instance_paths(root, home, bot)
         if not (profile / "AGENTS.md").is_file() or not (profile / ".pi/settings.json").is_file():
             raise click.ClickException(f"Missing installed role profile: {profile}")
         validate_private_home(private)
+        if role != "manager":
+            browser_settings(profile, private, home=home, bot=bot)
+            browsers.append((bot, profile, private))
         payload = mcp_payload(role=role, supabase_url=values["SUPABASE_URL"], memory_url=url)
         outputs.append((private / ".pi/mcp.json", payload))
         outputs.append((private / ".pi/web-search.json", read_config(profile / ".pi/web-search.json")))
@@ -60,6 +65,8 @@ def configure_release(root: Path, *, env_file: Path, home: Path) -> None:
         raise click.ClickException(f"Missing compiled scheduler helper: {helper}")
     # Provision only after every instance has passed preflight; never start a bot.
     run("node", str(helper), "--initialize", env={**os.environ, **values})
+    for bot, profile, private in browsers:
+        configure_browser(profile, private, home=home, bot=bot)
     for path, payload in outputs:
         path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
         write_config(path, payload, ".release-")

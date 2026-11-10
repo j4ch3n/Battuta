@@ -11,6 +11,11 @@ from bot_setup.configure import configure_source
 from skill_fixtures import skill_catalog
 
 
+@pytest.fixture(autouse=True)
+def isolated_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+
+
 @pytest.mark.parametrize("role", ["cos", "manager"])
 def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
     names = skill_catalog(
@@ -42,6 +47,11 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
     assert (pi / "telegram.json").exists() == (role == "cos")
     assert all((pi / "skills" / name).is_symlink() for name in names)
     assert json.loads((pi / "settings.json").read_text())["battutaMemoryCapture"]["enabled"] == (role == "cos")
+    browser = json.loads((pi / "settings.json").read_text()).get("pi-browser-use")
+    if role == "cos":
+        assert browser["userDataDir"] == str(tmp_path / "home/.battuta/pi-bots/cos-bot/.pi/browser-research")
+    else:
+        assert browser is None
     servers = json.loads((pi / "mcp.json").read_text())["mcpServers"]
     assert "assignments" in servers
     assert servers["memory"]["enabled"] is (role == "manager")

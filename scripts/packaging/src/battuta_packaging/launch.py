@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 
 import click
+from bot_setup.browser import validate_browser
 from bot_setup.env import read_env, required
 from bot_setup.instances import acquire_instance_lock, instance_paths, worker_names
 from bot_setup.release import validate_private_home
@@ -47,6 +48,8 @@ def run_bot(root: Path, *, bot: str, env_file: Path, node: Path, mode: str) -> N
                 raise click.ClickException(f"Unexpected ancestor instructions: {ancestor / name}")
     env = {**os.environ, **values, "AGENT_ROLE": role, "BATTUTA_BOT_NAME": bot, "PI_CODING_AGENT_DIR": str(private / ".pi")}
     env["PATH"] = str(node.parent) + os.pathsep + env.get("PATH", "")
+    if role != "manager":
+        env.update(validate_browser(profile, private, home=Path.home(), bot=bot, path=env["PATH"]))
     env["BATTUTA_MEMORY_URL"] = values.get("BATTUTA_MEMORY_URL", "http://127.0.0.1:8901/mcp")
     if role == "cos":
         helper = root / "bots/_shared/memory-client/dist/configure-scheduler.js"

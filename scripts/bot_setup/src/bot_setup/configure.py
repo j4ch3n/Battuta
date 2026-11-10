@@ -7,6 +7,7 @@ import re
 
 import click
 
+from .browser import browser_settings, configure_browser
 from .env import read_env, required
 from .install import SCHEDULE_PACKAGE, TELEGRAM_PACKAGE, install_packages, run, warn_running_session
 from .instructions import configure_instructions
@@ -39,6 +40,8 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
     assignment_server(supabase_url)
     telegram = prepare_telegram_config(bot_dir, env_file, prefix, values) if role == "cos" else None
     url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
+    if role == "cos":
+        browser_settings(bot_dir, bot_dir, home=Path.home(), bot="cos-bot")
     configure_instructions(bot_dir, role=role, root=root)
     if telegram is not None:
         path, data, changed = telegram
@@ -47,6 +50,7 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
     configure_mcp(bot_dir, role=role, memory_url=url, supabase_url=supabase_url)
     configure_memory_settings(bot_dir, role=role)
     if role == "cos":
+        configure_browser(bot_dir, bot_dir, home=Path.home(), bot="cos-bot")
         run("pnpm", "--dir", str(root / "memory-client"), "install", "--frozen-lockfile")
         run("node", str(root / "memory-client/configure-scheduler.mjs"), "--initialize", env={**os.environ, **values})
         extra = (SCHEDULE_PACKAGE,)

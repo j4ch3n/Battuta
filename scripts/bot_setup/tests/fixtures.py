@@ -8,6 +8,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+
+from bot_setup.browser import configure_browser
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -29,6 +32,10 @@ class ConfigFixture(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(prefix="battuta scripts ")
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
+        self.home = self.root / "home"
+        home = patch.dict(os.environ, {"HOME": str(self.home)})
+        home.start()
+        self.addCleanup(home.stop)
         (self.root / "scripts").mkdir()
         for name in ("setup-memory.sh", "setup-artifacts.sh"):
             shutil.copy2(ROOT / "scripts" / name, self.root / "scripts" / name)
@@ -91,6 +98,8 @@ class LauncherFixture(ConfigFixture):
             (bot / "node_modules/.bin/pi").touch(mode=0o700)
             (bot / "AGENTS.md").touch()
             (bot / ".pi/mcp.json").write_text("{}")
+        configure_browser(self.root / "bots/cos-bot", self.root / "bots/cos-bot", home=self.home, bot="cos-bot")
+        self.executable("chromium-browser", "raise RuntimeError('Do not launch Chromium in tests')\n")
         (self.root / "agent-mail/node_modules").mkdir(parents=True)
         (self.root / "project-spec/node_modules").mkdir(parents=True)
         copy_scheduler_runtime(self.root)
