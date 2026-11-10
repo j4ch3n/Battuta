@@ -43,6 +43,7 @@ def configure_release(root: Path, *, env_file: Path, home: Path) -> None:
         required(values, key, env_file)
     url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
     telegram = telegram_payload(env_file, "COS", values)
+    telegram["profiles"]["default"]["botToken"] = "${COS_TELEGRAM_TOKEN}"
     outputs = []
     for bot in names:
         role, profile, private = instance_paths(root, home, bot)

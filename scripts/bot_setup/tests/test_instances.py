@@ -2,6 +2,7 @@
 
 import pytest
 import click
+import os
 from click.testing import CliRunner
 
 from bot_setup import instances
@@ -39,3 +40,24 @@ def test_workers_cli(tmp_path):
     result = CliRunner().invoke(main, ["workers", "--env-file", str(env_file)])
     assert result.exit_code == 0, result.output
     assert result.output.splitlines() == ["worker-1", "worker-2"]
+
+
+def test_instance_lock_excludes_duplicates_and_releases_on_close(tmp_path):
+    first = instances.acquire_instance_lock(tmp_path / "worker-1")
+    try:
+        with pytest.raises(click.ClickException):
+            instances.acquire_instance_lock(tmp_path / "worker-1")
+        other = instances.acquire_instance_lock(tmp_path / "worker-2")
+        os.close(other)
+        assert os.get_inheritable(first)
+    finally:
+        os.close(first)
+    os.close(instances.acquire_instance_lock(tmp_path / "worker-1"))
+
+
+def test_instance_lock_refuses_symlink(tmp_path):
+    pi = tmp_path / "worker-1/.pi"
+    pi.mkdir(parents=True)
+    (pi / "instance.lock").symlink_to(tmp_path / "other")
+    with pytest.raises(click.ClickException):
+        instances.acquire_instance_lock(pi.parent)
