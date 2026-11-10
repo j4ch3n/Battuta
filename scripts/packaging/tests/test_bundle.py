@@ -29,6 +29,7 @@ def source(tmp_path, monkeypatch):
         (path / ".pi").mkdir()
         (path / ".pi/auth.json").write_text("private-sentinel")
         (path / ".pi/settings.json").write_text('{"defaultModel":"private-model"}')
+        (path / ".pi/web-search.json").write_text("{}")
     skill = root / "skills-hub/research"
     skill.mkdir(parents=True)
     for name in ("SKILL.md", "LICENSE", "tools.md"):

@@ -5,7 +5,8 @@ from pathlib import Path
 import click
 
 from . import skills
-from .configure import configure_source, configure_release, configure_worker
+from .configure import configure_source, configure_worker
+from .release import configure_release
 from .env import read_env
 from .instances import worker_names
 from .install import TELEGRAM_PACKAGE
@@ -55,9 +56,10 @@ def refresh_telegram(root, env_file):
 
 @main.command("configure-release")
 @click.option("--root", type=DIRECTORY, required=True)
-def release(root):
+@click.option("--env-file", type=FILE, required=True)
+def release(root, env_file):
     """Configure a clean installed release."""
-    configure_release(root)
+    configure_release(root, env_file=env_file, home=Path.home())
 
 
 @main.command("configure-worker")

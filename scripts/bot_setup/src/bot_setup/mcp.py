@@ -44,26 +44,12 @@ def assignment_server(supabase_url: str) -> dict:
     return {"url": supabase_url.rstrip("/") + "/functions/v1/assignments", "headers": {"apikey": "${SUPABASE_SECRET_KEY}"}, "exposure": "codemode", "description": "Shared project assignments, ordered TODOs, and local note paths"}
 
 
-def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager", "worker"], supabase_url: str, memory_url: str | None = None) -> None:
+def mcp_payload(*, role: Literal["cos", "manager", "worker"], supabase_url: str, memory_url: str | None = None) -> dict:
     if role not in {"cos", "manager", "worker"}:
         raise click.ClickException("Bot role must be cos or manager")
     url = validate_memory_url(memory_url) if role in {"cos", "manager"} else None
     assignment = assignment_server(supabase_url)
-    path = bot_dir / ".pi/mcp.json"
-    settings_path = bot_dir / ".pi/settings.json"
-    config = read_config(path)
-    servers = config.get("mcpServers", {})
-    if not isinstance(servers, dict):
-        raise click.ClickException("mcpServers must be a JSON object")
-    settings = read_config(settings_path)
-    packages = settings.get("packages", [])
-    if not isinstance(packages, list):
-        raise click.ClickException("packages must be a JSON array")
-    retained = []
-    for entry in packages:
-        source = entry.get("source") if isinstance(entry, dict) else entry
-        if not isinstance(source, str) or source.split("@", 1)[0] != "npm:pi-mcp-adapter":
-            retained.append(entry)
+    servers = {}
     if role != "worker":
         servers["linear"] = {"url": "https://mcp.linear.app/mcp", "headers": {"Authorization": "Bearer ${LINEAR_API_TOKEN}"}, "exposure": "codemode", "description": "Manage Linear issues, projects, and cycles"}
     if role == "cos":
@@ -84,7 +70,27 @@ def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager", "worker"], s
         assignment["toolExposure"] = {name: "codemode" for name in ("list_assignments", "get_assignment", "prepare_notes", "locate_notes")}
     if role == "cos":
         servers["luma"] = {"url": "https://mcp.luma.com", "oauth": {"clientRegistration": "cimd"}, "exposure": "hidden", "toolExposure": {f"{verb}_*": "codemode" for verb in ("search", "lookup", "get", "list", "find")}, "description": "Discover Luma events and look up event/account details; read-only use"}
-    config["mcpServers"] = servers
+    return {"mcpServers": servers}
+
+
+def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager", "worker"], supabase_url: str, memory_url: str | None = None) -> None:
+    owned = mcp_payload(role=role, supabase_url=supabase_url, memory_url=memory_url)
+    path = bot_dir / ".pi/mcp.json"
+    settings_path = bot_dir / ".pi/settings.json"
+    config = read_config(path)
+    servers = config.get("mcpServers", {})
+    if not isinstance(servers, dict):
+        raise click.ClickException("mcpServers must be a JSON object")
+    settings = read_config(settings_path)
+    packages = settings.get("packages", [])
+    if not isinstance(packages, list):
+        raise click.ClickException("packages must be a JSON array")
+    retained = []
+    for entry in packages:
+        source = entry.get("source") if isinstance(entry, dict) else entry
+        if not isinstance(source, str) or source.split("@", 1)[0] != "npm:pi-mcp-adapter":
+            retained.append(entry)
+    config["mcpServers"] = {**servers, **owned["mcpServers"]}
     if retained != packages:
         settings["packages"] = retained
         write_config(settings_path, settings, ".settings-")

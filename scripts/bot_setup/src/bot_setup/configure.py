@@ -9,13 +9,12 @@ import click
 
 from .env import read_env, required
 from .install import SCHEDULE_PACKAGE, TELEGRAM_PACKAGE, install_packages, run, warn_running_session
-from .instructions import configure_instructions, write_instructions
+from .instructions import configure_instructions
 from .json_config import read_config, write_config
 from .mcp import assignment_server, configure_mcp, validate_memory_url
 from .memory import configure_memory_settings
 from .subagents import SUBAGENT_PACKAGE, WEB_PACKAGE, configure_subagents
 from .telegram import prepare_telegram_config
-from .skills import check_manifests
 from .skills import load_selection
 from .workers import copy_worker_profile, validate_worker_settings
 
@@ -105,54 +104,3 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
     (bot_dir / "AGENTS.md").write_text(content)
     write_config(path, settings, ".settings-")
     configure_mcp(bot_dir, role="worker", memory_url=memory_url, supabase_url=supabase_url)
-
-
-def configure_release(root: Path) -> None:
-    values = dict(os.environ)
-    env_file = root / ".env.prod"
-    for key in ("LINEAR_API_TOKEN", "SUPABASE_URL", "SUPABASE_SECRET_KEY"):
-        required(values, key, env_file)
-    url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
-    assignment_server(values["SUPABASE_URL"])
-    bots = [(role, root / f"bots/{role}-bot") for role in ("cos", "manager")]
-    check_manifests(root)
-    telegram = prepare_telegram_config(root / "bots/cos-bot", env_file, "COS", values)
-    run("node", str(root / "memory-client/configure-scheduler.mjs"), "--initialize")
-    for role, bot in bots:
-        write_instructions(bot, root=root)
-        configure_mcp(bot, role=role, memory_url=url, supabase_url=values["SUPABASE_URL"])
-        configure_memory_settings(bot, role=role)
-        settings_path = bot / ".pi/settings.json"
-        settings = read_config(settings_path)
-        if role == "cos":
-            packages = settings.get("packages", [])
-            sources = [entry.get("source") if isinstance(entry, dict) else entry for entry in packages]
-            if not any(isinstance(source, str) and re.sub(r"@[^@/]+$", "", source) == re.sub(r"@[^@/]+$", "", SCHEDULE_PACKAGE) for source in sources):
-                packages.append(SCHEDULE_PACKAGE)
-            settings["packages"] = packages
-        else:
-            configure_subagents(settings, bot)
-            names = load_selection(bot / "skills.json", root / "skills-hub")
-            selected = [relpath(root / "skills-hub" / name, settings_path.parent) for name in names]
-            resources = settings.get("battutaManagerResources", {})
-            if not isinstance(resources, dict) or not isinstance(resources.get("skills", []), list):
-                raise click.ClickException("battutaManagerResources must be a JSON object with skills")
-            managed = resources.get("skills", [])
-            if any(not isinstance(path, str) for path in managed):
-                raise click.ClickException("battutaManagerResources.skills must be an array of strings")
-            skill_settings = settings.get("skills", [])
-            if isinstance(skill_settings, dict):
-                directories = skill_settings.get("customDirectories", [])
-                if not isinstance(directories, list) or any(not isinstance(path, str) for path in directories):
-                    raise click.ClickException("skills.customDirectories must be an array of strings")
-                settings["skills"] = {**skill_settings, "customDirectories": list(dict.fromkeys([*(path for path in directories if path not in managed), *selected]))}
-            elif isinstance(skill_settings, list) and all(isinstance(path, str) for path in skill_settings):
-                settings["skills"] = list(dict.fromkeys([*(path for path in skill_settings if path not in managed), *selected]))
-            else:
-                raise click.ClickException("skills must be an array of strings or a Pi skills object")
-            settings["battutaManagerResources"] = {**resources, "skills": selected}
-        write_config(settings_path, settings, ".settings-")
-    path, data, changed = telegram
-    if changed:
-        write_config(path, data, ".telegram-")
-    click.echo("Configured both bots. Run bin/battuta start-prod-screen.")

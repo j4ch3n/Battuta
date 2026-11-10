@@ -79,6 +79,7 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
             configure_subagents(settings, bot)
             settings["subagents"]["defaultExtensions"] = [".pi/npm/node_modules/pi-web-access/dist"]
         write_json(bot / ".pi/settings.json", settings)
+        shutil.copy2(original / ".pi/web-search.json", bot / ".pi/web-search.json")
     for relative in ENTRY_OUTPUTS:
         (destination / relative).parent.mkdir(parents=True, exist_ok=True)
     compile_bots(source, destination)
