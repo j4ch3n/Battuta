@@ -7,7 +7,7 @@ import re
 
 import click
 
-from .browser import browser_settings, configure_browser
+from .browser import browser_defaults, browser_settings, configure_browser
 from .env import read_env, required
 from .install import SCHEDULE_PACKAGE, TELEGRAM_PACKAGE, install_packages, run, warn_running_session
 from .instructions import configure_instructions
@@ -51,6 +51,10 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
     configure_memory_settings(bot_dir, role=role)
     if role == "cos":
         configure_browser(bot_dir, bot_dir, home=Path.home(), bot="cos-bot")
+        path = bot_dir / ".pi/settings.json"
+        settings = read_config(path)
+        browser_defaults(settings)
+        write_config(path, settings, ".settings-")
         run("pnpm", "--dir", str(root / "memory-client"), "install", "--frozen-lockfile")
         run("node", str(root / "memory-client/configure-scheduler.mjs"), "--initialize", env={**os.environ, **values})
         extra = (SCHEDULE_PACKAGE,)
@@ -84,6 +88,7 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
     path = bot_dir / ".pi/settings.json"
     settings = read_config(path)
     validate_worker_settings(settings)
+    browser_defaults(settings)
     runtime = profile / "extension/assignment-worker"
     if not shared_catalog:
         run("pnpm", "--dir", str(runtime), "install", "--frozen-lockfile")

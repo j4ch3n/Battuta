@@ -13,6 +13,18 @@ BROWSER_PACKAGE = "npm:@amaster.ai/pi-browser-use@0.1.38"
 BROWSER_DEFAULTS = {"sessionMode": "persistent", "headless": True, "viewport": "1440x900"}
 
 
+def browser_defaults(settings: dict) -> None:
+    packages = settings.get("packages", [])
+    section = settings.get("pi-browser-use", {})
+    if not isinstance(packages, list) or not isinstance(section, dict):
+        raise click.ClickException("Expected packages array and pi-browser-use object")
+    for key, value in BROWSER_DEFAULTS.items():
+        if key in section and (section[key] != value or type(section[key]) is not type(value)):
+            raise click.ClickException(f"Conflicting pi-browser-use.{key}")
+    settings["packages"] = packages if BROWSER_PACKAGE in packages else [*packages, BROWSER_PACKAGE]
+    settings["pi-browser-use"] = {**section, **BROWSER_DEFAULTS}
+
+
 def browser_directories(home: Path, bot: str) -> tuple[Path, Path]:
     role, _, private = instance_paths(home, home, bot)
     if role == "manager":

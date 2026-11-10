@@ -6,6 +6,11 @@
     "../extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/extensions/mcp/index.js",
     "../extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/extensions/codemode/index.js"
   ],
-  "packages": ["npm:pi-web-access@0.43.0"],
+  "packages": ["npm:pi-web-access@0.43.0", "npm:@amaster.ai/pi-browser-use@0.1.38"],
+  "pi-browser-use": {
+    "sessionMode": "persistent",
+    "headless": true,
+    "viewport": "1440x900"
+  },
   "battutaMemoryCapture": { "enabled": false }
 }

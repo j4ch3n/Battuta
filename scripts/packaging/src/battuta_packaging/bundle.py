@@ -8,6 +8,7 @@ import subprocess
 import tarfile
 
 import click
+from bot_setup.browser import browser_defaults
 from bot_setup.skills import load_selection
 from bot_setup.install import TELEGRAM_PACKAGE, SCHEDULE_PACKAGE
 from bot_setup.subagents import WEB_PACKAGE, SUBAGENT_PACKAGE, configure_subagents
@@ -93,6 +94,9 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         if profile == "worker":
             extensions += ["extensions/index.js"]
         settings = {"packages": packages[profile], "extensions": extensions, "battutaMemoryCapture": {"enabled": profile == "cos-bot"}}
+        if profile != "manager-bot":
+            browser_defaults(settings)
+            packages[profile] = settings["packages"]
         if profile == "manager-bot":
             configure_subagents(settings, bot)
             settings["subagents"]["defaultExtensions"] = [".pi/npm/node_modules/pi-web-access/dist"]
