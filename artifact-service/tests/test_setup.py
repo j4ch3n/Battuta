@@ -1,4 +1,4 @@
-"""Release wrapper + setup script + real CLI against a disposable old registry."""
+"""Installed CLI setup is repeatable and preserves current-format registrations."""
 
 import os
 import shutil
@@ -8,47 +8,28 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from alembic import command
-from sqlalchemy import URL, create_engine
-
-from battuta_artifacts.registry import Registry, migrate, migration_config
+from battuta_artifacts.registry import Registry
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class SetupTests(unittest.TestCase):
-    def test_release_setup_upgrades_old_database_and_preserves_existing_records(self):
-        with tempfile.TemporaryDirectory() as directory:
+    def test_installed_cli_setup_preserves_current_registrations(self):
+        with tempfile.TemporaryDirectory(dir='/tmp') as directory:
             root = Path(directory).resolve()
-            (root / 'bin').mkdir()
-            (root / 'scripts').mkdir()
-            shutil.copy2(ROOT / 'scripts/packaging/battuta', root / 'bin/battuta')
-            shutil.copy2(ROOT / 'scripts/setup-artifacts.sh', root / 'scripts/setup-artifacts.sh')
-            venv = root / 'bin'
-            (root / 'bin/uv').write_text('#!/bin/sh\nexit 0\n')
-            (root / 'bin/uv').chmod(0o755)
-            (venv / 'battuta-artifact').write_text(f'#!{sys.executable}\nfrom battuta_artifacts.cli import main\nmain()\n')
-            (venv / 'battuta-artifact').chmod(0o755)
             database = root / 'registry.db'
-            engine = create_engine(URL.create('sqlite', database=str(database)))
-            with engine.begin() as connection:
-                config = migration_config()
-                config.attributes['connection'] = connection
-                command.upgrade(config, '0001_registry')
-                connection.exec_driver_sql("INSERT INTO artifacts VALUES ('old', 'old', 'Old', 'Existing', '/source', 'index.html', 'html', 1, 'then', 'then')")
-                connection.exec_driver_sql("INSERT INTO artifact_files VALUES ('old', 'index.html', 'text/html')")
-            engine.dispose()
-            env = {**os.environ, 'BATTUTA_ARTIFACT_DB': str(database), 'PATH': f"{root / 'bin'}:{os.environ['PATH']}"}
-            result = subprocess.run(['bash', str(root / 'bin/battuta'), 'setup-artifacts'], env=env, capture_output=True, text=True)
+            env = {**os.environ, 'BATTUTA_ARTIFACT_DB': str(database)}
+            args = [sys.executable, '-c', 'from battuta_artifacts.cli import main; main()', 'setup']
+            result = subprocess.run(args, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             store = Registry(database)
             store.check_schema()
-            self.assertEqual(store.get('old')['status'], 'published')
             store.register(slug='draft', title='Draft', description='Hidden', source_root='/source',
-                           entry_path='index.html', format='html', files={'index.html': 'text/html'})
-            result = subprocess.run(['bash', str(root / 'bin/battuta'), 'setup-artifacts'], env=env, capture_output=True, text=True)
+                            entry_path='index.html', format='html', files={'index.html': 'text/html'})
+            before = store.get('draft')
+            result = subprocess.run(args, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(store.get('draft')['status'], 'draft')
+            self.assertEqual(store.get('draft'), before)
 
     def test_release_setup_uses_installed_tool_and_propagates_failure(self):
         import json

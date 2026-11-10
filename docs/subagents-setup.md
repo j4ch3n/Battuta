@@ -15,13 +15,11 @@ For a custom workspace, add `--bot-dir /absolute/path/to/manager-workspace`. Set
 registers and installs the pinned package and `pi-web-access@0.43.0`, then uses
 Pi's own settings and the package's bundled agents/skill. Restart Manager afterward.
 
-Release configuration uses the same setup-only helper; release assembly installs
-the packages. Existing authentication and other private files are not copied or
-overwritten. Old `.pi/subagents.json` grants are unused and left untouched.
-Remove an old deployed `bounded-subagents` extension directory and copied
-`use-subagent` skill before restarting an installation that retained those files;
-the repository no longer ships them. Setup removes explicit registrations of
-the obsolete adapter but does not delete operator files.
+Release builds generate Manager's project settings. `battuta-packaging
+install-runtime` installs pinned packages inside the installation and resolves
+the native web-access path there. Private settings/authentication stay in
+`~/.battuta/pi-bots/manager-bot/.pi`; they are not copied into the installation.
+Unexpected private executable resources stop setup rather than trigger a migration.
 
 ## Authentication
 

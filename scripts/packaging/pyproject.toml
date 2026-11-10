@@ -3,7 +3,11 @@ name = "battuta-packaging"
 dynamic = ["version"]
 description = "Self-contained Battuta release assembly and installation tools"
 requires-python = ">=3.12"
-dependencies = ["battuta-bot-setup>=0.1,<2", "click>=8.1,<9"]
+dependencies = [
+    "battuta-bot-setup>=0.1,<2",
+    "click>=8.1,<9",
+    "packaging>=24,<27",
+]
 
 [tool.uv.sources]
 battuta-bot-setup = { path = "../bot_setup", editable = true }

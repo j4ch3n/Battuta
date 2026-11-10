@@ -14,6 +14,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ -n "$bot_dir" && -f "$env_file" ]] || { printf 'Worker directory and environment file are required\n' >&2; exit 1; }
+[[ ! -L "$bot_dir" && ! -L "$bot_dir/.pi" ]] || { printf 'Worker home must be a private local directory\n' >&2; exit 1; }
+workers="$(uv run --project "$root/scripts/bot_setup" --locked battuta-bot-setup workers --env-file "$env_file")"
+selected=false
+while IFS= read -r worker; do
+  [[ "$worker" != "$(basename "$bot_dir")" ]] || selected=true
+done <<< "$workers"
+[[ "$selected" == true ]] || { printf 'Worker is outside the configured WORKER_BOT_COUNT\n' >&2; exit 1; }
 cli="$root/bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
 [[ -f "$cli" ]] || { printf 'Prepare the source worker profile and shared dependencies first\n' >&2; exit 1; }
 set -a
@@ -24,7 +31,7 @@ for key in SUPABASE_URL SUPABASE_SECRET_KEY; do
 done
 mcp_source="$root/bots/worker/.pi/mcp.json"
 if [[ ! -e "$bot_dir/.pi/mcp.json" && ! -L "$bot_dir/.pi/mcp.json" && ! -f "$mcp_source" ]]; then
-  printf 'Missing generated worker MCP configuration. From the source root run:\n  uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role worker --env-file %q\nFor a release, run bin/battuta configure-worker.\n' "$env_file" >&2
+  printf 'Missing generated worker MCP configuration. From the source root run:\n  uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role worker --env-file %q\n' "$env_file" >&2
   exit 1
 fi
 mkdir -p "$bot_dir/.pi"
@@ -57,4 +64,4 @@ done
 export AGENT_ROLE=worker PI_CODING_AGENT_DIR="$bot_dir/.pi"
 export BATTUTA_MEMORY_URL="${BATTUTA_MEMORY_URL:-http://127.0.0.1:8901/mcp}"
 cd "$bot_dir"
-exec node "$cli"
+exec uv run --project "$root/scripts/bot_setup" --locked battuta-bot-setup run-worker --root "$root" --bot-dir "$bot_dir" --env-file "$env_file" --node "$(command -v node)"

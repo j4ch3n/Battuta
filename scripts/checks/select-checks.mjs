@@ -50,7 +50,8 @@ const mail =
   files.some((file) => /^bots\/(?:cos-bot|manager-bot|worker)\/skills\.json$/.test(file));
 const artifacts =
   changed("project-context-cli/") ||
-  files.some((file) => ["scripts/setup-artifacts.sh", "scripts/packaging/battuta"].includes(file));
+  changed("scripts/packaging/") ||
+  files.includes("scripts/setup-artifacts.sh");
 const selected = {
   node: node.filter(
     (component) =>

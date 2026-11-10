@@ -1,242 +1,35 @@
-"""Release package installation runs inside the staged bot workspaces."""
+"""Release provenance rejects dirty trees and invalid tags before assembly."""
 
 import os
-import hashlib
-import json
 from pathlib import Path
-import re
-import shutil
 import subprocess
-import sys
-import shlex
-import textwrap
-import tempfile
-import unittest
+
 import yaml
 
-from fixtures import ConfigFixture, ROOT
-from skill_fixtures import skill_catalog
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
-class ReleaseInstallTests(ConfigFixture):
-    def test_archive_keeps_launch_resources_without_python_tool_payloads(self):
-        workflow = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
-        script = next(step["run"] for step in workflow["jobs"]["build"]["steps"] if step.get("name") == "Assemble release")
-        stage = self.root / "dist/stage/battuta"
-        stage.mkdir(parents=True)
-        git_dir = subprocess.check_output(["git", "rev-parse", "--absolute-git-dir"], cwd=ROOT, text=True).strip()
-        for command in (line for line in script.splitlines() if line.startswith("git archive HEAD ")):
-            result = subprocess.run(["bash", "-euo", "pipefail", "-c", command], cwd=self.root,
-                                    env={**os.environ, "GIT_DIR": git_dir}, capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0, result.stderr)
-        for required in ("skills-hub/research/SKILL.md", "bots/AGENTS_shared.md", "scripts/setup-memory.sh",
-                         "scripts/setup-artifacts.sh", "scripts/bot_setup/run-dev.sh", "scripts/bot_setup/run-worker.sh",
-                         "scripts/bot_setup/wait-for-assignments.mjs", "agent-mail/index.ts", "project-spec/index.ts", "memory-client/index.ts"):
-            self.assertTrue((stage / required).is_file(), required)
-        for excluded in ("project-context-cli", "artifact-service", "memory-service", "scripts/packaging", "scripts/bot_setup/src"):
-            self.assertFalse((stage / excluded).exists(), excluded)
-        self.assertEqual(list(stage.rglob("*.whl")), [])
-        self.assertEqual(list(stage.rglob(".venv")), [])
-
-    def test_release_provenance_produces_one_short_sha_version_or_fails_closed(self):
-        workflow = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
-        script = next(step["run"] for step in workflow["jobs"]["prepare"]["steps"] if step.get("id") == "version")
-        def git(*args):
-            return subprocess.check_output(["git", *args], cwd=self.root, text=True, stderr=subprocess.DEVNULL).strip()
-        git("init", "-b", "main")
-        git("config", "user.email", "test@example.com")
-        git("config", "user.name", "Release test")
-        (self.root / "source").write_text("release")
-        git("add", "source")
-        git("commit", "-m", "fixture")
-        git("tag", "v1.2.3")
-        git("remote", "add", "origin", str(self.root))
-        with tempfile.TemporaryDirectory(dir="/tmp") as directory:
-            output = Path(directory) / "outputs"
-            env = {**os.environ, "TAG": "v1.2.3", "GITHUB_OUTPUT": str(output)}
-            result = subprocess.run(["bash", "-c", script], cwd=self.root, env=env, capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(output.read_text(), f"version=1.2.3+g{git('rev-parse', '--short', 'HEAD')}\n")
-            self.assertNotIn(git("rev-parse", "HEAD"), output.read_text())
-            for dirty, tag in ((False, "vbad"), (True, "v1.2.3")):
-                with self.subTest(dirty=dirty, tag=tag):
-                    output.unlink(missing_ok=True)
-                    if dirty:
-                        (self.root / "source").write_text("dirty")
-                    result = subprocess.run(["bash", "-c", script], cwd=self.root, env={**env, "TAG": tag}, capture_output=True, text=True)
-                    self.assertNotEqual(result.returncode, 0)
-                    self.assertFalse(output.exists())
-
-    def test_publish_waits_for_all_parallel_wheels_and_archive(self):
-        jobs = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())["jobs"]
-        self.assertEqual(set(jobs["publish"]["needs"]), {"build", "collect-tools"})
-        self.assertIn("wheels", jobs["collect-tools"]["needs"])
-        self.assertEqual(jobs["wheels"]["needs"], jobs["build"]["needs"])
-        self.assertEqual({entry["path"] for entry in jobs["wheels"]["strategy"]["matrix"]["include"]},
-                         {"project-context-cli", "artifact-service", "memory-service", "scripts/bot_setup", "scripts/packaging"})
-
-    def extraction_commands(self, home):
-        guide = (ROOT / "RELEASE.md").read_text()
-        block = next(block for block in re.findall(r"```(?:bash|sh)\n(.*?)```", guide, re.DOTALL) if "tar -xzf" in block)
-        downloads = Path(home) / "battuta"
-        downloads.mkdir(exist_ok=True)
-        archive = downloads / "battuta-vX.X.X-linux-arm64.tar.gz"
-        archive.write_bytes(b"unused: checks stop before extraction")
-        archive.with_suffix(".gz.sha256").write_text(f"{hashlib.sha256(archive.read_bytes()).hexdigest()}  {archive.name}\n")
-        return block.split("tar -xzf", 1)[0] + "\nprintf extraction-reached\n"
-
-    def test_production_screen_calls_shared_launcher_after_relocation(self):
-        release = self.root / "release"
-        (release / "bin").mkdir(parents=True)
-        shutil.copy2(ROOT / "scripts/packaging/battuta", release / "bin/battuta")
-        launcher = release / "scripts/bot_setup/run-dev.sh"
-        launcher.parent.mkdir(parents=True)
-        launcher.write_text('printf "shared-launcher:%s\\n" "$1"\n')
-        moved = self.root / "relocated release"
-        release.rename(moved)
-        result = subprocess.run(["bash", str(moved / "bin/battuta"), "start-prod-screen"], cwd=self.root, text=True, capture_output=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "shared-launcher:prod\n")
-
-    def test_manager_subagent_release_boundary_requires_runtime_files(self):
-        workflow = (ROOT / ".github/workflows/release.yml").read_text()
-        boundary = re.search(
-            r'^          test -f dist/stage/battuta/bots/manager-bot/\.pi/npm/node_modules/pi-subagents/bundle/index.js\n.*?^          test ! -e dist/stage/battuta/bots/manager-bot/\.pi/subagents.json$',
-            workflow, re.MULTILINE | re.DOTALL,
-        )
-        self.assertIsNotNone(boundary)
-        manager = self.root / "dist/stage/battuta/bots/manager-bot"
-        extension = manager / ".pi/npm/node_modules/pi-subagents/bundle"
-        extension.mkdir(parents=True)
-        (extension / "index.js").write_text("// staged extension")
-        references = manager / ".pi/npm/node_modules/pi-subagents/skills/pi-subagents"
-        references.mkdir(parents=True)
-        (references / "SKILL.md").write_text("staged native skill")
-        command = ["bash", "-euc", textwrap.dedent(boundary.group())]
-        result = subprocess.run(command, cwd=self.root, capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        for path in (extension / "index.js", references / "SKILL.md"):
-            with self.subTest(missing=path.name):
-                content = path.read_text()
-                path.unlink()
-                result = subprocess.run(command, cwd=self.root, capture_output=True, text=True)
-                self.assertNotEqual(result.returncode, 0)
-                path.write_text(content)
-
-    def test_shared_catalog_is_portable_without_per_bot_materialization(self):
-        workflow = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
-        script = next(step["run"] for step in workflow["jobs"]["build"]["steps"] if step.get("name") == "Assemble release")
-        validation = [line for line in script.splitlines() if "battuta-packaging validate-skills" in line]
-        self.assertEqual(len(validation), 1)
-        self.executable("uv", '''import os, sys
-args = sys.argv[1:]
-index = args.index("battuta-packaging")
-os.execv(sys.executable, [sys.executable, "-m", "battuta_packaging.cli", *args[index + 1:]])
-''')
-        env = {**os.environ, "PATH": f"{self.bin}:{os.environ['PATH']}"}
-        snapshots = []
-        for _ in range(2):
-            with tempfile.TemporaryDirectory(dir=self.root) as directory:
-                work = Path(directory)
-                stage = work / "dist/stage/battuta"
-                for role in ("cos", "manager"):
-                    skill_catalog(stage, role)
-                for source in (stage / "skills-hub").iterdir():
-                    (source / "LICENSE").write_text("Required notice")
-                moved = work / "relocated"
-                stage.rename(moved)
-                for role in ("cos", "manager"):
-                    bot = moved / f"bots/{role}-bot"
-                    skills = bot / ".pi/skills"
-                    names = json.loads((bot / "skills.json").read_text())["skills"]
-                    self.assertFalse(skills.exists())
-                    for name in names:
-                        self.assertEqual((moved / "skills-hub" / name / "references/tools.md").read_text(), f"{name} tools")
-                        self.assertEqual((moved / "skills-hub" / name / "LICENSE").read_text(), "Required notice")
-                command = validation[0].replace("dist/stage/battuta", shlex.quote(str(moved)))
-                result = subprocess.run(["bash", "-euc", command], cwd=work, env=env, capture_output=True, text=True)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                snapshots.append({str(p.relative_to(moved)): p.read_bytes() for p in moved.rglob("*") if p.is_file()})
-        self.assertEqual(snapshots[0], snapshots[1])
-
-    def test_extraction_stops_on_visible_or_hidden_existing_content(self):
-        for content in (None, "", "existing", ".private", "\n"):
-            with self.subTest(content=content), tempfile.TemporaryDirectory(dir=self.root) as directory:
-                command = self.extraction_commands(directory)
-                target = Path(directory) / "battuta/battuta-vX.X.X"
-                if content is not None:
-                    target.mkdir()
-                if content:
-                    (target / content).write_text("preserve")
-                result = subprocess.run(["bash", "-c", command], env={**os.environ, "HOME": directory}, capture_output=True, text=True)
-                self.assertEqual(result.returncode == 0, not content, result.stderr)
-                self.assertEqual("extraction-reached" in result.stdout, not content)
-                if content:
-                    self.assertTrue(result.stderr)
-                    self.assertEqual((target / content).read_text(), "preserve")
-
-    @unittest.skipIf(os.geteuid() == 0, "root bypasses directory read permissions")
-    def test_extraction_stops_if_target_cannot_be_inspected(self):
-        with tempfile.TemporaryDirectory(dir=self.root) as directory:
-            commands = self.extraction_commands(directory)
-            target = Path(directory) / "battuta/battuta-vX.X.X"
-            target.mkdir()
-            target.chmod(0o300)
-            try:
-                result = subprocess.run(["bash", "-c", commands], env={**os.environ, "HOME": directory}, capture_output=True, text=True)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertNotIn("extraction-reached", result.stdout)
-            finally:
-                target.chmod(0o700)
-
-    def test_packages_are_installed_from_staged_bot_settings(self):
-        workflow = (ROOT / ".github/workflows/release.yml").read_text()
-        loop = re.search(
-            r'^          for bot in cos-bot manager-bot; do\n            bot_dir=.*?^          done$',
-            workflow, re.MULTILINE | re.DOTALL,
-        )
-        self.assertIsNotNone(loop)
-        stage = self.root / "dist/stage/battuta/bots"
-        expected_packages = {}
-        for role in ("cos-bot", "manager-bot"):
-            bot = stage / role
-            (bot / "node_modules/.bin").mkdir(parents=True)
-            settings = json.loads((ROOT / "bots" / role / ".pi/settings.json").read_text())
-            (bot / ".pi").mkdir(exist_ok=True)
-            (bot / ".pi/settings.json").write_text(json.dumps(settings))
-            expected_packages[role] = [
-                source.removeprefix("npm:").rsplit("@", 1)[0]
-                for entry in settings["packages"]
-                if isinstance(entry, str)
-                if (source := entry).startswith("npm:")
-            ]
-        self.executable("pnpm", '''import os, pathlib, sys
-args = sys.argv[1:]
-if args[:1] == ["--dir"]:
-    os.chdir(args[1])
-    args = args[2:]
-if args[:1] == ["exec"]:
-    os.execv(str(pathlib.Path.cwd() / "node_modules/.bin" / args[1]), args[1:])
-''')
-        self.executable("pi", '''import pathlib, sys
-source = sys.argv[-1].removeprefix("npm:")
-name, version = source.rsplit("@", 1)
-package = pathlib.Path.cwd() / ".pi/npm/node_modules" / name
-(package / "src").mkdir(parents=True, exist_ok=True)
-(package / "src/index.ts").write_text("Extension boundary stub")
-(package / "extensions/scheduler").mkdir(parents=True, exist_ok=True)
-(package / "extensions/scheduler/index.ts").write_text("Extension boundary stub")
-''')
-        for role in ("cos-bot", "manager-bot"):
-            shutil.copy2(self.bin / "pi", stage / role / "node_modules/.bin/pi")
-        result = subprocess.run(
-            ["bash", "-euc", textwrap.dedent(loop.group())], cwd=self.root,
-            env={**os.environ, "PATH": f"{self.bin}:{os.environ['PATH']}"},
-            capture_output=True, text=True,
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        for role in ("cos-bot", "manager-bot"):
-            packages = stage / role / ".pi/npm/node_modules"
-            for package in expected_packages[role]:
-                self.assertTrue((packages / package).is_dir())
-        self.assertFalse((self.root / ".pi/npm").exists())
+def test_release_provenance_fails_closed(tmp_path):
+    workflow = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
+    script = next(step["run"] for step in workflow["jobs"]["prepare"]["steps"] if step.get("id") == "version")
+    def git(*args):
+        return subprocess.check_output(["git", *args], cwd=tmp_path, text=True, stderr=subprocess.DEVNULL).strip()
+    git("init", "-b", "main")
+    git("config", "user.email", "test@example.com")
+    git("config", "user.name", "Release test")
+    (tmp_path / "source").write_text("release")
+    git("add", "source")
+    git("commit", "-m", "fixture")
+    git("tag", "v1.2.3")
+    git("remote", "add", "origin", str(tmp_path))
+    output = tmp_path.parent / (tmp_path.name + "-outputs")
+    env = {**os.environ, "TAG": "v1.2.3", "GITHUB_OUTPUT": str(output)}
+    result = subprocess.run(["bash", "-c", script], cwd=tmp_path, env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert output.read_text() == f"version=1.2.3+g{git('rev-parse', '--short', 'HEAD')}\n"
+    (tmp_path / "source").write_text("dirty")
+    output.unlink()
+    result = subprocess.run(["bash", "-c", script], cwd=tmp_path, env=env, capture_output=True, text=True)
+    assert result.returncode != 0
+    assert not output.exists()

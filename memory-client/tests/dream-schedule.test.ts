@@ -98,37 +98,58 @@ test("offline reconciliation upgrades the owned legacy prompt without enabling o
   expect(upgraded.tasks[0].prompt).not.toBe(legacy.prompt);
   expect(reconcileDreamSchedule(upgraded, now)).toEqual(upgraded);
 });
-test("explicit offline setup writes stable model/job config idempotently and refreshes registration", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "dream-setup-"));
-  dirs.push(dir);
-  const store = join(dir, "stable/jobs.json");
-  const data = join(dir, "memory");
-  await initializeSchedulerStore(store);
-  await chmod(join(dir, "stable"), 0o750);
-  await mkdir(join(dir, ".pi"));
-  await writeFile(
-    join(dir, ".pi/settings.json"),
-    JSON.stringify({ defaultProvider: "p", defaultModel: "m", extensions: ["custom.ts"] }),
-  );
-  const env = { ...process.env, PI_SCHEDULER_STATE_FILE: store, BATTUTA_MEMORY_DATA_DIR: data };
-  const configure = () =>
-    promisify(execFile)(process.execPath, ["configure-dream.mjs", dir], { env });
-  await configure();
-  expect((await stat(join(dir, "stable"))).mode & 0o777).toBe(0o750);
-  const first = await readFile(store, "utf8");
-  await configure();
-  expect(await readFile(store, "utf8")).toBe(first);
-  expect(JSON.parse(await readFile(join(data, "dream-config.json"), "utf8"))).toEqual({
-    version: 1,
-    model: "p/m",
-  });
-  expect(JSON.parse(await readFile(join(dir, ".pi/settings.json"), "utf8"))).toMatchObject({
-    extensions: ["custom.ts", expect.stringContaining("dream-extension.ts")],
-  });
-  await expect(readFile(join(dir, ".pi/schedule-prompts.json"))).rejects.toMatchObject({
-    code: "ENOENT",
-  });
-});
+test.each([false, true])(
+  "explicit offline setup preserves private model settings (separate agent dir: %s)",
+  async (separate) => {
+    const dir = await mkdtemp(join(tmpdir(), "dream-setup-"));
+    dirs.push(dir);
+    const store = join(dir, "stable/jobs.json");
+    const data = join(dir, "memory");
+    await initializeSchedulerStore(store);
+    await chmod(join(dir, "stable"), 0o750);
+    await mkdir(join(dir, ".pi"));
+    await writeFile(
+      join(dir, ".pi/settings.json"),
+      JSON.stringify({
+        ...(separate ? {} : { defaultProvider: "p", defaultModel: "m" }),
+        extensions: ["custom.ts"],
+      }),
+    );
+    const agent = join(dir, "private-agent");
+    await mkdir(agent);
+    await writeFile(
+      join(agent, "settings.json"),
+      JSON.stringify({ defaultProvider: "p", defaultModel: "m" }),
+    );
+    const env = {
+      ...process.env,
+      ...(separate ? { PI_CODING_AGENT_DIR: agent } : {}),
+      PI_SCHEDULER_STATE_FILE: store,
+      BATTUTA_MEMORY_DATA_DIR: data,
+    };
+    const configure = () =>
+      promisify(execFile)(process.execPath, ["configure-dream.mjs", dir], { env });
+    await configure();
+    expect(JSON.parse(await readFile(join(agent, "settings.json"), "utf8"))).toEqual({
+      defaultProvider: "p",
+      defaultModel: "m",
+    });
+    expect((await stat(join(dir, "stable"))).mode & 0o777).toBe(0o750);
+    const first = await readFile(store, "utf8");
+    await configure();
+    expect(await readFile(store, "utf8")).toBe(first);
+    expect(JSON.parse(await readFile(join(data, "dream-config.json"), "utf8"))).toEqual({
+      version: 1,
+      model: "p/m",
+    });
+    expect(JSON.parse(await readFile(join(dir, ".pi/settings.json"), "utf8"))).toMatchObject({
+      extensions: ["custom.ts", expect.stringContaining("dream-extension.ts")],
+    });
+    await expect(readFile(join(dir, ".pi/schedule-prompts.json"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  },
+);
 test.each([{}, { defaultProvider: "p", defaultModel: "model with spaces" }])(
   "invalid defaults %j leave scheduler and settings unchanged",
   async (settings) => {

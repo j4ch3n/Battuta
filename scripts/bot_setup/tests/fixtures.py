@@ -71,6 +71,7 @@ os.execv(sys.executable, [sys.executable, "-m", "bot_setup.cli", *args[args.inde
             "LINEAR_API_TOKEN=linear-test\n"
             "SUPABASE_URL=http://localhost:54321\n"
             "SUPABASE_SECRET_KEY=supabase-test\n"
+            "WORKER_BOT_COUNT=1\n"
         )
 
     def refresh(self, filename=".env"):
@@ -113,7 +114,7 @@ if "-P" in args:
         for name in ("supabase", "make"):
             self.executable(name, "")
         self.home = self.root / "home"
-        self.worker = self.home / ".battuta/workers/worker-1"
+        self.worker = self.home / ".battuta/pi-bots/worker-1"
         (self.worker / ".pi").mkdir(parents=True)
         for name in ("AGENTS.md", ".pi/settings.json", ".pi/mcp.json", ".pi/auth.json"):
             (self.worker / name).write_text("{}")

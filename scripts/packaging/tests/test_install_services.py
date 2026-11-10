@@ -1,44 +1,66 @@
-import os
-import shutil
-import subprocess
-import sys
-import tempfile
-import unittest
+"""Service generation selects workers without activating or exposing credentials."""
+
 from pathlib import Path
+from types import SimpleNamespace
 
-ROOT = Path(__file__).parents[3]
+import click
+import pytest
+
+from battuta_packaging import services
 
 
-class MemoryUnitTests(unittest.TestCase):
-    def test_units_are_idempotent_and_memory_is_not_required_by_bots(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "bin").mkdir()
-            env = {**os.environ, "HOME": directory, "XDG_CONFIG_HOME": str(root / "config")}
-            for _ in range(2):
-                result = subprocess.run([sys.executable, "-m", "battuta_packaging.cli", "install-services", "--root", str(root)], env=env, capture_output=True, text=True)
-                self.assertEqual(result.returncode, 0, result.stderr)
-            units = root / "config/systemd/user"
-            memory = (units / "battuta-memory.service").read_text()
-            self.assertIn(f"ExecStart={root.resolve()}/bin/battuta memory", memory)
-            self.assertIn("MCP_MEMORY_ONNX_ALLOW_DOWNLOAD=false", memory)
-            cos = (units / "battuta-cos.service").read_text()
-            self.assertIn("Wants=network-online.target battuta-memory.service", cos)
-            self.assertNotIn("Requires=", cos)
-            artifacts = (units / "battuta-artifacts.service").read_text()
-            self.assertIn(f"ExecStart={root.resolve()}/bin/battuta artifacts", artifacts)
-            self.assertNotIn("ExecStartPre=", artifacts)
-            self.assertIn("Restart=on-failure", artifacts)
-            self.assertIn("NoNewPrivileges=true", artifacts)
-            self.assertIn("ProtectSystem=strict", artifacts)
-            self.assertNotIn("setup", artifacts)
+@pytest.fixture
+def deployment(tmp_path, monkeypatch):
+    env_file = tmp_path / ".env.prod"
+    env_file.write_text("WORKER_BOT_COUNT=3\nCOS_TELEGRAM_TOKEN=private-sentinel\n")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setattr(services, "check_node", lambda *a: {})
+    monkeypatch.setattr(services.subprocess, "check_output", lambda *a, **k: str(tmp_path / "tool-bin") + "\n")
+    monkeypatch.setattr(services.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stdout=""))
+    return tmp_path / "release", env_file, Path("/tools/node"), tmp_path / "config/systemd/user"
 
-    def test_conflicting_unit_prevents_all_writes(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            units = root / "systemd/user"
-            units.mkdir(parents=True)
-            (units / "battuta-memory.service").write_text("owner customized unit")
-            result = subprocess.run([sys.executable, "-m", "battuta_packaging.cli", "install-services", "--root", str(root)], env={**os.environ, "XDG_CONFIG_HOME": directory}, capture_output=True, text=True)
-            self.assertNotEqual(result.returncode, 0)
-            self.assertEqual(list(units.iterdir()), [units / "battuta-memory.service"])
+
+@pytest.mark.parametrize("count", [0, 1, 3])
+def test_count_driven_units_are_private_and_never_activated(deployment, count, capsys):
+    root, env, node, units = deployment
+    env.write_text(f"WORKER_BOT_COUNT={count}\nCOS_TELEGRAM_TOKEN=private-sentinel\n")
+    services.install_services(root, env_file=env, node=node)
+    before = {p.name: p.read_bytes() for p in units.iterdir()}
+    services.install_services(root, env_file=env, node=node)
+    assert {p.name: p.read_bytes() for p in units.iterdir()} == before
+    assert set(before) == {"battuta-cos.service", "battuta-manager.service", "battuta-memory.service", "battuta-artifacts.service", "battuta-worker@.service"}
+    text = b"".join(before.values()).decode()
+    assert "private-sentinel" not in text
+    assert "/tools" in text
+    worker = before["battuta-worker@.service"].decode()
+    assert "worker-%i" in worker
+    assert "--mode service" in worker
+    assert "/usr/bin/script -q -e -c" in worker
+    assert "--env-file" in worker
+    assert not (units / "default.target.wants").exists()
+    assert ("battuta-worker@3.service" in capsys.readouterr().out) == (count == 3)
+
+
+@pytest.mark.parametrize("symlink", [False, True])
+def test_conflicting_units_preflight_before_writes(deployment, symlink):
+    root, env, node, units = deployment
+    units.mkdir(parents=True)
+    custom = units / "battuta-manager.service"
+    if symlink:
+        custom.symlink_to(env)
+    else:
+        custom.write_text("custom")
+    with pytest.raises(click.ClickException):
+        services.install_services(root, env_file=env, node=node)
+    assert len(list(units.iterdir())) == 1
+    if symlink:
+        with pytest.raises(click.ClickException):
+            services.install_services(root, env_file=env, node=node, replace=True)
+
+
+def test_excess_running_worker_is_not_stopped(deployment, monkeypatch):
+    root, env, node, units = deployment
+    monkeypatch.setattr(services.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="battuta-worker@4.service loaded active running worker\n"))
+    with pytest.raises(click.ClickException, match="worker"):
+        services.install_services(root, env_file=env, node=node)
+    assert not units.exists()

@@ -4,7 +4,7 @@ Battuta installs unmodified `npm:@jl1990/pi-scheduler@0.5.1` (upstream tag `v0.5
 
 ## Storage and launch
 
-Source CoS setup and release `bin/battuta configure` initialize the native version-2 store at **`~/.battuta/schedule-prompts.json`**. Repeated configuration preserves existing tasks. It does not create a dream task. Setup must run with CoS stopped.
+Source CoS setup and release `battuta-bot-setup configure-release --root DIR --env-file FILE` initialize the native version-2 store at **`~/.battuta/schedule-prompts.json`**. Repeated configuration preserves existing tasks. It does not create a dream task. Setup must run with CoS stopped.
 
 Set `PI_SCHEDULER_STATE_FILE` in the selected `.env`/`.env.prod` to override the path. Use an absolute filename; blank, relative, and literal `~` paths are rejected. Source dev/prod, release foreground, and user services resolve the same default. Keep the same persistent service user and HOME across releases. Run only one CoS process against the store.
 

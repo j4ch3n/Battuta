@@ -18,7 +18,7 @@ class SupportChecksTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name).resolve()
-        for name in ("scripts/checks/check-support.mjs", "scripts/packaging/battuta", "scripts/bot_setup/run-dev.sh",
+        for name in ("scripts/checks/check-support.mjs", "scripts/packaging/release-build.sh", "scripts/bot_setup/run-dev.sh",
                      "scripts/setup-memory.sh", "scripts/setup-artifacts.sh", "scripts/bot_setup/run-worker.sh"):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)

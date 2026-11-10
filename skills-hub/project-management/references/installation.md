@@ -33,12 +33,12 @@ For source development without a global tool installation, run `uv run --project
 The bot archive does not contain the Python CLI or dependency wheels. Install the
 selected GitHub Release's `battuta_project-<version>-py3-none-any.whl` with
 `uv tool install`; the version includes the tag and short commit SHA. Release
-setup provides the exact download URLs, SHA256 checks, and dependency constraints.
-For a wheel already downloaded and verified with its constraints:
+setup provides the exact download URLs and SHA256 checks. The wheel's standard
+metadata declares all pinned runtime dependencies; no separate constraints are
+required. For a wheel already downloaded and verified:
 
 ```sh
-uv tool install --python 3.12 --no-build \
-  --constraint battuta-project-constraints.txt ./battuta_project-<version>-py3-none-any.whl
+uv tool install --managed-python --python 3.12 --no-build ./battuta_project-<version>-py3-none-any.whl
 uv tool update-shell
 battuta-project --help
 ```
@@ -52,26 +52,12 @@ Python 3.12. Installing from source remains a separate development workflow.
 
 `uv tool dir --bin` prints the executable directory (normally `~/.local/bin`). Interactive shell initialization does not automatically apply to systemd user services.
 
-Newly generated release units already include the uv tool directory and uv's
-executable directory on PATH. Check any retained overrides. For custom or older
-bot units (`battuta-cos.service`, `battuta-manager.service`, and
-`battuta-worker.service`), use `systemctl --user edit <service>` and set an explicit
-PATH, replacing the example home with the actual absolute tool directory:
-
-```ini
-[Service]
-Environment="PATH=/home/bot/.local/bin:/usr/local/bin:/usr/bin:/bin"
-```
-
-Then reload the unit definitions without starting services:
-
-```sh
-systemctl --user daemon-reload
-```
-
-During release setup, keep bots stopped and return to the release guide's startup
-step. For an already running deployment, ask the owner before restarting affected
-bots to pick up PATH changes; a worker restart can claim available work.
+Generated CoS/Manager and `battuta-worker@N.service` units include the discovered
+uv tool directory, uv executable directory, and selected nvm Node directory on
+PATH. They do not depend on shell initialization. Keep bots stopped until the
+owner approves activation; a worker can claim available work immediately.
+Conflicting custom units or drop-ins require an owner decision, not an automatic
+PATH merge or legacy-unit migration.
 
 Include custom `gh`/Git locations in PATH when needed (Homebrew on Apple Silicon commonly uses `/opt/homebrew/bin`). Source/tmux launches inherit their shell environment; make the tool available before starting them. Ensure bot services also receive `LINEAR_API_TOKEN` through their runtime environment. Verify `battuta-project --help` and, when cloning is needed, `gh auth status` as the bot user with each bot's intended PATH and token environment. Notes use ordinary Pi file tools; this CLI does not manage notebooks or TODO progress.
 

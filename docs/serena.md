@@ -29,7 +29,7 @@ Paths below are relative to the repository root.
 | `bots/worker/extension/assignment-worker/`                                | Worker-only Pi extension and tests; shared profile settings register it, private instances use the normal interactive Pi CLI                                                              |
 | `project-context-cli/`                                                    | Filesystem project discovery, context and association CLI; see [project configuration](project-context.md)                                                                                |
 | `scripts/checks/`, root `package.json`, `Makefile`                        | Node developer-check runners, commands, and runtime-specific tooling                                                                                                                      |
-| `scripts/packaging/`, `.github/workflows/release.yml`                     | Standalone Python release assembly and service installation, with its own uv environment and tests; reuses the bot setup package                                                          |
+| `scripts/packaging/`, `.github/workflows/release.yml`                     | Compiled bot assembly, lock-derived wheels, installed launch/services, and Oracle Linux ARM64 build/install checks; reuses bot setup with its own uv environment/tests                    |
 | `docs/`                                                                   | Shared technical references and detailed material without a dedicated workflow home                                                                                                       |
 
 ## Serena indexing

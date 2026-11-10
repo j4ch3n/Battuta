@@ -40,7 +40,7 @@ if (selected.some((name) => !Object.hasOwn(groups, name)))
   throw new Error("Unknown support check group");
 const names = selected.length ? selected : Object.keys(groups);
 if (names.includes("scripts")) {
-  run("bash", ["-n", "scripts/packaging/battuta", "scripts/bot_setup/run-dev.sh"]);
+  run("bash", ["-n", "scripts/packaging/release-build.sh", "scripts/bot_setup/run-dev.sh"]);
   run("bash", ["-n", "scripts/setup-memory.sh", "scripts/setup-artifacts.sh"]);
   run("bash", ["-n", "scripts/bot_setup/run-worker.sh"]);
 }

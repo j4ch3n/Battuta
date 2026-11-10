@@ -20,13 +20,16 @@ case "$mode" in
     ;;
 esac
 
-programs=(tmux)
+programs=(tmux uv)
 if [[ "$mode" == dev ]]; then
   programs+=(supabase make)
 fi
 for program in "${programs[@]}"; do
   command -v "$program" >/dev/null || { printf '%s is required\n' "$program" >&2; exit 1; }
 done
+
+[[ -f "$env_file" ]] || { printf 'Missing %s; create it from .env.example\n' "$env_file" >&2; exit 1; }
+worker_list="$(uv run --project "$repo_dir/scripts/bot_setup" --locked battuta-bot-setup workers --env-file "$env_file")"
 
 if tmux has-session -t "=$session" 2>/dev/null; then
   if [[ -n "${TMUX:-}" ]]; then
@@ -39,7 +42,8 @@ fi
 
 if [[ "$mode" == dev ]]; then
   [[ -f "$repo_dir/supabase/.env" ]] || { printf 'Missing supabase/.env; copy supabase/.env.example\n' >&2; exit 1; }
-  worker_dir="$HOME/.battuta/workers/worker-1"
+fi
+if [[ -n "$worker_list" ]]; then
   [[ -f "$repo_dir/bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js" ]] || { printf 'Prepare the shared worker profile and dependencies first\n' >&2; exit 1; }
 fi
 [[ -x "$bot_dir/node_modules/.bin/pi" ]] || { printf 'Pi is not installed; run make setup-cos-bot\n' >&2; exit 1; }
@@ -84,19 +88,21 @@ fi
 pi_pane="$(tmux new-session -d -P -F '#{pane_id}' -s "$session" -n "$bot_window" -c "$bot_dir" "$pi_command")"
 manager_pane="$(tmux split-window -h -P -F '#{pane_id}' -t "$pi_pane" -c "$manager_dir" "$manager_command")"
 printf -v memory_command 'set -a; source %q; set +a; export PATH=%q; exec %q serve' "$env_file" "$PATH" "$repo_dir/memory-service/.venv/bin/battuta-memory"
-if [[ -x "$repo_dir/bin/battuta" ]]; then
-  printf -v memory_command 'export PATH=%q; exec %q memory' "$PATH" "$repo_dir/bin/battuta"
-fi
 memory_pane="$(tmux new-window -P -F '#{pane_id}' -t "=$session" -n "$service_window" -c "$repo_dir" "$memory_command")"
 if [[ "$mode" == dev ]]; then
   tmux split-window -h -t "$memory_pane" -c "$repo_dir" 'exec make functions-serve'
   tmux select-layout -t "$memory_pane" even-horizontal
+fi
+while IFS= read -r worker; do
+   [[ -n "$worker" ]] || continue
+   worker_dir="$HOME/.battuta/pi-bots/$worker"
   printf -v worker_command 'set -e; set -a; source %q; set +a; node %q; exec bash %q --bot-dir %q --env-file %q' "$env_file" "$repo_dir/scripts/bot_setup/wait-for-assignments.mjs" "$repo_dir/scripts/bot_setup/run-worker.sh" "$worker_dir" "$env_file"
   printf -v worker_command 'exec bash -c %q' "$worker_command"
   mkdir -p "$worker_dir"
-  tmux split-window -h -t "$manager_pane" -c "$worker_dir" "$worker_command"
-  tmux select-layout -t "$pi_pane" even-horizontal
-fi
+  worker_pane="$(tmux split-window -h -P -F '#{pane_id}' -t "$manager_pane" -c "$worker_dir" "$worker_command")"
+  tmux select-pane -t "$worker_pane" -T "$worker"
+done <<< "$worker_list"
+tmux select-layout -t "$pi_pane" even-horizontal
 tmux select-window -t "$pi_pane"
 tmux select-pane -t "$pi_pane"
 

@@ -34,13 +34,26 @@ make setup-bot
 make dev
 ```
 
-`make dev` opens a `bots` window with CoS, Manager, and Worker in three equal columns, and a `services` window with shared memory and Edge Functions side by side. It expects local Supabase to be running already and loads `.env`. The worker launcher prepares a private instance by copying relevant configuration from the shared profile only when absent, preserving existing files. See the worker setup entry in the [release setup index](../../../../RELEASE.md#extension-and-skill-setup-index) for preparation and authentication guidance. Workers use normal interactive Pi; the operator launches/tests them. Use `make prod` for CoS and Manager against remote Supabase with `.env.prod`. Do not run dev and prod concurrently from one checkout; they share Pi state. Generated runtime state is ignored and must not be committed.
+Set `WORKER_BOT_COUNT` explicitly in both selected source environment files: `1`
+is normal locally, `0` disables workers, and `N` selects worker-1 through worker-N.
+`make dev` opens a `bots` window with one pane per bot and a `services` window for
+memory and Edge Functions. It expects local Supabase to be running and loads `.env`.
+Workers use flat private paths at `~/.battuta/pi-bots/worker-N`; the source launcher
+copies missing profile configuration without copying authentication. `make prod`
+is source-checkout tmux against remote Supabase using `.env.prod`, including its
+configured workers; deployed releases default to services instead. Existing tmux
+sessions reattach without resizing or duplicate processes. Operators own runtime
+testing. Do not run dev and prod concurrently; they share source CoS/Manager state
+and worker identities. Generated private runtime state must not be committed.
 
 To update CoS Telegram separately, run `make refresh-telegram ENV_FILE=.env`; the file can also be `.env.prod` or another path. It updates CoS's profile only, without reinstalling packages, regenerating instructions, or restarting bots. Reattaching does not reload credentials.
 
 Complete model-provider `/login` interactively in each Pi pane when operating the bots. For setup validation, check generated instructions/MCP files for both profiles, CoS's Telegram file, Manager's absence of Telegram package/configuration, and ignored local skill/session paths. Fail on invalid configuration; do not send bot messages or make model requests as setup checks. Detach with `Ctrl-b d` and use the same Make target to reattach.
 
-Pi handles Linear MCP natively. `make setup-bot` writes the environment-expanded `Authorization` header to each bot's `.pi/mcp.json` and removes older `pi-mcp-adapter` package entries from settings. Rerun setup to migrate an existing checkout. The Make setup targets use `.env`; for production credentials, invoke each setup script explicitly:
+Pi handles Linear MCP natively. `make setup-bot` writes an environment-reference
+`Authorization` header to each bot's `.pi/mcp.json`; runtime supplies the credential.
+The Make setup targets use `.env`; for source work against remote credentials,
+invoke each setup command explicitly:
 
 ```sh
 uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role cos --env-file .env.prod

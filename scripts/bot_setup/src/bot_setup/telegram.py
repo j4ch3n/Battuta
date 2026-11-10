@@ -8,7 +8,7 @@ from .env import positive_id, required
 from .json_config import read_config, write_config
 
 
-def prepare_telegram_config(bot_dir: Path, env_file: Path, prefix: str, values: dict[str, str]) -> tuple[Path, dict, bool]:
+def telegram_payload(env_file: Path, prefix: str, values: dict[str, str]) -> dict:
     def field(name: str) -> str:
         return f"{prefix}_TELEGRAM_{name}"
 
@@ -22,6 +22,14 @@ def prepare_telegram_config(bot_dir: Path, env_file: Path, prefix: str, values: 
     if username and (not username.isascii() or not username.replace("_", "").isalnum()):
         raise click.ClickException(f"{field('BOT_USERNAME')} must be a Telegram username in {env_file}")
 
+    default = {"botToken": token, "allowedUserId": owner, "botId": bot_id}
+    if username:
+        default["botUsername"] = username
+    return {"profiles": {"default": default}}
+
+
+def prepare_telegram_config(bot_dir: Path, env_file: Path, prefix: str, values: dict[str, str]) -> tuple[Path, dict, bool]:
+    owned = telegram_payload(env_file, prefix, values)["profiles"]["default"]
     config = bot_dir / ".pi" / "telegram.json"
     data = read_config(config)
     profiles = data.setdefault("profiles", {})
@@ -31,13 +39,9 @@ def prepare_telegram_config(bot_dir: Path, env_file: Path, prefix: str, values: 
     if not isinstance(default, dict):
         raise click.ClickException("profiles.default must be a JSON object")
     previous = default.copy()
-    default["botToken"] = token
-    default["allowedUserId"] = owner
-    if username:
-        default["botUsername"] = username
-    else:
+    default.update(owned)
+    if "botUsername" not in owned:
         default.pop("botUsername", None)
-    default["botId"] = bot_id
     return config, data, default != previous
 
 

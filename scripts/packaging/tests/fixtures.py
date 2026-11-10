@@ -61,4 +61,4 @@ class LauncherFixture(ConfigFixture):
         self.scheduler = self.root / "stable-schedules/schedule-prompts.json"
         self.scheduler.parent.mkdir()
         self.scheduler.write_text('{"version":2,"revision":0,"tasks":[]}')
-        (self.root / ".env.prod").write_text(f'LINEAR_API_TOKEN=linear-test\nSUPABASE_URL=http://localhost\nSUPABASE_SECRET_KEY=test\nPI_SCHEDULER_STATE_FILE="{self.scheduler}"\n')
+        (self.root / ".env.prod").write_text(f'LINEAR_API_TOKEN=linear-test\nSUPABASE_URL=http://localhost\nSUPABASE_SECRET_KEY=test\nWORKER_BOT_COUNT=1\nPI_SCHEDULER_STATE_FILE="{self.scheduler}"\n')

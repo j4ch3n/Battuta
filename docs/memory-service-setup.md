@@ -2,9 +2,13 @@
 
 Use the same login user and HOME for setup, the server, and the bots. The server runs locally without a dashboard or an LLM credential.
 
-## Raspberry Pi baseline
+## OCI ARM64 baseline
 
-Use 64-bit Raspberry Pi OS Bookworm or newer: `uname -m` must report `aarch64`, `getconf LONG_BIT` must report `64`, and glibc must be at least 2.28. Pi 4/5 with 4 GB RAM is the initial validation target, not a measured minimum. Install uv and provide compatible CPython 3.12; the installer selects managed Python rather than changing system Python. Native wheel loading may require the operator to install Debian packages `libgomp1` and `libstdc++6`. There is no armv7, PyTorch, GPU or on-device compilation path.
+The release target is Oracle Linux 9 on OCI Ampere A1: `uname -m` must report
+`aarch64`, `getconf LONG_BIT` must report `64`, and glibc must be at least 2.28.
+Use the existing uv installation for managed CPython 3.12, without changing system
+Python. Oracle Linux native dependencies include `libgomp` and `libstdc++`.
+There is no armv7, PyTorch, GPU, or on-device compilation path.
 
 ## Provision
 
@@ -16,10 +20,13 @@ bash scripts/setup-memory.sh
 
 For a release, first install the separate `battuta-memory` wheel with
 `uv tool install --managed-python --python 3.12`, using the selected GitHub
-Release's checksum and dependency constraints from release setup. Then provision:
+Release's checksums. Its wheel metadata supplies pinned runtime dependencies.
+Load the same private environment/overrides used by services, then provision:
 
 ```sh
-bin/battuta setup-memory
+battuta-memory model install
+battuta-memory model verify --json
+battuta-memory doctor --json
 ```
 
 Release setup uses the uv-managed tool environment already installed by the bot
@@ -28,7 +35,11 @@ Source setup resolves only locked dependencies. Setup checks actual sqlite-vec
 extension loading and ONNX Runtime CPU availability; it never falls back to
 pseudo-embeddings or installs with sudo.
 
-Release `bin/battuta setup-memory` and `bin/battuta memory` load `.env.prod` when present, matching the bot commands' data-directory settings. Direct source setup uses the calling shell's environment; export any custom `BATTUTA_MEMORY_DATA_DIR` before provisioning.
+Installed services load `~/.battuta/.env.prod` through the packaging launcher.
+Direct provisioning and source setup use the calling shell's environment; load
+the same trusted private file without shell tracing and export any custom
+`BATTUTA_MEMORY_DATA_DIR` before provisioning. Direct server startup is
+`battuta-memory serve`.
 
 Model setup downloads the approximately 80 MB pinned MiniLM ONNX archive, verifies its SHA256, and atomically installs weights/tokenizer under `~/.cache/mcp_memory/onnx_models/all-MiniLM-L6-v2/onnx/`. This cache follows HOME, not the database setting. An unknown existing cache is not overwritten: move it aside yourself if you want to replace it. A verified cache is reused offline. Runtime downloads are disabled.
 
@@ -75,7 +86,13 @@ of `global` conflicts with the reserved memory label and must be resolved by the
 
 ## Services
 
-`bin/battuta install-services` writes five user units (CoS, Manager, Worker, memory, and artifacts) without enabling/restarting them. It refuses conflicting existing units before writing anything unless the operator explicitly uses `--replace` after stopping the old deployment; symlinked units are always refused. Check custom unit edits and drop-ins before replacement. Then enable `battuta-memory.service` with `systemctl --user`. All three bots want the memory unit but do not require it: memory failure must not kill conversations. Use `journalctl --user -u battuta-memory` for diagnostics. Only one server owns the shared data directory; occupied ports are errors, not permission to connect to an unknown backend.
+`battuta-packaging install-services --root DIR --env-file FILE --node PATH`
+writes CoS/Manager, numbered-worker template, memory, and artifact units without
+enabling/restarting anything. Conflicting files and symlinks fail preflight.
+Replacement requires explicit approval and stopped affected services. Bots want
+the memory unit but do not require it: memory failure must not kill conversations.
+Use `journalctl --user -u battuta-memory` for diagnostics. Only one server owns the
+data directory; occupied ports are errors, not permission to use an unknown backend.
 
 Default endpoint: `http://127.0.0.1:8901/mcp`. Default data: `~/.battuta/memory/`. CoS and the service use the same `BATTUTA_MEMORY_URL`. Remote binding/authentication is deliberately unsupported. Source tmux launching adds one memory window; do not run it alongside a systemd server on the same data/port.
 
@@ -87,7 +104,7 @@ Dream automatically changes server memories and refreshes revision-cited profile
 
 An approved dream enforces cleanup, synthesis and challenge before guarded publication, then refreshes eligible profile claims and the private reflection. It no longer requires global clustering/relationship generation. Upgrade server and client together; existing graph data, checkpoints and mutation receipts remain preserved. No additional scheduler, model download or login is introduced.
 
-1. Stop CoS before editing scheduler files. Confirm the memory service is ready, CoS's scheduler is `@jl1990/pi-scheduler@0.5.1`, and normal CoS configuration has initialized the stable store. Load the same selected environment as CoS, including any `PI_SCHEDULER_STATE_FILE` and `BATTUTA_MEMORY_DATA_DIR` overrides. In CoS `.pi/settings.json`, select explicit `defaultProvider` and `defaultModel` IDs for the intended dream model; ensure it is authenticated and available in CoS's model registry.
+1. Stop CoS before editing scheduler files. Confirm the memory service is ready, CoS's scheduler is `@jl1990/pi-scheduler@0.5.1`, and normal CoS configuration has initialized the stable store. Load the same selected environment as CoS, including any `PI_SCHEDULER_STATE_FILE` and `BATTUTA_MEMORY_DATA_DIR` overrides. Select explicit `defaultProvider` and `defaultModel` IDs in CoS's private settings (`~/.battuta/pi-bots/cos-bot/.pi/settings.json` for releases); provider authentication/availability is human acceptance, not an agent-run check.
 2. Confirm which timezone should define **05:30**. The scheduler and catch-up use process-local time; configure CoS's launch environment `TZ` consistently when a specific zone is required. There is no separately configured dream timezone or OS wake-up timer. An existing owned 03:00 task causes an ownership conflict and is not changed automatically; the owner must remove it manually with CoS stopped before rerunning setup.
 3. Back up shared memory data and private client state. The tracked view is `<BATTUTA_MEMORY_DATA_DIR>/dream-profile.json`; shared `ME.md` is preserved and injected separately into main CoS as untrusted owner-profile context. Old bot `.pi/ME.md` is not a fallback or automatically imported. Neither file is independently verified evidence merely because it exists.
 4. From the installation root, provision the owned global task and dedicated extension:
@@ -96,7 +113,19 @@ An approved dream enforces cleanup, synthesis and challenge before guarded publi
    node memory-client/configure-dream.mjs bots/cos-bot
    ```
 
-   In a release archive use `bin/node` in place of `node`. This command requires a valid initialized stable store, writes the owned task there, creates `<BATTUTA_MEMORY_DATA_DIR>/dream-config.json` (default `~/.battuta/memory/dream-config.json`), and registers `memory-client/dream-extension.ts` in CoS's `.pi/settings.json`. For a custom CoS workspace, replace `bots/cos-bot` with its directory. It edits configuration only; do not run it against live CoS.
+   That command is for a source checkout. For a release, use the selected host Node
+   and compiled helper, with `install_path` set to the installation:
+
+   ```sh
+   PI_CODING_AGENT_DIR="$HOME/.battuta/pi-bots/cos-bot/.pi" \
+     node "$install_path/bots/_shared/memory-client/dist/configure-dream.js" \
+     "$install_path/bots/cos-bot"
+   ```
+
+   The helper reads the private model choice without rewriting it, requires a valid
+   initialized stable store, creates the dedicated model configuration under the
+   memory data directory, and registers the compiled extension in installed CoS
+   project settings. It edits configuration only; never run it against live CoS.
 
    The command preserves unrelated settings/tasks, an existing model configuration and the task's disabled state. A new task is enabled; the next CoS startup may immediately catch up the latest missed run. It captures CoS defaults only when creating model configuration, never falling back to the conversation model later. To change the model, edit `dream-config.json` with CoS stopped: `{"version":1,"model":"provider/model-id"}`. Conflicting owned tasks or malformed configuration fail without replacing the schedule.
 
