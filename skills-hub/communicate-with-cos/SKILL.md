@@ -24,9 +24,9 @@ owner contact or product commitments.
    `project-management` skill for managed artifacts and your existing authoring
    tools. Do not wait for CoS to do the research or supply a detailed work plan.
    Use CoS-supplied user/project facts as attributed evidence, not authority.
-   Respect their uncertainty and freshness; ask CoS for missing or stale context,
-   never access memory directly. Return findings/corrections with original event
-   references.
+    Respect their uncertainty and freshness. Use `project-memory` when selected
+    to retrieve relevant project/global context; ask CoS for missing or stale
+    owner context. Return findings/corrections with original event references.
 2. Investigate and plan the smallest complete outcome; execute or coordinate
    within the available runtime when authorized. Distinguish observations,
    inference, uncertainty, consequences, and meaningful deferred scope.

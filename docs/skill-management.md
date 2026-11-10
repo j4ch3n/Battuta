@@ -37,10 +37,10 @@ The owning implementation is `scripts/bot_setup/`; packaging reuses it.
 
 Releases archive the catalog once, including nested resources and notices,
 alongside the profile manifests. They contain no generated per-agent skill
-discovery output. Installed CoS/Manager configuration validates selections but
-does not configure runtime discovery from them. Worker configuration writes
+discovery output. Installed Manager configuration validates selections and writes
 selected shared catalog paths into Pi's native `skills` settings; it does not
-copy the catalog into each instance.
+copy the catalog into the profile. Worker configuration follows the same native
+settings pattern. CoS continues to use its extension-managed runtime loadout.
 
 Source setup validates selections before configuration writes and does not wipe
 custom discovery content. When removing generated checkout links, inspect them first;

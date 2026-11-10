@@ -17,11 +17,13 @@ authorized maintenance calls; it is not a conversational runtime skill.
 | Dream state          | `dream-config.json`, `dream-lock.db`, `dream-state.json`, `dream-profile.json`, `dream.log`.                 |
 | `ME.md`              | Preserved private owner text; never automatically treated as verified evidence or overwritten by v3 dreams.  |
 
-Only the isolated recall agent has conversational memory MCP exposure. Main CoS
-receives prepared context without memory tools or a memory skill. Capture and
-approved dreaming retain programmatic access. Manager and workers receive
-selected Agent Mail context and return attributed findings/corrections. Same-user
-shell access still exists; this is not credential isolation or a security sandbox.
+CoS conversational recall uses an isolated recall agent. Main CoS receives
+prepared context without memory tools or a memory skill. Capture and approved
+dreaming retain programmatic access. Manager has a direct native MCP connection
+and selects `project-memory` for project/global retrieval and supported
+deliberate maintenance; workers receive selected Agent Mail context. Same-user
+shell access still exists; this is not credential isolation or a security
+sandbox.
 Protect all data, logs and backups as private conversation information. One server
 owns the data lock. There is no per-project database or `MEMORY.md`.
 
@@ -171,11 +173,13 @@ Pending capture suppresses both profile and recalled facts. Expiring recalled
 support invalidates recalled evidence without dropping a separately loaded profile.
 
 Commission-time origin/ref-selection gates and the extra recall pass are removed.
-CoS chooses relevant prepared evidence for Manager/workers and must not forward
-the whole packet/profile. Agent Mail retains normal envelope validation. Delivered
-mail cannot be revoked: send a correction citing the earlier message. Manual
-remember/update/forget tools are no longer in main CoS's loadout; capture still
-handles supported facts and corrections, without guaranteeing a particular save.
+CoS chooses relevant prepared owner evidence for Manager/workers and must not
+forward the whole packet/profile. Manager retrieves its own relevant
+project/global evidence through MCP. Agent Mail retains normal envelope
+validation. Delivered mail cannot be revoked: send a correction citing the
+earlier message. Manual remember/update/forget tools are absent from main CoS;
+capture still handles supported facts and corrections, without guaranteeing a
+particular save.
 
 ## Owner profile and nightly dream
 
@@ -222,7 +226,8 @@ and existing ten-minute caller/shutdown cancellation. No provider fallback is ad
 Setup never starts bots, changes provider login, imports private history, or tests
 by writing production memory. Obtain approval before stopping a deployment; retain
 consistent data/client-state backups. Upgrade server and client together, configure
-isolated recall exposure, disable main CoS memory MCP and configure disabled Manager/worker overrides, then use the
+isolated recall exposure, disable main CoS memory MCP, configure Manager's direct
+memory connection, and retain the disabled Worker override, then use the
 filesystem/CLI checks in the [setup guide](memory-service-setup.md). Do not start a
 second service on the same data/port. The unrelated exploration server on port 8900
 must not be stopped. Rollback is an operator-controlled restore, not live downgrade.

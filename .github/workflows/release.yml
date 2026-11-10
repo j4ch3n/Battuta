@@ -141,7 +141,7 @@ jobs:
           test -s dist/stage/battuta/docs/gogcli-setup.md
           test -s dist/stage/battuta/docs/luma-setup.md
           test -s dist/stage/battuta/docs/luma.md
-          test -s dist/stage/battuta/skills-hub/memory/references/tools.md
+          test -s dist/stage/battuta/skills-hub/project-memory/SKILL.md
           test ! -e dist/stage/battuta/bots/AGENTS_personal.md
           cp "$(command -v node)" dist/stage/battuta/bin/node
           cp scripts/packaging/battuta dist/stage/battuta/bin/battuta

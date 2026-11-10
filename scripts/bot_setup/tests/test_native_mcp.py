@@ -8,7 +8,7 @@ import pytest
 from bot_setup.mcp import configure_mcp
 
 
-@pytest.mark.parametrize("role", ["cos", "manager"])
+@pytest.mark.parametrize("role", ["cos", "manager", "worker"])
 def test_native_configuration_preserves_custom_and_private_state(tmp_path, role):
     pi = tmp_path / ".pi"
     pi.mkdir()
@@ -22,7 +22,19 @@ def test_native_configuration_preserves_custom_and_private_state(tmp_path, role)
         assert config["custom"] is True
         assert config["mcpServers"]["other"] == {"command": "custom"}
         assert ("luma" in config["mcpServers"]) == (role == "cos")
-        assert config["mcpServers"]["memory"]["enabled"] is False
+        expected_memory = (
+            {
+                "url": "http://localhost:8989/mcp",
+                "enabled": True,
+                "exposure": "codemode",
+                "description": "Shared project memory, including retrieval and supported maintenance",
+            }
+            if role == "manager"
+            else {"url": "http://localhost:8989/mcp", "enabled": False}
+            if role == "cos"
+            else {"enabled": False}
+        )
+        assert config["mcpServers"]["memory"] == expected_memory
         if role == "cos":
             assert "url" in config["mcpServers"]["memory"]
         assert json.loads((pi / "settings.json").read_text()) == {"theme": "dark", "packages": ["npm:custom@1"]}
@@ -30,10 +42,11 @@ def test_native_configuration_preserves_custom_and_private_state(tmp_path, role)
         assert (pi / "mcp.json").stat().st_mode & 0o777 == 0o600
 
 
+@pytest.mark.parametrize("role", ["cos", "manager"])
 @pytest.mark.parametrize("url", ["https://localhost/mcp", "http://example.com/mcp", "http://user:private-password@localhost/mcp", "invalid", ""])
-def test_invalid_endpoint_has_no_writes_or_secret_in_error(tmp_path, url):
+def test_invalid_endpoint_has_no_writes_or_secret_in_error(tmp_path, role, url):
     with pytest.raises(click.ClickException, match="loopback HTTP") as error:
-        configure_mcp(tmp_path, role="cos", memory_url=url, supabase_url="http://localhost:54321")
+        configure_mcp(tmp_path, role=role, memory_url=url, supabase_url="http://localhost:54321")
     assert "private-password" not in str(error.value)
     assert not (tmp_path / ".pi").exists()
 

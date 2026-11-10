@@ -47,7 +47,7 @@ def assignment_server(supabase_url: str) -> dict:
 def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager", "worker"], supabase_url: str, memory_url: str | None = None) -> None:
     if role not in {"cos", "manager", "worker"}:
         raise click.ClickException("Bot role must be cos or manager")
-    url = validate_memory_url(memory_url) if role == "cos" else None
+    url = validate_memory_url(memory_url) if role in {"cos", "manager"} else None
     assignment = assignment_server(supabase_url)
     path = bot_dir / ".pi/mcp.json"
     settings_path = bot_dir / ".pi/settings.json"
@@ -69,6 +69,13 @@ def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager", "worker"], s
     if role == "cos":
         # A disabled override also blocks an inherited user-level memory server.
         servers["memory"] = {"url": url, "enabled": False}
+    elif role == "manager":
+        servers["memory"] = {
+            "url": url,
+            "enabled": True,
+            "exposure": "codemode",
+            "description": "Shared project memory, including retrieval and supported maintenance",
+        }
     else:
         servers["memory"] = {"enabled": False}
     servers["assignments"] = assignment

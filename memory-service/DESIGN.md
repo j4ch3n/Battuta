@@ -3,10 +3,11 @@
 ## Purpose and ownership
 
 Memory supplies revisable personal and project evidence, never execution authority
-or a replacement for canonical project documents. Only the focused recall child
-has conversational memory MCP tools; CoS receives prepared evidence and `ME.md`.
-Manager and workers receive selected Agent Mail context and return attributed
-findings/corrections. Configuration exclusion is not a same-user security sandbox.
+or a replacement for canonical project documents. CoS receives prepared evidence
+from the focused recall child; its parent extension separately loads `ME.md`.
+Manager retrieves project/global memory through its direct MCP connection; workers
+receive selected Agent Mail context and return attributed findings/corrections.
+Configuration exclusion is not a same-user security sandbox.
 
 The CoS Pi extension owns capture, isolated recall preparation, dreaming and profile loading.
 The server owns storage, retrieval, evidence rendering, deterministic validation and replay. Pi owns
@@ -247,12 +248,14 @@ Old global-relationship tools/data remain optional, revision-checked maintenance
 views. V3 dreaming never requires `memory_consolidate_global` or graph hints.
 
 There is no commission-time origin/ref-selection gate or second recall pass.
-CoS chooses relevant prepared evidence for Agent Mail and must not forward the
-whole packet/profile. Preserve uncertainty and necessary counterevidence. The
+CoS chooses relevant prepared owner evidence for Agent Mail and must not forward
+the whole packet/profile. Manager retrieves relevant project/global evidence
+directly through MCP. Preserve uncertainty and necessary counterevidence. The
 existing Agent Mail validator checks envelope/size before transport. Delivered
 mail cannot be revoked; CoS sends a referenced correction when context changes.
-Direct manual memory mutation tools are absent from main CoS; existing capture
-and approved dream adapters retain their programmatic operations.
+Direct manual memory mutation tools are absent from main CoS; Manager's native
+MCP connection supports deliberate maintenance, while existing capture and
+approved dream adapters retain their programmatic operations.
 
 ## Preservation and deliberate limits
 
