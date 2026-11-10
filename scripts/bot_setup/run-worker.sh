@@ -50,6 +50,7 @@ for (const key of ["extensions", "skills", "packages"]) {
 }
 writeFileSync(target, JSON.stringify(settings, null, 2) + "\n", { flag: "wx", mode: 0o600 });
 JS
+  uv run --project "$root/scripts/bot_setup" --locked battuta-bot-setup configure-browser --profile "$root/bots/worker" --bot-dir "$bot_dir" --bot "$(basename "$bot_dir")"
 fi
 if [[ ! -e "$bot_dir/.pi/mcp.json" && ! -L "$bot_dir/.pi/mcp.json" ]]; then
   cp -n "$mcp_source" "$bot_dir/.pi/mcp.json"

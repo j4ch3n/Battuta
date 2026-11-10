@@ -57,6 +57,8 @@ bash scripts/bot_setup/run-worker.sh --bot-dir "$worker" --env-file .env
 ```
 
 The launcher uses the shared instance lock and normal Pi UI, not a custom host.
+It runs from the shared checkout worker role while `PI_CODING_AGENT_DIR` selects
+the intended private instance. Runtime state is not the project working directory.
 The operator handles `/login` and `/model` within the intended private instance.
 Never launch an additional authentication process beside a running instance or
 copy another bot's authentication. Launch can immediately claim available work.

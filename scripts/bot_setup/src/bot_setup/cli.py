@@ -5,10 +5,11 @@ from pathlib import Path
 import click
 
 from . import skills
+from .browser import configure_browser, validate_browser
 from .configure import configure_source, configure_worker
-from .release import configure_release
+from .release import configure_release, validate_private_home
 from .env import read_env
-from .instances import worker_names
+from .instances import instance_paths, worker_names
 from .source_launch import run_source_worker
 from .install import TELEGRAM_PACKAGE
 from .json_config import write_config
@@ -50,6 +51,24 @@ def run_worker(root, bot_dir, env_file, node):
     run_source_worker(root, bot_dir=bot_dir, env_file=env_file, node=node)
 
 
+@main.command("configure-browser")
+@click.option("--profile", type=DIRECTORY, required=True)
+@click.option("--bot-dir", type=DIRECTORY, required=True)
+@click.option("--bot", required=True)
+def browser_config(profile, bot_dir, bot):
+    """Configure one source bot's private browser settings without launching it."""
+    configure_browser(profile, bot_dir, home=Path.home(), bot=bot)
+
+
+@main.command("browser-executable")
+@click.option("--profile", type=DIRECTORY, required=True)
+@click.option("--bot-dir", type=DIRECTORY, required=True)
+@click.option("--bot", required=True)
+def browser_executable(profile, bot_dir, bot):
+    """Validate private browser settings and print the launch executable."""
+    click.echo(validate_browser(profile, bot_dir, home=Path.home(), bot=bot)["CHROME_PATH"])
+
+
 @main.command()
 @click.option("--root", type=DIRECTORY, required=True)
 @click.option("--role", type=click.Choice(["cos", "manager", "worker"]), required=True)
@@ -68,7 +87,9 @@ def configure(root, role, bot_dir, env_file, env_prefix, telegram_package):
 def refresh_telegram(root, env_file):
     """Refresh CoS Telegram without reinstalling packages."""
     values = read_env(env_file)
-    path, data, changed = prepare_telegram_config(root / "bots/cos-bot", env_file, "COS", values)
+    private = instance_paths(root, Path.home(), "cos-bot")[2]
+    validate_private_home(private)
+    path, data, changed = prepare_telegram_config(private, env_file, "COS", values)
     if changed:
         write_config(path, data, ".telegram-")
         click.echo(f"Updated {path} from {env_file}.")

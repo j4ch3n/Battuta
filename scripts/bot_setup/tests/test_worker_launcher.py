@@ -6,13 +6,23 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
+from bot_setup.browser import configure_browser
 from bot_setup.mcp import configure_mcp
 
 ROOT = Path(__file__).resolve().parents[3]
 
 
 class WorkerLauncherTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(dir="/tmp")
+        self.addCleanup(temporary.cleanup)
+        self.home = Path(temporary.name).resolve()
+        home = patch.dict(os.environ, {"HOME": str(self.home)})
+        home.start()
+        self.addCleanup(home.stop)
+
     def test_launch_exports_worker_context_without_telegram_or_scheduler(self):
         with tempfile.TemporaryDirectory(dir="/tmp") as directory:
             root = Path(directory).resolve()
@@ -27,11 +37,15 @@ class WorkerLauncherTests(unittest.TestCase):
             cli = runtime / "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
             cli.parent.mkdir(parents=True)
             cli.write_text("fixture")
+            configure_browser(root / "bots/worker", bot, home=self.home, bot="worker-1")
             binary = root / "bin"
             binary.mkdir()
             node = binary / "node"
             node.write_text("#!/usr/bin/env python3\nimport json,os,sys\nprint(json.dumps({'args':sys.argv[1:],'role':os.environ.get('AGENT_ROLE'),'agentDir':os.environ.get('PI_CODING_AGENT_DIR'),'private':[key for key in os.environ if 'TELEGRAM' in key or key.startswith('PI_SCHEDULER')]}))\n")
             node.chmod(0o755)
+            chromium = binary / "chromium-browser"
+            chromium.write_text("#!/bin/sh\nexit 99\n")
+            chromium.chmod(0o700)
             env_file = root / ".env"
             env_file.write_text("WORKER_BOT_COUNT=1\nSUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n")
             env = {**os.environ, "PATH":f"{binary}:{os.environ['PATH']}", "COS_TELEGRAM_TOKEN":"private-sentinel", "PI_SCHEDULER_STATE_FILE":"private-sentinel"}
@@ -75,13 +89,16 @@ class WorkerLauncherTests(unittest.TestCase):
             real_node = shutil.which("node")
             node.write_text(f'#!/bin/sh\nif [ "$1" = "--input-type=module" ]; then exec "{real_node}" "$@"; fi\nprintf "%s\\n" "$PI_CODING_AGENT_DIR" "$PWD"\n')
             node.chmod(0o755)
+            chromium = binary / "chromium-browser"
+            chromium.write_text("#!/bin/sh\nexit 99\n")
+            chromium.chmod(0o700)
             (root / ".env").write_text("WORKER_BOT_COUNT=1\nSUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n")
             bot = root / "new private instances/worker-1"
             env = {**os.environ, "PATH": f"{binary}:{os.environ['PATH']}"}
             args = ["bash", str(scripts / "run-worker.sh"), "--bot-dir", str(bot)]
             first = subprocess.run(args, env=env, capture_output=True, text=True)
             self.assertEqual(first.returncode, 0, first.stderr)
-            self.assertEqual(first.stdout.splitlines(), [str(bot / ".pi"), str(bot)])
+            self.assertEqual(first.stdout.splitlines(), [str(bot / ".pi"), str(profile)])
             settings = json.loads((bot / ".pi/settings.json").read_text())
             self.assertEqual(settings["extensions"], [str(profile / "extension/assignment-worker/index.ts")])
             self.assertEqual(settings["packages"], [{"source": "npm:pi-web-access@0.43.0", "skills": []}, "npm:custom"])
@@ -91,19 +108,21 @@ class WorkerLauncherTests(unittest.TestCase):
             self.assertEqual((bot / ".pi/web-search.json").read_bytes(), (profile / ".pi/web-search.json").read_bytes())
             self.assertNotIn("private-sentinel", (bot / ".pi/mcp.json").read_text())
             self.assertFalse((bot / ".pi/auth.json").exists())
-            (bot / ".pi/settings.json").write_text('{"theme":"custom"}')
+            settings["theme"] = "custom"
+            private_settings = json.dumps(settings)
+            (bot / ".pi/settings.json").write_text(private_settings)
             (bot / ".pi/mcp.json").unlink()
             (bot / ".pi/web-search.json").unlink()
             missing_mcp = subprocess.run(args, env=env, capture_output=True, text=True)
             self.assertEqual(missing_mcp.returncode, 0, missing_mcp.stderr)
             self.assertEqual((bot / ".pi/mcp.json").read_bytes(), (profile / ".pi/mcp.json").read_bytes())
             self.assertEqual((bot / ".pi/web-search.json").read_bytes(), (profile / ".pi/web-search.json").read_bytes())
-            self.assertEqual((bot / ".pi/settings.json").read_text(), '{"theme":"custom"}')
+            self.assertEqual((bot / ".pi/settings.json").read_text(), private_settings)
             for name in ("auth.json", "mcp.json", "web-search.json"):
                 (bot / ".pi" / name).write_text("private-state")
             again = subprocess.run(args, env=env, capture_output=True, text=True)
             self.assertEqual(again.returncode, 0, again.stderr)
-            self.assertEqual((bot / ".pi/settings.json").read_text(), '{"theme":"custom"}')
+            self.assertEqual((bot / ".pi/settings.json").read_text(), private_settings)
             for name in ("auth.json", "mcp.json", "web-search.json"):
                 self.assertEqual((bot / ".pi" / name).read_text(), "private-state")
 

@@ -38,13 +38,20 @@ Set `WORKER_BOT_COUNT` explicitly in both selected source environment files: `1`
 is normal locally, `0` disables workers, and `N` selects worker-1 through worker-N.
 `make dev` opens a `bots` window with one pane per bot and a `services` window for
 memory and Edge Functions. It expects local Supabase to be running and loads `.env`.
-Workers use flat private paths at `~/.battuta/pi-bots/worker-N`; the source launcher
+Bots use flat private paths at `~/.battuta/pi-bots/<bot>/.pi`; the source launcher
 copies missing profile configuration without copying authentication. `make prod`
 is source-checkout tmux against remote Supabase using `.env.prod`, including its
 configured workers; deployed releases default to services instead. Existing tmux
 sessions reattach without resizing or duplicate processes. Operators own runtime
 testing. Do not run dev and prod concurrently; they share source CoS/Manager state
 and worker identities. Generated private runtime state must not be committed.
+
+Every source bot uses `~/.battuta/pi-bots/<bot>/.pi/` for runtime configuration,
+authentication, and sessions; its checkout `.pi/settings.json` owns project
+resources/defaults only. Source workers launch from the shared worker role with
+their private agent directories. Bot-specific refresh commands write the private
+file. Existing checkout-local authentication/sessions are left untouched, not
+moved; perform human login in the private agent directory selected by the launcher.
 
 To update CoS Telegram separately, run `make refresh-telegram ENV_FILE=.env`; the file can also be `.env.prod` or another path. It updates CoS's profile only, without reinstalling packages, regenerating instructions, or restarting bots. Reattaching does not reload credentials.
 

@@ -40,16 +40,31 @@ def installed(tmp_path):
         pi = home / ".battuta/pi-bots" / name / ".pi"
         pi.mkdir(parents=True)
         (pi / "mcp.json").write_text("{}")
+        if name != "manager-bot":
+            (pi / "browser-research").mkdir(mode=0o700)
+            (pi / "settings.json").write_text(json.dumps({"pi-browser-use": {
+                "userDataDir": str(pi / "browser-research"), "executablePath": "${CHROME_PATH}",
+                "autoConnect": False, "isolated": False, "browserUrl": "", "wsEndpoint": "",
+                "session": {"enabled": False}, "extraArgs": [],
+            }}))
         if name == "cos-bot":
             (pi / "telegram.json").write_text("{}")
     (root / "bots/_shared/memory-client/dist/configure-scheduler.js").write_text('if(process.argv.includes("--print-path")) console.log("fixture-scheduler"); else if(process.argv.includes("--print-catchup")) console.log("0");')
+    binary = home / "bin"
+    binary.mkdir(parents=True)
+    chromium = binary / "chromium-browser"
+    chromium.write_text("#!/bin/sh\nexit 99\n")
+    chromium.chmod(0o700)
+    (home / ".battuta/browser-screenshot").mkdir(mode=0o700)
     return root, home, env, node
 
 
 @pytest.mark.parametrize("bot", ["cos-bot", "manager-bot", "worker-1", "worker-2"])
 def test_launch_cwd_private_state_and_credentials(installed, bot):
     root, home, env_file, node = installed
-    result = subprocess.run([sys.executable, "-m", "battuta_packaging.cli", "run-bot", "--root", str(root), "--bot", bot, "--env-file", str(env_file), "--node", str(node), "--mode", "service"], env={**os.environ, "HOME": str(home)}, capture_output=True, text=True)
+    if bot == "manager-bot":
+        (home / "bin/chromium-browser").unlink()
+    result = subprocess.run([sys.executable, "-m", "battuta_packaging.cli", "run-bot", "--root", str(root), "--bot", bot, "--env-file", str(env_file), "--node", str(node), "--mode", "service"], env={**os.environ, "HOME": str(home), "PATH": str(home / "bin") + os.pathsep + os.environ["PATH"]}, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     output = json.loads(result.stdout)
     assert output["cwd"] == str(root / "bots" / ("worker" if bot.startswith("worker-") else bot))
@@ -58,6 +73,8 @@ def test_launch_cwd_private_state_and_credentials(installed, bot):
     assert output["env"]["LINEAR_API_TOKEN"] == "private-linear"
     assert "--session-dir" in output["args"]
     assert "--offline" in output["args"]
+    if bot != "manager-bot":
+        assert output["env"]["CHROME_PATH"] == str(home / "bin/chromium-browser")
 
 
 @pytest.mark.parametrize("damage", ["incomplete", "missing", "wrong-version"])

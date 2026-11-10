@@ -23,7 +23,11 @@ class WorkerSetupTests(unittest.TestCase):
             skill = self.root / "skills-hub" / name
             skill.mkdir(parents=True)
             (skill / "SKILL.md").write_text(f"---\nname: {name}\ndescription: Fixture\n---\n")
-        self.bot = self.root / "private instance"
+        self.home = self.root / "home"
+        home = patch.dict("os.environ", {"HOME": str(self.home)})
+        home.start()
+        self.addCleanup(home.stop)
+        self.bot = self.home / ".battuta/pi-bots/worker-1"
         self.env = self.root / ".env"
         self.env.write_text("SUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-key\n")
         self.runtime = self.profile / "extension/assignment-worker"
@@ -55,12 +59,13 @@ class WorkerSetupTests(unittest.TestCase):
             path = self.profile / ".pi" / file
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("source-private")
-        for bot in (self.bot, self.root / "second instance"):
+        for bot in (self.bot, self.home / ".battuta/pi-bots/worker-2"):
             with patch("bot_setup.configure.run") as run:
                 configure_worker(self.root, bot_dir=bot, env_file=self.env)
             run.assert_not_called()
             self.assertEqual((bot / "AGENTS.md").read_text(), (self.profile / "AGENTS.md").read_text())
             settings = json.loads((bot / ".pi/settings.json").read_text())
+            self.assertEqual(settings["pi-browser-use"]["userDataDir"], str(bot / ".pi/browser-research"))
             self.assertTrue(all(Path(value).exists() for value in settings["extensions"]))
             self.assertTrue(all((Path(value) / "SKILL.md").is_file() for value in settings["skills"]))
             self.assertTrue(all(value.startswith("npm:") for value in settings["packages"]))

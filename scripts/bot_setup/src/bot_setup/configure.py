@@ -7,12 +7,15 @@ import re
 
 import click
 
+from .browser import browser_defaults, browser_settings, configure_browser
 from .env import read_env, required
 from .install import SCHEDULE_PACKAGE, TELEGRAM_PACKAGE, install_packages, run, warn_running_session
 from .instructions import configure_instructions
+from .instances import instance_paths
 from .json_config import read_config, write_config
 from .mcp import assignment_server, configure_mcp, validate_memory_url
 from .memory import configure_memory_settings
+from .release import validate_private_home
 from .subagents import SUBAGENT_PACKAGE, WEB_PACKAGE, configure_subagents
 from .telegram import prepare_telegram_config
 from .skills import load_selection
@@ -37,16 +40,26 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
     supabase_url = required(values, "SUPABASE_URL", env_file)
     required(values, "SUPABASE_SECRET_KEY", env_file)
     assignment_server(supabase_url)
-    telegram = prepare_telegram_config(bot_dir, env_file, prefix, values) if role == "cos" else None
+    private = instance_paths(root, Path.home(), "cos-bot")[2] if role == "cos" else bot_dir
+    if role == "cos":
+        validate_private_home(private)
+    telegram = prepare_telegram_config(private, env_file, prefix, values) if role == "cos" else None
     url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
+    if role == "cos":
+        browser_settings(bot_dir, private, home=Path.home(), bot="cos-bot")
     configure_instructions(bot_dir, role=role, root=root)
     if telegram is not None:
         path, data, changed = telegram
         if changed:
             write_config(path, data, ".telegram-")
-    configure_mcp(bot_dir, role=role, memory_url=url, supabase_url=supabase_url)
+    configure_mcp(private, role=role, memory_url=url, supabase_url=supabase_url)
     configure_memory_settings(bot_dir, role=role)
     if role == "cos":
+        configure_browser(bot_dir, private, home=Path.home(), bot="cos-bot")
+        path = bot_dir / ".pi/settings.json"
+        settings = read_config(path)
+        browser_defaults(settings)
+        write_config(path, settings, ".settings-")
         run("pnpm", "--dir", str(root / "memory-client"), "install", "--frozen-lockfile")
         run("node", str(root / "memory-client/configure-scheduler.mjs"), "--initialize", env={**os.environ, **values})
         extra = (SCHEDULE_PACKAGE,)
@@ -80,6 +93,7 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
     path = bot_dir / ".pi/settings.json"
     settings = read_config(path)
     validate_worker_settings(settings)
+    browser_defaults(settings)
     runtime = profile / "extension/assignment-worker"
     if not shared_catalog:
         run("pnpm", "--dir", str(runtime), "install", "--frozen-lockfile")

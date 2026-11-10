@@ -57,7 +57,12 @@ def test_staged_archive_is_bot_only(source, tmp_path):
         assert (bot / "AGENTS.md").is_file()
         assert (bot / ".pi/skills/research/LICENSE").read_text() == "LICENSE"
         assert not (bot / ".pi/auth.json").exists()
-        assert "defaultModel" not in json.loads((bot / ".pi/settings.json").read_text())
+        settings = json.loads((bot / ".pi/settings.json").read_text())
+        assert "defaultModel" not in settings
+        assert any("pi-browser-use" in package for package in settings["packages"]) == (profile != "manager-bot")
+        if profile != "manager-bot":
+            assert settings["pi-browser-use"]["headless"] is True
+            assert "userDataDir" not in settings["pi-browser-use"]
     assert not list(target.rglob("*.ts"))
     assert not list(target.rglob("node_modules"))
     moved = tmp_path / "relocated"

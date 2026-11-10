@@ -38,7 +38,10 @@ def test_release_preserves_private_state_and_regenerates_owned_files(deployment)
     (pi / "mcp.json").write_text('{"mcpServers":{"obsolete":{}}}')
     release.configure_release(root, env_file=env_file, home=home)
     release.configure_release(root, env_file=env_file, home=home)
-    assert {name: (pi / name).read_text() for name in private} == private
+    settings = json.loads((pi / "settings.json").read_text())
+    assert settings["defaultModel"] == "personal"
+    assert settings["theme"] == "light"
+    assert {name: (pi / name).read_text() for name in private if name != "settings.json"} == {name: data for name, data in private.items() if name != "settings.json"}
     assert "obsolete" not in json.loads((pi / "mcp.json").read_text())["mcpServers"]
     for bot in ("cos-bot", "manager-bot", "worker-1", "worker-2"):
         private_pi = home / ".battuta/pi-bots" / bot / ".pi"
@@ -47,6 +50,12 @@ def test_release_preserves_private_state_and_regenerates_owned_files(deployment)
         assert (private_pi / "telegram.json").exists() == (bot == "cos-bot")
         assert (private_pi / "mcp.json").stat().st_mode & 0o777 == 0o600
         assert not (private_pi.parent / "AGENTS.md").exists()
+        if bot == "manager-bot":
+            assert not (private_pi / "settings.json").exists()
+        else:
+            browser = json.loads((private_pi / "settings.json").read_text())["pi-browser-use"]
+            assert browser["userDataDir"] == str(private_pi / "browser-research")
+    assert not (home / ".pi").exists()
 
 
 @pytest.mark.parametrize("conflict", ["symlink", "resource", "malformed"])

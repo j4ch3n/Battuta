@@ -41,6 +41,13 @@ it does not merge historical values. Installed project settings own resources bu
 do not override the private model/provider defaults. Unexpected private resources,
 instructions, symlinks, or malformed settings stop setup for an owner decision.
 
+CoS and workers also merge owned browser settings into their separate private
+`settings.json` files; unrelated preferences remain unchanged. Browser profiles
+live under each bot's `.pi/browser-research/`, not inside the installation.
+Manager receives no browser configuration. Battuta does not provision global Pi
+settings; the browser extension's lower-priority global fallback is documented in
+its setup guide below.
+
 Everything under the installation is replaceable. It must be empty for extraction;
 setup never clears it automatically. Never clear `~/.battuta` or service data.
 Replacement requires stopping affected services and explicit owner approval; this
@@ -286,6 +293,7 @@ the owner confirms it.
 | Project-management CLI                    | [Project-management installation](skills-hub/project-management/references/installation.md) |
 | Assignment MCP                            | [Assignment setup](docs/assignments-setup.md)                                               |
 | Workers and numbered instances            | [Worker setup](docs/workers-setup.md)                                                       |
+| CoS and worker browsers                   | [Browser setup](docs/browser-setup.md)                                                      |
 | Manager native subagents                  | [Subagent setup](docs/subagents-setup.md)                                                   |
 | Google CLI                                | [Google setup](docs/gogcli-setup.md)                                                        |
 | Luma                                      | [Luma setup](docs/luma-setup.md)                                                            |
