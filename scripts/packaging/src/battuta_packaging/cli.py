@@ -12,11 +12,22 @@ from .bundle import stage_bots, validate_bundle
 from .runtime import install_runtime
 from .launch import run_bot
 from bot_setup.env import read_env
+from .wheel_metadata import build_wheels
 
 
 @click.group()
 def main():
     """Assemble and validate Battuta release output."""
+
+
+@main.command("build-wheels")
+@click.option("--source", required=True, type=click.Path(exists=True, file_okay=False, path_type=Path, resolve_path=True))
+@click.option("--output", required=True, type=click.Path(file_okay=False, path_type=Path))
+@click.option("--tag", required=True)
+@click.option("--tool-version", required=True)
+def wheels(source, output, tag, tool_version):
+    """Build self-describing release wheels from checked-in runtime locks."""
+    build_wheels(source, output, tag=tag, tool_version=tool_version)
 
 
 @main.command("stage-bots")

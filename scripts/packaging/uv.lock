@@ -34,6 +34,7 @@ source = { editable = "." }
 dependencies = [
     { name = "battuta-bot-setup" },
     { name = "click" },
+    { name = "packaging" },
 ]
 
 [package.dev-dependencies]
@@ -47,6 +48,7 @@ dev = [
 requires-dist = [
     { name = "battuta-bot-setup", editable = "../bot_setup" },
     { name = "click", specifier = ">=8.1,<9" },
+    { name = "packaging", specifier = ">=24,<27" },
 ]
 
 [package.metadata.requires-dev]
