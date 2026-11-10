@@ -6,6 +6,12 @@ the package in that bot's `.pi/settings.json`. Releases separate installed
 packages/code from private state and use the release installation command; do not
 install packages into `~/.battuta/pi-bots/`.
 
+The source installation directory is not necessarily the runtime agent directory.
+CoS runs from its checkout role with private configuration/authentication under
+`~/.battuta/pi-bots/cos-bot/.pi/`; source workers likewise use the shared worker
+role cwd and separate private agent directories. Keep environment-interpolated
+settings private: a trusted project's settings layer is not interpolated.
+
 ## 1. Check requirements
 
 Read the extension's published README and inspect its package metadata:

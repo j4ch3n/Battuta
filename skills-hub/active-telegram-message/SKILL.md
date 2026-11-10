@@ -1,6 +1,6 @@
 ---
 name: active-telegram-message
-description: Use when Telegram buttons, rich formatting, or a proactive message would make an owner-facing update or bounded decision clearer.
+description: Use when Telegram buttons, screenshot attachments, rich formatting, or a proactive message would make an owner-facing update or bounded decision clearer.
 ---
 
 # Telegram communication with the owner

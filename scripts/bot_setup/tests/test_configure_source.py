@@ -44,15 +44,19 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
     else:
         runtime.assert_not_called()
     pi = bot / ".pi"
-    assert (pi / "telegram.json").exists() == (role == "cos")
+    runtime_pi = tmp_path / "home/.battuta/pi-bots/cos-bot/.pi" if role == "cos" else pi
+    assert (runtime_pi / "telegram.json").exists() == (role == "cos")
     assert all((pi / "skills" / name).is_symlink() for name in names)
     assert json.loads((pi / "settings.json").read_text())["battutaMemoryCapture"]["enabled"] == (role == "cos")
-    browser = json.loads((pi / "settings.json").read_text()).get("pi-browser-use")
+    browser = json.loads((runtime_pi / "settings.json").read_text()).get("pi-browser-use")
     if role == "cos":
         assert browser["userDataDir"] == str(tmp_path / "home/.battuta/pi-bots/cos-bot/.pi/browser-research")
+        project_browser = json.loads((pi / "settings.json").read_text())["pi-browser-use"]
+        assert "executablePath" not in project_browser
+        assert "userDataDir" not in project_browser
     else:
         assert browser is None
-    servers = json.loads((pi / "mcp.json").read_text())["mcpServers"]
+    servers = json.loads((runtime_pi / "mcp.json").read_text())["mcpServers"]
     assert "assignments" in servers
     assert servers["memory"]["enabled"] is (role == "manager")
     assert not (tmp_path / "bots/worker/.pi/mcp.json").exists()

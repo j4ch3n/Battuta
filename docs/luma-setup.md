@@ -10,7 +10,8 @@ verification procedure; do not use bot/model requests as installation checks.
 
 ## 1. Check configuration
 
-Run normal Battuta configuration first. CoS's `.pi/mcp.json` must contain:
+Run normal Battuta configuration first. CoS's private
+`~/.battuta/pi-bots/cos-bot/.pi/mcp.json` must contain:
 
 ```json
 {
@@ -42,7 +43,7 @@ Run as the ordinary user who runs CoS, from the extracted release root. Do not r
 with `sudo`. With the owner's approval, run:
 
 ```sh
-(cd bots/cos-bot && PI_CODING_AGENT_DIR="$PWD/.pi" ../../bin/node node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js mcp login luma)
+(cd bots/cos-bot && PI_CODING_AGENT_DIR="$HOME/.battuta/pi-bots/cos-bot/.pi" node node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js mcp login luma)
 ```
 
 The owner completes Luma's browser authorization, checking the account and access
@@ -59,7 +60,7 @@ This is separate from `/login`, which authenticates the model provider.
 For a source checkout, use the same bot environment:
 
 ```sh
-(cd bots/cos-bot && PI_CODING_AGENT_DIR="$PWD/.pi" node_modules/.bin/pi mcp login luma)
+(cd bots/cos-bot && PI_CODING_AGENT_DIR="$HOME/.battuta/pi-bots/cos-bot/.pi" node_modules/.bin/pi mcp login luma)
 ```
 
 For a custom CoS workspace, use its directory and installed Pi executable instead.
@@ -70,9 +71,9 @@ A login under the default `~/.pi/agent` directory is not a login for Battuta CoS
 From the release root, with the normal production credential environment loaded:
 
 ```sh
-(cd bots/cos-bot && PI_CODING_AGENT_DIR="$PWD/.pi" ../../bin/node node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js mcp list)
-test -s bots/cos-bot/.pi/mcp-auth.json
-test "$(stat -c '%a' bots/cos-bot/.pi/mcp-auth.json)" = 600
+(cd bots/cos-bot && PI_CODING_AGENT_DIR="$HOME/.battuta/pi-bots/cos-bot/.pi" node node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js mcp list)
+test -s "$HOME/.battuta/pi-bots/cos-bot/.pi/mcp-auth.json"
+test "$(stat -c '%a' "$HOME/.battuta/pi-bots/cos-bot/.pi/mcp-auth.json")" = 600
 ```
 
 Expect `luma` connected with tools listed, the effective exposure shown for its

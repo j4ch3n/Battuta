@@ -7,9 +7,9 @@ import click
 from . import skills
 from .browser import configure_browser, validate_browser
 from .configure import configure_source, configure_worker
-from .release import configure_release
+from .release import configure_release, validate_private_home
 from .env import read_env
-from .instances import worker_names
+from .instances import instance_paths, worker_names
 from .source_launch import run_source_worker
 from .install import TELEGRAM_PACKAGE
 from .json_config import write_config
@@ -87,7 +87,9 @@ def configure(root, role, bot_dir, env_file, env_prefix, telegram_package):
 def refresh_telegram(root, env_file):
     """Refresh CoS Telegram without reinstalling packages."""
     values = read_env(env_file)
-    path, data, changed = prepare_telegram_config(root / "bots/cos-bot", env_file, "COS", values)
+    private = instance_paths(root, Path.home(), "cos-bot")[2]
+    validate_private_home(private)
+    path, data, changed = prepare_telegram_config(private, env_file, "COS", values)
     if changed:
         write_config(path, data, ".telegram-")
         click.echo(f"Updated {path} from {env_file}.")

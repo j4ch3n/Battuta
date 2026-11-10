@@ -43,6 +43,7 @@ class ConfigFixture(unittest.TestCase):
         for role in ("cos", "manager"):
             bot = self.root / f"bots/{role}-bot"
             (bot / ".pi").mkdir(parents=True)
+        self.config_path("cos").parent.mkdir(parents=True)
         self.config_path("cos").write_text(json.dumps({
                 "profiles": {"default": {
                     "botToken": "9:old", "botId": 9, "allowedUserId": 9,
@@ -65,6 +66,8 @@ os.execv(sys.executable, [sys.executable, "-m", "bot_setup.cli", *args[args.inde
         path.chmod(0o700)
 
     def config_path(self, role):
+        if role == "cos":
+            return self.home / ".battuta/pi-bots/cos-bot/.pi/telegram.json"
         return self.root / f"bots/{role}-bot/.pi/telegram.json"
 
     def config(self, role):
@@ -97,8 +100,9 @@ class LauncherFixture(ConfigFixture):
             (bot / "node_modules/.bin").mkdir(parents=True)
             (bot / "node_modules/.bin/pi").touch(mode=0o700)
             (bot / "AGENTS.md").touch()
-            (bot / ".pi/mcp.json").write_text("{}")
-        configure_browser(self.root / "bots/cos-bot", self.root / "bots/cos-bot", home=self.home, bot="cos-bot")
+            private_pi = self.config_path(role).parent
+            (private_pi / "mcp.json").write_text("{}")
+        configure_browser(self.root / "bots/cos-bot", self.home / ".battuta/pi-bots/cos-bot", home=self.home, bot="cos-bot")
         self.executable("chromium-browser", "raise RuntimeError('Do not launch Chromium in tests')\n")
         (self.root / "agent-mail/node_modules").mkdir(parents=True)
         (self.root / "project-spec/node_modules").mkdir(parents=True)

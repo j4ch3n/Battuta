@@ -24,5 +24,6 @@ def run_source_worker(root: Path, *, bot_dir: Path, env_file: Path, node: Path) 
     env.setdefault("BATTUTA_MEMORY_URL", "http://127.0.0.1:8901/mcp")
     env.update(validate_browser(root / "bots/worker", bot_dir, home=Path.home(), bot=bot_dir.name, path=env.get("PATH")))
     acquire_instance_lock(bot_dir)
-    os.chdir(bot_dir)
+    # Project settings must not shadow interpolated private browser settings.
+    os.chdir(root / "bots/worker")
     os.execve(str(node), [str(node), str(cli)], env)

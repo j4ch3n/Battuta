@@ -98,7 +98,7 @@ class WorkerLauncherTests(unittest.TestCase):
             args = ["bash", str(scripts / "run-worker.sh"), "--bot-dir", str(bot)]
             first = subprocess.run(args, env=env, capture_output=True, text=True)
             self.assertEqual(first.returncode, 0, first.stderr)
-            self.assertEqual(first.stdout.splitlines(), [str(bot / ".pi"), str(bot)])
+            self.assertEqual(first.stdout.splitlines(), [str(bot / ".pi"), str(profile)])
             settings = json.loads((bot / ".pi/settings.json").read_text())
             self.assertEqual(settings["extensions"], [str(profile / "extension/assignment-worker/index.ts")])
             self.assertEqual(settings["packages"], [{"source": "npm:pi-web-access@0.43.0", "skills": []}, "npm:custom"])

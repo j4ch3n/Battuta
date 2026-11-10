@@ -146,7 +146,8 @@ class RunDevTests(LauncherFixture):
 print(json.dumps({"role": os.environ["AGENT_ROLE"], "token": os.environ.get("LINEAR_API_TOKEN"),
     "telegram": any("TELEGRAM" in key for key in os.environ),
     "memory": os.environ.get("BATTUTA_MEMORY_URL"), "scheduler": os.environ.get("PI_SCHEDULER_STATE_FILE"),
-    "catchup": os.environ.get("PI_SCHEDULER_CATCHUP_MAX"), "browser": os.environ.get("CHROME_PATH"), "umask": os.umask(0)}))
+    "catchup": os.environ.get("PI_SCHEDULER_CATCHUP_MAX"), "browser": os.environ.get("CHROME_PATH"),
+    "agentDir": os.environ.get("PI_CODING_AGENT_DIR"), "umask": os.umask(0)}))
 ''')
         result = self.run_launcher("prod", existing=False)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -168,6 +169,7 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"], "token": os.environ.get("LIN
         self.assertEqual(outputs[0]["catchup"], "0")
         self.assertEqual(outputs[0]["umask"], 0o77)
         self.assertEqual(outputs[0]["browser"], str(self.bin / "chromium-browser"))
+        self.assertEqual(outputs[0]["agentDir"], str(self.home / ".battuta/pi-bots/cos-bot/.pi"))
         self.assertTrue(outputs[0]["telegram"])
         self.assertFalse(outputs[1]["telegram"])
         self.assertIsNone(outputs[1]["scheduler"])

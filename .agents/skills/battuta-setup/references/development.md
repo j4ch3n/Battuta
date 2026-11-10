@@ -46,6 +46,13 @@ sessions reattach without resizing or duplicate processes. Operators own runtime
 testing. Do not run dev and prod concurrently; they share source CoS/Manager state
 and worker identities. Generated private runtime state must not be committed.
 
+Source CoS also uses `~/.battuta/pi-bots/cos-bot/.pi/` for runtime configuration,
+authentication, and sessions; its checkout `.pi/settings.json` owns project
+resources/defaults only. Source workers launch from the shared worker role with
+their private agent directories. CoS Telegram refresh writes the private file.
+Existing checkout-local CoS authentication/sessions are left untouched, not moved;
+perform human login in the private agent directory selected by the launcher.
+
 To update CoS Telegram separately, run `make refresh-telegram ENV_FILE=.env`; the file can also be `.env.prod` or another path. It updates CoS's profile only, without reinstalling packages, regenerating instructions, or restarting bots. Reattaching does not reload credentials.
 
 Complete model-provider `/login` interactively in each Pi pane when operating the bots. For setup validation, check generated instructions/MCP files for both profiles, CoS's Telegram file, Manager's absence of Telegram package/configuration, and ignored local skill/session paths. Fail on invalid configuration; do not send bot messages or make model requests as setup checks. Detach with `Ctrl-b d` and use the same Make target to reattach.

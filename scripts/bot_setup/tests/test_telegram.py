@@ -37,7 +37,7 @@ class TelegramConfigTests(ConfigFixture):
 
     def test_preparation_derives_ids_without_writing_and_preserves_unrelated_settings(self):
         before = self.config_path("cos").read_text()
-        config, data, changed = prepare_telegram_config(self.root / "bots/cos-bot", self.root / ".env", "COS", self.values())
+        config, data, changed = prepare_telegram_config(self.config_path("cos").parent.parent, self.root / ".env", "COS", self.values())
         self.assertTrue(changed)
         self.assertEqual(config, self.config_path("cos"))
         self.assertEqual(data["profiles"]["default"], {
@@ -52,10 +52,10 @@ class TelegramConfigTests(ConfigFixture):
         values = self.values()
         values.pop("COS_TELEGRAM_BOT_USERNAME")
         with redirect_stdout(StringIO()):
-            configure_telegram(self.root / "bots/cos-bot", self.root / ".env", "COS", values)
+            configure_telegram(self.config_path("cos").parent.parent, self.root / ".env", "COS", values)
         self.assertNotIn("botUsername", self.config("cos")["profiles"]["default"])
         self.assertEqual(self.config_path("cos").stat().st_mode & 0o777, 0o600)
         before = self.config_path("cos").stat().st_mtime_ns
         with redirect_stdout(StringIO()):
-            configure_telegram(self.root / "bots/cos-bot", self.root / ".env", "COS", values)
+            configure_telegram(self.config_path("cos").parent.parent, self.root / ".env", "COS", values)
         self.assertEqual(self.config_path("cos").stat().st_mtime_ns, before)

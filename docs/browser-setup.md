@@ -38,9 +38,15 @@ actual launch PATH and exports its absolute path as `CHROME_PATH`. No executable
 path is hard-coded or persisted. Missing Chromium stops Linux launch. macOS
 source development can use standard Chrome discovery when that command is absent.
 
-Source CoS settings remain in its checkout `.pi/settings.json`; source workers
-have separate instance settings. Their browser data uses the same canonical
-private paths above. Never copy cookies, authentication, or profiles between bots.
+Source CoS also uses `~/.battuta/pi-bots/cos-bot/.pi/` for private settings,
+Telegram/MCP configuration, authentication, and sessions. Source workers launch
+from the shared checkout worker role with their own private agent directory.
+Their project settings contain only shared browser defaults, never the executable
+environment reference: trusted project settings are not interpolated and would
+otherwise override the expanded private value. Existing checkout-local CoS auth
+and sessions are left untouched, not automatically moved; human authentication
+must use the selected private agent directory. Never copy cookies,
+authentication, or profiles between bots.
 If a site needs login, the human owns authorized login for that bot; a headed
 login is separate from normal headless operation and setup validation.
 
@@ -75,8 +81,7 @@ test -d "$HOME/.battuta/browser-screenshot" && test -w "$HOME/.battuta/browser-s
 ```
 
 The executable must be discoverable and report its version; private settings and
-writable directories must exist. For source CoS, check the checkout's settings
-file instead. Do not dump settings/auth files, invoke Pi/models, browse accounts,
+writable directories must exist. Do not dump settings/auth files, invoke Pi/models, browse accounts,
 or message bots to validate setup. Browser use and CoS screenshot delivery remain
 human acceptance, not an extension or Pi setup test suite.
 
