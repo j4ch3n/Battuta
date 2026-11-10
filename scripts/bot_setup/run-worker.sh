@@ -14,6 +14,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ -n "$bot_dir" && -f "$env_file" ]] || { printf 'Worker directory and environment file are required\n' >&2; exit 1; }
+[[ ! -L "$bot_dir" && ! -L "$bot_dir/.pi" ]] || { printf 'Worker home must be a private local directory\n' >&2; exit 1; }
 cli="$root/bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
 [[ -f "$cli" ]] || { printf 'Prepare the source worker profile and shared dependencies first\n' >&2; exit 1; }
 set -a
@@ -57,4 +58,4 @@ done
 export AGENT_ROLE=worker PI_CODING_AGENT_DIR="$bot_dir/.pi"
 export BATTUTA_MEMORY_URL="${BATTUTA_MEMORY_URL:-http://127.0.0.1:8901/mcp}"
 cd "$bot_dir"
-exec node "$cli"
+exec uv run --project "$root/scripts/bot_setup" --locked battuta-bot-setup run-worker --root "$root" --bot-dir "$bot_dir" --env-file "$env_file" --node "$(command -v node)"

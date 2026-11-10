@@ -19,6 +19,28 @@ def test_shared_launcher_rejects_invalid_mode_from_an_unrelated_cwd(tmp_path):
 
 
 class RunDevTests(LauncherFixture):
+    def test_configured_worker_count_controls_distinct_panes(self):
+        for count in (0, 1, 3):
+            with self.subTest(count=count):
+                path = self.root / ".env"
+                text = path.read_text()
+                import re
+                path.write_text(re.sub(r"WORKER_BOT_COUNT=\d+", f"WORKER_BOT_COUNT={count}", text))
+                self.log.unlink(missing_ok=True)
+                result = self.run_launcher("dev", existing=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                workers = [c for c in self.commands() if c[0] == "split-window" and "--bot-dir" in c[-1]]
+                self.assertEqual(len(workers), count)
+                for number, call in enumerate(workers, 1):
+                    self.assertIn(f".battuta/pi-bots/worker-{number}", call[-1])
+
+    def test_invalid_count_fails_before_reattach(self):
+        path = self.root / ".env"
+        path.write_text(path.read_text().replace("WORKER_BOT_COUNT=1", "WORKER_BOT_COUNT=invalid"))
+        result = self.run_launcher("dev", existing=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.log.exists())
+
     def test_manager_and_memory_panes_keep_tool_path_with_stale_tmux_environment(self):
         self.executable("battuta-project", "")
         self.executable("battuta-memory", "print('installed-memory')\n")
@@ -196,7 +218,7 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"], "token": os.environ.get("LIN
         for role in ("cos", "manager"):
             pi = self.root / f"bots/{role}-bot/node_modules/.bin/pi"
             pi.write_text(f"#!{sys.executable}\n" + 'import json, os, sys\nprint(json.dumps({"mode": os.environ["BATTUTA_TEST_MODE"], "args": sys.argv[1:]}))\n')
-        for mode, expected_splits in (("dev", 3), ("prod", 1)):
+        for mode, expected_splits in (("dev", 3), ("prod", 2)):
             with self.subTest(mode=mode):
                 if self.log.exists():
                     self.log.unlink()

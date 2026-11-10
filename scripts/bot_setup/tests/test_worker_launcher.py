@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[3]
 class WorkerLauncherTests(unittest.TestCase):
     def test_launch_exports_worker_context_without_telegram_or_scheduler(self):
         with tempfile.TemporaryDirectory(dir="/tmp") as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             scripts = root / "scripts/bot_setup"
             scripts.mkdir(parents=True)
             shutil.copy2(ROOT / "scripts/bot_setup/run-worker.sh", scripts / "run-worker.sh")

@@ -9,6 +9,7 @@ from .configure import configure_source, configure_worker
 from .release import configure_release
 from .env import read_env
 from .instances import worker_names
+from .source_launch import run_source_worker
 from .install import TELEGRAM_PACKAGE
 from .json_config import write_config
 from .telegram import prepare_telegram_config
@@ -28,6 +29,16 @@ def workers(env_file):
     """Print selected worker instance names without launching them."""
     for name in worker_names(read_env(env_file), env_file):
         click.echo(name)
+
+
+@main.command("run-worker")
+@click.option("--root", type=DIRECTORY, required=True)
+@click.option("--bot-dir", type=DIRECTORY, required=True)
+@click.option("--env-file", type=FILE, required=True)
+@click.option("--node", type=click.Path(exists=True, dir_okay=False, path_type=Path, resolve_path=True), required=True)
+def run_worker(root, bot_dir, env_file, node):
+    """Run a prepared source worker under its private instance lock."""
+    run_source_worker(root, bot_dir=bot_dir, env_file=env_file, node=node)
 
 
 @main.command()

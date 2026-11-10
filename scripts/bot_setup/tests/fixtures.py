@@ -114,7 +114,7 @@ if "-P" in args:
         for name in ("supabase", "make"):
             self.executable(name, "")
         self.home = self.root / "home"
-        self.worker = self.home / ".battuta/workers/worker-1"
+        self.worker = self.home / ".battuta/pi-bots/worker-1"
         (self.worker / ".pi").mkdir(parents=True)
         for name in ("AGENTS.md", ".pi/settings.json", ".pi/mcp.json", ".pi/auth.json"):
             (self.worker / name).write_text("{}")
