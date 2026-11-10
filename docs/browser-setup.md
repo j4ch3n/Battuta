@@ -15,16 +15,15 @@ to supply a missing OS browser; do not install OS packages during validation.
 Installed CoS/worker `.pi/settings.json` files declare the package and shared
 defaults: `sessionMode: "persistent"`, `headless: true`, and
 `viewport: "1440x900"`. They contain no concrete instance profile or executable
-path. Each deployed bot has its own private file:
+path. Each deployed bot has its own private file under its agent directory:
 
 ```text
-~/.battuta/pi-bots/cos-bot/.pi/settings.json
-~/.battuta/pi-bots/manager-bot/.pi/settings.json   # No browser settings
-~/.battuta/pi-bots/worker-1/.pi/settings.json
-~/.battuta/pi-bots/worker-2/.pi/settings.json
+~/.battuta/pi-bots/<bot>/.pi/settings.json
 ```
 
-Manager setup preserves an existing private settings file; it need not create one.
+The Manager role has no browser settings. Other selected roles get their own
+private file. Setup preserves an existing private settings file; it need not
+create one for a role without browser support.
 Launchers set `PI_CODING_AGENT_DIR` to the selected bot's `.pi` directory while
 keeping the installed role as cwd. All workers share installed code, not private
 settings or browser data. Setup preserves unrelated private settings and rejects
@@ -38,14 +37,14 @@ actual launch PATH and exports its absolute path as `CHROME_PATH`. No executable
 path is hard-coded or persisted. Missing Chromium stops Linux launch. macOS
 source development can use standard Chrome discovery when that command is absent.
 
-Source CoS also uses `~/.battuta/pi-bots/cos-bot/.pi/` for private settings,
+Every source bot uses `~/.battuta/pi-bots/<bot>/.pi/` for private settings,
 Telegram/MCP configuration, authentication, and sessions. Source workers launch
 from the shared checkout worker role with their own private agent directory.
-Their project settings contain only shared browser defaults, never the executable
+Project settings contain only shared browser defaults, never the executable
 environment reference: trusted project settings are not interpolated and would
-otherwise override the expanded private value. Existing checkout-local CoS auth
-and sessions are left untouched, not automatically moved; human authentication
-must use the selected private agent directory. Never copy cookies,
+otherwise override the expanded private value. Existing checkout-local auth and
+sessions are left untouched, not automatically moved; human authentication must
+use the selected private agent directory. Never copy cookies,
 authentication, or profiles between bots.
 If a site needs login, the human owns authorized login for that bot; a headed
 login is separate from normal headless operation and setup validation.
@@ -73,7 +72,7 @@ Choose one configured browser-enabled bot and repeat only for other selected bot
 set -eu
 command -v chromium-browser >/dev/null
 chromium-browser --version
-bot=cos-bot
+bot="${BATTUTA_BOT_NAME:?Set BATTUTA_BOT_NAME to the selected browser-enabled bot}"
 private="$HOME/.battuta/pi-bots/$bot/.pi"
 test -s "$private/settings.json"
 test -d "$private/browser-research" && test -w "$private/browser-research"

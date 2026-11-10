@@ -7,8 +7,8 @@ packages/code from private state and use the release installation command; do no
 install packages into `~/.battuta/pi-bots/`.
 
 The source installation directory is not necessarily the runtime agent directory.
-CoS runs from its checkout role with private configuration/authentication under
-`~/.battuta/pi-bots/cos-bot/.pi/`; source workers likewise use the shared worker
+Each bot runs from its checkout role with private configuration/authentication under
+`~/.battuta/pi-bots/<bot>/.pi/`; source workers likewise use the shared worker
 role cwd and separate private agent directories. Keep environment-interpolated
 settings private: a trusted project's settings layer is not interpolated.
 
