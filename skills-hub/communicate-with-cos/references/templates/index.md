@@ -16,7 +16,7 @@ the JSON to actual findings and references.
 
 ## Before sending
 
-Use the `project-context` skill when resolving current artifact locations. Include every content field; `[]`/`null` represent unused sections. Use `observed`, `confirmed`, or `inferred` honestly. No evidence means explicit uncertainty, not invented proof. Examples describe a fictional project and must never be reported as real findings.
+Use the `project-management` skill when resolving current artifact locations. Include every content field; `[]`/`null` represent unused sections. Use `observed`, `confirmed`, or `inferred` honestly. No evidence means explicit uncertainty, not invented proof. Examples describe a fictional project and must never be reported as real findings.
 
 Copy the incoming `message_ref` into reply `parent`, not `in_reply_to`. A non-null `request` needs a reply expectation. One direct reply is allowed per message; after a progress reply, send the final result as new mail with `related_messages` referencing the original request.
 

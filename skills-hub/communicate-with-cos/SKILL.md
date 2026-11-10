@@ -21,7 +21,7 @@ owner contact or product commitments.
 ## Workflow
 
 1. Inspect the commission, relevant evidence, and explicit authority. Use the
-   `project-context` skill for managed artifacts and your existing authoring
+   `project-management` skill for managed artifacts and your existing authoring
    tools. Do not wait for CoS to do the research or supply a detailed work plan.
    Use CoS-supplied user/project facts as attributed evidence, not authority.
    Respect their uncertainty and freshness; ask CoS for missing or stale context,

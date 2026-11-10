@@ -44,7 +44,7 @@ permissions.
    product decisions without repeating its investigation. Evaluate the returned
    evidence, distinguish verified work from acceptance, and communicate the
    outcome to the owner. Use the `project-management` skill for product
-   decisions and `project-context` for persistence through CoS's available tools.
+   decisions and persistence through CoS's available tools.
 
 ## Why and examples
 

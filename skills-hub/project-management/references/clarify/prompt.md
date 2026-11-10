@@ -1,7 +1,7 @@
 ---
 name: "speckit-clarify"
 description: "Identify underspecified areas in the current feature spec by asking up to 5 highly targeted clarification questions and encoding answers back into the spec."
-compatibility: "Uses project-context workspace locations and existing file tools"
+compatibility: "Uses project-management workspace locations and existing file tools"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/clarify.md"
@@ -64,7 +64,7 @@ Note: This clarification workflow is expected to run (and be completed) BEFORE i
 
 Execution steps:
 
-1. Resolve the intended existing feature through project-context and establish these absolute paths:
+1. Resolve the intended existing feature through project-management and establish these absolute paths:
    - `FEATURE_DIR`
    - `FEATURE_SPEC`
    - (Optionally capture `IMPL_PLAN`, `TASKS` for future chained flows.)

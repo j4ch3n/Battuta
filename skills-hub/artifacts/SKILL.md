@@ -22,7 +22,7 @@ Use research for missing evidence and draft-writing for substantial text draftin
    authority. Ask about ambiguous project ownership before creating a draft; current
    selection alone is not ownership. In a bound assignment, use Manager's supplied
    project and paths and report essential gaps through execute-assignment. For
-   standalone project discovery, use project-context.
+   standalone project discovery, use project-management.
 2. State what the reader should understand and outline the connected explanation.
    Read [narrative](references/narrative.md) before drafting. Plain text is sufficient
    for direct answers; use reading-first HTML for depth and slides for a requested

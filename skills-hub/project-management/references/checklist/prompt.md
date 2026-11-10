@@ -1,7 +1,7 @@
 ---
 name: "speckit-checklist"
 description: "Generate a custom checklist for the current feature based on user requirements."
-compatibility: "Uses project-context workspace locations and existing file tools"
+compatibility: "Uses project-management workspace locations and existing file tools"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/checklist.md"

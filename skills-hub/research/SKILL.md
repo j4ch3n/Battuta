@@ -32,7 +32,7 @@ not a research ceremony. Local-only requests stay local.
    outlines or synthesis. None is a mandatory artifact or a prerequisite for the
    others. For a bound assignment, use Manager's explicit project, input paths,
    and requirements; report essential gaps through execute-assignment. Outside
-   bound work, use project-context for discovery and canonical documents.
+   bound work, use project-management for discovery and canonical documents.
 4. **Revise understanding.** Read [pre-writing](references/prewriting.md). Separate
    supplied confirmed owner facts, sourced findings, calculations and inference. Let
    discoveries change the question, outline and provisional answer.

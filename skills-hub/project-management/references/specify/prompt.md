@@ -1,7 +1,7 @@
 ---
 name: "speckit-specify"
 description: "Create or update the feature specification from a natural language feature description."
-compatibility: "Uses project-context workspace locations and existing file tools"
+compatibility: "Uses project-management workspace locations and existing file tools"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/specify.md"

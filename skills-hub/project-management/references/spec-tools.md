@@ -80,7 +80,7 @@ The hash and findings above are illustrative. Use the inspected checklist finger
 
 ## CoS: terminal decision
 
-Use [decision recording](decisions.md) after project-management selects go/no-go and establishes a rationale. Refinement happens through new versions while the spec is open. No-go and go both close the named spec permanently to artifact changes; read tools remain available.
+Use [decision recording](decisions.md) after CoS selects go/no-go and establishes a rationale through the product-decision workflow. Refinement happens through new versions while the spec is open. No-go and go both close the named spec permanently to artifact changes; read tools remain available.
 
 ## Persistence and recovery
 

@@ -14,11 +14,12 @@ Copyright GitHub, Inc. Original material is retained under the [MIT license](lic
 | analyze        | `analyze.md`                                 | Findings, not an output-file template |
 | constitution   | `constitution.md`                            | `constitution-template.md`            |
 
-The summary prompt, Markdown reference, and CLI Jinja skeleton are project-context-specific.
+The summary prompt, Markdown reference, and CLI Jinja skeleton are Battuta-specific.
 
 ## Integration edits
 
-- Prompt compatibility metadata points to project-context, and each prompt links to the common Workspace binding in `SKILL.md`.
+- Prompt compatibility metadata points to project-management, and each prompt links to the common Workspace binding in `SKILL.md`. The collection moved into this skill when project discovery/document operations and delivery management were consolidated; the clarification integration step uses the surviving skill name.
+- The consolidated binding distinguishes a verified commissioned worktree from the registered default checkout. Tool guidance names CoS as the product-decision authority rather than attributing decisions to a skill.
 - Natural-language requests supply upstream input placeholders; workflow spellings route to responsibility references instead of requiring slash commands.
 - Setup-script calls are replaced by explicit feature/artifact resolution and direct shared-template reads. The CLI resolves project/checkout context; spec tools resolve managed documents. Prompts and templates use returned references rather than prescribe filesystem layout.
 - Prerequisites are established from artifact contents rather than command history. Research examples use the current runtime's tools, with inline investigation when delegation is unavailable.

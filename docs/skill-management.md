@@ -10,7 +10,7 @@ stay outside the catalog.
 Each profile declares an ordered selection in `bots/<profile>/skills.json`:
 
 ```json
-{ "skills": ["memory", "project-context", "note-taking"] }
+{ "skills": ["project-management", "note-taking"] }
 ```
 
 These selections do not grant tools or permissions. Local source configuration
@@ -52,6 +52,11 @@ into the catalog.
 The Worker profile selects `artifacts` for commissioned creation and authorized
 publication; Manager selects `artifact-review` for independent editorial judgment.
 CoS retains final owner communication and intent/authority, not production tooling.
+
+CoS and Manager select `project-management` for the project lifecycle and managed
+document operations within their respective authority. Workers select
+`execute-assignment` for commissioned project orientation and verified execution,
+not project administration. Selections do not transfer document permissions.
 
 - Add or edit complete skill sources in the hub, never generated bot output.
 - Describe **when to use** a skill through the task or situation, never the

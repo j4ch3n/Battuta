@@ -1,7 +1,7 @@
 ---
 name: "speckit-tasks"
 description: "Generate an actionable, dependency-ordered tasks.md for the feature based on available design artifacts."
-compatibility: "Uses project-context workspace locations and existing file tools"
+compatibility: "Uses project-management workspace locations and existing file tools"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/tasks.md"

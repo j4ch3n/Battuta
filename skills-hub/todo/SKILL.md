@@ -23,7 +23,7 @@ who can use the skill or grant tools. A recorded result is not product acceptanc
 Keep explicit project and returned eight-character assignment ID on targeted
 calls. For bound execution, use Manager's supplied identity and inputs; report
 missing context through execute-assignment. For planning outside a bound task,
-use project-context to inspect registered context and ask the responsible requester
+use project-management to inspect registered context and ask the responsible requester
 when the commission lacks its project. Do not silently substitute global selection.
 Workers currently stay on the same project; this workflow does not change global
 project configuration.
