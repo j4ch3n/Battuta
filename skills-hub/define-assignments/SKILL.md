@@ -1,9 +1,9 @@
 ---
-name: define-implementation-tasks
+name: define-assignments
 description: Use when translating an approved ticket into bounded technical assignments for implementation agents.
 ---
 
-# Define implementation tasks
+# Define assignments
 
 ## Objective
 
