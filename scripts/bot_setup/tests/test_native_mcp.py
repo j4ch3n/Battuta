@@ -8,7 +8,7 @@ import pytest
 from bot_setup.mcp import configure_mcp
 
 
-@pytest.mark.parametrize("role", ["cos", "manager"])
+@pytest.mark.parametrize("role", ["cos", "manager", "worker"])
 def test_native_configuration_preserves_custom_and_private_state(tmp_path, role):
     pi = tmp_path / ".pi"
     pi.mkdir()
@@ -22,7 +22,19 @@ def test_native_configuration_preserves_custom_and_private_state(tmp_path, role)
         assert config["custom"] is True
         assert config["mcpServers"]["other"] == {"command": "custom"}
         assert ("luma" in config["mcpServers"]) == (role == "cos")
-        assert config["mcpServers"]["memory"]["enabled"] is False
+        expected_memory = (
+            {
+                "url": "http://localhost:8989/mcp",
+                "enabled": True,
+                "exposure": "codemode",
+                "description": "Shared project memory, including retrieval and supported maintenance",
+            }
+            if role == "manager"
+            else {"url": "http://localhost:8989/mcp", "enabled": False}
+            if role == "cos"
+            else {"enabled": False}
+        )
+        assert config["mcpServers"]["memory"] == expected_memory
         if role == "cos":
             assert "url" in config["mcpServers"]["memory"]
         assert json.loads((pi / "settings.json").read_text()) == {"theme": "dark", "packages": ["npm:custom@1"]}
