@@ -1,6 +1,6 @@
 # Memory tool reference
 
-The isolated CoS recall agent has direct `memory_recall` and `memory_get` tools, without Code Mode or discovery. Main CoS, Manager, and Worker have no conversational memory MCP tools. Capture and approved dream extensions retain programmatic access. Maintenance examples below apply only to an explicitly authorized maintenance client. Calls use flat JSON arguments, not a nested `request`. Successful machine responses have `ok:true`, `data` and `warnings`; failures have `ok:false` and MCP `isError:true`. Recall/get also return readable evidence text with explained qualifications. Read actual results before claiming persistence; never overwrite unrelated records to resolve a conflict.
+The isolated CoS recall agent has direct `memory_recall` and `memory_get` tools, without Code Mode or discovery. Main CoS and Worker have no conversational memory MCP tools. Manager has direct Code Mode MCP access through `project-memory`; capture and approved dream extensions retain programmatic access. Maintenance examples below apply to that connection or an explicitly authorized maintenance client. Calls use flat JSON arguments, not a nested `request`. Successful machine responses have `ok:true`, `data` and `warnings`; failures have `ok:false` and MCP `isError:true`. Recall/get also return readable evidence text with explained qualifications. Read actual results before claiming persistence; never overwrite unrelated records to resolve a conflict.
 
 ## Remember and recall
 
