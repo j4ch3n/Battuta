@@ -119,6 +119,8 @@ def build_wheels(source: Path, output: Path, *, tag: str, tool_version: str) -> 
             stage = Path(temporary) / name
             requirements = requirements_by_project[name]
             stage_wheel_project(source / relative, stage, requirements=requirements, tool_version=tool_version)
+            if name == "battuta-bot-setup":
+                shutil.copy2(source / ".env.example", stage / "src/bot_setup/env.example")
             subprocess.run(["uv", "build", str(stage), "--wheel", "--out-dir", str(output.resolve())], check=True)
             wheel = output / f"{name.replace('-', '_')}-{tool_version}-py3-none-any.whl"
             with zipfile.ZipFile(wheel) as contents:

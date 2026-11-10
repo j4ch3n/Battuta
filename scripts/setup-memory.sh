@@ -34,16 +34,16 @@ machine="$(uname -m)"
 case "$system/$machine" in
   Darwin/arm64|Darwin/x86_64) ;;
   Linux/aarch64)
-    [[ "$(getconf LONG_BIT)" == 64 ]] || fail 'Use 64-bit Raspberry Pi OS Bookworm or newer, not a 32-bit userspace.'
+    [[ "$(getconf LONG_BIT)" == 64 ]] || fail 'Use 64-bit Linux ARM64, not a 32-bit userspace.'
     libc="$(getconf GNU_LIBC_VERSION 2>/dev/null)" || fail 'glibc >=2.28 is required; musl is unsupported.'
     read -r family version <<< "$libc"
     major="${version%%.*}"
     minor="${version#*.}"
     minor="${minor%%.*}"
     [[ "$family" == glibc && "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ ]] || fail "Unsupported libc: $libc"
-    (( major > 2 || (major == 2 && minor >= 28) )) || fail 'Use glibc >=2.28 (64-bit Raspberry Pi OS Bookworm or newer).'
+    (( major > 2 || (major == 2 && minor >= 28) )) || fail 'Use glibc >=2.28 (Oracle Linux 9 is the release target).'
     ;;
-  *) fail "Unsupported platform: $system/$machine. Use 64-bit Raspberry Pi OS (aarch64/glibc >=2.28), or an arm64/x86_64 macOS development host." ;;
+  *) fail "Unsupported platform: $system/$machine. Use Linux aarch64/glibc >=2.28, or an arm64/x86_64 macOS development host." ;;
 esac
 command -v uv >/dev/null || fail 'uv is required. Install uv, then rerun setup; do not use system pip or sudo.'
 
@@ -58,7 +58,7 @@ else
   [[ -x "$python" ]] || fail 'Missing uv-managed memory environment; reinstall the selected release tool as the bot user.'
 fi
 
-run 'native SQLite and ONNX loading' 'Use managed CPython 3.12 with SQLite extension loading. On Raspberry Pi OS, install libgomp1/libstdc++6 if the native loader reports missing libraries; read the error above.' \
+run 'native SQLite and ONNX loading' 'Use managed CPython 3.12 with SQLite extension loading. On Oracle Linux 9, have the administrator supply libgomp/libstdc++ if missing; read the error above.' \
   "$python" -c "import sqlite3, sqlite_vec, onnxruntime, tokenizers; c=sqlite3.connect(':memory:'); c.enable_load_extension(True); sqlite_vec.load(c); c.enable_load_extension(False); c.close(); assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()"
 model_args=(model install)
 if [[ -n "$archive" ]]; then model_args+=(--archive "$archive"); fi

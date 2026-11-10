@@ -25,7 +25,7 @@ for key in SUPABASE_URL SUPABASE_SECRET_KEY; do
 done
 mcp_source="$root/bots/worker/.pi/mcp.json"
 if [[ ! -e "$bot_dir/.pi/mcp.json" && ! -L "$bot_dir/.pi/mcp.json" && ! -f "$mcp_source" ]]; then
-  printf 'Missing generated worker MCP configuration. From the source root run:\n  uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role worker --env-file %q\nFor a release, run bin/battuta configure-worker.\n' "$env_file" >&2
+  printf 'Missing generated worker MCP configuration. From the source root run:\n  uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role worker --env-file %q\n' "$env_file" >&2
   exit 1
 fi
 mkdir -p "$bot_dir/.pi"

@@ -44,9 +44,8 @@ class RunDevTests(LauncherFixture):
     def test_manager_and_memory_panes_keep_tool_path_with_stale_tmux_environment(self):
         self.executable("battuta-project", "")
         self.executable("battuta-memory", "print('installed-memory')\n")
-        binary = self.root / "bin"
-        binary.mkdir(exist_ok=True)
-        launcher = binary / "battuta"
+        launcher = self.root / "memory-service/.venv/bin/battuta-memory"
+        launcher.parent.mkdir(parents=True)
         launcher.write_text('#!/bin/sh\nexec battuta-memory\n')
         launcher.chmod(0o700)
         pi = self.root / "bots/manager-bot/node_modules/.bin/pi"
@@ -61,19 +60,6 @@ class RunDevTests(LauncherFixture):
                 self.assertEqual(pane.returncode, 0, pane.stderr)
                 expected = str(self.bin / "battuta-project") if "AGENT_ROLE=manager" in call[-1] else "installed-memory"
                 self.assertEqual(pane.stdout.strip(), expected)
-
-    def test_release_memory_pane_uses_installed_tool_through_release_launcher(self):
-        binary = self.root / "bin"
-        binary.mkdir(exist_ok=True)
-        launcher = binary / "battuta"
-        launcher.write_text('#!/bin/sh\ntest "$*" = memory || exit 99\nprintf installed-memory\n')
-        launcher.chmod(0o700)
-        result = self.run_launcher("prod", existing=False)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        command = next(call[-1] for call in self.commands() if call[0] == "new-window")
-        pane = subprocess.run(["bash", "-c", command], capture_output=True, text=True)
-        self.assertEqual(pane.returncode, 0, pane.stderr)
-        self.assertEqual(pane.stdout, "installed-memory")
 
     def test_dev_groups_bots_and_services_in_two_horizontal_windows(self):
         result = self.run_launcher("dev", existing=False)

@@ -26,17 +26,17 @@ database to bypass them. Do not start another server if one is already serving.
 
 ## Bot configuration
 
-Source bot configuration and release `bin/battuta configure` generate the
-`assignments` entry for CoS/Manager only. Prepare the worker profile separately
-with source `configure --root . --role worker` or release
-`bin/battuta configure-worker`; configuring another role never rewrites the
-worker's tool restrictions. The assignment entry uses
+Source bot configuration generates the role's `assignments` entry; prepare the
+source worker profile separately with `configure --root . --role worker`.
+Release `battuta-bot-setup configure-release --root DIR --env-file FILE` generates
+CoS, Manager and every worker selected by `WORKER_BOT_COUNT` into their flat private
+homes. Each role keeps its own tool restrictions. The assignment entry uses
 `<SUPABASE_URL>/functions/v1/assignments` and the literal environment placeholder
 `${SUPABASE_SECRET_KEY}` in the `apikey` header. Remote origins require HTTPS;
 loopback HTTP is allowed for development. Runtime processes need the secret in
 their environment; configuration does not embed its value.
 
-After configuring each intended profile, check files without invoking a model or
+For source configuration, check files without invoking a model or
 mutating remote task state:
 
 ```sh
@@ -58,11 +58,11 @@ print('Assignment MCP configuration checks passed')
 PY
 ```
 
-Expected: the success line only; any assertion/missing file fails setup. Preserve
-custom servers, OAuth grants, and private sessions. Restart bots separately only
-when authorized. Worker profile configuration does not create worker sessions or
-change the existing bounded-subagent isolation defaults. Private worker instances
-copy the prepared configuration and load the extension through ordinary Pi settings.
+Expected: the success line only; any assertion/missing file fails setup. Releases
+validate inputs before generating private configuration and regenerate owned MCP
+files completely, preserving OAuth grants and sessions rather than merging old
+servers. Restart bots separately only when authorized. Neither source nor release
+configuration starts worker sessions or changes bounded-subagent isolation defaults.
 
 Notes need no editor package or service: bots use Pi's file tools at returned
 paths. Verify project registration using `battuta-project list`; missing project

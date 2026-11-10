@@ -19,8 +19,8 @@ class ReleaseInstallation(unittest.TestCase):
         tag = os.environ["BATTUTA_RELEASE_TAG"]
         with tempfile.TemporaryDirectory(prefix="battuta-release-install-", dir="/tmp") as directory:
             work = Path(directory)
-            env = {key: value for key, value in os.environ.items() if key not in {"VIRTUAL_ENV", "PYTHONPATH", "UV_PROJECT_ENVIRONMENT", "UV_TOOL_DIR", "UV_TOOL_BIN_DIR"}}
-            env.update(HOME=str(work / "home"), UV_CACHE_DIR=str(work / "cache"), XDG_CONFIG_HOME=str(work / "config"), XDG_DATA_HOME=str(work / "data"), UV_PYTHON_PREFERENCE="only-managed")
+            env = {key: value for key, value in os.environ.items() if key not in {"VIRTUAL_ENV", "PYTHONPATH", "UV_PROJECT_ENVIRONMENT", "UV_TOOL_DIR", "UV_TOOL_BIN_DIR", "UV_PYTHON_PREFERENCE"}}
+            env.update(HOME=str(work / "home"), UV_CACHE_DIR=str(work / "cache"), XDG_CONFIG_HOME=str(work / "config"), XDG_DATA_HOME=str(work / "data"))
             Path(env["HOME"]).mkdir()
             def run(*args, **kwargs):
                 return subprocess.run(args, env=env, cwd=work, check=True, text=True, **kwargs)
@@ -65,7 +65,8 @@ for value in data['requires']:
             code = "for (const name of " + json.dumps(entries) + ") { const m = await import(" + json.dumps(str(root) + "/") + "+name); if(typeof m.default !== 'function') throw new Error(name); }"
             run(node, "--input-type=module", "-e", code)
             env_file = work / ".env.prod"
-            env_file.write_text("WORKER_BOT_COUNT=2\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\nLINEAR_API_TOKEN=fixture\nCOS_TELEGRAM_TOKEN=101:fixture\nTELEGRAM_ALLOWED_USER_ID=123\n")
+            template = run(str(tools / "battuta-bot-setup"), "env-example", capture_output=True).stdout
+            env_file.write_text(template + "\nWORKER_BOT_COUNT=2\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\nLINEAR_API_TOKEN=fixture\nCOS_TELEGRAM_TOKEN=101:fixture\nTELEGRAM_ALLOWED_USER_ID=123\n")
             run(str(tools / "battuta-bot-setup"), "configure-release", "--root", str(root), "--env-file", str(env_file))
             self.assertTrue((Path(env["HOME"]) / ".battuta/pi-bots/worker-2/.pi/mcp.json").is_file())
             self.assertFalse((root / "skills-hub").exists())

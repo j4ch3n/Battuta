@@ -20,7 +20,7 @@ and privilege contracts. Assignment completion is not product acceptance.
 
 ## Native Pi lifecycle
 
-The Bash launcher sets cwd to the private worker directory and agentDir to its
+The source launcher sets cwd to the private worker directory and agentDir to its
 `.pi`, then execs the normal pinned Pi CLI with terminal I/O intact. There is no
 custom SDK host. On first launch it copies missing settings and generated MCP
 configuration plus `web-search.json` from `bots/worker`, rebasing settings resource paths. Private auth
@@ -37,6 +37,14 @@ Explicit reconfiguration replaces those exact owned paths with the current
 installation's paths, preserving unrelated custom resources. Pi does not interpret
 that metadata at runtime. CoS/Manager configuration never rewrites worker MCP
 exposure; worker assignment mutations remain hidden from model/codemode tools.
+
+Installed releases instead use the compiled `bots/worker` role as cwd and
+`~/.battuta/pi-bots/worker-N/.pi` as agentDir. Build-generated instructions/skills
+and installed dependencies stay in the installation; private configuration is
+generated separately without resource merges. `WORKER_BOT_COUNT` selects the
+numbered systemd instances. Source and release launchers hold an instance lock
+across exec. Foreground maintenance requires the selected service to be stopped;
+tmux detach never authorizes starting another process for that identity.
 
 Startup creates a fresh idle conversation, never automatically resumes an old
 claimed crash session. Availability wakes `/worker-next`, a registered control

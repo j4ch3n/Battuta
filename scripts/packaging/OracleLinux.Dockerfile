@@ -15,6 +15,6 @@ RUN cd /tmp && \
     tar -xJf node.tar.xz --strip-components=1 -C /usr/local && \
     rm node.tar.xz SHASUMS256.txt
 RUN npm install --global "pnpm@${PNPM_VERSION}"
-ENV UV_PYTHON_PREFERENCE=only-managed HUSKY=0
+ENV HUSKY=0
 RUN uv python install 3.12
 CMD ["bash"]

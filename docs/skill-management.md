@@ -32,15 +32,16 @@ The owning implementation is `scripts/bot_setup/`; packaging reuses it.
 - `pnpm check:skills` checks all profile manifests against the shared catalog.
 - `pnpm precommit` checks staged selections and entry points from the Git index;
   unstaged repairs cannot make invalid staged content pass.
-- `battuta-packaging validate-skills ROOT` validates an assembled installation
-  against its own `ROOT/skills-hub/`, without the source checkout or network.
+- `battuta-packaging validate-bundle --root ROOT` validates generated role resources
+  and selections without a source catalog or network.
 
-Releases archive the catalog once, including nested resources and notices,
-alongside the profile manifests. They contain no generated per-agent skill
-discovery output. Installed Manager configuration validates selections and writes
-selected shared catalog paths into Pi's native `skills` settings; it does not
-copy the catalog into the profile. Worker configuration follows the same native
-settings pattern. CoS continues to use its extension-managed runtime loadout.
+Release builds copy complete selected skills, including nested resources and
+notices, into each role's `.pi/skills/`. They generate `AGENTS.md` and compile
+extensions during the build. The archive contains no `skills-hub/` or source
+selection manifests; `bots/release.json` records the resolved selections. Pi
+discovers the installed role's resources natively. Worker instances share one
+installed worker role while retaining separate private state; no discovery links
+or skill copies are created in persistent bot homes during release setup.
 
 Source setup validates selections before configuration writes and does not wipe
 custom discovery content. When removing generated checkout links, inspect them first;

@@ -31,6 +31,15 @@ def workers(env_file):
         click.echo(name)
 
 
+@main.command("env-example")
+def env_example():
+    """Print the release's credential-free environment template."""
+    template = Path(__file__).with_name("env.example")
+    if not template.is_file():
+        raise click.ClickException("For source configuration, use the checkout's .env.example")
+    click.echo(template.read_text(), nl=False)
+
+
 @main.command("run-worker")
 @click.option("--root", type=DIRECTORY, required=True)
 @click.option("--bot-dir", type=DIRECTORY, required=True)

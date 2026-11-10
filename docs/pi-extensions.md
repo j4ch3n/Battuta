@@ -1,6 +1,10 @@
 # Installing Pi extensions
 
-Battuta keeps Pi packages and runtime state local to each bot. Install from the selected bot's directory with `PI_CODING_AGENT_DIR` pointing to its `.pi` directory; `pi install -l` registers the package in that bot's `.pi/settings.json`.
+For source development, install from the selected bot's directory with
+`PI_CODING_AGENT_DIR` pointing to its `.pi` directory; `pi install -l` registers
+the package in that bot's `.pi/settings.json`. Releases separate installed
+packages/code from private state and use the release installation command; do not
+install packages into `~/.battuta/pi-bots/`.
 
 ## 1. Check requirements
 
@@ -36,9 +40,9 @@ Use the same bot directory in both the environment variable and `--dir` argument
 For a standard Battuta extension, update its owning setup and release paths:
 
 - Add the pinned package to `scripts/bot_setup/src/bot_setup/install.py`; include it in the owning role's installation list in `configure.py`.
-- Bundle it for the same bot in `.github/workflows/release.yml`.
-- Update the shared setup package's `configure_release` flow so retained settings discover the bundled package without duplicating entries or replacing package resource selections.
-- Add required runtime environment to the shared source launcher `scripts/bot_setup/run-dev.sh` and the release foreground/service launcher `scripts/packaging/battuta`.
+- Add it to the owning role's generated bundle settings in `scripts/packaging/src/battuta_packaging/bundle.py`; install-runtime consumes the pinned package selection.
+- Compile owned extension entry points and copy their resources through `scripts/packaging/build-bots.mjs`; keep external runtime dependencies in production manifests and frozen lockfiles.
+- Add required runtime environment to source `scripts/bot_setup/run-dev.sh` and installed `scripts/packaging/src/battuta_packaging/launch.py`.
 
 Keep runtime data out of source control. Extend tests in the owning `scripts/bot_setup/tests/` or `scripts/packaging/tests/` project for installation, retained settings, and launcher environment behavior. See [local setup](../.agents/skills/battuta-setup/references/development.md) for full bot configuration and launch instructions.
 

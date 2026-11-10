@@ -48,7 +48,7 @@ with `sudo`. With the owner's approval, run:
 The owner completes Luma's browser authorization, checking the account and access
 being granted. Over SSH, open the authorization page on the owner's browser and
 paste the resulting redirected URL into Pi's sign-in prompt if the callback
-cannot reach the Raspberry Pi. Paste it only into that prompt, never chat,
+cannot reach the remote OCI machine. Paste it only into that prompt, never chat,
 documentation, shell history, or a log. Stop if authorization fails; do not launch
 CoS expecting it to repair authentication.
 

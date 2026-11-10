@@ -88,9 +88,6 @@ fi
 pi_pane="$(tmux new-session -d -P -F '#{pane_id}' -s "$session" -n "$bot_window" -c "$bot_dir" "$pi_command")"
 manager_pane="$(tmux split-window -h -P -F '#{pane_id}' -t "$pi_pane" -c "$manager_dir" "$manager_command")"
 printf -v memory_command 'set -a; source %q; set +a; export PATH=%q; exec %q serve' "$env_file" "$PATH" "$repo_dir/memory-service/.venv/bin/battuta-memory"
-if [[ -x "$repo_dir/bin/battuta" ]]; then
-  printf -v memory_command 'export PATH=%q; exec %q memory' "$PATH" "$repo_dir/bin/battuta"
-fi
 memory_pane="$(tmux new-window -P -F '#{pane_id}' -t "=$session" -n "$service_window" -c "$repo_dir" "$memory_command")"
 if [[ "$mode" == dev ]]; then
   tmux split-window -h -t "$memory_pane" -c "$repo_dir" 'exec make functions-serve'
