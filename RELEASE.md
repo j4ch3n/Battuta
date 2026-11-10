@@ -220,7 +220,7 @@ Confirm the Manager configuration contains the enabled memory connection and a
 native project-memory skill path without printing private values:
 
 ```sh
-node -e '
+bin/node -e '
 const fs = require("node:fs");
 const base = "bots/manager-bot/.pi";
 const mcp = JSON.parse(fs.readFileSync(`${base}/mcp.json`, "utf8"));

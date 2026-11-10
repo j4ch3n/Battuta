@@ -17,7 +17,7 @@ The isolated CoS recall agent has direct `memory_recall` and `memory_get` tools,
     }
   ],
   "memory_metadata": {
-    "stage": "durable",
+    "stage": "temporal",
     "knowledge_type": "fact",
     "confidence": "confirmed",
     "status": "active"
@@ -25,7 +25,7 @@ The isolated CoS recall agent has direct `memory_recall` and `memory_get` tools,
 }
 ```
 
-Pass this to `memory_remember` only when the source references, scope, and metadata are established; otherwise defer the addition. For Atlas's database choice, instead use `content:"Atlas uses SQLite rather than Postgres."`, `projects:["atlas"]` and `kind:"decision"`. A fact can belong to multiple evidenced projects from the catalog returned by `battuta-project list --json`; preserve registered spelling when selecting new labels. Use `["global"]` alone for genuinely non-project facts, never as an unknown-project fallback. The server returns lowercase memberships. Extra `tags` cannot use reserved `scope:`, `proj:` or `kind:` prefixes.
+Pass this to `memory_remember` only when the source references, scope, and metadata are established; otherwise defer the addition. New additions and corrections are `temporal` until dream review; use `durable` only for reviewed records. For Atlas's database choice, instead use `content:"Atlas uses SQLite rather than Postgres."`, `projects:["atlas"]` and `kind:"decision"`. A fact can belong to multiple evidenced projects from the catalog returned by `battuta-project list --json`; preserve registered spelling when selecting new labels. Use `["global"]` alone for genuinely non-project facts, never as an unknown-project fallback. The server returns lowercase memberships. Extra `tags` cannot use reserved `scope:`, `proj:` or `kind:` prefixes.
 
 `memory_recall({"semantic_query":"previous database decisions and constraints","keywords":["SQLite","Postgres"]})` searches all projects and global memory. Either input can be omitted; at least one is required. Semantic-only uses embedding distance; keywords-only uses literal text/alias matching; both combine ranked results. Rewrite using conversation history, review results, and revise/repeat queries as useful. Keywords may be phrases, never raw query syntax. An oversized semantic query must be shortened or split, not silently truncated.
 
@@ -42,7 +42,7 @@ not confirmed. Exact-content retries with different scope/source/expiry conflict
 
 Use `memory_list({"selector":"all","page":1,"page_size":20})` for inventory; increment page until all `total` records are consumed. `memory_get({"ref":"<full returned content hash>"})` reads one complete record. `include_history:true` exposes predecessor/successor lineage, excluding deleted content from discovery.
 
-After reading an incorrect record, call `memory_update({"ref":"<old ref>","content":"Atlas uses SQLite.","reason":"Owner corrected the database decision"})`. This creates a new version and returns a new ref. It inherits scope unless changed through the membership tool; default recall/list omit the predecessor. Existing-content collisions and stale refs are conflicts, not permission to overwrite unrelated history.
+After reading an incorrect record, call `memory_update({"ref":"<old ref>","expected_revision":"<returned revision>","content":"Atlas uses SQLite.","reason":"Owner corrected the database decision","sources":[{"agent_id":"manager","session_id":"<supporting session ID>","entry_id":"<supporting entry ID>"}],"memory_metadata":{"stage":"temporal","knowledge_type":"fact","confidence":"confirmed","status":"active"}})`. This creates a new version and returns a new ref. It inherits scope unless changed through the membership tool; default recall/list omit the predecessor. Existing-content collisions and stale refs are conflicts, not permission to overwrite unrelated history. Defer the correction when its new source or metadata cannot be established.
 
 `memory_link_projects({"ref":"<ref>","add":["beacon"],"remove":[]})` adds evidence-backed membership without recomputing embeddings. New memberships must be in the catalog; an attached label may be removed after its project disappears. Removing the final project or attaching projects to a global record is rejected. Compatible exact-content retries reuse a record; conflicting membership needs an explicit evidenced link, not silent broadening.
 

@@ -15,6 +15,9 @@ confirmed durable additions or corrections when they will help later work.
 2. Read the returned evidence text and structured metadata together. Use
    `memory_get` when a result's full record, sources, or history matters.
 3. Preserve material qualifications when using or sharing a result.
+4. Treat retrieval as eventually consistent. When a consequential decision could
+   depend on a pending correction, verify current evidence or coordinate before
+   acting.
 
 ## Interpret results
 
@@ -33,10 +36,11 @@ confirmed durable additions or corrections when they will help later work.
 
 Use supported memory tools to record a confirmed decision, reusable lesson, or
 correction with its applicable scope, source references, and lifecycle metadata.
-Defer an addition when those source references cannot be established. Read an
-existing record before correcting, linking, changing metadata, or forgetting it;
-retain the returned reference and revision where the operation requires them. A
-write is complete only after the service returns its result.
+New records are temporal until dream review. Defer an addition when those source
+references cannot be established. Read an existing record before correcting,
+linking, changing metadata, or forgetting it; retain the returned reference and
+revision where the operation requires them. A write is complete only after the
+service returns its result.
 
 Keep temporary status, raw logs, credentials, and copied canonical documents
 out of durable memory.

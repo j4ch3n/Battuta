@@ -46,6 +46,7 @@ def test_release_setup_is_repeatable_without_skill_output(release, capsys):
             if role == "manager":
                 settings["skills"] = ["../custom-skill", *settings.get("skills", [])]
             (pi / "settings.json").write_text(json.dumps(settings))
+        (release / "bots/manager-bot/skills.json").write_text('{"skills":["todo"]}')
         configure_release(release)
     for role in ("cos", "manager"):
         pi = release / f"bots/{role}-bot/.pi"
