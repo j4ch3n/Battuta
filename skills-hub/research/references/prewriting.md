@@ -40,7 +40,7 @@ For exploratory work, provide an understandable default explanation and then off
 a meaningful branch the owner can steer. Do not require a choice of unfamiliar
 frames before orientation. No mind map, expert transcript or decision is mandatory.
 
-Use artifacts for commissioned narrative, format and interaction design;
-Manager uses artifact-review to judge the result independently.
+Use artifacts for commissioned narrative, format and interaction design; use
+artifact-review when independent judgement is needed for the requested sharing stage.
 If it exposes a missing evidential link, investigate or label that gap; polished
 prose and animation cannot establish the missing fact.

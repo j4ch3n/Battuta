@@ -10,7 +10,7 @@ stay outside the catalog.
 Each profile declares an ordered selection in `bots/<profile>/skills.json`:
 
 ```json
-{ "skills": ["memory", "project-context", "note-taking"] }
+{ "skills": ["project-management", "note-taking"] }
 ```
 
 These selections do not grant tools or permissions. Local source configuration
@@ -53,7 +53,24 @@ The Worker profile selects `artifacts` for commissioned creation and authorized
 publication; Manager selects `artifact-review` for independent editorial judgment.
 CoS retains final owner communication and intent/authority, not production tooling.
 
+CoS and Manager select `project-management` for the project lifecycle and managed
+document operations within their respective authority. Workers select
+`execute-assignment` for commissioned project orientation and verified execution,
+not project administration. Selections do not transfer document permissions.
+
 - Add or edit complete skill sources in the hub, never generated bot output.
+- Describe **when to use** a skill through the task or situation, never the
+  identity of its invoker. Each `SKILL.md` states its objective, capabilities,
+  boundaries, workflow, practical rationale, and a concise positive/negative
+  example pair. Reuse an equivalent existing section rather than adding headings
+  mechanically.
+- Define roles only where they are recipients, authorities, subjects, or evidence
+  sources. Loading a skill neither assigns that role nor grants its tools,
+  permissions, or publication authority. Preserve literal routes such as
+  `manager` and `cos` and state the real authorization prerequisite instead.
+- Keep command detail, storage mechanics, and large templates in the skill's
+  owned references. Link to the owning technical documentation rather than
+  copying implementation details into workflow rationale.
 - Rename directory, frontmatter, selections, owned links, callers, and maintained
   references together; do not keep duplicate instruction copies.
 - Remove affected selections and callers before removing a source. Never

@@ -1,14 +1,23 @@
 ---
 name: communicate-with-manager
-description: Use when CoS needs to commission work beyond a quick factual check, clarify a mandate, provide changed context, or request investigation, planning, execution, or reassessment from Manager.
+description: Use when commissioning substantial work, clarifying a mandate, sending changed context, or requesting investigation, planning, execution, or reassessment through Agent Mail.
 ---
 
 # Communicate with Manager
 
-CoS understands intent and routes substantive work; Manager owns investigation,
-breakdown, planning, execution/coordination, progress evaluation, and result
-judgment. Commission the work before doing it yourself. CoS remains available
-to the owner and owns product/authority decisions and final communication.
+## Objective
+
+Deliver an actionable commission, clarification, or context update to `manager`
+with explicit authority, expected result, and reply expectation.
+
+## Roles and boundaries
+
+`manager` is the Agent Mail recipient for substantive investigation, breakdown,
+planning, execution/coordination, progress evaluation, and result judgment.
+CoS is the product-authority role that retains owner communication and product
+decisions. These roles describe the route and authority, not who may use this
+skill. A message does not grant tools, product approval, or managed-document
+permissions.
 
 ## Workflow
 
@@ -31,12 +40,22 @@ to the owner and owns product/authority decisions and final communication.
 3. Choose an outbound example from the [template index](references/templates/index.md).
    Send or reply through Agent Mail to `manager`, preserving the existing
    message-reference and reply-expectation contract.
-4. Let Manager own the hard work. Handle consequential clarification and
+4. Let `manager` own the hard work. Handle consequential clarification and
    product decisions without repeating its investigation. Evaluate the returned
    evidence, distinguish verified work from acceptance, and communicate the
    outcome to the owner. Use the `project-management` skill for product
-   decisions and `project-context` for persistence through CoS's available tools.
+   decisions and persistence through CoS's available tools.
+
+## Why and examples
+
+A bounded commission prevents duplicate investigation and accidental product
+commitments. For example, send `manager` a request to compare two migration
+paths with the project, settled constraints, decision owner, and expected
+evidence. It can be assessed without inferring authority.
+
+Avoid “implement it” when the evidence or execution authorization is absent.
+**Why:** investigation, execution authorization, and acceptance are different
+states; the message should request assessment or provide the missing mandate.
 
 Budget means useful scope boundaries and accepted tradeoffs, not mandatory
-money/hour estimates. These examples are CoS → Manager only; they do not grant
-new tools or change managed-document permissions.
+money/hour estimates.

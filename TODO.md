@@ -1,6 +1,6 @@
 # Future execution responsibilities
 
-These are preserved ideas, not active project-context workflows. The current collection authors and reviews documents; it does not implement a task runner, convergence loop, or issue synchronizer.
+These are preserved ideas, not active project-management document workflows. The document collection authors and reviews documents; it does not implement a task runner, convergence loop, or issue synchronizer.
 
 ## Implementation checklist handling
 

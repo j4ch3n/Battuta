@@ -107,11 +107,10 @@ test("product-decision workflow links reach the shared command reference", () =>
   for (const file of [
     "skills-hub/project-management/SKILL.md",
     "skills-hub/project-management/references/product-decisions.md",
-    "skills-hub/project-context/SKILL.md",
-    "skills-hub/project-context/references/decisions.md",
-    "skills-hub/project-context/references/commands.md",
-    "skills-hub/project-context/references/spec-tools.md",
-    "skills-hub/project-context/references/spec-metadata.md",
+    "skills-hub/project-management/references/decisions.md",
+    "skills-hub/project-management/references/commands.md",
+    "skills-hub/project-management/references/spec-tools.md",
+    "skills-hub/project-management/references/spec-metadata.md",
   ])
     checkLinks(resolve(root, file));
 });

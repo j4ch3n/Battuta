@@ -1,7 +1,7 @@
 ---
 name: "speckit-constitution"
 description: "Create or update the project constitution from interactive or provided principle inputs."
-compatibility: "Uses project-context workspace locations and dedicated constitution tools"
+compatibility: "Uses project-management workspace locations and dedicated constitution tools"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/constitution.md"

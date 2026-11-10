@@ -1,30 +1,39 @@
 ---
 name: problem-framing
-description: Clarify a vague product idea by facilitating a problem-framing canvas covering affected users, evidence, and desired outcomes. Use when the problem is not yet agreed or a proposed solution needs reframing.
+description: Use when a product problem is unclear, a proposed solution needs reframing, or affected users, evidence, and desired outcomes are not yet agreed.
 license: CC-BY-NC-SA-4.0
 metadata:
   source: https://github.com/deanpeters/product-manager-prompts/blob/c3b91dba8f7782fac72c7aa340b98d6554b1f3ec/workshops/problem-framing-canvas-workshop.md
 ---
 
-## Context
+## Objective
 
-Manager uses this to clarify a commissioned problem with CoS when consequential
-facts are missing; it does not authorize owner contact. A Worker drafts only from
-confirmed assignment inputs and reports consequential gaps through execute-assignment.
+Produce an evidence-labeled problem statement, affected populations, desired
+outcome, and open “How might we” question without assuming a solution.
 
-Hello, Chatbot AI Assistant (that's you, ChatGPT, Claude, Gemini,
-Perplexity, etc.). Act as a **problem framing facilitator** for
-product managers, using the MITRE Problem Framing Canvas.
+## Capabilities and boundaries
 
-Your job is to run a short guided loop through the canvas territory,
-then generate the completed canvas, a problem statement, and a "How
-might we..." question. Guard the problem/solution boundary
-throughout: if an answer smuggles in a solution, say so and reframe
-it as the underlying difficulty.
+Facilitate or draft a MITRE Problem Framing Canvas from the supplied context.
+It does not authorize owner contact, product approval, or implementation. CoS is
+the recipient for consequential product decisions; a bound assignment uses its
+confirmed inputs and reports consequential gaps through execute-assignment.
+
+## Choose the mode
+
+Use the guided loop when a participant is available to answer open questions.
+For a commissioned or bound task with sufficient supplied material, draft the
+requested canvas directly, label assumptions/open questions, and do not wait at
+conversation gates. This distinction is task context, not invoker identity.
+
+In an interactive setting, run a short guided loop through the canvas territory;
+for a commissioned draft, use the supplied answers directly. Then generate the
+completed canvas, a problem statement, and a "How might we..." question. Guard
+the problem/solution boundary throughout: if an answer smuggles in a solution,
+say so and reframe it as the underlying difficulty.
 
 ## Facilitation Rules (Generative Guidance v2)
 
-1. Open the loop by stating the contract: 4 questions, one at a time;
+1. In an interactive loop, state the contract: 4 questions, one at a time;
    the user can pick an option, type their own, say "take your best
    guess," or drop in notes to skip ahead.
 2. For each question, offer 3 recommendations generated from
@@ -42,8 +51,9 @@ it as the underlying difficulty.
 7. If the user arrives with sufficient context, reduce or skip
    questions and proceed. Per MITRE: an aligned team should pass
    through in 30 seconds.
-8. Withhold the output until the loop closes; then present what you
-   know, what you assumed, and what is open, confirm, and build.
+8. In an interactive loop, withhold the output until the loop closes; then
+   present what you know, what you assumed, and what is open. In a commissioned
+   draft, provide the requested output without an interactive confirmation gate.
 
 ## Question Flow (Budget: 4)
 
@@ -78,7 +88,7 @@ as a feature shipping.)
 
 ## Output
 
-After confirmation, generate:
+After the interactive loop, or directly for a commissioned draft, generate:
 
 ### 1) The Problem Framing Canvas
 
@@ -131,3 +141,11 @@ Offer exactly 4 next options:
 
 Ask the user to reply with `1`, `2`, `3`, `4`, `1 and 3`, or a custom
 path.
+
+## Why and examples
+
+Reframe “we need a dashboard” as the evidenced difficulty a dashboard is meant
+to address, then name the affected populations and observable outcome. **Why:**
+separating problem from solution preserves alternatives. Avoid treating the
+feature request itself as the problem or re-asking supplied answers; it hides
+assumptions and wastes the available context.

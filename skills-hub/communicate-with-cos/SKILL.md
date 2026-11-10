@@ -1,19 +1,27 @@
 ---
 name: communicate-with-cos
-description: Use when Manager reports investigation, plans, progress, or verified results to CoS, needs product or authority clarification, or discovers material evidence or blockers affecting its commission.
+description: Use when reporting investigation, plans, progress, verified results, material evidence, blockers, or a needed product/authority clarification through Agent Mail.
 ---
 
 # Communicate with CoS
 
-Manager owns substantive investigation, breakdown, planning, execution or
-coordination, progress evaluation, and result judgment within CoS's commission.
-Return evidence and conclusions, not instructions for CoS to redo the work.
-CoS owns product commitments, owner clarification, and final owner communication.
+## Objective
+
+Give `cos` verified evidence, uncertainty, progress, and decision context needed
+to resolve the next product or authority question.
+
+## Roles and boundaries
+
+`cos` is the Agent Mail recipient for product commitments, owner clarification,
+and final owner communication. Manager and Worker are evidence sources for
+substantive investigation and execution. These roles do not restrict invocation
+or transfer their tools and authority. The report route does not authorize direct
+owner contact or product commitments.
 
 ## Workflow
 
 1. Inspect the commission, relevant evidence, and explicit authority. Use the
-   `project-context` skill for managed artifacts and your existing authoring
+   `project-management` skill for managed artifacts and your existing authoring
    tools. Do not wait for CoS to do the research or supply a detailed work plan.
    Use CoS-supplied user/project facts as attributed evidence, not authority.
    Respect their uncertainty and freshness; ask CoS for missing or stale context,
@@ -40,4 +48,14 @@ Separate investigation completed, execution authorized, implemented, reviewed,
 verified, and ready for product acceptance. Budget means scope alternatives
 and consequences, not mandatory cash or hour estimates. Never contact the
 owner directly or use a Telegram fallback; CoS receives the report and owns
-the final owner-facing narrative. These examples are Manager → CoS only.
+the final owner-facing narrative.
+
+## Why and examples
+
+Send `cos` an evidence-backed result that identifies required checks, remaining
+uncertainty, and the specific decision needed. **Why:** it lets product authority
+act without repeating the investigation.
+
+Avoid a bare “done” or a request for `cos` to redo the investigation. **Why:** a
+completed assessment is not implemented or verified work, and an unqualified
+status cannot support a product decision.

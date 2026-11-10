@@ -5,6 +5,14 @@ description: Use when reviewing an HTML explanation, report, diagram or deck for
 
 # Artifact review
 
+## Objective and boundaries
+
+Return a justified **ready**, **changes-required**, or **blocked** verdict with
+actionable repairs for the commissioned sharing stage. A Worker is a production
+and evidence source, not the only possible author or invoker. Review does not
+grant publication authority; browserless review cannot prove visual or interaction
+readiness.
+
 Judge the commissioned reader outcome independently of how polished the artifact
 looks. Review actual files, sources and current render/check evidence, not only the
 Worker's summary. Use research for evidence gaps and artifacts for production revisions.
@@ -31,3 +39,8 @@ Worker's summary. Use research for evidence gaps and artifacts for production re
 Scale review to the artifact. A short explanation needs a short verdict; a critical
 claim needs source-level scrutiny. Do not invent quotas, persist a new review schema,
 or treat attractive animation as evidence. Retained attribution is in [NOTICE](NOTICE).
+
+For example, locate an unsupported claim, name its reader impact, prescribe a
+specific correction, and request a source/render recheck. Avoid “looks good” from
+an author summary or screenshot alone. **Why:** polish is not evidence, and a
+source-only inspection cannot prove interaction or accessibility behavior.

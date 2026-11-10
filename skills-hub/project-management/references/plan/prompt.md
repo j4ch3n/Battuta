@@ -1,7 +1,7 @@
 ---
 name: "speckit-plan"
 description: "Execute the implementation planning workflow using the plan template to generate design artifacts."
-compatibility: "Uses project-context workspace locations and existing file tools"
+compatibility: "Uses project-management workspace locations and existing file tools"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/plan.md"

@@ -62,3 +62,17 @@ sys.exit(int(os.environ.get("FAIL_CHILD", "0")))
         self.assertEqual(calls[0][0:2], ["pnpm", str(self.root)])
         self.assertIn(str(node_file), calls[0][2])
         self.assertEqual(calls[1], ["deno", str(function), ["lint", str(deno_file)]])
+
+    def test_project_skill_changes_select_mail_and_worker_contract_checks(self):
+        (self.root / "supabase/functions/alpha").mkdir(parents=True)
+        git = self.bin / "git"
+        git.write_text(f"#!{sys.executable}\nimport os, sys\nsys.stdout.write(os.environ['CHANGED_FILE'] + chr(0))\n")
+        git.chmod(0o700)
+        for changed in ("skills-hub/project-management/SKILL.md", "skills-hub/execute-assignment/SKILL.md", "bots/worker/skills.json"):
+            with self.subTest(changed=changed):
+                self.env["CHANGED_FILE"] = changed
+                result = self.runner("select-checks.mjs", "base", "head")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                selected = json.loads(result.stdout)
+                self.assertIn("agent-mail", selected["node"])
+                self.assertIn("bots/worker/extension/assignment-worker", selected["node"])

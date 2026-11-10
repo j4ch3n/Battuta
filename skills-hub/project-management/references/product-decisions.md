@@ -4,11 +4,11 @@ Use after technical assessment when selecting a useful achievement milestone, re
 
 ## Decide and record
 
-1. Read registered project metadata, the named spec's actual latest version, canonical checklist/review, Manager findings, and the owner's mandate. Use the `project-context` skill when inspecting managed project/spec artifacts.
-2. Compare the smallest useful achievement with broader alternatives: acceptance boundary, deferred capabilities, consequences, evidence, and unknowns. Decide within delegated authority; request a bounded probe for missing evidence or take owner-reserved choices to the owner.
-3. For refinement, establish the revised requirements, acceptance boundary and what evidence would resolve the remaining uncertainty. Use the project-context skill for canonical persistence. Refinement keeps the proposal open and is not a final decision.
-4. Establish the rationale before go/no-go: why this outcome follows from the evidence, alternatives, constraints and conditions. Use the project-context skill to record the outcome and full rationale together and inspect the saved result before reporting success. A technical review informs judgement; it does not transfer product authority.
-5. Send Manager additional context, an answer, or a bounded action only when needed. Reference saved version/decision paths; a standalone decision announcement and acknowledgment are unnecessary. Outstanding questions still need answers, and affected active work still needs explicit pause/context.
+1. Read registered project metadata, the named spec's actual latest version, canonical checklist/review, Manager findings, and the owner's mandate. Use the [command reference](commands.md) and [project-spec tools](spec-tools.md) to resolve authoritative context and document versions.
+2. Compare the smallest useful achievement with broader alternatives: acceptance boundary, deferred capabilities, consequences, evidence, and unknowns. CoS decides the high-level outcome and scope within the owner's mandate; Manager supplies detailed requirements, technical implications, and a recommendation. Route consequential product gaps to CoS. CoS asks the owner when the answer cannot be established within its mandate or confirmed context.
+3. For refinement, establish the revised requirements, acceptance boundary and what evidence would resolve the remaining uncertainty. CoS persists a complete new version through its project-spec tools. Refinement keeps the proposal open and is not a final decision.
+4. Establish the rationale before go/no-go: why this outcome follows from the evidence, alternatives, constraints and conditions. CoS follows the [decision contract](decisions.md) to record the outcome and full rationale together and inspects the saved result before reporting success. Manager returns its assessment for that decision rather than recording product approval. A technical review informs judgement; it does not transfer product authority.
+5. After the decision, CoS sends Manager additional context, an answer, or a bounded action only when needed. Reference saved version/decision paths; a standalone decision announcement and acknowledgment are unnecessary. Outstanding questions still need answers, and affected active work still needs explicit pause/context.
 
 ## Decision meaning
 
@@ -17,4 +17,4 @@ Use after technical assessment when selecting a useful achievement milestone, re
 
 ## Completion
 
-The assessed requirements are current, the go/no-go and rationale are recorded against the intended version, and necessary next actions have an owner. A recorded decision does not prove implementation, verification, acceptance, or release. Use project-context for terminal-state and document-persistence contracts.
+The assessed requirements are current, the go/no-go and rationale are recorded against the intended version, and necessary next actions have an owner. A recorded decision does not prove implementation, verification, acceptance, or release. The decision and project-spec references above own terminal-state and document-persistence contracts.

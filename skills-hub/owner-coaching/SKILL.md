@@ -5,7 +5,12 @@ description: Use when the owner is exploring life goals, personal priorities, va
 
 # Owner coaching
 
-Use this skill as the owner's emotionally intelligent chief of staff, not as a therapist or a replacement for decisive product leadership. The owner controls the depth and direction of the conversation.
+## Objective and boundaries
+
+Help the owner reach clearer understanding or a chosen next step at their preferred
+depth, without diagnosis or forced execution. The owner controls the depth and
+direction; this is coaching behavior, not an assumed assistant persona, therapy,
+or a replacement for decisive product leadership.
 
 ## When to use it
 
@@ -84,12 +89,16 @@ Keep a concise internal digest of explicit facts, the owner’s stated aim, answ
 
 **Owner:** “I am not sure whether to keep building this business.”
 
-**CoS:** “It sounds like this is larger than the next project decision. What would you most want clarity on by the end of this conversation?”
+**Assistant:** “It sounds like this is larger than the next project decision. What would you most want clarity on by the end of this conversation?”
 
 **Owner:** “I keep delaying the launch.”
 
-**CoS:** “What feels most difficult about moving the launch forward right now?”
+**Assistant:** “What feels most difficult about moving the launch forward right now?”
 
 **Owner:** “I could prioritize growth or profitability.”
 
-**CoS:** “Which direction best supports what you want the business to make possible over the next year?”
+**Assistant:** “Which direction best supports what you want the business to make possible over the next year?”
+
+Avoid a compound interrogation or unsolicited diagnosis. **Why:** it pressures
+disclosure and reduces the owner's autonomy; ask one useful question, or provide
+a requested direct answer or practical action instead.

@@ -46,8 +46,8 @@ const mail =
   changed("agent-mail/") ||
   changed("skills-hub/communicate-with-") ||
   changed("skills-hub/project-management/") ||
-  changed("skills-hub/project-context/") ||
-  files.some((file) => /^bots\/(cos|manager)-bot\/skills\.json$/.test(file));
+  changed("skills-hub/execute-assignment/") ||
+  files.some((file) => /^bots\/(?:cos-bot|manager-bot|worker)\/skills\.json$/.test(file));
 const artifacts =
   changed("project-context-cli/") ||
   files.some((file) => ["scripts/setup-artifacts.sh", "scripts/packaging/battuta"].includes(file));

@@ -1,6 +1,11 @@
-# Manager → CoS templates
+# Messages to `cos`
 
-Manager owns the substantive investigation, breakdown, plan, execution/coordination, progress evaluation, and result judgment. Select the message that answers the commission or presents new evidence. Return evidence and conclusions to CoS without making product commitments or contacting the owner directly. Adapt the JSON to actual findings and references.
+Manager is an evidence source for substantive investigation, breakdown, planning,
+execution/coordination, progress evaluation, and result judgment. Select the
+message that answers the commission or presents new evidence. Return evidence and
+conclusions to `cos` without making product commitments or contacting the owner
+directly. This route description does not limit who may use the template. Adapt
+the JSON to actual findings and references.
 
 | Situation                                             | Template                                                          | Expected next step                                             |
 | ----------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------- |
@@ -11,7 +16,7 @@ Manager owns the substantive investigation, breakdown, plan, execution/coordinat
 
 ## Before sending
 
-Use the `project-context` skill when resolving current artifact locations. Include every content field; `[]`/`null` represent unused sections. Use `observed`, `confirmed`, or `inferred` honestly. No evidence means explicit uncertainty, not invented proof. Examples describe a fictional project and must never be reported as real findings.
+Use the `project-management` skill when resolving current artifact locations. Include every content field; `[]`/`null` represent unused sections. Use `observed`, `confirmed`, or `inferred` honestly. No evidence means explicit uncertainty, not invented proof. Examples describe a fictional project and must never be reported as real findings.
 
 Copy the incoming `message_ref` into reply `parent`, not `in_reply_to`. A non-null `request` needs a reply expectation. One direct reply is allowed per message; after a progress reply, send the final result as new mail with `related_messages` referencing the original request.
 
