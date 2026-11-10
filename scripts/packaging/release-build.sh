@@ -5,7 +5,7 @@ tag="${1:?release tag required}"
 tool_version="${2:?Python tool version required}"
 source /etc/os-release
 [[ "$ID" == ol && "${VERSION_ID%%.*}" == 9 && "$(uname -m)" == aarch64 ]]
-git config --global --add safe.directory /source
+git config --global --add safe.directory /source/.git
 work="$(mktemp -d /tmp/battuta-build-XXXXXXXX)"
 git clone --no-hardlinks /source "$work/source"
 cd "$work/source"
