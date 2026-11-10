@@ -7,6 +7,7 @@ import click
 from . import skills
 from .configure import configure_source, configure_release, configure_worker
 from .env import read_env
+from .instances import worker_names
 from .install import TELEGRAM_PACKAGE
 from .json_config import write_config
 from .telegram import prepare_telegram_config
@@ -18,6 +19,14 @@ FILE = click.Path(dir_okay=False, path_type=Path, resolve_path=True)
 @click.group()
 def main():
     """Configure Battuta bots and validate their skill selections."""
+
+
+@main.command("workers")
+@click.option("--env-file", type=FILE, required=True)
+def workers(env_file):
+    """Print selected worker instance names without launching them."""
+    for name in worker_names(read_env(env_file), env_file):
+        click.echo(name)
 
 
 @main.command()
