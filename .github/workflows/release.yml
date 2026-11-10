@@ -1,4 +1,4 @@
-name: Release Raspberry Pi package
+name: Release Oracle Linux ARM64 package
 
 on:
   push:
@@ -13,6 +13,7 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/ci.yml
+
   prepare:
     needs: validate
     runs-on: ubuntu-24.04-arm
@@ -35,190 +36,35 @@ jobs:
           test -z "$(git status --porcelain)"
           echo "version=${TAG#v}+g$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
-  wheels:
-    needs: prepare
-    runs-on: ubuntu-24.04-arm
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - package: battuta-project
-            path: project-context-cli
-          - package: battuta-artifacts
-            path: artifact-service
-          - package: battuta-memory
-            path: memory-service
-          - package: battuta-bot-setup
-            path: scripts/bot_setup
-          - package: battuta-packaging
-            path: scripts/packaging
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-      - uses: astral-sh/setup-uv@v10.2.0
-        with:
-          version: "0.11.19"
-      - name: Build wheel and export locked runtime constraints
-        env:
-          SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.prepare.outputs.version }}
-          PROJECT: ${{ matrix.path }}
-          PACKAGE: ${{ matrix.package }}
-        run: |
-          set -euo pipefail
-          uv build "$PROJECT" --wheel --out-dir dist
-          uv export --project "$PROJECT" --frozen --no-dev --no-emit-project \
-            --no-emit-package battuta-project --no-emit-package battuta-bot-setup \
-            --no-hashes --format requirements-txt --output-file "dist/$PACKAGE-constraints.txt"
-      - uses: actions/upload-artifact@v6
-        with:
-          name: wheel-${{ matrix.package }}
-          path: dist/*
-          if-no-files-found: error
-
-  collect-tools:
-    needs: [prepare, wheels]
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - uses: actions/download-artifact@v7
-        with:
-          pattern: wheel-*
-          merge-multiple: true
-          path: dist
-      - name: Record version and checksums
-        env:
-          TOOL_VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          printf '%s\n' "$TOOL_VERSION" > dist/python-tools-version.txt
-          cd dist
-          sha256sum *.whl *-constraints.txt python-tools-version.txt > python-tools-SHA256SUMS
-      - uses: actions/upload-artifact@v6
-        with:
-          name: python-tools
-          path: dist/*
-          if-no-files-found: error
-
   build:
-    needs: prepare
+    needs: [prepare]
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-
-      - uses: astral-sh/setup-uv@v10.2.0
-        with:
-          version: "0.11.19"
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .node-version
-
-      - name: Install pnpm
-        run: corepack enable && corepack prepare pnpm@10.20.0 --activate
-
-      - name: Validate skill manifests
-        run: pnpm check:skills
-
+      - name: Build Oracle Linux toolchain image
+        run: |
+          docker build -t battuta-release \
+            --build-arg NODE_VERSION="$(cat .node-version)" \
+            --build-arg PNPM_VERSION="$(python3 -c 'import json; print(json.load(open("package.json"))["packageManager"].split("@")[1])')" \
+            - < scripts/packaging/OracleLinux.Dockerfile
       - name: Assemble release
         env:
           TAG: ${{ github.ref_name }}
           TOOL_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          set -euo pipefail
-          mkdir -p dist/stage/battuta/bin
-          git archive HEAD bots scripts/bot_setup/run-dev.sh scripts/bot_setup/run-worker.sh scripts/bot_setup/wait-for-assignments.mjs skills-hub agent-mail project-spec memory-client scripts/setup-memory.sh scripts/setup-artifacts.sh .env.example RELEASE.md docs/skill-management.md docs/gogcli-setup.md docs/luma-setup.md docs/luma.md docs/memory-service.md docs/memory-service-setup.md docs/artifact-service.md docs/artifact-service-setup.md docs/subagents-setup.md docs/assignments.md docs/assignments-setup.md docs/workers.md docs/workers-setup.md | tar -x -C dist/stage/battuta
-          printf '%s\n' "$TOOL_VERSION" > dist/stage/battuta/python-tools-version.txt
-          test -s dist/stage/battuta/RELEASE.md
-          git archive HEAD docs/workers.md docs/workers-setup.md docs/scheduler.md | tar -x -C dist/stage/battuta
-          test -s dist/stage/battuta/docs/gogcli-setup.md
-          test -s dist/stage/battuta/docs/luma-setup.md
-          test -s dist/stage/battuta/docs/luma.md
-          test -s dist/stage/battuta/skills-hub/project-memory/SKILL.md
-          test ! -e dist/stage/battuta/bots/AGENTS_personal.md
-          cp "$(command -v node)" dist/stage/battuta/bin/node
-          cp scripts/packaging/battuta dist/stage/battuta/bin/battuta
-          chmod +x dist/stage/battuta/bin/*
-          test -d dist/stage/battuta/skills-hub
-          uv run --project scripts/packaging --locked battuta-packaging validate-skills dist/stage/battuta
-          for bot in cos-bot manager-bot; do
-            test ! -e "dist/stage/battuta/bots/$bot/.pi/ME.md"
-          done
-          bash -n dist/stage/battuta/bin/battuta
-          for bot in cos-bot manager-bot; do
-            bot_dir="$PWD/dist/stage/battuta/bots/$bot"
-            pnpm --dir "$bot_dir" install --frozen-lockfile --prod
-            while IFS=$'\t' read -r source package; do
-              PI_CODING_AGENT_DIR="$bot_dir/.pi" pnpm --dir "$bot_dir" exec pi install -l --approve "$source"
-              test -d "$bot_dir/.pi/npm/node_modules/$package"
-            done < <(node -e '
-              const { readFileSync } = require("node:fs");
-              const settings = JSON.parse(readFileSync(process.argv[1], "utf8"));
-              for (const entry of settings.packages ?? []) {
-                const source = typeof entry === "string" ? entry : entry?.source;
-                if (typeof source !== "string" || !source.startsWith("npm:")) continue;
-                const packageName = source.slice(4).replace(/@[^@/]+$/, "");
-                console.log(`${source}\t${packageName}`);
-              }
-            ' "$bot_dir/.pi/settings.json")
-            test ! -e "$bot_dir/.pi/skills"
-          done
-          pnpm --dir dist/stage/battuta/agent-mail install --frozen-lockfile --prod
-          pnpm --dir dist/stage/battuta/project-spec install --frozen-lockfile --prod
-          pnpm --dir dist/stage/battuta/memory-client install --frozen-lockfile --prod
-          worker_runtime="$PWD/dist/stage/battuta/bots/worker/extension/assignment-worker"
-          pnpm --dir "$worker_runtime" install --frozen-lockfile --prod
-          test -f dist/stage/battuta/bots/worker/.pi/web-search.json
-          test -f "$worker_runtime/index.ts"
-          test -f "$worker_runtime/node_modules/@earendil-works/pi-coding-agent/dist/extensions/mcp/index.js"
-          test -f "$worker_runtime/node_modules/@earendil-works/pi-coding-agent/dist/extensions/codemode/index.js"
-          bash -n dist/stage/battuta/scripts/bot_setup/run-worker.sh
-          memory_smoke_home="$(mktemp -d)"
-          mkdir -p "$memory_smoke_home/agent"
-          HOME="$memory_smoke_home" node dist/stage/battuta/memory-client/tests/loader-worker.mjs "$memory_smoke_home/agent" "$PWD/dist/stage/battuta/bots/cos-bot/node_modules/@earendil-works/pi-coding-agent/dist/index.js" "$PWD/dist/stage/battuta/bots/cos-bot/.pi/npm/node_modules/@jl1990/pi-scheduler/extensions/scheduler/index.ts"
-          rm -rf "$memory_smoke_home"
-          test -x dist/stage/battuta/bots/cos-bot/node_modules/.bin/pi
-          test -x dist/stage/battuta/bots/manager-bot/node_modules/.bin/pi
-          test -f dist/stage/battuta/bots/manager-bot/.pi/npm/node_modules/pi-subagents/bundle/index.js
-          test -f dist/stage/battuta/bots/manager-bot/.pi/npm/node_modules/pi-subagents/skills/pi-subagents/SKILL.md
-          test ! -e dist/stage/battuta/bots/cos-bot/node_modules/pi-subagents
-          test ! -e dist/stage/battuta/bots/manager-bot/.pi/subagents.json
-          pnpm --dir dist/stage/battuta/bots/manager-bot exec node --input-type=module -e 'import upstream from "pi-subagents"; import { SUBAGENT_DELEGATION_REQUEST_EVENT } from "pi-subagents/delegation"; if (typeof upstream !== "function" || !SUBAGENT_DELEGATION_REQUEST_EVENT) process.exit(1)'
-          test -d dist/stage/battuta/agent-mail/node_modules
-          test -d dist/stage/battuta/project-spec/node_modules
-          test -d dist/stage/battuta/memory-client/node_modules
-          test ! -e dist/stage/battuta/.env
-          test ! -e dist/stage/battuta/bots/cos-bot/.pi/auth.json
-          test ! -e dist/stage/battuta/bots/manager-bot/.pi/auth.json
-          test ! -e dist/stage/battuta/bots/cos-bot/.pi/mcp-auth.json
-          test ! -e dist/stage/battuta/bots/manager-bot/.pi/mcp-auth.json
-          test ! -e dist/stage/battuta/bots/cos-bot/.pi/telegram.json
-          test ! -e dist/stage/battuta/bots/manager-bot/.pi/telegram.json
-          test ! -e dist/stage/battuta/project-context-cli
-          test ! -e dist/stage/battuta/memory-service
-          test ! -e dist/stage/battuta/artifact-service
-          test ! -e dist/stage/battuta/scripts/packaging
-          test ! -e dist/stage/battuta/scripts/bot_setup/src
-          tar -C dist/stage -czf "dist/battuta-$TAG-linux-arm64.tar.gz" battuta
-          (cd dist && sha256sum "battuta-$TAG-linux-arm64.tar.gz" > "battuta-$TAG-linux-arm64.tar.gz.sha256")
-
+          mkdir -p dist
+          docker run --rm -v "$PWD:/source:ro" -v "$PWD/dist:/assets" battuta-release \
+            bash /source/scripts/packaging/release-build.sh "$TAG" "$TOOL_VERSION"
       - uses: actions/upload-artifact@v6
         with:
-          name: bot-archive
-          path: |
-            dist/*.tar.gz
-            dist/*.sha256
+          name: release-assets
+          path: dist/*
           if-no-files-found: error
 
-  publish:
-    needs: [build, collect-tools]
+  prerelease:
+    needs: [build]
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: write
@@ -226,19 +72,48 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v7
         with:
-          name: bot-archive
+          name: release-assets
           path: dist
-      - uses: actions/download-artifact@v7
-        with:
-          name: python-tools
-          path: dist
-      - name: Publish GitHub Release and verify downloadable assets
+      - name: Expose immutable candidate wheel URLs for installation checks
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" dist/* --verify-tag --prerelease --generate-notes
+
+  verify-install:
+    needs: [prerelease]
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download the actual published candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release download "$TAG" --dir dist
+      - name: Build clean Oracle Linux toolchain image
         run: |
-          set -euo pipefail
-          gh release create "$TAG" dist/* --verify-tag --generate-notes
-          gh release download "$TAG" --dir "$RUNNER_TEMP/published-tools" --pattern '*.whl' --pattern '*-constraints.txt' --pattern 'python-tools-*'
-          cd "$RUNNER_TEMP/published-tools"
-          sha256sum -c python-tools-SHA256SUMS
+          docker build -t battuta-verify \
+            --build-arg NODE_VERSION="$(cat .node-version)" \
+            --build-arg PNPM_VERSION="$(python3 -c 'import json; print(json.load(open("package.json"))["packageManager"].split("@")[1])')" \
+            - < scripts/packaging/OracleLinux.Dockerfile
+      - name: Install and verify without models or bot startup
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          docker run --rm -v "$PWD:/source:ro" -v "$PWD/dist:/assets:ro" \
+            -e BATTUTA_RELEASE_ASSETS=/assets -e BATTUTA_RELEASE_TAG="$TAG" \
+            battuta-verify uv run --no-project --python 3.12 \
+            python /source/scripts/packaging/tests/release_install.it.py
+
+  promote:
+    needs: [verify-install]
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Promote the tested assets without rebuilding
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release edit "$TAG" --prerelease=false --latest

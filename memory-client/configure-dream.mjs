@@ -20,12 +20,17 @@ export async function configureDream(botDirectory) {
   if (!settings || typeof settings !== "object" || Array.isArray(settings))
     throw new Error("Invalid CoS settings");
   const modelText = await optionalText(modelPath);
-  if (!modelText && (!settings.defaultProvider || !settings.defaultModel))
+  const agentDirectory = process.env.PI_CODING_AGENT_DIR ?? directory;
+  const modelSettings =
+    agentDirectory === directory
+      ? settings
+      : JSON.parse((await optionalText(join(agentDirectory, "settings.json"))) ?? "{}");
+  if (!modelText && (!modelSettings.defaultProvider || !modelSettings.defaultModel))
     throw new Error("Configure CoS defaultProvider/defaultModel before dream setup");
   const model = dreamConfigSchema.parse(
     modelText
       ? JSON.parse(modelText)
-      : { version: 1, model: `${settings.defaultProvider}/${settings.defaultModel}` },
+      : { version: 1, model: `${modelSettings.defaultProvider}/${modelSettings.defaultModel}` },
   );
   const store = await readSchedulerStore(storePath);
   const result = reconcileDreamSchedule(store, new Date().toISOString());
@@ -34,10 +39,9 @@ export async function configureDream(botDirectory) {
     (!Array.isArray(settings.extensions) || settings.extensions.some((e) => typeof e !== "string"))
   )
     throw new Error("Invalid CoS extensions");
-  const extension = fileURLToPath(new URL("./dream-extension.ts", import.meta.url));
-  settings.extensions = (settings.extensions ?? []).filter(
-    (e) => !e.replaceAll("\\", "/").endsWith("/memory-client/dream-extension.ts"),
-  );
+  const suffix = import.meta.url.endsWith(".js") ? "js" : "ts";
+  const extension = fileURLToPath(new URL(`./dream-extension.${suffix}`, import.meta.url));
+  settings.extensions = (settings.extensions ?? []).filter((entry) => entry !== extension);
   settings.extensions.push(extension);
   // Validate first, then make model/extension available before publishing the job.
   await atomicPrivateWrite(modelPath, JSON.stringify(model, null, 2) + "\n");

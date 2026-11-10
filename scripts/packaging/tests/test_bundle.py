@@ -1,6 +1,8 @@
 """Build-owned resources must be complete, private-free and relocatable."""
 
 import json
+import io
+import tarfile
 from pathlib import Path
 
 import click
@@ -81,4 +83,17 @@ def test_skill_escape_fails_before_writing(source, tmp_path):
     target = tmp_path / "release"
     with pytest.raises(click.ClickException):
         bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
+    assert not target.exists()
+
+
+@pytest.mark.parametrize("member", ["../escape", "/absolute", "bots/../escape", "other/file"])
+def test_archive_traversal_is_rejected_before_extraction(tmp_path, member):
+    archive = tmp_path / "release.tar.gz"
+    with tarfile.open(archive, "w:gz") as output:
+        info = tarfile.TarInfo(member)
+        info.size = 1
+        output.addfile(info, io.BytesIO(b"x"))
+    target = tmp_path / "install"
+    with pytest.raises(click.ClickException):
+        bundle.extract_bundle(archive, target)
     assert not target.exists()

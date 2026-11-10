@@ -32,14 +32,17 @@ def installed(tmp_path):
     (root / "bots/release.json").write_text(json.dumps({"node": version, "skills": {p: [] for p in ("cos-bot", "manager-bot", "worker")}}))
     env = tmp_path / ".env.prod"
     env.write_text("WORKER_BOT_COUNT=2\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=private-key\nLINEAR_API_TOKEN=private-linear\nCOS_TELEGRAM_TOKEN=private-telegram\n")
-    for name in ("manager-bot", "worker-1", "worker-2"):
+    for name in ("cos-bot", "manager-bot", "worker-1", "worker-2"):
         pi = home / ".battuta/pi-bots" / name / ".pi"
         pi.mkdir(parents=True)
         (pi / "mcp.json").write_text("{}")
+        if name == "cos-bot":
+            (pi / "telegram.json").write_text("{}")
+    (root / "bots/_shared/memory-client/dist/configure-scheduler.js").write_text('if(process.argv.includes("--print-path")) console.log("fixture-scheduler"); else if(process.argv.includes("--print-catchup")) console.log("0");')
     return root, home, env, node
 
 
-@pytest.mark.parametrize("bot", ["manager-bot", "worker-1", "worker-2"])
+@pytest.mark.parametrize("bot", ["cos-bot", "manager-bot", "worker-1", "worker-2"])
 def test_launch_cwd_private_state_and_credentials(installed, bot):
     root, home, env_file, node = installed
     result = subprocess.run([sys.executable, "-m", "battuta_packaging.cli", "run-bot", "--root", str(root), "--bot", bot, "--env-file", str(env_file), "--node", str(node), "--mode", "service"], env={**os.environ, "HOME": str(home)}, capture_output=True, text=True)
@@ -47,7 +50,7 @@ def test_launch_cwd_private_state_and_credentials(installed, bot):
     output = json.loads(result.stdout)
     assert output["cwd"] == str(root / "bots" / ("worker" if bot.startswith("worker-") else bot))
     assert output["env"]["PI_CODING_AGENT_DIR"] == str(home / ".battuta/pi-bots" / bot / ".pi")
-    assert not any("TELEGRAM" in key for key in output["env"])
+    assert any("TELEGRAM" in key for key in output["env"]) == (bot == "cos-bot")
     assert output["env"]["LINEAR_API_TOKEN"] == "private-linear"
     assert "--session-dir" in output["args"]
 

@@ -1,10 +1,11 @@
 """Assemble disposable bot code; private state never enters this tree."""
 
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 import subprocess
+import tarfile
 
 import click
 from bot_setup.skills import load_selection
@@ -19,6 +20,23 @@ ENTRY_OUTPUTS = (
     "bots/_shared/memory-client/dist/configure-scheduler.js", "bots/_shared/memory-client/dist/configure-dream.js",
     "bots/cos-bot/.pi/extensions/index.js", "bots/worker/.pi/extensions/index.js",
 )
+
+
+def extract_bundle(archive: Path, destination: Path) -> None:
+    if destination.is_symlink() or (destination.exists() and (not destination.is_dir() or any(destination.iterdir()))):
+        raise click.ClickException("Extraction destination must be an empty regular directory")
+    try:
+        with tarfile.open(archive, "r:gz") as contents:
+            members = contents.getmembers()
+            for member in members:
+                parts = PurePosixPath(member.name).parts
+                if not parts or parts[0] != "bots" or ".." in parts or not (member.isfile() or member.isdir()):
+                    raise click.ClickException("Archive must contain only regular files/directories below bots/")
+            destination.mkdir(parents=True, exist_ok=True)
+            contents.extractall(destination, members=members, filter="data")
+    except (OSError, tarfile.TarError) as error:
+        raise click.ClickException("Cannot extract bot archive; stop and inspect the verified input") from error
+    validate_bundle(destination)
 
 
 def compile_bots(source: Path, destination: Path) -> None:
