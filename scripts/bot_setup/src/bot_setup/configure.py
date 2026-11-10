@@ -134,13 +134,23 @@ def configure_release(root: Path) -> None:
             configure_subagents(settings, bot)
             names = load_selection(bot / "skills.json", root / "skills-hub")
             selected = [relpath(root / "skills-hub" / name, settings_path.parent) for name in names]
-            catalog = (root / "skills-hub").resolve()
-            retained = [
-                path
-                for path in settings.get("skills", [])
-                if not isinstance(path, str) or catalog not in (settings_path.parent / path).resolve().parents
-            ]
-            settings["skills"] = list(dict.fromkeys([*retained, *selected]))
+            resources = settings.get("battutaManagerResources", {})
+            if not isinstance(resources, dict) or not isinstance(resources.get("skills", []), list):
+                raise click.ClickException("battutaManagerResources must be a JSON object with skills")
+            managed = resources.get("skills", [])
+            if any(not isinstance(path, str) for path in managed):
+                raise click.ClickException("battutaManagerResources.skills must be an array of strings")
+            skill_settings = settings.get("skills", [])
+            if isinstance(skill_settings, dict):
+                directories = skill_settings.get("customDirectories", [])
+                if not isinstance(directories, list) or any(not isinstance(path, str) for path in directories):
+                    raise click.ClickException("skills.customDirectories must be an array of strings")
+                settings["skills"] = {**skill_settings, "customDirectories": list(dict.fromkeys([*(path for path in directories if path not in managed), *selected]))}
+            elif isinstance(skill_settings, list) and all(isinstance(path, str) for path in skill_settings):
+                settings["skills"] = list(dict.fromkeys([*(path for path in skill_settings if path not in managed), *selected]))
+            else:
+                raise click.ClickException("skills must be an array of strings or a Pi skills object")
+            settings["battutaManagerResources"] = {**resources, "skills": selected}
         write_config(settings_path, settings, ".settings-")
     path, data, changed = telegram
     if changed:

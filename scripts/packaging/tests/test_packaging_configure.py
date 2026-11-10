@@ -44,7 +44,8 @@ def test_release_setup_is_repeatable_without_skill_output(release, capsys):
             settings = json.loads((pi / "settings.json").read_text())
             settings["theme"] = "custom"
             if role == "manager":
-                settings["skills"] = ["../custom-skill", *settings.get("skills", [])]
+                (release / "skills-hub/custom-memory").mkdir()
+                settings["skills"] = ["../custom-skill", "../../../skills-hub/custom-memory", *settings.get("skills", [])]
             (pi / "settings.json").write_text(json.dumps(settings))
         (release / "bots/manager-bot/skills.json").write_text('{"skills":["todo"]}')
         configure_release(release)
@@ -58,10 +59,11 @@ def test_release_setup_is_repeatable_without_skill_output(release, capsys):
         assert settings["battutaMemoryCapture"]["enabled"] == (role == "cos")
         if role == "manager":
             names = json.loads((release / "bots/manager-bot/skills.json").read_text())["skills"]
-            assert settings["skills"][0] == "../custom-skill"
-            assert [(pi / path).resolve() for path in settings["skills"][1:]] == [
+            assert settings["skills"][:2] == ["../custom-skill", "../../../skills-hub/custom-memory"]
+            assert [(pi / path).resolve() for path in settings["skills"][2:]] == [
                 release / "skills-hub" / name for name in names
             ]
+            assert settings["battutaManagerResources"] == {"skills": settings["skills"][2:]}
         else:
             assert "skills" not in settings
         servers = json.loads((pi / "mcp.json").read_text())["mcpServers"]
@@ -71,6 +73,23 @@ def test_release_setup_is_repeatable_without_skill_output(release, capsys):
         assert (pi / "settings.json").stat().st_mode & 0o777 == 0o600
     output = capsys.readouterr()
     assert "private-" not in output.out + output.err
+
+
+def test_release_setup_preserves_legacy_skill_settings(release):
+    with patch("bot_setup.configure.run"):
+        configure_release(release)
+        settings_path = release / "bots/manager-bot/.pi/settings.json"
+        settings = json.loads(settings_path.read_text())
+        settings["skills"] = {"customDirectories": ["../custom-skill"], "enableSkillCommands": False}
+        settings_path.write_text(json.dumps(settings))
+        configure_release(release)
+    settings = json.loads(settings_path.read_text())
+    assert settings["skills"]["enableSkillCommands"] is False
+    assert settings["skills"]["customDirectories"][0] == "../custom-skill"
+    assert [(settings_path.parent / path).resolve() for path in settings["skills"]["customDirectories"][1:]] == [
+        release / "skills-hub" / name
+        for name in json.loads((release / "bots/manager-bot/skills.json").read_text())["skills"]
+    ]
 
 
 def test_release_setup_preserves_worker_tool_restrictions(release):
