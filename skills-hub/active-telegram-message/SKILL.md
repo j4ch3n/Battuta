@@ -32,6 +32,20 @@ Buttons reduce effort only for a genuinely bounded choice. A visible plain-text
 message and one delivery route keep the result understandable without buttons
 and prevent duplicate notifications.
 
+## Screenshot attachments
+
+When an authorized owner conversation needs browser evidence, use the
+`browser-evidence` skill to save a PNG first. Confirm the file exists, then call
+`telegram_attach` with its absolute path and provide a concise explanation of
+what the screenshot shows. Never expose credentials or unrelated private content.
+
+During an active Telegram turn, the attachment may be queued for final-turn
+delivery: give the normal reply rather than duplicating it with
+`telegram_message`. Outside an active turn, use the bridge only with explicit
+delivery authority and an authorized target. A saved file or queued attachment is
+not confirmed delivery; report the returned status honestly and never blindly
+resend an uncertain upload. Keep the file until delivery is settled.
+
 ## Telegram buttons
 
 Place `telegram_button` markup on a top-level line after the visible message, without a code fence, list, or blockquote. It is an HTML comment containing a JSON matrix: nested arrays are one row and top-level entries are separate rows.
