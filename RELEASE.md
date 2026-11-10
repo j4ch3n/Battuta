@@ -205,15 +205,28 @@ configuration rather than reinstalling or regenerating what is already present.
 Keep `.env.prod` as the credential source. Standalone terminals need their own
 environment loading; services load it through the release launcher.
 
-## 4. Configure only missing bot files
+## 4. Reconcile bot configuration
 
-If both CoS and Manager already have `AGENTS.md`, `.pi/settings.json`, and
-`.pi/mcp.json`, and CoS has `.pi/telegram.json`, **skip** `bin/battuta configure`.
-Only CoS may select the Telegram package. If required configuration is missing,
-run:
+After copying private state, run configuration once to reconcile owned
+instructions, MCP configuration, and Manager's native selected-skill paths while
+preserving private authentication and unrelated settings. Only CoS may select the
+Telegram package:
 
 ```sh
 bin/battuta configure
+```
+
+Confirm the Manager configuration contains the enabled memory connection and a
+native project-memory skill path without printing private values:
+
+```sh
+node -e '
+const fs = require("node:fs");
+const base = "bots/manager-bot/.pi";
+const mcp = JSON.parse(fs.readFileSync(`${base}/mcp.json`, "utf8"));
+const settings = JSON.parse(fs.readFileSync(`${base}/settings.json`, "utf8"));
+if (mcp.mcpServers?.memory?.enabled !== true || !settings.skills?.some((path) => path.endsWith("/project-memory"))) process.exit(1);
+'
 ```
 
 If `bots/worker/AGENTS.md`, `bots/worker/.pi/settings.json`, and

@@ -4,10 +4,10 @@
 
 Memory supplies revisable personal and project evidence, never execution authority
 or a replacement for canonical project documents. CoS receives prepared evidence
-and `ME.md` from the focused recall child. Manager retrieves project/global memory
-through its direct MCP connection; workers receive selected Agent Mail context and
-return attributed findings/corrections. Configuration exclusion is not a same-user
-security sandbox.
+from the focused recall child; its parent extension separately loads `ME.md`.
+Manager retrieves project/global memory through its direct MCP connection; workers
+receive selected Agent Mail context and return attributed findings/corrections.
+Configuration exclusion is not a same-user security sandbox.
 
 The CoS Pi extension owns capture, isolated recall preparation, dreaming and profile loading.
 The server owns storage, retrieval, evidence rendering, deterministic validation and replay. Pi owns

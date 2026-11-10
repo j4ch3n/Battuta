@@ -21,21 +21,22 @@ confirmed durable additions or corrections when they will help later work.
 - **Confidence** qualifies how well the retrieved evidence supports the result;
   it is not a substitute for current verification when the decision depends on
   it.
-- **Project/global scope** identifies where a record applies. Do not infer an
-  unnamed project from an active task.
+- **Project/global scope** identifies where a record applies. Use the explicit
+  project/global selector fields; do not infer an unnamed project from an active
+  task.
 - **Lifecycle status** distinguishes current evidence from superseded, expired,
   rejected, or otherwise limited records.
-- **Tags** classify and filter records, including scope, project, and kind.
-  They help find context but do not replace the content, sources, or
-  counterevidence.
+- **Kind** is a dedicated record filter. **Tags** are additional, non-reserved
+  topic filters; they do not replace the content, sources, or counterevidence.
 
 ## Maintain durable context
 
 Use supported memory tools to record a confirmed decision, reusable lesson, or
-correction with its applicable scope and available evidence. Read an existing
-record before correcting, linking, changing metadata, or forgetting it; retain
-the returned reference and revision where the operation requires them. A write
-is complete only after the service returns its result.
+correction with its applicable scope, source references, and lifecycle metadata.
+Defer an addition when those source references cannot be established. Read an
+existing record before correcting, linking, changing metadata, or forgetting it;
+retain the returned reference and revision where the operation requires them. A
+write is complete only after the service returns its result.
 
 Keep temporary status, raw logs, credentials, and copied canonical documents
 out of durable memory.

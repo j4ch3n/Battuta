@@ -132,6 +132,9 @@ def configure_release(root: Path) -> None:
             settings["packages"] = packages
         else:
             configure_subagents(settings, bot)
+            names = load_selection(bot / "skills.json", root / "skills-hub")
+            selected = [relpath(root / "skills-hub" / name, settings_path.parent) for name in names]
+            settings["skills"] = list(dict.fromkeys([*settings.get("skills", []), *selected]))
         write_config(settings_path, settings, ".settings-")
     path, data, changed = telegram
     if changed:

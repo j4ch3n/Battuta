@@ -43,6 +43,8 @@ def test_release_setup_is_repeatable_without_skill_output(release, capsys):
             (pi / "mcp-auth.json").write_bytes(b'{"private":"oauth"}\n')
             settings = json.loads((pi / "settings.json").read_text())
             settings["theme"] = "custom"
+            if role == "manager":
+                settings["skills"] = ["../custom-skill", *settings.get("skills", [])]
             (pi / "settings.json").write_text(json.dumps(settings))
         configure_release(release)
     for role in ("cos", "manager"):
@@ -53,6 +55,14 @@ def test_release_setup_is_repeatable_without_skill_output(release, capsys):
         settings = json.loads((pi / "settings.json").read_text())
         assert settings["theme"] == "custom"
         assert settings["battutaMemoryCapture"]["enabled"] == (role == "cos")
+        if role == "manager":
+            names = json.loads((release / "bots/manager-bot/skills.json").read_text())["skills"]
+            assert settings["skills"][0] == "../custom-skill"
+            assert [(pi / path).resolve() for path in settings["skills"][1:]] == [
+                release / "skills-hub" / name for name in names
+            ]
+        else:
+            assert "skills" not in settings
         servers = json.loads((pi / "mcp.json").read_text())["mcpServers"]
         assert ("luma" in servers) == (role == "cos")
         assert servers["memory"]["enabled"] is (role == "manager")

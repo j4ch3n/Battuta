@@ -8,15 +8,28 @@ The isolated CoS recall agent has direct `memory_recall` and `memory_get` tools,
 {
   "content": "The owner prefers concise replies.",
   "projects": ["global"],
-  "kind": "preference"
+  "kind": "preference",
+  "sources": [
+    {
+      "agent_id": "manager",
+      "session_id": "<supporting session ID>",
+      "entry_id": "<supporting entry ID>"
+    }
+  ],
+  "memory_metadata": {
+    "stage": "durable",
+    "knowledge_type": "fact",
+    "confidence": "confirmed",
+    "status": "active"
+  }
 }
 ```
 
-Pass this to `memory_remember`. For Atlas's database choice, instead use `content:"Atlas uses SQLite rather than Postgres."`, `projects:["atlas"]` and `kind:"decision"`. A fact can belong to multiple evidenced projects from the catalog returned by `battuta-project list --json`; preserve registered spelling when selecting new labels. Use `["global"]` alone for genuinely non-project facts, never as an unknown-project fallback. The server returns lowercase memberships. Extra `tags` cannot use reserved `scope:`, `proj:` or `kind:` prefixes.
+Pass this to `memory_remember` only when the source references, scope, and metadata are established; otherwise defer the addition. For Atlas's database choice, instead use `content:"Atlas uses SQLite rather than Postgres."`, `projects:["atlas"]` and `kind:"decision"`. A fact can belong to multiple evidenced projects from the catalog returned by `battuta-project list --json`; preserve registered spelling when selecting new labels. Use `["global"]` alone for genuinely non-project facts, never as an unknown-project fallback. The server returns lowercase memberships. Extra `tags` cannot use reserved `scope:`, `proj:` or `kind:` prefixes.
 
 `memory_recall({"semantic_query":"previous database decisions and constraints","keywords":["SQLite","Postgres"]})` searches all projects and global memory. Either input can be omitted; at least one is required. Semantic-only uses embedding distance; keywords-only uses literal text/alias matching; both combine ranked results. Rewrite using conversation history, review results, and revise/repeat queries as useful. Keywords may be phrases, never raw query syntax. An oversized semantic query must be shortened or split, not silently truncated.
 
-Use explicit `projects:["atlas"],include_global:false` for Atlas only or `selector:"global"` for global facts. There is no current-project recall selector or implicit selected-project restriction. Kind/tag filters narrow selection. Preserve the server-rendered confidence, provenance and counterevidence. Branch failure/omission is partial, not complete; unavailable is not empty memory. Explicit maintenance `include_expired:true` retrieves active expired history, not rejected/deleted records.
+Use explicit `projects:["atlas"],include_global:false` for Atlas only or `selector:"global"` for global facts. There is no current-project recall selector or implicit selected-project restriction. Use `kind` to filter record kind and `tags` only for additional, non-reserved tags. Preserve the server-rendered confidence, provenance and counterevidence. Branch failure/omission is partial, not complete; unavailable is not empty memory. Explicit maintenance `include_expired:true` retrieves active expired history, not rejected/deleted records.
 
 For source-backed writes, supply `sources` and `memory_metadata`; capture normally
 builds these rather than asking the conversational model to reconstruct them.
@@ -38,7 +51,7 @@ to change lifecycle/keywords without changing content or embedding. Read the ful
 record first, preserve confidence and sources, and use exact returned revisions.
 The optional `replacement_ref` is for evidenced supersession after that replacement
 was saved. Expiry filters current relevance; it does not delete historical evidence.
-The [record contract](../../../memory-service/DESIGN.md#memory-record-contract)
+The [record contract](../memory-service/DESIGN.md#memory-record-contract)
 defines fields and eligibility; do not improvise tags as substitutes.
 
 ## Forget and check health

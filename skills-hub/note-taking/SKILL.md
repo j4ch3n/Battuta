@@ -61,8 +61,8 @@ problem; do not silently replace or repair another file.
 Prefer specific findings, sources, decisions, and material limits over generic
 knowledge or tool-call logs. Use supplied context for confirmed enduring facts and
 return candidate durable findings through the originating result route (the
-execution report to Manager for bound work). CoS owns durable memory handling.
-Notes must never contain credentials or
+execution report to Manager for bound work). Use `project-memory` when selected
+for supported durable maintenance. Notes must never contain credentials or
 unrelated private data.
 
 For example, retain a measured parsing result with workload, source, and limit.
