@@ -107,9 +107,22 @@ export async function createRecallSession(
   try {
     await session.bindExtensions({});
     options.signal.throwIfAborted();
+    if (
+      !session.agent.state.tools.some(
+        (candidate) => candidate.name === "mcp__memory__memory_recall",
+      )
+    )
+      throw new Error("Isolated memory_recall tool unavailable");
   } catch (error) {
     await dispose();
     throw error;
   }
-  return { session, dispose };
+  async function queryRecall(semantic_query: string) {
+    const tool = session.agent.state.tools.find(
+      (candidate) => candidate.name === "mcp__memory__memory_recall",
+    );
+    if (!tool) throw new Error("Isolated memory_recall tool unavailable");
+    return tool.execute("required-memory-recall", { semantic_query }, options.signal);
+  }
+  return { session, dispose, queryRecall };
 }

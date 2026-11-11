@@ -40,6 +40,10 @@ export class RecallCollector {
   attempt() {
     this.attempts++;
   }
+  observeRecall(raw: unknown, isError: boolean) {
+    this.attempt();
+    this.observe(raw, isError);
+  }
   observe(raw: unknown, isError: boolean) {
     const parsed = z
       .object({
@@ -74,9 +78,15 @@ export class RecallCollector {
         eligibleRecords([...this.evidence.values()], new Date()).map((r) => r.ref),
       );
       if ([...this.currentRefs].some((ref) => !eligible.has(ref))) return unavailableRecall();
-      if (outcome.status === "skipped") {
-        if (this.attempts || outcome.context) return unavailableRecall();
-      } else if (!this.successes || !outcome.context.trim()) return unavailableRecall();
+      // Every parent preparation must observe a real MCP query. A child that declines to query
+      // cannot turn a greeting or transport gap into an implicit empty-memory result.
+      if (
+        !this.attempts ||
+        outcome.status === "skipped" ||
+        !this.successes ||
+        !outcome.context.trim()
+      )
+        return unavailableRecall();
       return {
         ...outcome,
         status: this.partial ? "partial" : outcome.status,
@@ -96,7 +106,6 @@ export async function runRecallAgent(
   options: {
     url: string;
     signal: AbortSignal;
-    capturePending: boolean;
     onUsage: (usage: unknown) => void;
   },
 ): Promise<PreparedRecall> {
@@ -107,17 +116,32 @@ export async function runRecallAgent(
       ...options,
       systemPrompt: await readFile(new URL("./prompts/recall.md", import.meta.url), "utf8"),
       observe: (pi) => {
-        pi.on("tool_call", () => {
-          collector.attempt();
-          if (options.capturePending)
-            return {
-              block: true,
-              reason: "Memory unavailable: earlier capture may contain corrections.",
-            };
+        pi.on("tool_call", (event) => {
+          if (event.toolName === "mcp__memory__memory_recall") collector.attempt();
         });
-        pi.on("tool_result", (event) => collector.observe(event.structuredContent, event.isError));
+        pi.on("tool_result", (event) => {
+          if (event.toolName === "mcp__memory__memory_recall")
+            collector.observe(event.structuredContent, event.isError);
+        });
       },
     });
+    // This is an isolated child's MCP tool, not a main-CoS connection. Await its outcome before
+    // allowing the child model to prepare a packet, so a skipped/no-tool response cannot bypass
+    // the required search. The child can still rewrite and enrich with later recall/get calls.
+    const query = await abortable(
+      child.queryRecall(
+        input.current.trim() ||
+          input.history.at(-1)?.text ||
+          input.summary ||
+          "recent owner context",
+      ),
+      options.signal,
+    );
+    // Preserve the MCP AgentTool result verbatim for the isolated child. It is untrusted evidence,
+    // not a host-produced summary, and never enters the main CoS context except through the child's
+    // validated packet below.
+    collector.observeRecall(query.structuredContent, query.isError === true);
+    if (query.isError) return unavailableRecall();
     child.session.subscribe((event) => {
       if (event.type === "message_end" && event.message.role === "assistant")
         options.onUsage(event.message.usage);
@@ -126,12 +150,7 @@ export async function runRecallAgent(
       child.session.prompt(
         JSON.stringify({
           ...input,
-          ...(options.capturePending
-            ? {
-                memory_availability:
-                  "capture-pending; skip if unnecessary, otherwise return unavailable",
-              }
-            : {}),
+          required_query_result: query.structuredContent,
         }),
       ),
       options.signal,
@@ -140,7 +159,6 @@ export async function runRecallAgent(
     const last = messages.at(-1);
     if (last?.role !== "assistant" || last.stopReason !== "stop") return unavailableRecall();
     const result = collector.finish(child.session.getLastAssistantText() ?? "");
-    if (options.capturePending && result.status !== "skipped") return unavailableRecall();
     if (result.status === "ready" || result.status === "partial") {
       const client = new MemoryMcpClient(options.url);
       const fresh = await Promise.all(

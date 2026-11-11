@@ -47,8 +47,10 @@ test.each([
   expect(new RecallCollector().finish(text).status).toBe("unavailable");
 });
 
-test("zero-call skip is valid; oversized UTF-8 packet is never sliced", () => {
-  expect(new RecallCollector().finish('{"status":"skipped","context":""}').status).toBe("skipped");
+test("zero-call completion is unavailable; oversized UTF-8 packet is never sliced", () => {
+  expect(new RecallCollector().finish('{"status":"skipped","context":""}').status).toBe(
+    "unavailable",
+  );
   const collector = new RecallCollector();
   collector.attempt();
   collector.observe(

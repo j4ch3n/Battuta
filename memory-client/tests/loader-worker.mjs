@@ -54,11 +54,20 @@ for (const role of ["cos", "manager"]) {
       },
     },
   };
+  for (const handler of extension.handlers.get("session_start") ?? []) await handler({}, ctx);
+  const start = {
+    systemPrompt: "Original prompt",
+    systemPromptOptions: { sections: {} },
+    messageType: "custom",
+    message: { customType: "memory-context", content: "internal" },
+  };
   for (const handler of extension.handlers.get("before_agent_start") ?? []) {
-    const result = await handler({ systemPrompt: "Original prompt" }, ctx);
+    const result = await handler(start, ctx);
     if (result?.systemPrompt) prompt = result.systemPrompt;
   }
   assert.equal(prompt, undefined, "Memory context must not replace the main system prompt");
+  if (role === "cos")
+    assert.match(start.systemPromptOptions.sections["owner-profile"], /Prefers concise answers/);
   for (const event of [
     "session_start",
     "agent_settled",
