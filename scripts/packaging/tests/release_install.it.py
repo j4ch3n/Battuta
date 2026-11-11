@@ -99,7 +99,8 @@ for value in data['requires']:
             settings = json.loads((root / "bots/cos-bot/.pi/settings.json").read_text())
             dream = [path for path in settings["extensions"] if "dream-extension" in path]
             self.assertEqual(len(dream), 1)
-            self.assertTrue(Path(dream[0]).is_file())
+            self.assertFalse(Path(dream[0]).is_absolute())
+            self.assertTrue((root / "bots/cos-bot/.pi" / dream[0]).is_file())
             run(str(installed["battuta-memory"][1] / "bin/python"), "-c", "import sqlite3,sqlite_vec,onnxruntime,tokenizers; c=sqlite3.connect(':memory:'); c.enable_load_extension(True); sqlite_vec.load(c); c.close(); assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()")
 
 

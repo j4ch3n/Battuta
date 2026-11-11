@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { atomicPrivateWrite, optionalText } from "./dream-files.ts";
@@ -41,8 +41,10 @@ export async function configureDream(botDirectory) {
     throw new Error("Invalid CoS extensions");
   const suffix = import.meta.url.endsWith(".js") ? "js" : "ts";
   const extension = fileURLToPath(new URL(`./dream-extension.${suffix}`, import.meta.url));
-  settings.extensions = (settings.extensions ?? []).filter((entry) => entry !== extension);
-  settings.extensions.push(extension);
+  settings.extensions = (settings.extensions ?? []).filter(
+    (entry) => resolve(directory, entry) !== extension,
+  );
+  settings.extensions.push(relative(directory, extension));
   // Validate first, then make model/extension available before publishing the job.
   await atomicPrivateWrite(modelPath, JSON.stringify(model, null, 2) + "\n");
   await atomicPrivateWrite(settingsPath, JSON.stringify(settings, null, 2) + "\n");

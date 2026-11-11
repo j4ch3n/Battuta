@@ -62,6 +62,7 @@ export interface DreamDependencies {
     catalog?: readonly string[],
   ) => Promise<unknown>;
   prepareProjects?: (signal: AbortSignal) => Promise<string[]>;
+  onStage?: (stage: string) => void;
 }
 const ref = z.string().regex(/^[0-9a-f]{64}$/);
 const inventorySchema = z.object({
@@ -859,6 +860,7 @@ export async function runDream(
   deps: DreamDependencies,
   signal: AbortSignal,
 ): Promise<DreamOutcome> {
+  deps.onStage?.("checkpoint");
   signal.throwIfAborted();
   const path = join(deps.directory, "dream-state.json");
   const priorText = await optionalText(path);
@@ -887,6 +889,7 @@ export async function runDream(
       return previous.pending.length || previous.conflict
         ? { status: "partial" }
         : { status: "complete", summary: previous.summary ?? "Memory review completed." };
+    deps.onStage?.("inventory");
     let state =
       previous &&
       !previous.completed &&
@@ -921,6 +924,7 @@ export async function runDream(
       await save();
     }
     if (!state.artifacts.cleanup) {
+      deps.onStage?.("cleanup");
       state.artifacts.cleanup = await structuredArtifact(
         deps,
         "dream.md",
@@ -932,6 +936,7 @@ export async function runDream(
       await save();
     }
     if (!state.artifacts.synthesis) {
+      deps.onStage?.("synthesis");
       state.artifacts.synthesis = await structuredArtifact(
         deps,
         "dream-synthesis.md",
@@ -943,6 +948,7 @@ export async function runDream(
       await save();
     }
     if (!state.artifacts.challenge) {
+      deps.onStage?.("challenge");
       const contrary: MemoryRecord[] = [];
       for (const proposal of state.artifacts.synthesis.proposals) {
         const source = state.records.find((r) => r.ref === proposal.source_refs[0])!;
@@ -1010,9 +1016,11 @@ export async function runDream(
         return { status: "partial" };
       }
     }
+    deps.onStage?.("publish");
     await publishStages(deps, state, save, signal);
     state.stage = "refresh";
     await save();
+    deps.onStage?.("refresh");
     const inventory = await stageInventory(deps, signal);
     const valid = inventory.records.flatMap((raw) => {
       const r = memoryRecordSchema.safeParse(raw);
@@ -1081,6 +1089,7 @@ export async function runDream(
           .map((d) => d.reason)
           .join(" ") || "No memory changes were needed.";
     if (!state.reflection) {
+      deps.onStage?.("reflection");
       state.reflection = await createDreamReflection(
         deps.complete,
         state.run_id,
@@ -1096,6 +1105,7 @@ export async function runDream(
       await save();
     }
     signal.throwIfAborted();
+    deps.onStage?.("dream_log");
     await publishDreamLog(deps.directory, state.run_id, state.reflection);
     state.stage = "complete";
     state.completed = true;

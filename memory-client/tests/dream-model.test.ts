@@ -1,6 +1,6 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { expect, test } from "vitest";
-import { dreamCompletion } from "../dream-model.ts";
+import { DreamModelError, dreamCompletion } from "../dream-model.ts";
 
 test("uses the configured Pi model and records usage without a conversation turn", async () => {
   const usage: unknown[] = [];
@@ -57,3 +57,10 @@ test.each(["length", "error", "toolUse"])(
     ).rejects.toThrow("finish");
   },
 );
+
+test("classifies provider errors without retaining private messages", () => {
+  const error = new DreamModelError("error", "HTTP 429 rate limit: private evidence and secret");
+  expect(error).toMatchObject({ stopReason: "error", category: "rate_limit" });
+  expect(JSON.stringify(error)).not.toContain("private evidence");
+  expect(new DreamModelError("unexpected private value", "secret").stopReason).toBe("unknown");
+});

@@ -18,5 +18,7 @@
     "enabled": true,
     "batchMessages": 6
   },
-  "deviceId": "25da896d-f069-477c-8c78-c02a6560b88d"
+  "extensions": [
+    "../../../memory-client/dream-extension.ts"
+  ]
 }

@@ -8,14 +8,14 @@ authorized maintenance calls; it is not a conversational runtime skill.
 
 ## Storage and role boundaries
 
-| Item                 | Location or behavior                                                                                         |
-| -------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Shared data          | `~/.battuta/memory/`; override with `BATTUTA_MEMORY_DATA_DIR`.                                               |
-| `memory.db`          | Existing upstream content, embeddings, sources and owned lifecycle metadata.                                 |
-| `state.db`           | Mutation/capture receipts, recovery intents, rebuildable FTS5 index and retained optional graph generations. |
-| `capture-queue/cos/` | Private CoS delivery state. Other roles' old queues remain untouched.                                        |
-| Dream state          | `dream-config.json`, `dream-lock.db`, `dream-state.json`, `dream-profile.json`, `dream.log`.                 |
-| `ME.md`              | Preserved private owner text; never automatically treated as verified evidence or overwritten by v3 dreams.  |
+| Item                 | Location or behavior                                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Shared data          | `~/.battuta/memory/`; override with `BATTUTA_MEMORY_DATA_DIR`.                                                     |
+| `memory.db`          | Existing upstream content, embeddings, sources and owned lifecycle metadata.                                       |
+| `state.db`           | Mutation/capture receipts, recovery intents, rebuildable FTS5 index and retained optional graph generations.       |
+| `capture-queue/cos/` | Private CoS delivery state. Other roles' old queues remain untouched.                                              |
+| Dream state          | `dream-config.json`, `dream-lock.db`, `dream-state.json`, `dream-profile.json`, `dream.log`, `dream-errors.jsonl`. |
+| `ME.md`              | Preserved private owner text; never automatically treated as verified evidence or overwritten by v3 dreams.        |
 
 CoS conversational recall uses an isolated recall agent. Main CoS receives
 prepared context without memory tools or a memory skill. Capture and approved
