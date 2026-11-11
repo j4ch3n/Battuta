@@ -5,6 +5,7 @@ repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 bot_dir="$repo_dir/bots/cos-bot"
 bot_private="$HOME/.battuta/pi-bots/cos-bot"
 manager_dir="$repo_dir/bots/manager-bot"
+manager_private="$HOME/.battuta/pi-bots/manager-bot"
 mode="${1:-}"
 case "$mode" in
   dev)
@@ -52,7 +53,7 @@ fi
 [[ -f "$bot_private/.pi/mcp.json" ]] || { printf 'Project management MCP is not configured; run make setup-cos-bot\n' >&2; exit 1; }
 [[ -f "$bot_dir/AGENTS.md" ]] || { printf 'CoS instructions are not configured; run make setup-cos-bot\n' >&2; exit 1; }
 [[ -x "$manager_dir/node_modules/.bin/pi" ]] || { printf 'Manager Pi is not installed; run make setup-manager-bot\n' >&2; exit 1; }
-[[ -f "$manager_dir/.pi/mcp.json" ]] || { printf 'Manager Linear MCP is not configured; run make setup-manager-bot\n' >&2; exit 1; }
+[[ -f "$manager_private/.pi/mcp.json" ]] || { printf 'Manager Linear MCP is not configured; run make setup-manager-bot\n' >&2; exit 1; }
 [[ -f "$manager_dir/AGENTS.md" ]] || { printf 'Manager instructions are not configured; run make setup-manager-bot\n' >&2; exit 1; }
 [[ -f "$env_file" ]] || { printf 'Missing %s; copy .env.example and set the appropriate Supabase credentials\n' "$env_file" >&2; exit 1; }
 
@@ -77,7 +78,7 @@ PI_SCHEDULER_CATCHUP_MAX="$(node "$repo_dir/memory-client/configure-scheduler.mj
 node "$repo_dir/memory-client/configure-scheduler.mjs" --check
 
 printf -v pi_command 'set -e; set -a; source %q; set +a; umask 077; export PATH=%q; export CHROME_PATH; CHROME_PATH="$(uv run --project %q --locked battuta-bot-setup browser-executable --profile %q --bot-dir %q --bot cos-bot)"; export PI_SCHEDULER_STATE_FILE; PI_SCHEDULER_STATE_FILE="$(node %q --print-path)"; export PI_SCHEDULER_CATCHUP_MAX; PI_SCHEDULER_CATCHUP_MAX="$(node %q --print-catchup)"; node %q --check; AGENT_ROLE=cos BATTUTA_BOT_NAME=cos-bot PI_CODING_AGENT_DIR=%q BATTUTA_MEMORY_URL=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q --extension %q' "$env_file" "$PATH" "$repo_dir/scripts/bot_setup" "$bot_dir" "$bot_private" "$repo_dir/memory-client/configure-scheduler.mjs" "$repo_dir/memory-client/configure-scheduler.mjs" "$repo_dir/memory-client/configure-scheduler.mjs" "$bot_private/.pi" "$memory_url" "$bot_dir/node_modules/.bin/pi" "$bot_private/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts" "$repo_dir/memory-client/index.ts"
-printf -v manager_command 'set -e; set -a; source %q; set +a; export PATH=%q; for key in $(compgen -v); do case "$key" in *TELEGRAM*) unset "$key";; esac; done; unset PI_SCHEDULER_STATE_FILE PI_SCHEDULER_CATCHUP_MAX; AGENT_ROLE=manager PI_CODING_AGENT_DIR=%q BATTUTA_MEMORY_URL=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q' "$env_file" "$PATH" "$manager_dir/.pi" "$memory_url" "$manager_dir/node_modules/.bin/pi" "$manager_dir/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts"
+printf -v manager_command 'set -e; set -a; source %q; set +a; umask 077; export PATH=%q; for key in $(compgen -v); do case "$key" in *TELEGRAM*) unset "$key";; esac; done; unset PI_SCHEDULER_STATE_FILE PI_SCHEDULER_CATCHUP_MAX; AGENT_ROLE=manager PI_CODING_AGENT_DIR=%q BATTUTA_MEMORY_URL=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q' "$env_file" "$PATH" "$manager_private/.pi" "$memory_url" "$manager_dir/node_modules/.bin/pi" "$manager_private/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts"
 # tmux's default shell may be zsh; credential scrubbing uses Bash builtins.
 printf -v manager_command 'exec bash -c %q' "$manager_command"
 bot_window="$mode"

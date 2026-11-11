@@ -40,9 +40,8 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
     supabase_url = required(values, "SUPABASE_URL", env_file)
     required(values, "SUPABASE_SECRET_KEY", env_file)
     assignment_server(supabase_url)
-    private = instance_paths(root, Path.home(), "cos-bot")[2] if role == "cos" else bot_dir
-    if role == "cos":
-        validate_private_home(private)
+    private = instance_paths(root, Path.home(), f"{role}-bot")[2]
+    validate_private_home(private)
     telegram = prepare_telegram_config(private, env_file, prefix, values) if role == "cos" else None
     url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
     if role == "cos":

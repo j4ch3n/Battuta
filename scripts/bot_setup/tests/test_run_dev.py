@@ -173,6 +173,8 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"], "token": os.environ.get("LIN
         self.assertTrue(outputs[0]["telegram"])
         self.assertFalse(outputs[1]["telegram"])
         self.assertIsNone(outputs[1]["scheduler"])
+        self.assertEqual(outputs[1]["agentDir"], str(self.home / ".battuta/pi-bots/manager-bot/.pi"))
+        self.assertEqual(outputs[1]["umask"], 0o77)
 
     def test_shared_endpoint_override_reaches_both_processes(self):
         override = "http://127.0.0.1:8989/mcp"
@@ -206,7 +208,7 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"], "token": os.environ.get("LIN
                 output.write(f'BATTUTA_TEST_MODE={mode}\n')
         for role in ("cos", "manager"):
             pi = self.root / f"bots/{role}-bot/node_modules/.bin/pi"
-            pi.write_text(f"#!{sys.executable}\n" + 'import json, os, sys\nprint(json.dumps({"mode": os.environ["BATTUTA_TEST_MODE"], "args": sys.argv[1:]}))\n')
+            pi.write_text(f"#!{sys.executable}\n" + 'import json, os, sys\nprint(json.dumps({"mode": os.environ["BATTUTA_TEST_MODE"], "agentDir": os.environ["PI_CODING_AGENT_DIR"], "args": sys.argv[1:]}))\n')
         for mode, expected_splits in (("dev", 3), ("prod", 2)):
             with self.subTest(mode=mode):
                 if self.log.exists():
@@ -221,6 +223,10 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"], "token": os.environ.get("LIN
                         self.assertEqual(pane.returncode, 0, pane.stderr)
                         result = json.loads(pane.stdout)
                         self.assertEqual(result["mode"], mode)
+                        if "AGENT_ROLE=manager" in command[-1]:
+                            private_pi = str(self.home / ".battuta/pi-bots/manager-bot/.pi")
+                            self.assertEqual(result["agentDir"], private_pi)
+                            self.assertEqual(result["args"][result["args"].index("--session-dir") + 1], f"{private_pi}/mail-sessions")
                         self.assertIn(str(self.root / "project-spec/index.ts"), result["args"])
                         self.assertEqual(str(self.root / "memory-client/index.ts") in result["args"], "AGENT_ROLE=cos" in command[-1])
                 self.assertEqual(self.commands()[-1], ["attach-session", "-t", f"=battuta-{mode}"])
