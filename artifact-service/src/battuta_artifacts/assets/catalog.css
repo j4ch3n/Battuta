@@ -108,6 +108,92 @@ h1 {
   padding-block: var(--space-10) var(--space-8);
 }
 
+.project-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project {
+  border-block-end: 1px solid var(--color-rule);
+  animation: project-appear 240ms ease-out both;
+}
+
+.project:first-child {
+  border-block-start: 1px solid var(--color-rule);
+}
+
+.project-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 4.5rem;
+  padding-block: var(--space-4);
+  cursor: pointer;
+  list-style: none;
+  -webkit-tap-highlight-color: var(--color-active);
+}
+
+.project-summary::-webkit-details-marker {
+  display: none;
+}
+
+.project-name {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 1.625rem;
+  font-weight: 500;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.project-count {
+  color: var(--color-muted);
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.project-chevron {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: 0 0 auto;
+  margin-inline: var(--space-1);
+  border-inline-end: 1px solid currentColor;
+  border-block-end: 1px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 200ms ease-out;
+}
+
+.project-disclosure[open] .project-chevron {
+  transform: rotate(225deg);
+}
+
+.project-panel {
+  display: flow-root;
+}
+
+/* Clip only during motion, never the resting keyboard-focus outlines. */
+.project-panel[data-animating] {
+  overflow: hidden;
+}
+
+.project-panel > .artifact-list {
+  padding-block-start: var(--space-4);
+}
+
+@keyframes project-appear {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .artifact-list {
   position: relative;
   margin: 0;
@@ -197,6 +283,8 @@ h1 {
 }
 
 .artifact-link:focus-visible,
+.project-summary:focus-visible,
+.project-list:focus-visible,
 .artifact-list:focus-visible,
 .empty-state:focus-visible {
   outline: 2px solid var(--color-accent);
@@ -270,6 +358,10 @@ h1 {
     padding-block-start: 0;
   }
 
+  .artifact:last-child .artifact-link {
+    border-block-end: 0;
+  }
+
   .artifact-updated {
     display: block;
     padding: 0 0 var(--space-2);
@@ -286,7 +378,12 @@ h1 {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .artifact-title {
+  .project {
+    animation: none;
+  }
+
+  .artifact-title,
+  .project-chevron {
     transition: none;
   }
 }
