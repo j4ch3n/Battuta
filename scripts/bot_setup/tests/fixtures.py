@@ -100,7 +100,8 @@ class LauncherFixture(ConfigFixture):
             (bot / "node_modules/.bin").mkdir(parents=True)
             (bot / "node_modules/.bin/pi").touch(mode=0o700)
             (bot / "AGENTS.md").touch()
-            private_pi = self.config_path(role).parent
+            private_pi = self.home / f".battuta/pi-bots/{role}-bot/.pi"
+            private_pi.mkdir(parents=True, exist_ok=True)
             (private_pi / "mcp.json").write_text("{}")
         configure_browser(self.root / "bots/cos-bot", self.home / ".battuta/pi-bots/cos-bot", home=self.home, bot="cos-bot")
         self.executable("chromium-browser", "raise RuntimeError('Do not launch Chromium in tests')\n")
