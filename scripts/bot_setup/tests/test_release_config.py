@@ -22,8 +22,19 @@ def deployment(tmp_path, monkeypatch):
     helper = root / "bots/_shared/memory-client/dist/configure-scheduler.js"
     helper.parent.mkdir(parents=True)
     helper.touch()
+    helper.with_name("configure-dream.js").touch()
     monkeypatch.setattr(release, "run", lambda *args, **kwargs: None)
     return root, home, env_file
+
+
+def test_release_provisions_dream_with_private_model_settings(deployment, monkeypatch):
+    root, home, env_file = deployment
+    calls = []
+    monkeypatch.setattr(release, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
+    release.configure_release(root, env_file=env_file, home=home)
+    args, kwargs = calls[1]
+    assert args == ("node", str(root / "bots/_shared/memory-client/dist/configure-dream.js"), str(root / "bots/cos-bot"))
+    assert kwargs["env"]["PI_CODING_AGENT_DIR"] == str(home / ".battuta/pi-bots/cos-bot/.pi")
 
 
 def test_release_preserves_private_state_and_regenerates_owned_files(deployment):

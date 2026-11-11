@@ -98,34 +98,16 @@ Default endpoint: `http://127.0.0.1:8901/mcp`. Default data: `~/.battuta/memory/
 
 ## Nightly CoS dream setup
 
-Dream automatically changes server memories and refreshes revision-cited profile claims. It preserves untracked `ME.md`. Configure it only after owner approval of unattended consolidation; ordinary bot configuration does not imply this approval.
+Dream is a standard part of CoS in both local development and production. Setup must make the `memory_dream` tool available and enable its nightly schedule. Dream automatically changes server memories and refreshes revision-cited profile claims; it preserves untracked `ME.md`.
 
-**Installing the scheduler does not create the dream schedule.** Neither normal bot configuration nor memory-service setup runs the command below. Normal CoS configuration initializes an empty native store at `~/.battuta/schedule-prompts.json`; dream is not active until explicitly provisioned.
+Source CoS configuration and release configuration provision the dream extension, model configuration and scheduler task automatically.
 
 An approved dream enforces cleanup, synthesis and challenge before guarded publication, then refreshes eligible profile claims and the private reflection. It no longer requires global clustering/relationship generation. Upgrade server and client together; existing graph data, checkpoints and mutation receipts remain preserved. No additional scheduler, model download or login is introduced.
 
-1. Stop CoS before editing scheduler files. Confirm the memory service is ready, CoS's scheduler is `@jl1990/pi-scheduler@0.5.1`, and normal CoS configuration has initialized the stable store. Load the same selected environment as CoS, including any `PI_SCHEDULER_STATE_FILE` and `BATTUTA_MEMORY_DATA_DIR` overrides. Select explicit `defaultProvider` and `defaultModel` IDs in CoS's private settings (`~/.battuta/pi-bots/cos-bot/.pi/settings.json` for releases); provider authentication/availability is human acceptance, not an agent-run check.
+1. Stop CoS before running configuration. Select explicit `defaultProvider` and `defaultModel` IDs in CoS's private settings (`~/.battuta/pi-bots/cos-bot/.pi/settings.json`), and use the same environment as CoS, including any `PI_SCHEDULER_STATE_FILE` and `BATTUTA_MEMORY_DATA_DIR` overrides. Provider authentication/availability is human acceptance, not an agent-run check.
 2. Confirm which timezone should define **05:30**. The scheduler and catch-up use process-local time; configure CoS's launch environment `TZ` consistently when a specific zone is required. There is no separately configured dream timezone or OS wake-up timer. An existing owned 03:00 task causes an ownership conflict and is not changed automatically; the owner must remove it manually with CoS stopped before rerunning setup.
 3. Back up shared memory data and private client state. The tracked view is `<BATTUTA_MEMORY_DATA_DIR>/dream-profile.json`; shared `ME.md` is preserved and injected separately into main CoS as untrusted owner-profile context. Old bot `.pi/ME.md` is not a fallback or automatically imported. Neither file is independently verified evidence merely because it exists.
-4. From the installation root, provision the owned global task and dedicated extension:
-
-   ```sh
-   node memory-client/configure-dream.mjs bots/cos-bot
-   ```
-
-   That command is for a source checkout. For a release, use the selected host Node
-   and compiled helper, with `install_path` set to the installation:
-
-   ```sh
-   PI_CODING_AGENT_DIR="$HOME/.battuta/pi-bots/cos-bot/.pi" \
-     node "$install_path/bots/_shared/memory-client/dist/configure-dream.js" \
-     "$install_path/bots/cos-bot"
-   ```
-
-   The helper reads the private model choice without rewriting it, requires a valid
-   initialized stable store, creates the dedicated model configuration under the
-   memory data directory, and registers the compiled extension in installed CoS
-   project settings. It edits configuration only; never run it against live CoS.
+4. Run normal CoS configuration for a source checkout or `configure-release` for a release. It initializes the stable scheduler store, registers the CoS dream extension, and provisions the dream model and owned task without starting a bot.
 
    The command preserves unrelated settings/tasks, an existing model configuration and the task's disabled state. A new task is enabled; the next CoS startup may immediately catch up the latest missed run. It captures CoS defaults only when creating model configuration, never falling back to the conversation model later. To change the model, edit `dream-config.json` with CoS stopped: `{"version":1,"model":"provider/model-id"}`. Conflicting owned tasks or malformed configuration fail without replacing the schedule.
 

@@ -198,7 +198,7 @@ particular save.
 
 ## Owner profile and nightly dream
 
-Unattended dreaming requires separate owner approval and explicit setup. The pinned
+Dream is provisioned by standard CoS setup in development and production. The pinned
 CoS scheduler requests it at process-local 05:30; use consistent `TZ` configuration.
 While CoS is stopped no job runs. Startup catch-up uses the same latest-run identity,
 lock and checkpoint rather than a daemon or one job for every missed day.
