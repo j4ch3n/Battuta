@@ -42,7 +42,7 @@ class ReleaseInstallation(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="battuta-release-install-", dir="/tmp") as directory:
             work = Path(directory)
             env = {key: value for key, value in os.environ.items() if key not in {"VIRTUAL_ENV", "PYTHONPATH", "UV_PROJECT_ENVIRONMENT", "UV_TOOL_DIR", "UV_TOOL_BIN_DIR", "UV_PYTHON_PREFERENCE"}}
-            env.update(HOME=str(work / "home"), UV_CACHE_DIR=str(work / "cache"), XDG_CONFIG_HOME=str(work / "config"), XDG_DATA_HOME=str(work / "data"))
+            env.update(HOME=str(work / "home"), UV_CACHE_DIR=str(work / "cache"), XDG_CONFIG_HOME=str(work / "config"), XDG_DATA_HOME=str(work / "data"), LINEAR_API_TOKEN="fixture")
             Path(env["HOME"]).mkdir()
             def run(*args, **kwargs):
                 return subprocess.run(args, env=kwargs.pop("env", env), cwd=work, check=True, text=True, **kwargs)
