@@ -15,16 +15,19 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
     return Promise.resolve({
       session: {
         agent: { state: { tools: state.tools } },
-        extensionRunner: { emit: state.shutdown },
-        bindExtensions: () => {
-          if (state.enableRecall)
-            state.tools.push({
-              name: "mcp__memory__memory_recall",
-              execute: state.recallExecute,
-            });
-          state.tools.push({ name: "mcp__memory__memory_get", execute: vi.fn() });
-          return Promise.resolve();
+        extensionRunner: {
+          emit: state.shutdown,
+          emitBeforeAgentStart: () => {
+            if (state.enableRecall)
+              state.tools.push({
+                name: "mcp__memory__memory_recall",
+                execute: state.recallExecute,
+              });
+            state.tools.push({ name: "mcp__memory__memory_get", execute: vi.fn() });
+            return Promise.resolve();
+          },
         },
+        bindExtensions: () => Promise.resolve(),
         dispose: state.disposed,
       },
     });

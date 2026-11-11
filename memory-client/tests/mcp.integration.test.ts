@@ -15,11 +15,14 @@ import { memoryRecordSchema } from "../records.ts";
 import { runDream } from "../dream-runtime.ts";
 import { loadProjectCatalog } from "../projects.ts";
 import { prepareCorrectionCandidates } from "../correction-candidates.ts";
+import { createRecallSession } from "../recall-session.ts";
+import { RecallCollector } from "../recall-agent.ts";
 
 test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
   "durable JS capture survives lost acknowledgement and server restart",
   async () => {
     const directory = await mkdtemp(join(tmpdir(), "memory-http-test-"));
+    const modelHome = process.env.HOME;
     const reservation = createServer();
     reservation.listen(0, "127.0.0.1");
     await once(reservation, "listening");
@@ -40,6 +43,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
         {
           env: {
             ...process.env,
+            HOME: modelHome,
             BATTUTA_MEMORY_DATA_DIR: join(directory, "data"),
           },
           stdio: ["ignore", "ignore", "pipe"],
@@ -94,6 +98,42 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
         "项目",
       ]);
       await start();
+      vi.stubEnv("AGENT_ROLE", "cos");
+      vi.stubEnv("PI_CODING_AGENT_DIR", join(directory, "agent"));
+      const recallContext = {
+        cwd: directory,
+        model: {
+          provider: "openai",
+          id: "synthetic",
+          api: "openai-completions",
+          name: "synthetic",
+          contextWindow: 10000,
+          maxTokens: 1000,
+          input: ["text"],
+          reasoning: false,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        },
+        modelRegistry: {
+          getRegisteredProviderConfig: () => undefined,
+          getRegisteredNativeProvider: () => undefined,
+          getApiKeyAndHeaders: () => Promise.resolve({ ok: true, apiKey: "synthetic" }),
+        },
+      } as unknown as ExtensionContext;
+      const child = await createRecallSession(recallContext, {
+        url: `http://127.0.0.1:${address.port}/mcp`,
+        systemPrompt: "synthetic",
+        signal: AbortSignal.timeout(15_000),
+      });
+      try {
+        const result = await child.queryRecall("synthetic test");
+        const collector = new RecallCollector();
+        collector.observeRecall(result.structuredContent, result.isError === true);
+        expect(
+          collector.finish('{"status":"ready","context":"No matching memories."}').status,
+        ).toBe("ready");
+      } finally {
+        await child.dispose();
+      }
       const queue = await CaptureQueue.open(join(directory, "queue"), "cos");
       const prepareProjects = (signal: AbortSignal) => loadProjectCatalog(signal);
       const client = new MemoryMcpClient(`http://127.0.0.1:${address.port}/mcp`, prepareProjects);
