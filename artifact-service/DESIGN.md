@@ -1,6 +1,6 @@
 ---
 name: Artifact index
-description: A Sienna-inspired working library with a small hero and continuous timeline.
+description: A Sienna-inspired working library with a small hero and collapsible project timelines.
 colors:
   canvas: "hsl(37deg 47% 93%)"
   ink: "hsl(28deg 16% 13%)"
@@ -37,16 +37,24 @@ are retained in [SIENNA-LICENSE.txt](src/battuta_artifacts/SIENNA-LICENSE.txt).
 - Warm paper canvas, brown-black serif content and restrained rust interactions.
 - A compact hero contains “Artifacts,” one short context line and the live work count.
 - No navigation menu, long introduction, images, avatars, cards or format groups.
-- A 46rem column carries a continuous timeline with a 7rem date rail and 2.25rem gap.
+- A 46rem column carries alphabetically sorted project disclosures, collapsed initially. Each opens a timeline with a 7rem date rail and 2.25rem gap.
+- Within each project, newest updates come first; equal or missing dates use slug order, with undated work last. Unassociated work appears under “Unassigned.”
 - At 45rem and below, dates sit above content, timeline dots disappear and fine horizontal rules separate entries.
 - Every item title is 1.375rem, with no featured-item sizing. Descriptions remain complete.
 - A quiet footer reads “© 2026 Fiscum Technology,” separated by a fine rule. It stays at the bottom on short pages without covering content.
 
 ## Interaction and ownership
 
-Native links, visible rust focus outlines, underline feedback, reduced-motion and
-forced-color support remain. Live updates reuse nodes and retain meaningful keyboard
-focus through changes, removal and repopulation. No backend or CLI behavior changes.
+Native links and disclosure controls, visible rust focus outlines, underline feedback,
+reduced-motion and forced-color support remain. Project entrances use a short fade/shift;
+disclosures animate height and opacity over 200ms, with instant native toggles for reduced
+motion or without JavaScript. Live updates reuse nodes and retain disclosure state and
+meaningful keyboard focus through changes, removal and repopulation.
+
+The public catalog includes only project labels, never source paths. Explicit project
+metadata takes precedence; older registrations inside canonical project-owned workspaces
+use the owning directory name. Other registrations remain unassigned. No registry writes,
+artifact destination changes or CLI behavior changes are involved.
 
 [catalog.css](src/battuta_artifacts/assets/catalog.css) owns the actual tokens and
 responsive rules. Newsreader and Inter are self-hosted; font sources and licenses

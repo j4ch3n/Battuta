@@ -19,13 +19,47 @@ from .markdown import render_markdown
 from .registry import ArtifactError, Registry
 
 
-def catalog_date(value: str) -> str:
+def catalog_timestamp(value) -> float:
+    """Missing or invalid dates sort after dated work, consistently in UTC."""
+    try:
+        date = datetime.fromisoformat(value)
+        return date.replace(tzinfo=date.tzinfo or timezone.utc).timestamp()
+    except (TypeError, ValueError, OverflowError):
+        return float("-inf")
+
+
+def catalog_date(value) -> str:
     """Use a stable UTC calendar date, including before JavaScript is available."""
-    if not value:
-        return ""
-    date = datetime.fromisoformat(value).astimezone(timezone.utc)
+    stamp = catalog_timestamp(value)
+    if stamp == float("-inf"):
+        return "Date unavailable"
+    date = datetime.fromtimestamp(stamp, timezone.utc)
     months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
     return f"{date.day} {months[date.month - 1]} {date.year}"
+
+
+def catalog_project(row: dict) -> str | None:
+    if row.get("project"):
+        return row["project"]
+    # Older registrations have no project metadata but point into a project-owned
+    # workspace. Derive only its label, never publish the private source path.
+    try:
+        relative = Path(row["source_root"]).relative_to(Path.home() / ".battuta/projects")
+        if len(relative.parts) > 1:
+            return relative.parts[0]
+    except ValueError:
+        pass
+    return None
+
+
+def catalog_groups(artifacts: list[dict]) -> list[dict]:
+    groups = {}
+    for artifact in artifacts:
+        key = artifact["project"] or ""
+        groups.setdefault(key, {"key": key, "name": key or "Unassigned", "artifacts": []})["artifacts"].append(artifact)
+    for group in groups.values():
+        group["artifacts"].sort(key=lambda item: (-catalog_timestamp(item["updated_at"]), item["slug"]))
+    return sorted(groups.values(), key=lambda group: (group["name"].lower(), group["key"]))
 
 
 def create_app(path: Path | None = None) -> FastAPI:
@@ -47,11 +81,13 @@ def create_app(path: Path | None = None) -> FastAPI:
 
     def catalog():
         return [{**{key: row[key] for key in ("slug", "title", "description", "format", "revision", "updated_at")},
+                 "project": catalog_project(row),
                  "url": f"/artifacts/a/{row['slug']}/"} for row in registry.list(published_only=True)]
 
     @app.get("/artifacts/")
     def index():
-        return HTMLResponse(templates.get_template("index.html").render(artifacts=catalog()),
+        artifacts = catalog()
+        return HTMLResponse(templates.get_template("index.html").render(artifacts=artifacts, groups=catalog_groups(artifacts)),
                             headers={"Cache-Control": "no-store"})
 
     @app.get("/artifacts/catalog")
