@@ -63,8 +63,13 @@ def configure_release(root: Path, *, env_file: Path, home: Path) -> None:
     helper = root / "bots/_shared/memory-client/dist/configure-scheduler.js"
     if not helper.is_file():
         raise click.ClickException(f"Missing compiled scheduler helper: {helper}")
+    dream = helper.with_name("configure-dream.js")
+    if not dream.is_file():
+        raise click.ClickException(f"Missing compiled dream helper: {dream}")
     # Provision only after every instance has passed preflight; never start a bot.
-    run("node", str(helper), "--initialize", env={**os.environ, **values})
+    dream_env = {**os.environ, **values, "HOME": str(home), "PI_CODING_AGENT_DIR": str(home / ".battuta/pi-bots/cos-bot/.pi")}
+    run("node", str(helper), "--initialize", env=dream_env)
+    run("node", str(dream), str(root / "bots/cos-bot"), env=dream_env)
     for bot, profile, private in browsers:
         configure_browser(profile, private, home=home, bot=bot)
     for path, payload in outputs:

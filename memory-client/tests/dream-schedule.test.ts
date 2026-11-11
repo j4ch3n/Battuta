@@ -1,9 +1,11 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile, chmod, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
+import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { DREAM_PROMPT, ownedDreamTask, reconcileDreamSchedule } from "../dream-schedule.ts";
 import { initializeSchedulerStore } from "../scheduler-store.ts";
 
@@ -112,7 +114,7 @@ test.each([false, true])(
       join(dir, ".pi/settings.json"),
       JSON.stringify({
         ...(separate ? {} : { defaultProvider: "p", defaultModel: "m" }),
-        extensions: ["custom.ts"],
+        extensions: ["custom.ts", fileURLToPath(new URL("../dream-extension.ts", import.meta.url))],
       }),
     );
     const agent = join(dir, "private-agent");
@@ -142,14 +144,51 @@ test.each([false, true])(
       version: 1,
       model: "p/m",
     });
-    expect(JSON.parse(await readFile(join(dir, ".pi/settings.json"), "utf8"))).toMatchObject({
-      extensions: ["custom.ts", expect.stringContaining("dream-extension.ts")],
-    });
+    const { extensions } = JSON.parse(await readFile(join(dir, ".pi/settings.json"), "utf8")) as {
+      extensions: string[];
+    };
+    expect(extensions).toHaveLength(2);
+    expect(extensions[0]).toBe("custom.ts");
+    expect(isAbsolute(extensions[1])).toBe(false);
+    expect(resolve(dir, ".pi", extensions[1])).toBe(
+      fileURLToPath(new URL("../dream-extension.ts", import.meta.url)),
+    );
     await expect(readFile(join(dir, ".pi/schedule-prompts.json"))).rejects.toMatchObject({
       code: "ENOENT",
     });
   },
 );
+test("Pi loads the configured relative dream extension", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "dream-relative-"));
+  dirs.push(dir);
+  const agent = join(dir, "agent");
+  await mkdir(join(dir, ".pi"));
+  await mkdir(agent);
+  await writeFile(
+    join(dir, ".pi/settings.json"),
+    JSON.stringify({ defaultProvider: "p", defaultModel: "m" }),
+  );
+  const store = join(dir, "jobs.json");
+  await initializeSchedulerStore(store);
+  vi.stubEnv("AGENT_ROLE", "cos");
+  await promisify(execFile)(process.execPath, ["configure-dream.mjs", dir], {
+    env: {
+      ...process.env,
+      PI_CODING_AGENT_DIR: join(dir, ".pi"),
+      PI_SCHEDULER_STATE_FILE: store,
+      BATTUTA_MEMORY_DATA_DIR: join(dir, "memory"),
+    },
+  });
+  const loader = new DefaultResourceLoader({
+    cwd: dir,
+    agentDir: agent,
+    settingsManager: SettingsManager.create(dir, agent),
+  });
+  await loader.reload();
+  const loaded = loader.getExtensions();
+  expect(loaded.errors).toEqual([]);
+  expect(loaded.extensions.some((extension) => extension.tools.has("memory_dream"))).toBe(true);
+});
 test.each([{}, { defaultProvider: "p", defaultModel: "model with spaces" }])(
   "invalid defaults %j leave scheduler and settings unchanged",
   async (settings) => {

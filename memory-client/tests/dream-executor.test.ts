@@ -1,7 +1,11 @@
 import { afterEach, expect, test, vi } from "vitest";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { DreamDependencies } from "../dream-runtime.ts";
 import { executeDream } from "../dream-executor.ts";
+import { DreamModelError } from "../dream-model.ts";
 import type { DreamOutcome } from "../dream-result.ts";
 
 const run = vi.hoisted(() =>
@@ -65,3 +69,40 @@ test.each(["fuzzy", "p/missing", "p/dream extra"])(
     expect(run).not.toHaveBeenCalled();
   },
 );
+
+test("records private, bounded failure diagnostics without error contents", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "dream-errors-"));
+  try {
+    vi.stubEnv("BATTUTA_MEMORY_DATA_DIR", directory);
+    const h = harness();
+    run.mockImplementationOnce((deps) => {
+      deps.onStage?.("reflection");
+      return Promise.reject(new Error("private evidence and secret"));
+    });
+    await expect(executeDream(h.ctx, h.options)).rejects.toThrow("failed");
+    const path = join(directory, "dream-errors.jsonl");
+    const text = await readFile(path, "utf8");
+    expect(JSON.parse(text)).toMatchObject({
+      stage: "reflection",
+      failure: "failed",
+      reason: "unexpected_error",
+    });
+    expect(text).not.toContain("private evidence");
+    expect((await stat(path)).mode & 0o777).toBe(0o600);
+    run.mockImplementationOnce((deps) => {
+      deps.onStage?.("reflection");
+      return Promise.reject(new DreamModelError("error", "HTTP 429 private secret"));
+    });
+    await expect(executeDream(h.ctx, h.options)).rejects.toThrow("failed");
+    const lines = (await readFile(path, "utf8")).trim().split("\n");
+    expect(JSON.parse(lines[1])).toMatchObject({
+      stage: "reflection",
+      reason: "Dream model did not finish",
+      stopReason: "error",
+      modelErrorCategory: "rate_limit",
+    });
+    expect(lines[1]).not.toContain("private secret");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

@@ -177,6 +177,10 @@ Set `WORKER_BOT_COUNT` explicitly: `1` is the normal local example, `0` disables
 workers, and `N` selects `worker-1` through `worker-N`. Missing/invalid values fail
 before configuration or launch. This setting is not live autoscaling.
 
+Before configuration, stop CoS and select `defaultProvider` and `defaultModel` in
+`~/.battuta/pi-bots/cos-bot/.pi/settings.json`. Configuration provisions the nightly
+dream task; a missed run may execute when CoS next starts.
+
 ```bash
 battuta-bot-setup configure-release --root "$install_path" --env-file "$env_file"
 ```
@@ -285,21 +289,21 @@ the owner confirms it.
 
 ## Extension and skill setup index
 
-| Component                                 | Setup                                                                                       |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Pi, Telegram, agent mail, project-spec    | Compiled bundle plus install-runtime; remote Supabase is provisioned separately             |
-| Shared memory and optional approved dream | [Memory setup](docs/memory-service-setup.md)                                                |
-| Artifact service and CLI                  | [Artifact setup](docs/artifact-service-setup.md)                                            |
-| Project-management CLI                    | [Project-management installation](skills-hub/project-management/references/installation.md) |
-| Assignment MCP                            | [Assignment setup](docs/assignments-setup.md)                                               |
-| Workers and numbered instances            | [Worker setup](docs/workers-setup.md)                                                       |
-| CoS and worker browsers                   | [Browser setup](docs/browser-setup.md)                                                      |
-| Manager native subagents                  | [Subagent setup](docs/subagents-setup.md)                                                   |
-| Google CLI                                | [Google setup](docs/gogcli-setup.md)                                                        |
-| Luma                                      | [Luma setup](docs/luma-setup.md)                                                            |
-| CoS scheduler                             | [Scheduler](docs/scheduler.md)                                                              |
-| Per-role skills                           | [Skill management](docs/skill-management.md)                                                |
-| Source extensions/contributor tools       | [Pi extensions](docs/pi-extensions.md), [OpenCode](docs/opencode.md)                        |
+| Component                              | Setup                                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Pi, Telegram, agent mail, project-spec | Compiled bundle plus install-runtime; remote Supabase is provisioned separately             |
+| Shared memory and nightly CoS dream    | [Memory setup](docs/memory-service-setup.md)                                                |
+| Artifact service and CLI               | [Artifact setup](docs/artifact-service-setup.md)                                            |
+| Project-management CLI                 | [Project-management installation](skills-hub/project-management/references/installation.md) |
+| Assignment MCP                         | [Assignment setup](docs/assignments-setup.md)                                               |
+| Workers and numbered instances         | [Worker setup](docs/workers-setup.md)                                                       |
+| CoS and worker browsers                | [Browser setup](docs/browser-setup.md)                                                      |
+| Manager native subagents               | [Subagent setup](docs/subagents-setup.md)                                                   |
+| Google CLI                             | [Google setup](docs/gogcli-setup.md)                                                        |
+| Luma                                   | [Luma setup](docs/luma-setup.md)                                                            |
+| CoS scheduler                          | [Scheduler](docs/scheduler.md)                                                              |
+| Per-role skills                        | [Skill management](docs/skill-management.md)                                                |
+| Source extensions/contributor tools    | [Pi extensions](docs/pi-extensions.md), [OpenCode](docs/opencode.md)                        |
 
 The archive does not contain these guides or `skills-hub/`; view them on GitHub
 at the same release tag. Source-checkout development uses the separate

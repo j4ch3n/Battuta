@@ -12,6 +12,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { clientConfig } from "./config.ts";
 import { MemoryMcpClient } from "./mcp-client.ts";
+import { abortable } from "./abortable.ts";
 
 export function recallMcpConfig(url: string) {
   new MemoryMcpClient(url);
@@ -73,7 +74,7 @@ export async function createRecallSession(
     noThemes: true,
     systemPrompt: options.systemPrompt,
     extensionFactories: [
-      createMcpExtension({ loadConfig: () => recallMcpConfig(options.url) }),
+      createMcpExtension({ loadConfig: () => recallMcpConfig(options.url), startupWaitMs: 30_000 }),
       ...(options.observe ? [options.observe] : []),
     ],
   });
@@ -106,10 +107,31 @@ export async function createRecallSession(
   };
   try {
     await session.bindExtensions({});
+    // Pi connects MCP servers asynchronously; its first-start hook waits for direct tools.
+    await abortable(
+      session.extensionRunner.emitBeforeAgentStart(
+        { messageType: "user", prompt: "" },
+        { cwd: ctx.cwd },
+      ),
+      options.signal,
+    );
     options.signal.throwIfAborted();
+    if (
+      !session.agent.state.tools.some(
+        (candidate) => candidate.name === "mcp__memory__memory_recall",
+      )
+    )
+      throw new Error("Isolated memory_recall tool unavailable");
   } catch (error) {
     await dispose();
     throw error;
   }
-  return { session, dispose };
+  async function queryRecall(semantic_query: string) {
+    const tool = session.agent.state.tools.find(
+      (candidate) => candidate.name === "mcp__memory__memory_recall",
+    );
+    if (!tool) throw new Error("Isolated memory_recall tool unavailable");
+    return tool.execute("required-memory-recall", { semantic_query }, options.signal);
+  }
+  return { session, dispose, queryRecall };
 }

@@ -89,18 +89,18 @@ for value in data['requires']:
             env_file = work / ".env.prod"
             template = run(str(installed["battuta-bot-setup"][0] / "battuta-bot-setup"), "env-example", capture_output=True).stdout
             env_file.write_text(template + "\nWORKER_BOT_COUNT=2\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\nLINEAR_API_TOKEN=fixture\nCOS_TELEGRAM_TOKEN=101:fixture\nTELEGRAM_ALLOWED_USER_ID=123\n")
+            agent = Path(env["HOME"]) / ".battuta/pi-bots/cos-bot/.pi"
+            agent.mkdir(parents=True)
+            (agent / "settings.json").write_text('{"defaultProvider":"fixture","defaultModel":"model"}')
             run(str(installed["battuta-bot-setup"][0] / "battuta-bot-setup"), "configure-release", "--root", str(root), "--env-file", str(env_file))
             self.assertTrue((Path(env["HOME"]) / ".battuta/pi-bots/worker-2/.pi/mcp.json").is_file())
             self.assertFalse((root / "skills-hub").exists())
             # Only disposable schedule/config files: no scheduler or model is running.
-            agent = Path(env["HOME"]) / ".battuta/pi-bots/cos-bot/.pi"
-            (agent / "settings.json").write_text('{"defaultProvider":"fixture","defaultModel":"model"}')
-            env["PI_CODING_AGENT_DIR"] = str(agent)
-            run(node, str(root / "bots/_shared/memory-client/dist/configure-dream.js"), str(root / "bots/cos-bot"))
             settings = json.loads((root / "bots/cos-bot/.pi/settings.json").read_text())
             dream = [path for path in settings["extensions"] if "dream-extension" in path]
             self.assertEqual(len(dream), 1)
-            self.assertTrue(Path(dream[0]).is_file())
+            self.assertFalse(Path(dream[0]).is_absolute())
+            self.assertTrue((root / "bots/cos-bot/.pi" / dream[0]).is_file())
             run(str(installed["battuta-memory"][1] / "bin/python"), "-c", "import sqlite3,sqlite_vec,onnxruntime,tokenizers; c=sqlite3.connect(':memory:'); c.enable_load_extension(True); sqlite_vec.load(c); c.close(); assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()")
 
 

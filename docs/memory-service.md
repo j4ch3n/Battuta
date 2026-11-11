@@ -8,14 +8,14 @@ authorized maintenance calls; it is not a conversational runtime skill.
 
 ## Storage and role boundaries
 
-| Item                 | Location or behavior                                                                                         |
-| -------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Shared data          | `~/.battuta/memory/`; override with `BATTUTA_MEMORY_DATA_DIR`.                                               |
-| `memory.db`          | Existing upstream content, embeddings, sources and owned lifecycle metadata.                                 |
-| `state.db`           | Mutation/capture receipts, recovery intents, rebuildable FTS5 index and retained optional graph generations. |
-| `capture-queue/cos/` | Private CoS delivery state. Other roles' old queues remain untouched.                                        |
-| Dream state          | `dream-config.json`, `dream-lock.db`, `dream-state.json`, `dream-profile.json`, `dream.log`.                 |
-| `ME.md`              | Preserved private owner text; never automatically treated as verified evidence or overwritten by v3 dreams.  |
+| Item                 | Location or behavior                                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Shared data          | `~/.battuta/memory/`; override with `BATTUTA_MEMORY_DATA_DIR`.                                                     |
+| `memory.db`          | Existing upstream content, embeddings, sources and owned lifecycle metadata.                                       |
+| `state.db`           | Mutation/capture receipts, recovery intents, rebuildable FTS5 index and retained optional graph generations.       |
+| `capture-queue/cos/` | Private CoS delivery state. Other roles' old queues remain untouched.                                              |
+| Dream state          | `dream-config.json`, `dream-lock.db`, `dream-state.json`, `dream-profile.json`, `dream.log`, `dream-errors.jsonl`. |
+| `ME.md`              | Preserved private owner text; never automatically treated as verified evidence or overwritten by v3 dreams.        |
 
 CoS conversational recall uses an isolated recall agent. Main CoS receives
 prepared context without memory tools or a memory skill. Capture and approved
@@ -71,20 +71,31 @@ rejected. The server is independent of project files. Client discovery uses only
 
 ## Recall input and local trust
 
-Ordinary user runs enter an awaited `before_agent_start` preparation block. No
-request-origin marker or current-project selection is required. The child receives
-the latest active compaction summary, up to ten retained human/assistant text
-messages, and current text separately. Tools, thinking, mail, injected context and
-other branches are excluded. Summary text is conversation context, not verified
-evidence. Older context is available only through stored memory.
+Every main-CoS `before_agent_start` run enters an awaited preparation block before
+its model work: ordinary owner input, Agent Mail-triggered work, and other custom
+runs that could produce owner-facing output are included. Pi does not expose a
+reliable owner-facing-origin marker for custom runs, so the extension conservatively
+prepares all main-CoS starts except its own deterministic `memory-context` internal
+message. No current-project selection is required. The child receives the latest
+active compaction summary, up to ten retained human/assistant text messages, and
+current text separately. Tools, thinking, injected context and other branches are
+excluded. Summary text is conversation context, not verified evidence. Older
+context is available only through stored memory.
 
 The child is an in-memory Pi SDK session with its own focused instructions and
 direct recall/get tools. It does not inherit CoS skills/extensions, other MCP
-servers, coding tools, codemode or discovery. Native Pi handles repeated tool
-rounds; the child may skip a greeting, rewrite searches, inspect results and search
-again. It returns skipped, ready, partial or unavailable before main CoS starts.
-Custom/internal runs do not recursively prepare recall. Queued input admitted to
-an existing run is not automatically another preparation boundary.
+servers, coding tools, codemode or discovery. Main CoS receives prepared context,
+not memory tools. Before the child model is allowed to prepare a packet, the isolated
+child's own `memory_recall` MCP tool executes one bounded query and its outcome is
+awaited. Its unmodified AgentTool result is supplied only to the isolated child as
+untrusted evidence for enrichment; the main CoS receives only the child's validated
+packet. Only that named tool counts as the required query; `memory_get` and other
+tool events do not. A failed/cancelled query yields unavailable context honestly.
+Native Pi then handles repeated child tool rounds, so the child can rewrite searches,
+inspect results and search again. A skipped/no-tool child result remains unavailable
+rather than an implicit empty-memory result. The child has no memory-client extension,
+so it cannot recursively prepare recall. Queued input admitted to an existing run is
+not automatically another preparation boundary.
 
 The service remains loopback-only. Any permitted local client can access all
 scopes; project filtering is relevance, not authorization. Invocation IDs prevent
@@ -146,12 +157,12 @@ queued capture is best-effort understanding, not proof a particular fact was sav
 
 ## Automatic context and delegation
 
-Every ordinary user-run preparation invokes the recall agent, independently of
-capture enablement. There is no application recall deadline or round-count cap:
-a stalled child can delay CoS until cancellation or an underlying failure. Native
-provider/transport limits still apply. Session switch/fork and shutdown cancel
-pending work; old packets do not accumulate. Available Pi operation cancellation
-is forwarded to the child.
+Every main-CoS preparation invokes the recall agent independently of capture
+enablement and awaits its outcome. The application bounds child setup, transport,
+query, evidence revalidation and model preparation with a 30-second deadline;
+timeout/failure produces explicit unavailable context while retaining the instruction
+profile snapshot. Session switch/fork and shutdown cancel pending work; old packets
+do not accumulate. Available Pi operation cancellation is forwarded to the child.
 
 One recall tool accepts independent optional `semantic_query` and `keywords`.
 The child rewrites them using history. Either branch can run alone; both combine
@@ -161,16 +172,20 @@ revisions, expiry and dependencies and renders whole evidence/counterevidence
 groups as qualified bullets. Raw tags/ranks are not model context; machine
 records remain available to capture and dream callers.
 
-Earlier pending capture suppresses memory/profile with `capture-pending`, rather
-than risking an obsolete fact. Status distinguishes ready, partial and unavailable
-from an empty result. Numerical retrieval rank/usage is not belief confidence.
-The parent separately loads shared `ME.md` (maximum 32,000 bytes), redacts it, and
-labels it as owner-profile context, not verified facts or instructions. It is not
-sent to the child, counted against the 2,000-byte recalled-evidence budget, or
-gated on search success. Missing files are optional; unreadable/oversized profiles
-are omitted without failing recall. No bot-local or sidecar fallback is injected.
-Pending capture suppresses both profile and recalled facts. Expiring recalled
-support invalidates recalled evidence without dropping a separately loaded profile.
+Capture-pending work does not suppress the read-only query or owner-profile
+instructions. Status distinguishes ready, partial and unavailable from an empty
+result. Numerical retrieval rank/usage is not belief confidence. At session start
+and after each completed compaction, the parent reads shared `ME.md` (maximum
+32,000 bytes), redacts it, and stores that value as the stable `owner-profile`
+instruction-prompt section for the session. A Pi `context_with_system` projection
+also supplies that retained value to an in-flight post-compaction continuation,
+which does not otherwise cross another `before_agent_start` boundary. It does not
+reread the file for each message, send it to the child, count it against the
+2,000-byte recalled-evidence budget, or remove/label it stale because capture is
+pending or recall fails. Session replacement starts a fresh snapshot. Missing, unreadable, or oversized
+profiles are omitted without failing recall; no bot-local or sidecar fallback is
+injected. Expiring recalled support invalidates recalled evidence without dropping
+a separately loaded profile snapshot.
 
 Commission-time origin/ref-selection gates and the extra recall pass are removed.
 CoS chooses relevant prepared owner evidence for Manager/workers and must not
@@ -183,7 +198,7 @@ particular save.
 
 ## Owner profile and nightly dream
 
-Unattended dreaming requires separate owner approval and explicit setup. The pinned
+Dream is provisioned by standard CoS setup in development and production. The pinned
 CoS scheduler requests it at process-local 05:30; use consistent `TZ` configuration.
 While CoS is stopped no job runs. Startup catch-up uses the same latest-run identity,
 lock and checkpoint rather than a daemon or one job for every missed day.
