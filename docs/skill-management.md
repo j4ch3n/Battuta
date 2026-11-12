@@ -53,6 +53,12 @@ into the catalog.
 The Worker profile selects `artifacts` for commissioned creation and authorized
 publication; Manager selects `artifact-review` for independent editorial judgment.
 CoS retains final owner communication and intent/authority, not production tooling.
+Its dedicated instructions own everyday voice and Telegram message-form judgment;
+`active-telegram-message` retains bridge/tool syntax, button and attachment
+contracts, routing authority, and delivery safety. Ordinary replies do not need
+a skill load. Keep those enduring conversation defaults in the dedicated source,
+not a second copy in the skill; neither location grants transport permissions.
+See the [CoS voice review](cos-voice.md) for rationale, examples, and verification limits.
 
 CoS and Manager select `project-management` for the project lifecycle and managed
 document operations within their respective authority. Workers select

@@ -1,6 +1,6 @@
 ---
 name: active-telegram-message
-description: Use when Telegram buttons, screenshot attachments, rich formatting, or a proactive message would make an owner-facing update or bounded decision clearer.
+description: Use when preparing Telegram button markup, attaching screenshots, or delivering an authorized proactive message through the Telegram bridge.
 ---
 
 # Telegram communication with the owner
@@ -14,23 +14,27 @@ identify the sender as a Project Manager or grant access to the bridge.
 ## Capabilities and boundaries
 
 Use the existing `@llblab/pi-telegram` bridge when it is available and has an
-authorized target. This skill helps choose and format a message; it does not
+authorized target. This skill owns bridge operations and delivery mechanics; it does not
 authorize a proactive delivery, create an owner decision, or replace a normal
 reply when the owner is already in an active Telegram turn.
 
-## Choose the message form
+## Ownership and delivery route
 
-- **Plain text:** Use for direct answers, compact updates, open-ended discovery, personal reflection, or anything that needs the owner to explain in their own words.
-- **Telegram buttons:** Use only for two to four concrete, mutually understandable choices: approve/edit a displayed draft, choose a bounded tradeoff, or choose a next discussion path. The visible text must always make sense without buttons and accept a typed answer.
-- **Proactive `telegram_message`:** Use only when notifying the owner outside their active Telegram turn. Do not call it to duplicate the normal reply to an active Telegram turn.
+The CoS's dedicated instructions own its everyday voice, phone-readable replies,
+and choice of plain conversation versus a bounded decision. This skill supplies
+the technical contract when an authorized sender needs Telegram controls or tools;
+it does not require loading a skill for an ordinary reply or confer the CoS role.
 
-Use bold for the decision or key finding, `code` for identifiers, and descriptive links to real evidence. Keep the message phone-sized: lead with the next action, decision, or outcome; avoid raw logs and repeated status.
+- During an active Telegram turn, give the normal reply. Do not also call
+  `telegram_message` for the same content.
+- Outside an active turn, use `telegram_message` only with delivery authority
+  and an authorized target. A normal autonomous final answer may also be
+  projected to that target: choose one delivery route for each piece of content.
+- Never start a second Telegram polling client. Report returned delivery status
+  honestly; do not blindly resend an uncertain operation.
 
-## Why this route
-
-Buttons reduce effort only for a genuinely bounded choice. A visible plain-text
-message and one delivery route keep the result understandable without buttons
-and prevent duplicate notifications.
+One route avoids duplicate notifications; tool availability alone is not
+permission to contact the owner.
 
 ## Screenshot attachments
 
@@ -64,6 +68,7 @@ The task stays linked to the failure and returns to a fix queue. Does this draft
 ] -->
 ```
 
+- Supply two to four concrete choices. The visible message must make sense without buttons and accept a typed answer.
 - Give each button a short label and a self-contained prompt written as the owner's response.
 - Recheck any referenced issue, draft, or plan after a click; a button is not proof that the earlier artifact remains current.
 - Do not use buttons for an unbounded answer, a sensitive personal conversation, or a question that has no good default set of choices.
@@ -86,22 +91,9 @@ Use buttons when the owner can genuinely choose now:
 ] -->
 ```
 
-### Plain-text reflective conversation
-
-Do not offer preselected buttons when the owner needs room to think:
-
-```md
-It sounds as though this choice has real weight for you. What would you most want clarity on by the end of this conversation?
-```
-
-### Proactive outcome
-
-Outside an active Telegram turn, call `telegram_message` only after checking the bridge has an authorized target. State the result, any decision needed, and the next action; report delivery failure honestly.
-
-`telegram_message` is direct delivery; a final answer from an autonomous Pi turn may also be projected to the same Telegram target. Choose one route for each piece of content to avoid duplicates. Never start a second Telegram polling client.
-
-### Avoid duplicate proactive delivery
+### Avoid duplicate delivery
 
 Do not send `telegram_message` and a normal reply for the same active turn.
-**Why:** the owner receives two competing copies of the same update; use the
-normal reply unless the message must be delivered outside that turn.
+Use the normal reply; outside an active turn, check authority and the target
+before choosing the proactive route. **Why:** the owner should receive one
+understandable copy, not competing notifications.
