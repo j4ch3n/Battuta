@@ -1,7 +1,8 @@
 # Messages to `cos`
 
-Manager is an evidence source for substantive investigation, breakdown, planning,
-execution/coordination, progress evaluation, and result judgment. Select the
+Manager frames and commissions substantive investigation/execution through
+assignments, owns breakdown/dependency planning and coordination, and reviews
+worker evidence for progress evaluation and result judgment. Select the
 message that answers the commission or presents new evidence. Return evidence and
 conclusions to `cos` without making product commitments or contacting the owner
 directly. This route description does not limit who may use the template. Adapt

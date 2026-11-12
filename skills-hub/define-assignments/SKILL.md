@@ -20,6 +20,12 @@ execution authority.
 
 ## How and why
 
+Manager must use actual assignments for worker-level research, implementation,
+artifact production and execution verification; a small/tightly coupled task is
+not an exception. Frame the work and review evidence directly, but commission
+substantive discovery needed for the plan rather than doing it first. Escalate
+unavailable assignment tools/workers to CoS rather than executing inline.
+
 Determine the smallest complete solution, integration boundaries, acceptance
 checks, and existing assignment prerequisites. Use todo to create each assignment
 with its complete initial TODO batch atomically, not create-then-append initial
