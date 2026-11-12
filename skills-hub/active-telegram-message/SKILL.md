@@ -30,6 +30,11 @@ it does not require loading a skill for an ordinary reply or confer the CoS role
 - Outside an active turn, use `telegram_message` only with delivery authority
   and an authorized target. A normal autonomous final answer may also be
   projected to that target: choose one delivery route for each piece of content.
+- When the host supplies completed intermediate assistant segments, the bridge
+  can deliver those before the final reply. Do not repeat an intermediate in the
+  final. Paragraph breaks alone are not separate-message commands; if only a
+  final reply is available, keep topic chunks within it. Never insert dummy tool
+  calls or extra proactive sends just to force a split.
 - Never start a second Telegram polling client. Report returned delivery status
   honestly; do not blindly resend an uncertain operation.
 
