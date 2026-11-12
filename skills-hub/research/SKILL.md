@@ -11,7 +11,11 @@ Answer the actual question with traceable evidence, alternatives, changed
 understanding, and honest uncertainty. Research can investigate and synthesize;
 it does not authorize delivery commitments, requirement approval, rendering, or
 publication. CoS/Manager are recipients where authority matters, not invoker
-requirements.
+requirements. Manager uses this guidance to frame research assignments and review
+returned evidence, not to execute substantive research directly. Commission that
+work through actual assignment tools even when the question seems small or
+tightly coupled; unavailable delegation must be disclosed/escalated to CoS.
+CoS's authorized quick factual checks and bound workers' research remain intact.
 
 Build an evidence-backed understanding before choosing how to present it. Scale
 the investigation to the question: a narrow source check needs a direct answer,
@@ -27,8 +31,10 @@ not a research ceremony. Local-only requests stay local.
    provisional frame, inspect sources, then choose distinct investigative lenses.
    Follow evidence-driven questions and counterevidence rather than filling an
    outline chosen in advance. Respect the standing evidence/tool-access rules.
-3. **Organise selectively.** Use todo for tracked steps when useful, note-taking
-   for short findings with provenance, and draft-writing for substantial memos,
+3. **Organise selectively.** For Manager, create the complete worker assignment
+   before substantive research; tracking is not optional. For bound workers, use
+   their existing ordered TODOs, note-taking for short findings with provenance,
+   and draft-writing for substantial memos,
    outlines or synthesis. None is a mandatory artifact or a prerequisite for the
    others. For a bound assignment, use Manager's explicit project, input paths,
    and requirements; report essential gaps through execute-assignment. Outside

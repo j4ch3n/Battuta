@@ -8,8 +8,14 @@ dispatch queue, result queue, or scheduler daemon is introduced.
 ## Responsibilities
 
 - CoS supplies the confirmed project, intended outcome, constraints, and authority.
-- Manager determines the solution and publishes complete assignment plans and
-  prerequisites. It remains available for asynchronous results and blockers.
+- Manager frames the outcome, supplies initial guidance and publishes complete
+  assignment plans and prerequisites. Assignment delegation is mandatory for
+  worker-level research, implementation, artifacts and execution verification,
+  including small/tightly coupled tasks; Manager does not perform that work first
+  and delegate only validation. It remains available for asynchronous results,
+  reviews evidence and unblocks/replans/escalates to CoS. Managerial records and
+  ticket/PR administration remain Manager-owned. Unavailable delegation is a
+  disclosed blocker, not an inline-execution fallback.
 - Workers execute ordered TODOs and report explicit outcomes. Extension code
   owns claim/progress/completion and mandatory Manager mail.
 - Manager inspects authoritative state and evidence, integrates results, handles
