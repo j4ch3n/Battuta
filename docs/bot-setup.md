@@ -11,6 +11,7 @@ Pi consumes the prepared settings/resources, not the manifest itself.
 | `[bot]`                | Role and environment-variable prefix                                       |
 | `[skills]`             | Ordered `include` selection from the runtime skill catalog                 |
 | `[packages]`           | Pinned Pi package sources and repository-relative Node projects to install |
+| `[[extensions]]`       | Named repository-owned extension entry points                              |
 | `[[files]]`            | File preparation operations with explicit ownership policy                 |
 | `[setup]`              | Ordered, known Python setup steps, restricted by role                      |
 | `[runtime]`            | Private `pi_coding_agent_dir`, relative to the fixed private base          |
@@ -20,7 +21,38 @@ Pi consumes the prepared settings/resources, not the manifest itself.
 Node dependency versions remain in `package.json` and lockfiles. Secrets stay in
 environment files and private state, never TOML. Browser/MCP configuration and
 worker resource ownership retain their specialised validation and merge rules.
-Source and compiled extension paths remain layout-specific Python adapters.
+
+## Extension discovery and generated settings
+
+Each profile declares its extensions in TOML:
+
+```toml
+[[extensions]]
+name = "assignment-worker"
+source = "assignment-worker/index.ts"
+```
+
+Names are unique lowercase kebab-case. Sources are `.ts` or `.js` repository-relative entry
+points inside an owning package directory with its own `package.json` and
+`pnpm-lock.yaml`; absolute paths and upward traversal are rejected.
+
+Source setup creates relative links under `bots/<profile>/.pi/extensions/`.
+Release assembly uses the same selection to build JavaScript packages in that
+directory, including their manifests, lockfiles, and required resources.
+Release runtime installation installs each package's locked production
+dependencies. No raw extension source or development symlinks ship.
+
+Pi discovers these project-local extensions directly. Neither generated settings
+nor launch arguments register them again. MCP and codemode use Pi's built-in
+extensions rather than paths into `node_modules`. Third-party Pi packages remain
+declared in `[packages].pi` and installed through Pi.
+
+Setup generates each profile's `.pi/settings.json` from its manifest and role
+defaults. These files and development extension links are Git-ignored, not
+maintained inputs. Re-running setup regenerates profile settings; put personal
+preferences in private runtime settings instead. Setup tracks its own extension
+links, removes deselected links only while unchanged, and refuses to overwrite
+custom extension files or links.
 
 ## Worker subagents
 

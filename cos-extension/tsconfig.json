@@ -7,5 +7,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": [".pi/extensions/**/*.ts"]
+  "include": ["index.ts"]
 }

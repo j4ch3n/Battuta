@@ -1,7 +1,4 @@
 # Pi runtime state is local; explicitly allow versioned bot configuration and code.
 AGENTS.md
 .pi/*
-!.pi/settings.json
 !.pi/web-search.json
-!.pi/extensions/
-.pi/extensions/*

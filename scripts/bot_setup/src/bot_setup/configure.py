@@ -14,13 +14,13 @@ from .files import prepare_files, safe_path
 from .manifest import load_profile
 from .json_config import read_config, write_config
 from .mcp import assignment_server, configure_mcp, validate_memory_url
-from .memory import configure_memory_settings
 from .release import validate_private_home
 from .subagents import prepare_worker_agents, prepare_worker_skill, render_worker_agents
 from .telegram import prepare_telegram_config
 from .skills import load_selection, link_selected_skills
-from .workers import copy_worker_profile, validate_worker_settings
+from .workers import copy_worker_profile
 from .runtime import initialize_settings_if_missing, resolve_agent_dir
+from .extensions import prepare_source_extensions, profile_settings, source_extension_links
 
 
 def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_file: Path | None = None, env_prefix: str | None = None, telegram_package: str | None = None) -> None:
@@ -56,7 +56,10 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
     projects = [safe_path(root, project) for project in manifest.packages.node_projects]
     if manifest.defaults is None:
         raise click.ClickException("Bot manifest requires defaults")
+    source_extension_links(root, bot_dir, manifest.extensions)
     prepare_files(root, bot_dir, private, manifest.files)
+    write_config(bot_dir / ".pi/settings.json", profile_settings(manifest, browser="browser" in steps), ".settings-")
+    prepare_source_extensions(root, bot_dir, manifest.extensions)
     initialize_settings_if_missing(private / ".pi", manifest.defaults)
     link_selected_skills(bot_dir, root / "skills-hub", names)
     for project in projects:
@@ -81,7 +84,6 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
     handlers = {
         "telegram": telegram_config,
         "mcp": lambda: configure_mcp(private, role=role, memory_url=url, supabase_url=supabase_url),
-        "memory-settings": lambda: configure_memory_settings(bot_dir, role=role),
         "browser": browser, "dream": dream,
     }
     for step in steps:
@@ -112,36 +114,21 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
     memory_url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
     names = load_selection(root / "bots/worker/bot.toml", root / "skills-hub")
     agents = render_worker_agents(profile, manifest)
+    source_extension_links(root, bot_dir, manifest.extensions)
     path = bot_dir / ".pi/settings.json"
-    settings = read_config(path)
-    validate_worker_settings(settings)
-    browser_defaults(settings)
-    runtime = profile / "extension/assignment-worker"
+    settings = profile_settings(manifest, browser=True)
+    runtime = root / "assignment-worker"
     if not shared_catalog:
         for project in manifest.packages.node_projects:
             run("pnpm", "--dir", str(safe_path(root, project)), "install", "--frozen-lockfile")
-    extensions = settings.get("extensions", [])
-    for extension in [runtime / "index.ts", *[runtime / f"node_modules/@earendil-works/pi-coding-agent/dist/extensions/{name}/index.js" for name in ("mcp", "codemode")]]:
-        if not extension.is_file():
-            raise click.ClickException(f"Missing worker extension: {extension}")
-        value = relpath(extension, path.parent)
-        if value not in extensions:
-            extensions.append(value)
-    settings["extensions"] = extensions
-    settings["battutaMemoryCapture"] = {"enabled": False}
-    packages = settings.get("packages", [])
-    for package in manifest.packages.pi:
-        if package not in packages:
-            packages.append(package)
-    settings["packages"] = packages
+    prepare_source_extensions(root, bot_dir, manifest.extensions)
     for name in names:
         prepare_worker_skill(root / "skills-hub" / name, bot_dir)
     selected = [
         relpath(bot_dir / ".pi/skills" / name, path.parent)
         for name in names
     ]
-    existing = settings.get("skills", [])
-    settings["skills"] = list(dict.fromkeys([*existing, *selected]))
+    settings["skills"] = selected
     bot_dir.mkdir(parents=True, exist_ok=True)
     prepare_worker_agents(agents, bot_dir)
     prepare_files(root, profile, bot_dir, [rule for rule in manifest.files if rule.destination == "profile"])

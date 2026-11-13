@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile, chmod, stat } from "node:fs/promises";
-import { isAbsolute, join, resolve } from "node:path";
+import { mkdtemp, mkdir, readFile, rm, writeFile, chmod, stat, symlink } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
@@ -114,7 +114,7 @@ test.each([false, true])(
       join(dir, ".pi/settings.json"),
       JSON.stringify({
         ...(separate ? {} : { defaultProvider: "p", defaultModel: "m" }),
-        extensions: ["custom.ts", fileURLToPath(new URL("../dream-extension.ts", import.meta.url))],
+        extensions: ["custom.ts"],
       }),
     );
     const agent = join(dir, "private-agent");
@@ -155,22 +155,21 @@ test.each([false, true])(
     const { extensions } = JSON.parse(await readFile(join(dir, ".pi/settings.json"), "utf8")) as {
       extensions: string[];
     };
-    expect(extensions).toHaveLength(2);
-    expect(extensions[0]).toBe("custom.ts");
-    expect(isAbsolute(extensions[1])).toBe(false);
-    expect(resolve(dir, ".pi", extensions[1])).toBe(
-      fileURLToPath(new URL("../dream-extension.ts", import.meta.url)),
-    );
+    expect(extensions).toEqual(["custom.ts"]);
     await expect(readFile(join(dir, ".pi/schedule-prompts.json"))).rejects.toMatchObject({
       code: "ENOENT",
     });
   },
 );
-test("Pi loads the configured relative dream extension", async () => {
+test("Pi discovers the prepared project-local dream extension", async () => {
   const dir = await mkdtemp(join(tmpdir(), "dream-relative-"));
   dirs.push(dir);
   const agent = join(dir, "agent");
-  await mkdir(join(dir, ".pi"));
+  await mkdir(join(dir, ".pi/extensions"), { recursive: true });
+  await symlink(
+    fileURLToPath(new URL("../dream-extension.ts", import.meta.url)),
+    join(dir, ".pi/extensions/dream.ts"),
+  );
   await mkdir(agent);
   await writeFile(join(dir, ".pi/settings.json"), JSON.stringify({}));
   const store = join(dir, "jobs.json");

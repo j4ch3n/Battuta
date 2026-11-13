@@ -15,7 +15,8 @@ runs:
           agent-mail/pnpm-lock.yaml
           project-spec/pnpm-lock.yaml
           memory-client/pnpm-lock.yaml
-          bots/worker/extension/assignment-worker/pnpm-lock.yaml
+          assignment-worker/pnpm-lock.yaml
+          cos-extension/pnpm-lock.yaml
           bots/cos-bot/pnpm-lock.yaml
           bots/manager-bot/pnpm-lock.yaml
     - run: pnpm install --frozen-lockfile

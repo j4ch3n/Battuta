@@ -31,7 +31,7 @@ class WorkerSetupTests(unittest.TestCase):
         self.bot = self.home / ".battuta/pi-bots/worker-1"
         self.env = self.root / ".env"
         self.env.write_text("SUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-key\n")
-        self.runtime = self.profile / "extension/assignment-worker"
+        self.runtime = self.root / "assignment-worker"
         self.runtime.mkdir(parents=True)
         (self.runtime / "index.ts").write_text("export default () => {};")
         for name in ("mcp", "codemode"):
@@ -54,7 +54,8 @@ class WorkerSetupTests(unittest.TestCase):
         self.assertTrue(run.called)
         self.assertTrue(any(call.args[0] == str(self.runtime / "node_modules/.bin/pi") and call.args[-1] == "npm:@tintinweb/pi-subagents@0.24.0" for call in run.call_args_list))
         settings = json.loads((self.profile / ".pi/settings.json").read_text())
-        self.assertTrue(any((self.profile / ".pi" / value).resolve() == self.runtime / "index.ts" for value in settings["extensions"]))
+        self.assertNotIn("extensions", settings)
+        self.assertEqual((self.profile / ".pi/extensions/assignment-worker.ts").resolve(), self.runtime / "index.ts")
         self.assertTrue(all((self.profile / ".pi" / value).exists() for value in settings["skills"]))
         self.assertTrue(all(value.startswith("skills/") for value in settings["skills"]))
         self.assertFalse((self.profile / ".pi/skills/execute-assignment").is_symlink())
@@ -199,7 +200,7 @@ class WorkerSetupTests(unittest.TestCase):
             configure_worker(self.root, bot_dir=self.bot)
         settings = json.loads((self.bot / ".pi/settings.json").read_text())
         self.assertEqual(settings["defaultModel"], "private-model")
-        self.assertEqual(settings["extensions"].count(str(self.runtime / "index.ts")), 1)
+        self.assertEqual(settings["extensions"], ["/private/custom.ts"])
         self.assertIn("/private/custom.ts", settings["extensions"])
         self.assertEqual((self.bot / ".pi/auth.json").read_text(), "private-auth")
         self.assertEqual((self.bot / ".pi/skills/custom/SKILL.md").read_text(), "private custom")
@@ -248,11 +249,12 @@ class WorkerSetupTests(unittest.TestCase):
         settings_path.write_text(json.dumps(settings))
         second = self.root / "installation B"
         shutil.copytree(self.profile, second / "bots/worker")
+        shutil.copytree(self.runtime, second / "assignment-worker")
         shutil.copytree(self.root / "skills-hub", second / "skills-hub")
         # Both installations still exist; old owned paths must not load alongside B.
         configure_worker(second, bot_dir=self.bot)
         configured = json.loads(settings_path.read_text())
-        for key in ("extensions", "packages", "skills"):
+        for key in ("packages", "skills"):
             paths = [path for path in configured[key] if path != "/private/custom.ts"]
             self.assertTrue(paths)
             self.assertTrue(all(path.startswith("npm:") or Path(path).is_relative_to(second) for path in paths), paths)

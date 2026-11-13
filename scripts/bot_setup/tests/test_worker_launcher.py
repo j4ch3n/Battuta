@@ -10,6 +10,8 @@ from unittest.mock import patch
 
 from bot_setup.browser import configure_browser
 from bot_setup.mcp import configure_mcp
+from bot_setup.extensions import prepare_source_extensions, profile_settings
+from bot_setup.manifest import load_profile
 from skill_fixtures import manifest_text
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -34,10 +36,11 @@ class WorkerLauncherTests(unittest.TestCase):
             (bot / ".pi").mkdir(parents=True)
             (bot / ".pi/settings.json").write_text("{}")
             (bot / ".pi/mcp.json").write_text("{}")
-            runtime = root / "bots/worker/extension/assignment-worker"
+            runtime = root / "assignment-worker"
             cli = runtime / "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
             cli.parent.mkdir(parents=True)
             cli.write_text("fixture")
+            (root / "bots/worker").mkdir(parents=True)
             (root / "bots/worker/bot.toml").write_text(manifest_text("worker", []))
             configure_browser(root / "bots/worker", bot, home=self.home, bot="worker-1")
             binary = root / "bin"
@@ -78,15 +81,16 @@ class WorkerLauncherTests(unittest.TestCase):
                 'pi_coding_agent_dir = "{instance}/runtime/.pi"',
             ))
             (profile / "AGENTS.md").write_text("profile instructions")
-            (profile / ".pi/settings.json").write_text(json.dumps({
-                "extensions": ["../extension/assignment-worker/index.ts"],
-                "packages": [{"source": "npm:pi-web-access@0.43.0", "skills": []}, "npm:custom"],
-                "skills": ["../../../skills-hub/research"],
-            }))
+            manifest = load_profile(profile / "bot.toml", "worker")
+            (profile / ".pi/settings.json").write_text(json.dumps(profile_settings(manifest, browser=True)))
+            source = root / "assignment-worker/index.ts"
+            source.parent.mkdir(parents=True)
+            source.write_text("export default () => {}")
+            prepare_source_extensions(root, profile, manifest.extensions)
             configure_mcp(profile, role="worker", supabase_url="http://127.0.0.1:54321")
             (profile / ".pi/web-search.json").write_text('{"fetchContent":{"userAgent":"fixture mobile browser"}}')
             (profile / ".pi/auth.json").write_text("never-copy")
-            cli = profile / "extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
+            cli = root / "assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
             cli.parent.mkdir(parents=True)
             cli.write_text("fixture")
             binary = root / "bin"
@@ -107,9 +111,9 @@ class WorkerLauncherTests(unittest.TestCase):
             settings = json.loads((bot / ".pi/settings.json").read_text())
             self.assertEqual(settings["defaultThinkingLevel"], "high")
             self.assertTrue(settings["defaultModel"])
-            self.assertEqual(settings["extensions"], [str(profile / "extension/assignment-worker/index.ts")])
-            self.assertEqual(settings["packages"], [{"source": "npm:pi-web-access@0.43.0", "skills": []}, "npm:custom"])
-            self.assertEqual(settings["skills"], [str(root / "skills-hub/research")])
+            self.assertNotIn("extensions", settings)
+            self.assertEqual(settings["packages"], manifest.packages.pi)
+            self.assertEqual((profile / ".pi/extensions/assignment-worker.ts").resolve(), source)
             self.assertFalse((bot / "AGENTS.md").exists())
             self.assertEqual((bot / ".pi/mcp.json").read_bytes(), (profile / ".pi/mcp.json").read_bytes())
             self.assertEqual((bot / ".pi/web-search.json").read_bytes(), (profile / ".pi/web-search.json").read_bytes())
@@ -139,9 +143,10 @@ class WorkerLauncherTests(unittest.TestCase):
             scripts = root / "scripts/bot_setup"
             scripts.mkdir(parents=True)
             shutil.copy2(ROOT / "scripts/bot_setup/run-worker.sh", scripts / "run-worker.sh")
-            cli = root / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
+            cli = root / "assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
             cli.parent.mkdir(parents=True)
             cli.write_text("fixture")
+            (root / "bots/worker").mkdir(parents=True)
             (root / "bots/worker/bot.toml").write_text(manifest_text("worker", []))
             bot = self.home / ".battuta/pi-bots/worker-1"
             (bot / ".pi").mkdir(parents=True)

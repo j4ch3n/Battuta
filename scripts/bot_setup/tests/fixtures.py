@@ -133,9 +133,10 @@ if "-P" in args:
         (self.worker / ".pi").mkdir(parents=True)
         for name in ("AGENTS.md", ".pi/settings.json", ".pi/mcp.json", ".pi/auth.json"):
             (self.worker / name).write_text("{}")
-        cli = self.root / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
+        cli = self.root / "assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
         cli.parent.mkdir(parents=True)
         cli.touch()
+        (self.root / "bots/worker").mkdir(parents=True)
         shutil.copy2(ROOT / "bots/worker/bot.toml", self.root / "bots/worker/bot.toml")
         scripts = self.root / "scripts/bot_setup"
         scripts.mkdir(exist_ok=True)

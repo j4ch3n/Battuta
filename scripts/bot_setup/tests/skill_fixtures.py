@@ -21,4 +21,8 @@ def skill_catalog(root: Path, role: str, names=None) -> list[str]:
     bot = root / f"bots/{role}-bot"
     bot.mkdir(parents=True, exist_ok=True)
     (bot / "bot.toml").write_text(manifest_text(role, names))
+    for source in ("agent-mail/index.ts", "project-spec/index.ts", "memory-client/index.ts", "memory-client/dream-extension.ts", "assignment-worker/index.ts", "cos-extension/index.ts"):
+        path = root / source
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("export default () => {}")
     return names

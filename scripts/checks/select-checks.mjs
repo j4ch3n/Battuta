@@ -34,8 +34,8 @@ const all =
         ".deno-version",
       ].includes(file),
   );
-const worker = "bots/worker/extension/assignment-worker";
-const node = ["agent-mail", "project-spec", "memory-client", worker, "bots/cos-bot"];
+const worker = "assignment-worker";
+const node = ["agent-mail", "project-spec", "memory-client", worker, "cos-extension"];
 const python = ["memory-service", "artifact-service", "project-context-cli"];
 const functions = readdirSync(resolve(root, "supabase/functions"), { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && !entry.name.startsWith("_"))
@@ -58,7 +58,8 @@ const selected = {
       all ||
       changed(`${component}/`) ||
       (mail && ["agent-mail", worker].includes(component)) ||
-      (component === "memory-client" && changed("bots/cos-bot/")),
+      (component === "memory-client" && (changed("bots/cos-bot/") || changed("cos-extension/"))) ||
+      (component === "cos-extension" && changed("bots/cos-bot/")),
   ),
   python: [
     "scripts",

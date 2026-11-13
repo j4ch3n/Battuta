@@ -1,8 +1,8 @@
 import { expect, test, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildManagerContent, createNotifier } from "../notify.ts";
-import { Content, validate } from "../../../../../agent-mail/schemas.ts";
-import { validateContent, MAX_CONTENT_BYTES } from "../../../../../agent-mail/content.ts";
+import { Content, validate } from "../../agent-mail/schemas.ts";
+import { validateContent, MAX_CONTENT_BYTES } from "../../agent-mail/content.ts";
 import { detail } from "./fixtures.ts";
 import type { Detail } from "../types.ts";
 

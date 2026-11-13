@@ -130,7 +130,7 @@ try {
       SUPABASE_TEST_JWT_SECRET: status.JWT_SECRET,
     },
   });
-  run("pnpm", ["--dir", "bots/worker/extension/assignment-worker", "test:integration"], {
+  run("pnpm", ["--dir", "assignment-worker", "test:integration"], {
     env: {
       ...process.env,
       SUPABASE_URL: status.API_URL,
