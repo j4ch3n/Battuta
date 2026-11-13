@@ -28,14 +28,10 @@ owner contact or product commitments.
     Respect their uncertainty and freshness. Use `project-memory` when selected
     to retrieve relevant project/global context; ask CoS for missing or stale
     owner context. Return findings/corrections with original event references.
-2. For Manager, frame and plan the smallest complete outcome, commission worker-level work
-   through complete project assignments and review the returned evidence. Do not
-   personally execute it, including for small/tightly coupled tasks; if delegation
-   is unavailable, report the blocker and recovery decision to CoS. Distinguish
-   observations, inference, uncertainty and deferred scope. Manager may directly
-   author its briefs, reflection/review/status records and ticket/PR administration.
-   Bound workers execute their commissioned TODOs and report results/blockers to
-   Manager through the existing runtime; they do not commission nested work.
+2. Establish the assessed result within the commission and the invoking agent's
+   existing authority. Distinguish observations, inference, uncertainty and
+   deferred scope. Report unavailable tools, inputs or delegation honestly,
+   with the observed blocker and a bounded recovery recommendation.
 3. Choose an outbound example from the [template index](references/templates/index.md).
    Report findings, progress, evidence-backed conclusions, blockers,
    recommendations, or a specific decision needed through Agent Mail to `cos`.

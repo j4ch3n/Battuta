@@ -40,3 +40,17 @@ Check package role separation, native custom-type discovery, preservation of
 private/custom resources, idempotence and relocatable releases. Do not assert
 prompt wording in tests. Use no production mail or live model calls in setup
 checks. Live-model compliance remains a separate manual acceptance check.
+
+## Execution record
+
+- Manager package removal committed as `170d81d`.
+- Role prompts now cover owner confirmation, authorized milestone progression,
+  Manager read-only review spot-checks and bounded worker assistance.
+- Worker setup/packaging regressions observed failing before implementation.
+- Full bot setup: 197 passed and 48 subtests passed with `TMPDIR=/private/tmp`.
+  Default macOS TMPDIR exposes three existing `/var` versus `/private/var`
+  launcher assertions; canonicalizing TMPDIR avoids that environment mismatch.
+- Full packaging: 55 passed and 22 subtests passed.
+- Ruling: use native Markdown agent definitions plus existing setup machinery,
+  not new workflow enforcement. Preserve privately modified definitions by
+  refusing replacement rather than silently overwriting them.

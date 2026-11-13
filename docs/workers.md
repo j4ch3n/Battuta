@@ -11,8 +11,10 @@ dispatch queue, result queue, or scheduler daemon is introduced.
 - Manager frames the outcome, supplies initial guidance and publishes complete
   assignment plans and prerequisites. Assignment delegation is mandatory for
   worker-level research, implementation, artifacts and execution verification,
-  including small/tightly coupled tasks; Manager does not perform that work first
-  and delegate only validation. It remains available for asynchronous results,
+  through complete assignments for the next useful milestone, adapting later
+  assignments to reviewed findings. Manager may run bounded read-only review
+  spot-checks without taking over implementation or formal verification.
+  It remains available for asynchronous results,
   reviews evidence and unblocks/replans/escalates to CoS. Managerial records and
   ticket/PR administration remain Manager-owned. Unavailable delegation is a
   disclosed blocker, not an inline-execution fallback.
@@ -80,7 +82,11 @@ arrives through the commission; workers do not connect to memory MCP.
 Claim/status/control/mail mutations are excluded from model tool
 registration, including native MCP/codemode discovery. Shell and the backend
 secret still make this a trusted process, **not a security sandbox**. No Telegram,
-worker inbox, nested delegation, owner-profile preload, or memory capture runs.
+worker inbox, nested assignment creation, owner-profile preload, or memory capture runs.
+The worker may use the native subagent extension for bounded research and review;
+its custom types load no assignment lifecycle extension. The worker retains
+responsibility for integration and its execution report. Prompt boundaries are
+not sandbox guarantees.
 
 ## Project targets and shared files
 

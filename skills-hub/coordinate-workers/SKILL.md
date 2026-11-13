@@ -1,6 +1,6 @@
 ---
 name: coordinate-workers
-description: Use when coordinating multiple implementation workers, resolving their questions, or integrating delegated changes.
+description: Use when coordinating assignment execution, resolving questions, reviewing results or replanning the next milestone.
 ---
 
 # Coordinate workers
@@ -19,11 +19,9 @@ not who may use this skill or access its tools.
 
 ## How and why
 
-Assignment-based execution is mandatory for Manager's worker-level work: research,
-implementation, artifacts and execution checks are commissioned, not personally
-performed as an alternative, even for small/tightly coupled tasks. Manager owns
-initial guidance, breakdown, dependencies, coordination, evidence review and
-unblocking; unavailable delegation requires disclosure/escalation to CoS.
+Review the current milestone's evidence before publishing the next milestone's
+assignments. Adapt the plan to findings rather than guessing all later work.
+Follow the invoking agent's existing authority and escalation boundaries.
 
 Plan complete assignments using todo, with ordered initial TODOs and existing prerequisites. Persistent workers claim whole assignments; do not dispatch individual TODOs, select a worker, create a scheduler, or wait synchronously. Use dependencies/non-conflicting boundaries when assignments share a workspace.
 

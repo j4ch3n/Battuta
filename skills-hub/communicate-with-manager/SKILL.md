@@ -14,9 +14,8 @@ with explicit authority, expected result, and reply expectation.
 
 `manager` is the Agent Mail recipient for substantive investigation, breakdown,
 planning, assignment-based execution coordination, progress evaluation, and result
-judgment. Manager commissions worker-level work rather than personally executing
-it, including substantive research and verification; unavailable delegation is an
-honest blocker/escalation, not a direct-execution fallback.
+judgment. This route does not change the invoking agent's execution or delegation
+authority.
 CoS is the product-authority role that retains owner communication and product
 decisions. These roles describe the route and authority, not who may use this
 skill. A message does not grant tools, product approval, or managed-document

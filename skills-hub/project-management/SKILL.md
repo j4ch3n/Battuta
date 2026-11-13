@@ -15,12 +15,8 @@ Start at the current task or decision; do not restart a healthy project.
 
 CoS decides high-level intent, scope, priorities, and product acceptance within
 the owner's mandate. Manager develops complementary requirements, technical
-detail, executable briefs, and delivery recommendations through assignment-based
-coordination. Manager commissions worker-level research, drafting, implementation,
-artifact production and execution verification, even for small or tightly coupled
-work. Manager directly owns framing/guidance, complete plans and dependencies,
-review, unblock/escalation and managerial records/ticket administration, not the
-worker deliverables. CoS quick checks and bound worker execution remain distinct.
+detail, executable briefs, and delivery recommendations. Plan the next useful
+milestone from current evidence; review results and adapt subsequent work.
 Questions that change product intent go to `cos`; CoS asks the owner when confirmed context and its
 mandate cannot establish the answer. These are authority and recipient roles,
 not invoker restrictions; loading this skill grants no tools or permissions.
@@ -83,10 +79,8 @@ provided. These are document methodologies, not automatic lifecycle gates.
 | [Analyze](references/analyze/prompt.md) | Read-only consistency and coverage findings across documents |
 | [Constitution](references/constitution/prompt.md) | Adopted project-wide principles in the canonical versioned `Constitution` |
 
-Route substantial drafting to Manager for worker assignment; bound workers use
-prd for requirements, draft-writing for prose and research for investigation.
-Manager may author managerial requirements, briefs and review records directly,
-but must not substitute direct drafting or investigation for worker execution.
+Use prd for requirements, draft-writing for prose and research for investigation.
+Apply these methods within the invoking agent's existing mandate.
 This skill provides project lifecycle and document integration, not competing
 specialist workflows. CoS persists complete immutable document versions and
 terminal go/no-go with rationale. Manager commissions and reviews substantive
@@ -136,11 +130,9 @@ source-relative plans/tasks. Do not create or switch branches merely to author
 documents. Replace command tokens/placeholders with real artifact references.
 Evaluate prerequisites from actual artifact content, not command history. Report
 stale/missing documents, including tasks inconsistent with an updated plan; do
-not silently regenerate them during review. Use available research tools within
-the executing role's mandate. For Manager,
-unavailable delegation is a blocker to disclose/escalate to CoS, not permission
-to investigate inline or install another runtime. Bound workers report unavailable
-tools/evidence to Manager; CoS retains its authorized quick-check role.
+not silently regenerate them during review. Use available tools within the
+commission's authority; report unavailable tools or evidence through the
+established route rather than installing another runtime or inventing results.
 
 **Inactive upstream integration sections:** do not execute Pre-Execution Checks,
 Mandatory Post-Execution Hooks, Post-Execution Checks, “Check for extension hooks,”
