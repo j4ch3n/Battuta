@@ -90,6 +90,20 @@ class WorkerSetupTests(unittest.TestCase):
         run.assert_not_called()
         self.assertFalse((self.profile / "AGENTS.md").exists())
 
+    def test_prompt_paths_are_profile_relative_and_symlinks_are_rejected(self):
+        manifest = self.profile / "bot.toml"
+        manifest.write_text(manifest.read_text().replace("agents/researcher.md", "prompts/custom.md"))
+        prompt = self.profile / "prompts/custom.md"
+        prompt.parent.mkdir()
+        prompt.write_text("---\nname: researcher\n---\nCustom location")
+        self.prepare()
+        assert "Custom location" in (self.profile / ".pi/agents/custom.md").read_text()
+        prompt.unlink()
+        prompt.symlink_to(self.profile / "agents/researcher.md")
+        with patch("bot_setup.configure.run") as run, self.assertRaises(Exception):
+            configure_source(self.root, role="worker", env_file=self.env)
+        run.assert_not_called()
+
     def test_agent_updates_preserve_custom_definitions_and_private_state(self):
         self.prepare()
         configure_worker(self.root, bot_dir=self.bot)

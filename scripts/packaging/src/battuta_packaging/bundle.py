@@ -12,6 +12,7 @@ from bot_setup.browser import browser_defaults
 from bot_setup.skills import load_selection
 from bot_setup.files import prepare_files
 from bot_setup.manifest import load_profile
+from bot_setup.subagents import render_worker_agents
 
 PROFILES = ("cos-bot", "manager-bot", "worker")
 SHARED = ("agent-mail", "project-spec", "memory-client")
@@ -55,6 +56,7 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         raise click.ClickException("Release destination must be an empty regular directory")
     selections = {profile: load_selection(source / "bots" / profile / "bot.toml", source / "skills-hub") for profile in PROFILES}
     manifests = {profile: load_profile(source / "bots" / profile / "bot.toml", profile.removesuffix("-bot")) for profile in PROFILES}
+    worker_agents = render_worker_agents(source / "bots/worker", manifests["worker"])
     for names in selections.values():
         for name in names:
             skill = source / "skills-hub" / name
@@ -91,7 +93,10 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
             extensions += ["../../_shared/memory-client/dist/index.js", "extensions/index.js"]
         if profile == "worker":
             extensions += ["extensions/index.js"]
-            shutil.copytree(original / "agents", bot / ".pi/agents")
+            agents = bot / ".pi/agents"
+            agents.mkdir()
+            for name, content in worker_agents.items():
+                (agents / name).write_bytes(content)
         settings = {"packages": packages[profile], "extensions": extensions, "battutaMemoryCapture": {"enabled": profile == "cos-bot"}}
         if profile != "manager-bot":
             browser_defaults(settings)

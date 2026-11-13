@@ -6,20 +6,44 @@ Pi consumes the prepared settings/resources, not the manifest itself.
 
 ## Sections
 
-| Section      | Responsibility                                                             |
-| ------------ | -------------------------------------------------------------------------- |
-| `[bot]`      | Role and environment-variable prefix                                       |
-| `[skills]`   | Ordered `include` selection from the runtime skill catalog                 |
-| `[packages]` | Pinned Pi package sources and repository-relative Node projects to install |
-| `[[files]]`  | File preparation operations with explicit ownership policy                 |
-| `[setup]`    | Ordered, known Python setup steps, restricted by role                      |
-| `[runtime]`  | Private `pi_coding_agent_dir`, relative to the fixed private base          |
-| `[defaults]` | Initial provider, model and thinking preferences                           |
+| Section                | Responsibility                                                             |
+| ---------------------- | -------------------------------------------------------------------------- |
+| `[bot]`                | Role and environment-variable prefix                                       |
+| `[skills]`             | Ordered `include` selection from the runtime skill catalog                 |
+| `[packages]`           | Pinned Pi package sources and repository-relative Node projects to install |
+| `[[files]]`            | File preparation operations with explicit ownership policy                 |
+| `[setup]`              | Ordered, known Python setup steps, restricted by role                      |
+| `[runtime]`            | Private `pi_coding_agent_dir`, relative to the fixed private base          |
+| `[defaults]`           | Initial provider, model and thinking preferences                           |
+| `[[subagents.agents]]` | Profile-relative prompt, selected parent skills, and child extensions      |
 
 Node dependency versions remain in `package.json` and lockfiles. Secrets stay in
 environment files and private state, never TOML. Browser/MCP configuration and
 worker resource ownership retain their specialised validation and merge rules.
 Source and compiled extension paths remain layout-specific Python adapters.
+
+## Worker subagents
+
+The worker manifest declares each native subagent:
+
+```toml
+[[subagents.agents]]
+path = "agents/researcher.md"
+inherit_parent_skills = ["research"]
+extensions = ["pi-web-access"]
+```
+
+Paths are relative to the worker profile. Inherited skills must also be selected
+by the parent worker; extension names must be backed by a package in `[packages]`.
+Setup renders native `skills` and `extensions` frontmatter into generated agent
+definitions, so source prompt files must not declare those keys themselves.
+The agent's `tools` restriction remains in the prompt. The researcher requests
+web-access tools; the reviewer requests neither skills nor extensions.
+
+Source setup materializes inherited skill files for native subagent discovery;
+release bundles include the selected skills and render the same agent definitions.
+Generated files are refreshed only when still owned by setup; custom private
+agent definitions are preserved.
 
 ## Private runtime settings
 
