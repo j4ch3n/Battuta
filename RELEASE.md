@@ -29,9 +29,8 @@ human acceptance, not agent-run setup checks.
     worker-2/.pi/
 ```
 
-The archive contains only `bots/`: compiled JavaScript, generated instructions,
+The `bots/` directory contains compiled JavaScript, generated instructions,
 complete per-role skills, resources, notices, and dependency manifests/lockfiles.
-No source runtime catalog, Node executable, or dependency environments are bundled.
 JavaScript dependencies and Pi packages are installed **inside the installation**.
 Python servers/CLIs are separate wheels installed into uv-managed environments.
 
@@ -305,7 +304,3 @@ the owner confirms it.
 | CoS scheduler                          | [Scheduler](docs/scheduler.md)                                                              |
 | Per-role skills                        | [Skill management](docs/skill-management.md)                                                |
 | Source extensions/contributor tools    | [Pi extensions](docs/pi-extensions.md), [OpenCode](docs/opencode.md)                        |
-
-The archive does not contain these guides or `skills-hub/`; view them on GitHub
-at the same release tag. Source-checkout development uses the separate
-[development guide](.agents/skills/battuta-setup/references/development.md).
