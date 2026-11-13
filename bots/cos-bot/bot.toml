@@ -1,3 +1,37 @@
+[bot]
+role = "cos"
+env_prefix = "COS"
+
+[packages]
+pi = [
+  "npm:@llblab/pi-telegram@0.59.0",
+  "npm:pi-web-access@0.43.0",
+  "npm:@jl1990/pi-scheduler@0.5.1",
+  "npm:@amaster.ai/pi-browser-use@0.1.38",
+]
+node_projects = ["agent-mail", "project-spec", "memory-client"]
+
+[[files]]
+operation = "concatenate"
+sources = [
+  { root = "repository", path = "bots/AGENTS_shared.md" },
+  { root = "profile", path = "AGENTS_dedicated.md" },
+]
+target = "AGENTS.md"
+destination = "profile"
+policy = "replace"
+
+[[files]]
+operation = "copy"
+sources = [{ root = "profile", path = ".pi/web-search.json" }]
+target = ".pi/web-search.json"
+destination = "private"
+policy = "create-only"
+optional = true
+
+[setup]
+steps = ["telegram", "mcp", "memory-settings", "browser", "dream"]
+
 [skills]
 include = [
   "browser-evidence",

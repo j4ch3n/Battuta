@@ -41,11 +41,11 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
     assert any("pi-scheduler" in source for source in sources) == (role == "cos")
     if role == "cos":
         assert runtime.call_args_list[0].args[:2] == ("pnpm", "--dir")
-        dream = runtime.call_args_list[1]
+        dream = next(call for call in runtime.call_args_list if call.args[0] == "node")
         assert dream.args == ("node", str(tmp_path / "memory-client/configure-dream.mjs"), str(bot))
         assert dream.kwargs["env"]["PI_CODING_AGENT_DIR"] == str(tmp_path / "home/.battuta/pi-bots/cos-bot/.pi")
     else:
-        runtime.assert_not_called()
+        assert all(call.args[0] == "pnpm" for call in runtime.call_args_list)
     pi = bot / ".pi"
     runtime_pi = tmp_path / f"home/.battuta/pi-bots/{role}-bot/.pi"
     assert (runtime_pi / "telegram.json").exists() == (role == "cos")

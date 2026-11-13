@@ -7,10 +7,6 @@ from pathlib import Path
 import click
 
 
-WEB_PACKAGE = "npm:pi-web-access@0.43.0"
-WORKER_SUBAGENT_PACKAGE = "npm:@tintinweb/pi-subagents@0.24.0"
-
-
 def prepare_worker_agents(source: Path, bot_dir: Path, settings: dict) -> None:
     """Refresh owned definitions without overwriting private customizations."""
     settings["battutaWorkerAgents"] = _prepare_files(

@@ -9,7 +9,6 @@ import click
 from .instances import instance_paths
 from .json_config import read_config, write_config
 
-BROWSER_PACKAGE = "npm:@amaster.ai/pi-browser-use@0.1.38"
 BROWSER_DEFAULTS = {"sessionMode": "persistent", "headless": True, "viewport": "1440x900"}
 
 
@@ -21,7 +20,6 @@ def browser_defaults(settings: dict) -> None:
     for key, value in BROWSER_DEFAULTS.items():
         if key in section and (section[key] != value or type(section[key]) is not type(value)):
             raise click.ClickException(f"Conflicting pi-browser-use.{key}")
-    settings["packages"] = packages if BROWSER_PACKAGE in packages else [*packages, BROWSER_PACKAGE]
     settings["pi-browser-use"] = {**section, **BROWSER_DEFAULTS}
 
 

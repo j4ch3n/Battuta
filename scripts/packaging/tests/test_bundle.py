@@ -9,6 +9,7 @@ import click
 import pytest
 
 from battuta_packaging import bundle
+from skill_fixtures import manifest_text
 
 
 @pytest.fixture
@@ -28,7 +29,7 @@ def source(tmp_path, monkeypatch):
     for profile in ("cos-bot", "manager-bot", "worker"):
         path = root / "bots" / profile
         (path / "AGENTS_dedicated.md").write_text(profile)
-        (path / "bot.toml").write_text('[skills]\ninclude=["research"]')
+        (path / "bot.toml").write_text(manifest_text(profile.removesuffix("-bot"), ["research"]))
         (path / ".pi").mkdir()
         (path / ".pi/auth.json").write_text("private-sentinel")
         (path / ".pi/settings.json").write_text('{"defaultModel":"private-model"}')

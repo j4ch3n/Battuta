@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 from bot_setup.instructions import configure_instructions
-from skill_fixtures import skill_catalog
+from skill_fixtures import skill_catalog, manifest_text
 
 
 @pytest.mark.parametrize("role", ["cos", "manager"])
@@ -49,7 +49,7 @@ def test_custom_workspace_manifest_controls_local_discovery(tmp_path):
     bot.mkdir()
     (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
     (bot / "AGENTS_dedicated.md").write_text("Dedicated")
-    (bot / "bot.toml").write_text('[skills]\ninclude=["note-taking"]')
+    (bot / "bot.toml").write_text(manifest_text("cos", ["note-taking"]))
     configure_instructions(bot, role="cos", root=tmp_path)
     assert {entry.name for entry in (bot / ".pi/skills").iterdir()} == {"note-taking"}
 
@@ -72,7 +72,7 @@ def test_reselection_removes_only_owned_links_and_preserves_custom_content(tmp_p
     skills = bot / ".pi/skills"
     custom = skills / "custom"
     custom.write_text("Private content")
-    (bot / "bot.toml").write_text('[skills]\ninclude=["research"]')
+    (bot / "bot.toml").write_text(manifest_text("manager", ["research"]))
     configure_instructions(bot, role="manager", root=tmp_path)
     assert (skills / "research").is_symlink()
     assert not (skills / "note-taking").exists()

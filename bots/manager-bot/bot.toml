@@ -1,3 +1,32 @@
+[bot]
+role = "manager"
+env_prefix = "MANAGER"
+
+[packages]
+pi = ["npm:pi-web-access@0.43.0"]
+node_projects = ["agent-mail", "project-spec", "memory-client"]
+
+[[files]]
+operation = "concatenate"
+sources = [
+  { root = "repository", path = "bots/AGENTS_shared.md" },
+  { root = "profile", path = "AGENTS_dedicated.md" },
+]
+target = "AGENTS.md"
+destination = "profile"
+policy = "replace"
+
+[[files]]
+operation = "copy"
+sources = [{ root = "profile", path = ".pi/web-search.json" }]
+target = ".pi/web-search.json"
+destination = "private"
+policy = "create-only"
+optional = true
+
+[setup]
+steps = ["mcp", "memory-settings", "manager-cleanup"]
+
 [skills]
 include = [
   "communicate-with-cos",

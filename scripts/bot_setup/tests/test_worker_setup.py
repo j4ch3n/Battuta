@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from bot_setup.configure import configure_source, configure_worker
+from skill_fixtures import manifest_text
 
 
 class WorkerSetupTests(unittest.TestCase):
@@ -18,7 +19,7 @@ class WorkerSetupTests(unittest.TestCase):
         self.profile.mkdir(parents=True)
         (self.root / "bots/AGENTS_shared.md").write_text("shared fixture")
         (self.profile / "AGENTS_dedicated.md").write_text("dedicated fixture")
-        (self.profile / "bot.toml").write_text('[skills]\ninclude=["execute-assignment","research"]')
+        (self.profile / "bot.toml").write_text(manifest_text("worker", ["execute-assignment", "research"]))
         for name in ("execute-assignment", "research"):
             skill = self.root / "skills-hub" / name
             skill.mkdir(parents=True)

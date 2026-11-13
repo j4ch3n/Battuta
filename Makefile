@@ -30,14 +30,9 @@ functions-serve:
 
 setup-cos-bot:
 	uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role cos
-	pnpm --dir agent-mail install
-	pnpm --dir project-spec install --frozen-lockfile
 
 setup-manager-bot:
 	uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role manager
-	pnpm --dir agent-mail install
-	pnpm --dir project-spec install --frozen-lockfile
-	pnpm --dir memory-client install --frozen-lockfile
 
 setup-bot: setup-cos-bot setup-manager-bot
 

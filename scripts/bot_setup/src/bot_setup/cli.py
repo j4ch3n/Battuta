@@ -11,7 +11,6 @@ from .release import configure_release, validate_private_home
 from .env import read_env
 from .instances import instance_paths, worker_names
 from .source_launch import run_source_worker
-from .install import TELEGRAM_PACKAGE
 from .json_config import write_config
 from .telegram import prepare_telegram_config
 
@@ -75,7 +74,7 @@ def browser_executable(profile, bot_dir, bot):
 @click.option("--bot-dir", type=click.Path(file_okay=False, path_type=Path, resolve_path=True))
 @click.option("--env-file", type=FILE)
 @click.option("--env-prefix")
-@click.option("--telegram-package", default=TELEGRAM_PACKAGE)
+@click.option("--telegram-package", help="Override the CoS Telegram package selected by bot.toml.")
 def configure(root, role, bot_dir, env_file, env_prefix, telegram_package):
     """Configure a source-checkout bot."""
     configure_source(root, role=role, bot_dir=bot_dir, env_file=env_file, env_prefix=env_prefix, telegram_package=telegram_package)
