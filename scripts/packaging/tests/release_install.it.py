@@ -16,6 +16,7 @@ COMMANDS = {
     "battuta-project": "battuta-project",
     "battuta-artifacts": "battuta-artifact",
     "battuta-memory": "battuta-memory",
+    "battuta-speech": "battuta-speech",
     "battuta-bot-setup": "battuta-bot-setup",
     "battuta-packaging": "battuta-packaging",
 }
@@ -52,7 +53,7 @@ class ReleaseInstallation(unittest.TestCase):
                     self.assertEqual(Path(name).name, name)
                     self.assertEqual(hashlib.sha256((assets / name).read_bytes()).hexdigest(), digest)
             wheels = [(wheel, wheel_metadata(wheel)) for wheel in assets.glob("*.whl")]
-            self.assertEqual(len(wheels), 5)
+            self.assertEqual(len(wheels), 6)
             self.assertFalse(list(assets.glob("*-constraints.txt")))
             installed = {}
             for wheel, metadata in wheels:

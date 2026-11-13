@@ -1,0 +1,25 @@
+[project]
+name = "battuta-speech"
+version = "0.1.0"
+description = "Battuta shared local speech MCP service"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "click>=8.1,<9",
+  "mcp>=1.26,<2",
+  "numpy>=2,<3",
+  "sherpa-onnx==2.0.1",
+  "uvicorn>=0.30,<1",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<10"]
+
+[project.scripts]
+battuta-speech = "battuta_speech.server:main"
+
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/battuta_speech"]

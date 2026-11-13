@@ -23,6 +23,7 @@ PROJECTS = {
     "battuta-bot-setup": "scripts/bot_setup",
     "battuta-artifacts": "artifact-service",
     "battuta-memory": "memory-service",
+    "battuta-speech": "speech-service",
     "battuta-packaging": "scripts/packaging",
 }
 

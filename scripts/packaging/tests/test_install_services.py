@@ -28,7 +28,7 @@ def test_count_driven_units_are_private_and_never_activated(deployment, count, c
     before = {p.name: p.read_bytes() for p in units.iterdir()}
     services.install_services(root, env_file=env, node=node)
     assert {p.name: p.read_bytes() for p in units.iterdir()} == before
-    assert set(before) == {"battuta-cos.service", "battuta-manager.service", "battuta-memory.service", "battuta-artifacts.service", "battuta-worker@.service"}
+    assert set(before) == {"battuta-cos.service", "battuta-manager.service", "battuta-memory.service", "battuta-artifacts.service", "battuta-speech.service", "battuta-worker@.service"}
     text = b"".join(before.values()).decode()
     assert "private-sentinel" not in text
     assert "/tools" in text
@@ -37,6 +37,7 @@ def test_count_driven_units_are_private_and_never_activated(deployment, count, c
     assert "--mode service" in worker
     assert "/usr/bin/script -q -e -c" in worker
     assert "--env-file" in worker
+    assert "verify-speech" in before["battuta-speech.service"].decode()
     assert not (units / "default.target.wants").exists()
     assert ("battuta-worker@3.service" in capsys.readouterr().out) == (count == 3)
 

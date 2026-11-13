@@ -59,8 +59,9 @@ RestartSec=5
 [Install]
 WantedBy=default.target
 '''
-    for component in ("memory", "artifacts"):
+    for component in ("memory", "artifacts", "speech"):
         extra = "Environment=MCP_MEMORY_ONNX_ALLOW_DOWNLOAD=false\n" if component == "memory" else "NoNewPrivileges=true\nProtectSystem=strict\nProtectHome=read-only\n"
+        preflight = f"ExecStartPre={executable} verify-speech\n" if component == "speech" else ""
         units[f"battuta-{component}.service"] = f'''[Unit]
 Description=Battuta {component}
 After=network-online.target
@@ -72,7 +73,7 @@ Environment="PATH={path_value}"
 Environment=HOME={Path.home()}
 Environment=PYTHONDONTWRITEBYTECODE=1
 UMask=0077
-ExecStart={executable} run-component --component {component} --env-file {env_file}
+{preflight}ExecStart={executable} run-component --component {component} --env-file {env_file}
 Restart=on-failure
 RestartSec=5
 {extra}
@@ -97,5 +98,5 @@ WantedBy=default.target
                 temporary.replace(directory / name)
             finally:
                 temporary.unlink(missing_ok=True)
-    selected = ["battuta-memory.service", "battuta-artifacts.service", "battuta-cos.service", "battuta-manager.service", *sorted(expected)]
+    selected = ["battuta-memory.service", "battuta-artifacts.service", "battuta-speech.service", "battuta-cos.service", "battuta-manager.service", *sorted(expected)]
     click.echo("Installed units without activation. After owner approval:\nsystemctl --user daemon-reload\nsystemctl --user enable --now " + " ".join(selected))
