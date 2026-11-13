@@ -90,3 +90,14 @@ def test_staged_symlinks_are_not_regular_manifest_or_entry_files(tmp_path, targe
     subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
     with pytest.raises(click.ClickException):
         skills.check_manifests(tmp_path, staged=True)
+
+
+@pytest.mark.parametrize("role,outbound,peer", [
+    ("cos", "communicate-with-manager", "communicate-with-cos"),
+    ("manager", "communicate-with-cos", "communicate-with-manager"),
+])
+def test_communication_profiles_select_only_their_outbound_skill(role, outbound, peer):
+    root = Path(__file__).parents[3]
+    selected = skills.load_selection(root / f"bots/{role}-bot/bot.toml", root / "skills-hub")
+    assert outbound in selected
+    assert peer not in selected

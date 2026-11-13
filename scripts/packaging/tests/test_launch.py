@@ -96,6 +96,31 @@ def test_launch_rejects_incomplete_packages_without_installing(installed, damage
     assert package.exists() == (damage != "missing")
 
 
+def test_nested_worker_runtime_directory_retains_logical_identity(installed):
+    root, home, env_file, node = installed
+    profile = root / "bots/worker"
+    manifest = profile / "bot.toml"
+    manifest.write_text(manifest.read_text().replace(
+        'pi_coding_agent_dir = "{instance}/.pi"',
+        'pi_coding_agent_dir = "{instance}/runtime/.pi"',
+    ))
+    private = home / ".battuta/pi-bots/worker-1"
+    (private / "runtime").mkdir()
+    (private / ".pi").rename(private / "runtime/.pi")
+    (private / "runtime/.pi/settings.json").unlink()
+    result = subprocess.run(
+        [sys.executable, "-m", "battuta_packaging.cli", "run-bot", "--root", str(root),
+         "--bot", "worker-1", "--env-file", str(env_file), "--node", str(node), "--mode", "service"],
+        env={**os.environ, "HOME": str(home), "PATH": str(home / "bin") + os.pathsep + os.environ["PATH"]},
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["env"]["BATTUTA_BOT_NAME"] == "worker-1"
+    assert output["env"]["PI_CODING_AGENT_DIR"] == str(private / "runtime/.pi")
+    assert json.loads((private / "runtime/.pi/settings.json").read_text())["defaultThinkingLevel"] == "high"
+
+
 def test_maintenance_refuses_active_service(installed, monkeypatch):
     from battuta_packaging import launch
     from types import SimpleNamespace

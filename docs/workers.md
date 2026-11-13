@@ -28,13 +28,14 @@ and privilege contracts. Assignment completion is not product acceptance.
 
 ## Native Pi lifecycle
 
-The source launcher sets cwd to the private worker directory and agentDir to its
-`.pi`, then execs the normal pinned Pi CLI with terminal I/O intact. There is no
-custom SDK host. On first launch it copies missing settings and generated MCP
-configuration plus `web-search.json` from `bots/worker`, rebasing settings resource paths. Private auth
+The source launcher uses `bots/worker` as cwd and the manifest-derived private
+`.pi` as agentDir, then execs the normal pinned Pi CLI with terminal I/O intact.
+There is no custom SDK host. On first launch it creates settings from the shared
+profile and manifest defaults, rebasing settings resource paths. It also copies
+missing generated MCP configuration and `web-search.json` from `bots/worker`. Private auth
 and instructions are not prerequisites. Missing shared MCP configuration stops
 launch with a setup command rather than synthesizing endpoints.
-Optional full setup prepares `bots/worker` from its `skills.json` and copies its
+Optional full setup prepares `bots/worker` from its `bot.toml` and copies its
 configuration into instances. Instances share extension/dependency/catalog resources.
 Authentication and runtime state are private, never copied. Pi natively discovers the prepared
 skills, packages, extensions, and instructions. Runtime code does not parse the
@@ -53,6 +54,10 @@ generated separately without resource merges. `WORKER_BOT_COUNT` selects the
 numbered systemd instances. Source and release launchers hold an instance lock
 across exec. Foreground maintenance requires the selected service to be stopped;
 tmux detach never authorizes starting another process for that identity.
+
+Source launch `--bot-dir` must match the worker manifest's private path.
+See [bot setup manifests](bot-setup.md) for the fixed private base, worker
+substitution and create-only model/thinking defaults.
 
 Startup creates a fresh idle conversation, never automatically resumes an old
 claimed crash session. Availability wakes `/worker-next`, a registered control

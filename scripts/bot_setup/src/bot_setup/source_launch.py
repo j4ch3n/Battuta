@@ -16,22 +16,25 @@ from .workers import prepare_launch_worker
 
 def run_source_worker(root: Path, *, bot_dir: Path, env_file: Path, node: Path) -> None:
     values = read_env(env_file)
-    if bot_dir.name not in worker_names(values, env_file):
+    selected = worker_names(values, env_file)
+    if not selected:
         raise click.ClickException("Worker is outside the configured WORKER_BOT_COUNT")
     for key in ("SUPABASE_URL", "SUPABASE_SECRET_KEY"):
         required(values, key, env_file)
     cli = root / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
     if not cli.is_file():
         raise click.ClickException("Prepare the source worker runtime first")
-    _, profile, private = instance_paths(root, Path.home(), bot_dir.name)
-    if bot_dir.absolute() != private.absolute():
-        raise click.ClickException("Worker directory must match bot.toml runtime path")
+    matches = [name for name in selected if instance_paths(root, Path.home(), name)[2].absolute() == bot_dir.absolute()]
+    if len(matches) != 1:
+        raise click.ClickException("Worker directory must match bot.toml and configured WORKER_BOT_COUNT")
+    bot = matches[0]
+    profile = root / "bots/worker"
     acquire_instance_lock(bot_dir)
-    prepare_launch_worker(root, profile, bot_dir, bot=bot_dir.name)
+    prepare_launch_worker(root, profile, bot_dir, bot=bot)
     env = {key: value for key, value in {**os.environ, **values}.items() if "TELEGRAM" not in key and not key.startswith("PI_SCHEDULER")}
-    env.update(AGENT_ROLE="worker", BATTUTA_BOT_NAME=bot_dir.name, PI_CODING_AGENT_DIR=str(bot_dir / ".pi"))
+    env.update(AGENT_ROLE="worker", BATTUTA_BOT_NAME=bot, PI_CODING_AGENT_DIR=str(bot_dir / ".pi"))
     env.setdefault("BATTUTA_MEMORY_URL", "http://127.0.0.1:8901/mcp")
-    env.update(validate_browser(root / "bots/worker", bot_dir, home=Path.home(), bot=bot_dir.name, path=env.get("PATH")))
+    env.update(validate_browser(profile, bot_dir, home=Path.home(), bot=bot, path=env.get("PATH")))
     # Project settings must not shadow interpolated private browser settings.
     os.chdir(root / "bots/worker")
     os.execve(str(node), [str(node), str(cli)], env)
