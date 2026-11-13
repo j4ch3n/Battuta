@@ -45,10 +45,21 @@ class FileRule(Section):
     destination: Literal["profile", "private"]
     policy: Literal["replace", "create-only"]
     optional: bool = False
+    context: Literal["source", "release", "all"] = "all"
 
 
 class Setup(Section):
     steps: list[Literal["telegram", "mcp", "memory-settings", "browser", "dream", "manager-cleanup", "worker-profile"]]
+
+
+class Runtime(Section):
+    pi_coding_agent_dir: str
+
+
+class Defaults(Section):
+    provider: Annotated[str, StringConstraints(min_length=1)]
+    model: Annotated[str, StringConstraints(min_length=1)]
+    thinking: Literal["off", "minimal", "low", "medium", "high", "xhigh"]
 
 
 class BotManifest(Section):
@@ -57,6 +68,8 @@ class BotManifest(Section):
     packages: Packages = Field(default_factory=Packages)
     files: list[FileRule] = Field(default_factory=list)
     setup: Setup | None = None
+    runtime: Runtime | None = None
+    defaults: Defaults | None = None
 
 
 def parse_manifest(text: str, path: Path) -> BotManifest:

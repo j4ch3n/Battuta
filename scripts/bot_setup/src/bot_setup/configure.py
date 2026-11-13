@@ -12,7 +12,6 @@ from .env import read_env, required
 from .install import install_packages, run, warn_running_session
 from .files import prepare_files, safe_path
 from .manifest import load_profile
-from .instances import instance_paths
 from .json_config import read_config, write_config
 from .mcp import assignment_server, configure_mcp, validate_memory_url
 from .memory import configure_memory_settings
@@ -21,6 +20,7 @@ from .subagents import prepare_worker_agents, prepare_worker_research, remove_ma
 from .telegram import prepare_telegram_config
 from .skills import load_selection, link_selected_skills
 from .workers import copy_worker_profile, validate_worker_settings
+from .runtime import initialize_settings_if_missing, resolve_agent_dir
 
 
 def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_file: Path | None = None, env_prefix: str | None = None, telegram_package: str | None = None) -> None:
@@ -47,14 +47,17 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
     supabase_url = required(values, "SUPABASE_URL", env_file)
     required(values, "SUPABASE_SECRET_KEY", env_file)
     assignment_server(supabase_url)
-    private = instance_paths(root, Path.home(), f"{role}-bot")[2]
+    private = resolve_agent_dir(manifest, f"{role}-bot", Path.home()).parent
     validate_private_home(private)
     telegram = prepare_telegram_config(private, env_file, prefix, values) if "telegram" in steps else None
     url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
     if "browser" in steps:
         browser_settings(bot_dir, private, home=Path.home(), bot="cos-bot")
     projects = [safe_path(root, project) for project in manifest.packages.node_projects]
+    if manifest.defaults is None:
+        raise click.ClickException("Bot manifest requires defaults")
     prepare_files(root, bot_dir, private, manifest.files)
+    initialize_settings_if_missing(private / ".pi", manifest.defaults)
     link_selected_skills(bot_dir, root / "skills-hub", names)
     for project in projects:
         run("pnpm", "--dir", str(project), "install", "--frozen-lockfile")

@@ -48,6 +48,7 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
         assert all(call.args[0] == "pnpm" for call in runtime.call_args_list)
     pi = bot / ".pi"
     runtime_pi = tmp_path / f"home/.battuta/pi-bots/{role}-bot/.pi"
+    assert json.loads((runtime_pi / "settings.json").read_text())["defaultThinkingLevel"] == ("low" if role == "cos" else "medium")
     assert (runtime_pi / "telegram.json").exists() == (role == "cos")
     assert all((pi / "skills" / name).is_symlink() for name in names)
     assert json.loads((pi / "settings.json").read_text())["battutaMemoryCapture"]["enabled"] == (role == "cos")

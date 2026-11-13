@@ -43,6 +43,7 @@ class ConfigFixture(unittest.TestCase):
         for role in ("cos", "manager"):
             bot = self.root / f"bots/{role}-bot"
             (bot / ".pi").mkdir(parents=True)
+            shutil.copy2(ROOT / f"bots/{role}-bot/bot.toml", bot / "bot.toml")
         self.config_path("cos").parent.mkdir(parents=True)
         self.config_path("cos").write_text(json.dumps({
                 "profiles": {"default": {
@@ -135,6 +136,7 @@ if "-P" in args:
         cli = self.root / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
         cli.parent.mkdir(parents=True)
         cli.touch()
+        shutil.copy2(ROOT / "bots/worker/bot.toml", self.root / "bots/worker/bot.toml")
         scripts = self.root / "scripts/bot_setup"
         scripts.mkdir(exist_ok=True)
         shutil.copy2(ROOT / "scripts/bot_setup/run-worker.sh", scripts / "run-worker.sh")

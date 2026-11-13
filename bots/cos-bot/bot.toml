@@ -2,6 +2,14 @@
 role = "cos"
 env_prefix = "COS"
 
+[runtime]
+pi_coding_agent_dir = "cos-bot/.pi"
+
+[defaults]
+provider = "openai"
+model = "gpt-6.1-sol"
+thinking = "low"
+
 [packages]
 pi = [
   "npm:@llblab/pi-telegram@0.59.0",

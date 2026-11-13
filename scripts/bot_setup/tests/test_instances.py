@@ -7,6 +7,7 @@ from click.testing import CliRunner
 
 from bot_setup import instances
 from bot_setup.cli import main
+from skill_fixtures import manifest_text
 
 
 @pytest.mark.parametrize("count,expected", [("0", []), ("1", ["worker-1"]), ("3", ["worker-1", "worker-2", "worker-3"])])
@@ -25,6 +26,9 @@ def test_invalid_counts_do_not_expose_values(tmp_path, value):
 @pytest.mark.parametrize("bot,role,profile", [("cos-bot", "cos", "cos-bot"), ("manager-bot", "manager", "manager-bot"), ("worker-2", "worker", "worker")])
 def test_instance_paths(tmp_path, bot, role, profile):
     root, home = tmp_path / "release", tmp_path / "home"
+    directory = root / "bots" / profile
+    directory.mkdir(parents=True)
+    (directory / "bot.toml").write_text(manifest_text(role, []))
     assert instances.instance_paths(root, home, bot) == (role, root / "bots" / profile, home / ".battuta/pi-bots" / bot)
 
 

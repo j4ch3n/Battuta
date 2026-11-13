@@ -18,9 +18,3 @@ def configure_instructions(bot_dir: Path, *, role: Literal["cos", "manager"], ro
     selected = load_manifest(manifest if manifest.exists() else root / f"bots/{role}-bot/bot.toml")
     prepare_files(root, bot_dir, bot_dir, [rule for rule in selected.files if rule.destination == "profile"])
     link_selected_skills(bot_dir, root / "skills-hub", names)
-
-
-def write_instructions(bot_dir: Path, *, root: Path | None = None) -> None:
-    root = root or bot_dir.parent.parent
-    manifest = load_manifest(bot_dir / "bot.toml")
-    prepare_files(root, bot_dir, bot_dir, [rule for rule in manifest.files if rule.destination == "profile"])

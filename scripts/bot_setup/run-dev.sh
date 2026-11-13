@@ -3,9 +3,7 @@ set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 bot_dir="$repo_dir/bots/cos-bot"
-bot_private="$HOME/.battuta/pi-bots/cos-bot"
 manager_dir="$repo_dir/bots/manager-bot"
-manager_private="$HOME/.battuta/pi-bots/manager-bot"
 mode="${1:-}"
 case "$mode" in
   dev)
@@ -32,6 +30,10 @@ done
 
 [[ -f "$env_file" ]] || { printf 'Missing %s; create it from .env.example\n' "$env_file" >&2; exit 1; }
 worker_list="$(uv run --project "$repo_dir/scripts/bot_setup" --locked battuta-bot-setup workers --env-file "$env_file")"
+bot_agent_dir="$(uv run --project "$repo_dir/scripts/bot_setup" --locked battuta-bot-setup agent-dir --root "$repo_dir" --bot cos-bot)"
+manager_agent_dir="$(uv run --project "$repo_dir/scripts/bot_setup" --locked battuta-bot-setup agent-dir --root "$repo_dir" --bot manager-bot)"
+bot_private="${bot_agent_dir%/.pi}"
+manager_private="${manager_agent_dir%/.pi}"
 
 if tmux has-session -t "=$session" 2>/dev/null; then
   if [[ -n "${TMUX:-}" ]]; then
@@ -67,7 +69,6 @@ done
 [[ -d "$repo_dir/agent-mail/node_modules" ]] || { printf 'Install agent-mail dependencies with pnpm --dir agent-mail install\n' >&2; exit 1; }
 [[ -d "$repo_dir/project-spec/node_modules" ]] || { printf 'Install project-spec dependencies with pnpm --dir project-spec install --frozen-lockfile\n' >&2; exit 1; }
 [[ -d "$repo_dir/memory-client/node_modules" ]] || { printf 'Install memory client dependencies with pnpm --dir memory-client install --frozen-lockfile\n' >&2; exit 1; }
-memory_url="${BATTUTA_MEMORY_URL:-http://127.0.0.1:8901/mcp}"
 if [[ -f "$repo_dir/artifact-service/pyproject.toml" ]]; then
   export PATH="$repo_dir/artifact-service/.venv/bin:$PATH"
 fi
@@ -77,10 +78,8 @@ export PI_SCHEDULER_CATCHUP_MAX
 PI_SCHEDULER_CATCHUP_MAX="$(node "$repo_dir/memory-client/configure-scheduler.mjs" --print-catchup)"
 node "$repo_dir/memory-client/configure-scheduler.mjs" --check
 
-printf -v pi_command 'set -e; set -a; source %q; set +a; umask 077; export PATH=%q; export CHROME_PATH; CHROME_PATH="$(uv run --project %q --locked battuta-bot-setup browser-executable --profile %q --bot-dir %q --bot cos-bot)"; export PI_SCHEDULER_STATE_FILE; PI_SCHEDULER_STATE_FILE="$(node %q --print-path)"; export PI_SCHEDULER_CATCHUP_MAX; PI_SCHEDULER_CATCHUP_MAX="$(node %q --print-catchup)"; node %q --check; AGENT_ROLE=cos BATTUTA_BOT_NAME=cos-bot PI_CODING_AGENT_DIR=%q BATTUTA_MEMORY_URL=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q --extension %q' "$env_file" "$PATH" "$repo_dir/scripts/bot_setup" "$bot_dir" "$bot_private" "$repo_dir/memory-client/configure-scheduler.mjs" "$repo_dir/memory-client/configure-scheduler.mjs" "$repo_dir/memory-client/configure-scheduler.mjs" "$bot_private/.pi" "$memory_url" "$bot_dir/node_modules/.bin/pi" "$bot_private/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts" "$repo_dir/memory-client/index.ts"
-printf -v manager_command 'set -e; set -a; source %q; set +a; umask 077; export PATH=%q; for key in $(compgen -v); do case "$key" in *TELEGRAM*) unset "$key";; esac; done; unset PI_SCHEDULER_STATE_FILE PI_SCHEDULER_CATCHUP_MAX; AGENT_ROLE=manager PI_CODING_AGENT_DIR=%q BATTUTA_MEMORY_URL=%q exec %q --approve --continue --session-dir %q --extension %q --extension %q' "$env_file" "$PATH" "$manager_private/.pi" "$memory_url" "$manager_dir/node_modules/.bin/pi" "$manager_private/.pi/mail-sessions" "$repo_dir/agent-mail/index.ts" "$repo_dir/project-spec/index.ts"
-# tmux's default shell may be zsh; credential scrubbing uses Bash builtins.
-printf -v manager_command 'exec bash -c %q' "$manager_command"
+printf -v pi_command 'export PATH=%q; AGENT_ROLE=cos exec uv run --project %q --locked battuta-bot-setup run-source --root %q --bot cos-bot --env-file %q' "$PATH" "$repo_dir/scripts/bot_setup" "$repo_dir" "$env_file"
+printf -v manager_command 'export PATH=%q; AGENT_ROLE=manager exec uv run --project %q --locked battuta-bot-setup run-source --root %q --bot manager-bot --env-file %q' "$PATH" "$repo_dir/scripts/bot_setup" "$repo_dir" "$env_file"
 bot_window="$mode"
 service_window="memory"
 if [[ "$mode" == dev ]]; then
@@ -97,7 +96,8 @@ if [[ "$mode" == dev ]]; then
 fi
 while IFS= read -r worker; do
    [[ -n "$worker" ]] || continue
-   worker_dir="$HOME/.battuta/pi-bots/$worker"
+   worker_agent_dir="$(uv run --project "$repo_dir/scripts/bot_setup" --locked battuta-bot-setup agent-dir --root "$repo_dir" --bot "$worker")"
+   worker_dir="${worker_agent_dir%/.pi}"
   printf -v worker_command 'set -e; set -a; source %q; set +a; node %q; exec bash %q --bot-dir %q --env-file %q' "$env_file" "$repo_dir/scripts/bot_setup/wait-for-assignments.mjs" "$repo_dir/scripts/bot_setup/run-worker.sh" "$worker_dir" "$env_file"
   printf -v worker_command 'exec bash -c %q' "$worker_command"
   mkdir -p "$worker_dir"

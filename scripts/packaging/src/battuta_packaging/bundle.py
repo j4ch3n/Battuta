@@ -80,7 +80,7 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         manifest["type"] = "module"
         write_json(bot / "package.json", manifest)
         shutil.copy2(original / "bot.toml", bot / "bot.toml")
-        prepare_files(source, bot, bot, [rule for rule in manifests[profile].files if rule.destination == "profile"], source_profile=original)
+        prepare_files(source, bot, bot, [rule for rule in manifests[profile].files if rule.destination == "profile"], source_profile=original, context="release")
         for name in selections[profile]:
             shutil.copytree(source / "skills-hub" / name, bot / ".pi/skills" / name)
         (bot / ".pi/skills").mkdir(exist_ok=True)

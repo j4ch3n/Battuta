@@ -10,6 +10,7 @@ import sys
 import pytest
 
 from battuta_packaging.bundle import ENTRY_OUTPUTS
+from skill_fixtures import manifest_text
 
 
 @pytest.fixture
@@ -23,6 +24,7 @@ def installed(tmp_path):
     for profile in ("cos-bot", "manager-bot", "worker"):
         bot = root / "bots" / profile
         (bot / ".pi/skills").mkdir(parents=True, exist_ok=True)
+        (bot / "bot.toml").write_text(manifest_text(profile.removesuffix("-bot"), []))
         (bot / "AGENTS.md").write_text("instructions")
         (bot / ".pi/settings.json").write_text("{}")
         cli = bot / "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"

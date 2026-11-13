@@ -21,15 +21,48 @@ def safe_path(base: Path, relative: str) -> Path:
     return target
 
 
-def prepare_files(root: Path, profile: Path, private: Path, rules: list[FileRule], *, source_profile: Path | None = None) -> None:
+def write_file(target: Path, content: bytes, *, policy: str) -> bool:
+    safe_path(target.parent, target.name)
+    if target.exists() and not target.is_file():
+        raise click.ClickException(f"Expected a regular setup file: {target}")
+    temporary = None
+    try:
+        target.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+        fd, temporary = tempfile.mkstemp(prefix=".setup-", dir=target.parent)
+        with os.fdopen(fd, "wb") as output:
+            output.write(content)
+        if policy == "replace":
+            os.replace(temporary, target)
+        else:
+            # Publish complete bytes without replacing a concurrent creator's file.
+            try:
+                os.link(temporary, target, follow_symlinks=False)
+            except FileExistsError:
+                safe_path(target.parent, target.name)
+                if not target.is_file():
+                    raise click.ClickException(f"Expected a regular setup file: {target}")
+                return False
+        return True
+    except OSError as error:
+        raise click.ClickException(f"Cannot write setup file: {target}") from error
+    finally:
+        if temporary is not None and os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def prepare_files(root: Path, profile: Path, private: Path, rules: list[FileRule], *, source_profile: Path | None = None, context: str = "source") -> None:
     pending = []
     targets = set()
     for rule in rules:
+        if rule.context not in {"all", context}:
+            continue
         destination = profile if rule.destination == "profile" else private
         target = safe_path(destination, rule.target)
         if target in targets or (target.exists() and not target.is_file()):
             raise click.ClickException(f"Invalid or duplicate generated file: {target}")
         targets.add(target)
+        if rule.policy == "create-only" and target.exists():
+            continue
         sources = [safe_path(root if source.root == "repository" else source_profile or profile, source.path) for source in rule.sources]
         if rule.operation == "copy" and len(sources) != 1:
             raise click.ClickException("Copy rules require exactly one source")
@@ -41,20 +74,4 @@ def prepare_files(root: Path, profile: Path, private: Path, rules: list[FileRule
             raise click.ClickException(f"Cannot read setup file: {error.filename}") from error
         pending.append((target, content, rule.policy))
     for target, content, policy in pending:
-        target.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
-        if policy == "create-only":
-            try:
-                fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-            except FileExistsError:
-                continue
-            with os.fdopen(fd, "wb") as output:
-                output.write(content)
-        else:
-            fd, temporary = tempfile.mkstemp(prefix=".setup-", dir=target.parent)
-            try:
-                with os.fdopen(fd, "wb") as output:
-                    output.write(content)
-                os.replace(temporary, target)
-            finally:
-                if os.path.exists(temporary):
-                    os.unlink(temporary)
+        write_file(target, content, policy=policy)

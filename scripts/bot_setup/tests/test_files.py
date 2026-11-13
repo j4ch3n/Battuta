@@ -70,3 +70,18 @@ def test_all_rules_preflight_before_writes(tmp_path, bad):
 def test_optional_missing_source_is_skipped(tmp_path):
     prepare_files(tmp_path, tmp_path / "profile", tmp_path / "private", [rule(optional=True)])
     assert not (tmp_path / "private").exists()
+
+
+def test_failed_replacement_preserves_existing_file_and_cleans_temporary(tmp_path, monkeypatch):
+    (tmp_path / "input.txt").write_text("generated")
+    private = tmp_path / "private"
+    private.mkdir()
+    (private / "output.txt").write_text("preserve")
+    def denied(*args):
+        raise PermissionError("private-sentinel")
+    monkeypatch.setattr("os.replace", denied)
+    with pytest.raises(click.ClickException) as error:
+        prepare_files(tmp_path, tmp_path / "profile", private, [rule(policy="replace")])
+    assert "private-sentinel" not in str(error.value)
+    assert (private / "output.txt").read_text() == "preserve"
+    assert [path.name for path in private.iterdir()] == ["output.txt"]

@@ -2,6 +2,14 @@
 role = "manager"
 env_prefix = "MANAGER"
 
+[runtime]
+pi_coding_agent_dir = "manager-bot/.pi"
+
+[defaults]
+provider = "openai"
+model = "gpt-6.1.sol"
+thinking = "medium"
+
 [packages]
 pi = ["npm:pi-web-access@0.43.0"]
 node_projects = ["agent-mail", "project-spec", "memory-client"]
