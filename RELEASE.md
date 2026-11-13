@@ -122,6 +122,11 @@ source compilation. Pins are not a dependency hash lock or an offline wheelhouse
 
 All five tools need their own installation so their CLI commands are exposed.
 An internal dependency inside another tool's environment does not expose its CLI.
+Project registrations live under `~/.battuta/projects`. Initializing a project
+from GitHub also requires Git and the GitHub CLI (`gh`), authenticated as the bot
+user with access to the intended repository. Name-only initialization needs neither.
+Generated services include the uv tool directory on `PATH`; ensure custom Git and
+`gh` locations are also available to services when needed.
 
 ## 3. Extract bots and install JavaScript dependencies
 
@@ -289,18 +294,18 @@ the owner confirms it.
 
 ## Extension and skill setup index
 
-| Component                              | Setup                                                                                       |
-| -------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Pi, Telegram, agent mail, project-spec | Compiled bundle plus install-runtime; remote Supabase is provisioned separately             |
-| Shared memory and nightly CoS dream    | [Memory setup](docs/memory-service-setup.md)                                                |
-| Artifact service and CLI               | [Artifact setup](docs/artifact-service-setup.md)                                            |
-| Project-management CLI                 | [Project-management installation](skills-hub/project-management/references/installation.md) |
-| Assignment MCP                         | [Assignment setup](docs/assignments-setup.md)                                               |
-| Workers and numbered instances         | [Worker setup](docs/workers-setup.md)                                                       |
-| Worker researcher/reviewer subagents   | [Subagent setup](docs/subagents-setup.md)                                                   |
-| CoS and worker browsers                | [Browser setup](docs/browser-setup.md)                                                      |
-| Google CLI                             | [Google setup](docs/gogcli-setup.md)                                                        |
-| Luma                                   | [Luma setup](docs/luma-setup.md)                                                            |
-| CoS scheduler                          | [Scheduler](docs/scheduler.md)                                                              |
-| Per-role skills                        | [Skill management](docs/skill-management.md)                                                |
-| Source extensions/contributor tools    | [Pi extensions](docs/pi-extensions.md), [OpenCode](docs/opencode.md)                        |
+| Component                              | Setup                                                                           |
+| -------------------------------------- | ------------------------------------------------------------------------------- |
+| Pi, Telegram, agent mail, project-spec | Compiled bundle plus install-runtime; remote Supabase is provisioned separately |
+| Shared memory and nightly CoS dream    | [Memory setup](docs/memory-service-setup.md)                                    |
+| Artifact service and CLI               | [Artifact setup](docs/artifact-service-setup.md)                                |
+| Project-management CLI                 | Installed with the Python wheels above                                          |
+| Assignment MCP                         | [Assignment setup](docs/assignments-setup.md)                                   |
+| Workers and numbered instances         | [Worker setup](docs/workers-setup.md)                                           |
+| Worker researcher/reviewer subagents   | [Subagent setup](docs/subagents-setup.md)                                       |
+| CoS and worker browsers                | [Browser setup](docs/browser-setup.md)                                          |
+| Google CLI                             | [Google setup](docs/gogcli-setup.md)                                            |
+| Luma                                   | [Luma setup](docs/luma-setup.md)                                                |
+| CoS scheduler                          | [Scheduler](docs/scheduler.md)                                                  |
+| Per-role skills                        | [Skill management](docs/skill-management.md)                                    |
+| Source extensions/contributor tools    | [Pi extensions](docs/pi-extensions.md), [OpenCode](docs/opencode.md)            |

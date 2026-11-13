@@ -65,10 +65,11 @@ def test_staged_archive_separates_documentation_and_bots(source, tmp_path):
     bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
     assert (target / "RELEASE.md").is_file()
     assert (target / "docs/setup.md").read_text() == "setup"
-    assert (target / "skills-hub/project-management/references/installation.md").is_file()
+    assert not (target / "skills-hub").exists()
     assert (target / ".agents/skills/battuta-setup/references/development.md").is_file()
     assert (target / "memory-service/DESIGN.md").is_file()
     assert (target / "bots/LICENSE").read_text() == "repository license"
+    assert not list((target / "bots").rglob("skills-hub"))
     for profile in ("cos-bot", "manager-bot", "worker"):
         bot = target / "bots" / profile
         assert (bot / "AGENTS.md").is_file()
@@ -76,6 +77,9 @@ def test_staged_archive_separates_documentation_and_bots(source, tmp_path):
         assert not (bot / ".pi/auth.json").exists()
         settings = json.loads((bot / ".pi/settings.json").read_text())
         assert "defaultModel" not in settings
+        assert "skills-hub" not in json.dumps(settings)
+        assert not (bot / ".pi/skills/research").is_symlink()
+        assert (bot / ".pi/skills/research/SKILL.md").read_text() == "SKILL.md"
         if profile == "manager-bot":
             assert not any("pi-subagents" in package for package in settings["packages"])
         if profile == "worker":
@@ -112,6 +116,7 @@ def test_extracts_only_bots_from_archive_with_documentation(source, tmp_path):
     bundle.extract_bundle(archive, target)
     assert (target / "bots/release.json").is_file()
     assert {path.name for path in target.iterdir()} == {"bots"}
+    assert not list((target / "bots").rglob("skills-hub"))
 
 
 def test_stage_rejects_nonempty_and_symlink_targets(source, tmp_path):

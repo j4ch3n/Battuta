@@ -106,7 +106,7 @@ def copy_worker_profile(profile: Path, bot_dir: Path) -> None:
     if manifest.subagents is None:
         raise click.ClickException("Worker manifest requires subagents")
     agents = {Path(agent.path).name: (profile / ".pi/agents" / Path(agent.path).name).read_bytes() for agent in manifest.subagents.agents}
-    prepare_worker_agents(agents, bot_dir, settings)
+    prepare_worker_agents(agents, bot_dir)
     bot_dir.mkdir(parents=True, exist_ok=True)
     if not (bot_dir / ".pi/settings.json").exists():
         manifest = load_manifest(profile / "bot.toml")

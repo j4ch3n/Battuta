@@ -14,6 +14,6 @@ uv run --project scripts/packaging --locked --python 3.12 battuta-packaging stag
   --source . --destination "$work/stage" --tag "$tag" --tool-version "$tool_version"
 uv run --project scripts/packaging --locked --python 3.12 battuta-packaging build-wheels \
   --source . --output /assets --tag "$tag" --tool-version "$tool_version"
-tar -C "$work/stage" -czf "/assets/battuta-$tag-linux-arm64.tar.gz" bots RELEASE.md docs skills-hub .agents memory-service
+tar -C "$work/stage" -czf "/assets/battuta-$tag-linux-arm64.tar.gz" bots RELEASE.md docs .agents memory-service
 cd /assets
 sha256sum "battuta-$tag-linux-arm64.tar.gz" > "battuta-$tag-linux-arm64.tar.gz.sha256"

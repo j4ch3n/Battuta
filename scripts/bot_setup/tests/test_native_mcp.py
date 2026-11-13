@@ -13,7 +13,7 @@ def test_native_configuration_preserves_custom_and_private_state(tmp_path, role)
     pi = tmp_path / ".pi"
     pi.mkdir()
     (pi / "mcp.json").write_text('{"custom":true,"mcpServers":{"other":{"command":"custom"},"memory":{"url":"http://localhost:8901/mcp","exposure":"codemode"}}}')
-    (pi / "settings.json").write_text('{"theme":"dark","packages":["npm:custom@1","npm:pi-mcp-adapter@1"]}')
+    (pi / "settings.json").write_text('{"theme":"dark","packages":["npm:custom@1"]}')
     auth = pi / "mcp-auth.json"
     auth.write_bytes(b'{"private":"oauth"}\n')
     for _ in range(2):
@@ -81,7 +81,7 @@ def test_nonfinite_json_rejected_before_any_configuration_write(tmp_path, number
     pi = tmp_path / ".pi"
     pi.mkdir()
     original = '{"custom":' + number + '}'
-    settings = '{"packages":["npm:pi-mcp-adapter@1"]}'
+    settings = '{"packages":["npm:custom@1"]}'
     (pi / "mcp.json").write_text(original)
     (pi / "settings.json").write_text(settings)
     with pytest.raises(click.ClickException, match="Invalid JSON"):

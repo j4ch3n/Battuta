@@ -17,8 +17,14 @@
   "battutaMemoryCapture": {
     "enabled": false
   },
-  "battutaWorkerAgents": {
-    "researcher.md": "084db4d9766de7525496808d5ad5976e8f236753ce017b75ee882115c79e93f7",
-    "reviewer.md": "5ae5d53eded254643f5147fb2bf9cccdf385e584c5112681e73b2c1d2c49b9bd"
-  }
+  "skills": [
+    "skills/todo",
+    "skills/note-taking",
+    "skills/draft-writing",
+    "skills/execute-assignment",
+    "skills/research",
+    "skills/browser-evidence",
+    "skills/artifacts",
+    "skills/prd"
+  ]
 }

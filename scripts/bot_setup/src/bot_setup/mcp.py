@@ -85,13 +85,5 @@ def configure_mcp(bot_dir: Path, *, role: Literal["cos", "manager", "worker"], s
     packages = settings.get("packages", [])
     if not isinstance(packages, list):
         raise click.ClickException("packages must be a JSON array")
-    retained = []
-    for entry in packages:
-        source = entry.get("source") if isinstance(entry, dict) else entry
-        if not isinstance(source, str) or source.split("@", 1)[0] != "npm:pi-mcp-adapter":
-            retained.append(entry)
     config["mcpServers"] = {**servers, **owned["mcpServers"]}
-    if retained != packages:
-        settings["packages"] = retained
-        write_config(settings_path, settings, ".settings-")
     write_config(path, config, ".mcp-")

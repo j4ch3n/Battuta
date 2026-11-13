@@ -33,7 +33,7 @@ policy = "create-only"
 optional = true
 
 [setup]
-steps = ["mcp", "memory-settings", "manager-cleanup"]
+steps = ["mcp", "memory-settings"]
 
 [skills]
 include = [

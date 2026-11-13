@@ -15,8 +15,9 @@ Setup installs the pinned extension and copies maintained definitions from
 `bots/worker/agents/` to the native `.pi/agents/` discovery directory.
 It also prepares a real copy of `research` and its references under
 `bots/worker/.pi/skills/research/`: native subagent preloading does not follow
-catalog links or Pi's configured skill paths. Re-run setup after skill changes;
-privately modified prepared files are not overwritten.
+catalog links or Pi's configured skill paths. Setup creates missing files and
+leaves existing files unchanged. To pick up a source change, first move or remove
+the corresponding prepared file, then rerun setup.
 Reconfigure existing instances explicitly:
 
 ```sh
@@ -25,8 +26,7 @@ uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root .
 
 Repeat for each configured worker. Stop workers before maintenance and restart
 afterward. Setup preserves private authentication and unrelated custom resources.
-If a managed definition was privately edited, setup refuses to overwrite it;
-inspect and move the customization to a distinct type before reconfiguring.
+Existing definitions, including private customizations, are left unchanged.
 
 ## Installed releases
 
