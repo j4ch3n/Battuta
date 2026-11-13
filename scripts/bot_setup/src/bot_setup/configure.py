@@ -16,7 +16,7 @@ from .json_config import read_config, write_config
 from .mcp import assignment_server, configure_mcp, validate_memory_url
 from .memory import configure_memory_settings
 from .release import validate_private_home
-from .subagents import WEB_PACKAGE, WORKER_SUBAGENT_PACKAGE, prepare_worker_agents, remove_manager_subagents
+from .subagents import WEB_PACKAGE, WORKER_SUBAGENT_PACKAGE, prepare_worker_agents, prepare_worker_research, remove_manager_subagents
 from .telegram import prepare_telegram_config
 from .skills import load_selection
 from .workers import copy_worker_profile, validate_worker_settings
@@ -113,12 +113,19 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
         packages.append(WORKER_SUBAGENT_PACKAGE)
     settings["packages"] = packages
     if "research" in names:
+        prepare_worker_research(root / "skills-hub/research", bot_dir, settings)
         packages = settings.get("packages", [])
         if WEB_PACKAGE not in packages:
             packages.append(WEB_PACKAGE)
         settings["packages"] = packages
-    selected = [relpath(root / "skills-hub" / name, path.parent) for name in names]
-    settings["skills"] = list(dict.fromkeys([*settings.get("skills", []), *selected]))
+    selected = [
+        relpath(bot_dir / ".pi/skills/research" if name == "research" else root / "skills-hub" / name, path.parent)
+        for name in names
+    ]
+    existing = settings.get("skills", [])
+    if "research" in names:
+        existing = [value for value in existing if value != relpath(root / "skills-hub/research", path.parent)]
+    settings["skills"] = list(dict.fromkeys([*existing, *selected]))
     bot_dir.mkdir(parents=True, exist_ok=True)
     prepare_worker_agents(profile / "agents", bot_dir, settings)
     (bot_dir / "AGENTS.md").write_text(content)

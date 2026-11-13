@@ -13,6 +13,10 @@ uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root .
 
 Setup installs the pinned extension and copies maintained definitions from
 `bots/worker/agents/` to the native `.pi/agents/` discovery directory.
+It also prepares a real copy of `research` and its references under
+`bots/worker/.pi/skills/research/`: native subagent preloading does not follow
+catalog links or Pi's configured skill paths. Re-run setup after skill changes;
+privately modified prepared files are not overwritten.
 Reconfigure existing instances explicitly:
 
 ```sh
@@ -37,13 +41,14 @@ private authentication into a release or child folder.
 - `researcher` uses local inspection and the installed web-access extension.
 - `reviewer` uses inspection tools and shell commands for requested checks.
 
-Both use standalone prompts, no inherited conversation or skills, and no further
-delegation. Only the researcher loads web access; neither loads the assignment
+Both use standalone prompts, no inherited conversation or ambient skills, and no
+further delegation. The researcher explicitly preloads only `research`; the
+reviewer preloads no skills. Only the researcher loads web access; neither loads the assignment
 worker lifecycle extension. Worker instructions explain when to use each type;
 the extension supplies native `Agent` tool help.
 
-These are trusted processes, not a sandbox. Prompts prohibit deliverable edits,
-team mail, assignment claims and wider authority; shell/environment access is not
+These are trusted processes, not a sandbox. Subagents return findings to their
+parent rather than completing its assignment; shell/environment access is not
 a security boundary. The parent finishes needed child work before reporting its
 TODO complete and reviews evidence rather than treating child completion as
 assignment completion.
@@ -54,6 +59,8 @@ assignment completion.
 test -f bots/worker/.pi/npm/node_modules/@tintinweb/pi-subagents/package.json
 test -f bots/worker/.pi/agents/researcher.md
 test -f bots/worker/.pi/agents/reviewer.md
+test -f bots/worker/.pi/skills/research/SKILL.md
+test -f bots/worker/.pi/skills/research/references/investigation.md
 ```
 
 Inspect the package version and both definitions, then verify instance copies

@@ -22,7 +22,7 @@ Return concise findings with file/line or source references, exact commands and
 observed outcomes, failures and limitations. A check not run is not a pass.
 Identify the inspected revision or inputs when relevant.
 
-Do not create or claim assignments, report assignment completion, send team mail,
+Do not create or claim assignments, report assignment completion,
 contact the owner, write durable memory, or delegate further. The parent worker
 owns integration and the final execution report; your review does not grant
 merge, publication or product approval.
