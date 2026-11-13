@@ -18,11 +18,13 @@ Other sections declare setup and private runtime defaults; see
 [bot setup manifests](bot-setup.md). There is no separate skill-selection JSON file.
 
 These selections do not grant tools or permissions. Local source configuration
-creates relative `.pi/skills/<name>` links into the catalog for Pi discovery;
-all `.pi/skills/` output is ignored and must never be committed. Reconfiguring
-reconciles only owned same-name hub links and refuses to overwrite custom
-selected content. Empty selections are valid. Worker selections do not create
-or launch workers.
+creates relative `.pi/skills/<name>` links into the catalog for CoS and Manager;
+worker setup copies selected files into `.pi/skills/` for Pi discovery and leaves
+existing files unchanged. Remove a prepared file before setup to refresh it.
+All `.pi/skills/` output is ignored and must never be committed. CoS and Manager
+reconfiguration reconciles only owned same-name hub links and refuses to overwrite
+custom selected content. Empty selections are valid. Worker selections do not
+create or launch workers.
 
 Names must be unique lowercase kebab-case and match catalog directory and
 frontmatter names. The shared validator rejects unknown fields, invalid

@@ -120,7 +120,7 @@ policy = "replace"
 
 Setup steps select known Python functions, not shell commands or imports:
 CoS supports Telegram, MCP, memory settings, browser and dream provisioning;
-Manager supports MCP, memory settings and removal of obsolete subagent settings;
+Manager supports MCP and memory settings;
 Worker uses the specialised worker-profile preparation step.
 
 Use [development commands](commands.md) for configuration/launch and

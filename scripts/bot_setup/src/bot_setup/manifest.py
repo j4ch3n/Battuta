@@ -49,7 +49,7 @@ class FileRule(Section):
 
 
 class Setup(Section):
-    steps: list[Literal["telegram", "mcp", "memory-settings", "browser", "dream", "manager-cleanup", "worker-profile"]]
+    steps: list[Literal["telegram", "mcp", "memory-settings", "browser", "dream", "worker-profile"]]
 
 
 class Runtime(Section):
@@ -105,7 +105,7 @@ def load_profile(path: Path, role: str) -> BotManifest:
         raise click.ClickException(f"Missing or conflicting bot/setup sections: {path}")
     allowed = {
         "cos": {"telegram", "mcp", "memory-settings", "browser", "dream"},
-        "manager": {"mcp", "memory-settings", "manager-cleanup"},
+        "manager": {"mcp", "memory-settings"},
         "worker": {"worker-profile"},
     }[role]
     if len(set(manifest.setup.steps)) != len(manifest.setup.steps) or not set(manifest.setup.steps) <= allowed:

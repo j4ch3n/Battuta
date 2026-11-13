@@ -63,7 +63,7 @@ Include custom `gh`/Git locations in PATH when needed (Homebrew on Apple Silicon
 
 ## Project registrations
 
-All projects live under `~/.battuta/projects`, inside the global Battuta directory. There is no project-root option or environment override. See the [project configuration contract](../../../docs/project-context.md) for the minimal `project.yaml` shape and filesystem identity.
+All projects live under `~/.battuta/projects`, inside the global Battuta directory. There is no project-root option or environment override.
 
 Before upgrading an existing installation, stop affected bots. Move any custom-root project directories into `~/.battuta/projects` without changing their names. Remove the duplicated `project` name/path section from each `project.yaml`, retaining its version and GitHub/Linear associations. Remove obsolete project-root overrides from launch configuration. The CLI does not convert YAML, move private files, or delete an old root `.config.json`; that selection file is ignored. Other components' `.config.json` metadata must be retained. A directory rename changes project identity and does not rewrite assignment or memory references.
 

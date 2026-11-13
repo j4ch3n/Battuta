@@ -56,7 +56,12 @@ class WorkerSetupTests(unittest.TestCase):
         settings = json.loads((self.profile / ".pi/settings.json").read_text())
         self.assertTrue(any((self.profile / ".pi" / value).resolve() == self.runtime / "index.ts" for value in settings["extensions"]))
         self.assertTrue(all((self.profile / ".pi" / value).exists() for value in settings["skills"]))
+        self.assertTrue(all(value.startswith("skills/") for value in settings["skills"]))
+        self.assertFalse((self.profile / ".pi/skills/execute-assignment").is_symlink())
+        self.assertTrue((self.profile / ".pi/skills/execute-assignment/SKILL.md").is_file())
         self.assertIn("npm:@tintinweb/pi-subagents@0.24.0", settings["packages"])
+        self.assertNotIn("battutaWorkerAgents", settings)
+        self.assertNotIn("battutaWorkerResearch", settings)
         researcher = (self.profile / ".pi/agents/researcher.md").read_text()
         reviewer = (self.profile / ".pi/agents/reviewer.md").read_text()
         self.assertIn('skills: ["research"]', researcher)
@@ -104,7 +109,7 @@ class WorkerSetupTests(unittest.TestCase):
             configure_source(self.root, role="worker", env_file=self.env)
         run.assert_not_called()
 
-    def test_agent_updates_preserve_custom_definitions_and_private_state(self):
+    def test_agent_setup_preserves_existing_definitions_and_private_state(self):
         self.prepare()
         configure_worker(self.root, bot_dir=self.bot)
         custom = self.bot / ".pi/agents/custom.md"
@@ -112,11 +117,11 @@ class WorkerSetupTests(unittest.TestCase):
         (self.profile / "agents/researcher.md").write_text("---\nname: researcher\n---\nUpdated researcher")
         self.prepare()
         configure_worker(self.root, bot_dir=self.bot)
-        self.assertIn("Updated researcher", (self.bot / ".pi/agents/researcher.md").read_text())
+        self.assertIn("Research fixture", (self.bot / ".pi/agents/researcher.md").read_text())
         self.assertEqual(custom.read_text(), "Custom definition")
         (self.bot / ".pi/agents/researcher.md").write_text("Private customization")
-        with self.assertRaisesRegex(Exception, "custom subagent"):
-            configure_worker(self.root, bot_dir=self.bot)
+        configure_worker(self.root, bot_dir=self.bot)
+        self.assertEqual((self.bot / ".pi/agents/researcher.md").read_text(), "Private customization")
 
     def test_research_preload_has_real_files_and_references(self):
         research = self.root / "skills-hub/research"
@@ -135,15 +140,14 @@ class WorkerSetupTests(unittest.TestCase):
         self.assertNotIn(research, selected)
         reference.write_text("Updated evidence fixture")
         self.prepare()
-        self.assertEqual((prepared / "references/evidence.md").read_text(), "Updated evidence fixture")
+        self.assertEqual((prepared / "references/evidence.md").read_text(), "Evidence fixture")
 
     def test_research_preload_preserves_custom_content(self):
         self.prepare()
         prepared = self.profile / ".pi/skills/research"
         prepared.mkdir(parents=True, exist_ok=True)
         (prepared / "SKILL.md").write_text("Private custom research")
-        with self.assertRaisesRegex(Exception, "custom"):
-            self.prepare()
+        self.prepare()
         self.assertEqual((prepared / "SKILL.md").read_text(), "Private custom research")
 
     def test_research_preload_refuses_symlinked_directory(self):

@@ -32,7 +32,7 @@ def extract_bundle(archive: Path, destination: Path) -> None:
             members = contents.getmembers()
             for member in members:
                 parts = PurePosixPath(member.name).parts
-                if (not parts or parts[0] not in {"bots", "docs", "skills-hub", ".agents", "memory-service", "RELEASE.md"}
+                if (not parts or parts[0] not in {"bots", "docs", ".agents", "memory-service", "RELEASE.md"}
                         or ".." in parts or member.name.startswith("/")
                         or not (member.isfile() or member.isdir())):
                     raise click.ClickException("Archive contains an unsafe or unexpected member")
@@ -64,7 +64,7 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
             skill = source / "skills-hub" / name
             if any(path.is_symlink() for path in [skill, *skill.rglob("*")]):
                 raise click.ClickException(f"Skill resources must not be symlinks: {name}")
-    for relative in ("docs", "skills-hub/project-management", "RELEASE.md",
+    for relative in ("docs", "RELEASE.md",
                      ".agents/skills/battuta-setup/references/development.md",
                      ".agents/skills/battuta-verify/references/checks.md", "memory-service/DESIGN.md"):
         path = source / relative
@@ -76,7 +76,6 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source / relative, target)
     shutil.copytree(source / "docs", destination / "docs", ignore=shutil.ignore_patterns("superpowers"))
-    shutil.copytree(source / "skills-hub/project-management", destination / "skills-hub/project-management")
     node_version = (source / ".node-version").read_text().strip()
     package_manager = json.loads((source / "package.json").read_text())["packageManager"]
     for component in SHARED:
