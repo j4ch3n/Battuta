@@ -8,10 +8,6 @@ import subprocess
 import click
 
 
-TELEGRAM_PACKAGE = "npm:@llblab/pi-telegram@0.59.0"
-SCHEDULE_PACKAGE = "npm:@jl1990/pi-scheduler@0.5.1"
-
-
 def run(*args: str, **kwargs: object) -> None:
     try:
         subprocess.run(args, check=True, **kwargs)
@@ -19,14 +15,13 @@ def run(*args: str, **kwargs: object) -> None:
         raise click.ClickException(f"{args[0]} failed (exit {error.returncode})") from error
 
 
-def install_packages(bot_dir: Path, telegram_package: str | None, *, extra_packages: tuple[str, ...] = ()) -> None:
+def install_packages(bot_dir: Path, packages: list[str]) -> None:
     if shutil.which("pnpm") is None:
         raise click.ClickException("pnpm is required")
     run("pnpm", "install", "--frozen-lockfile", cwd=bot_dir)
     agent_env = {**os.environ, "PI_CODING_AGENT_DIR": str(bot_dir / ".pi")}
-    for package in (telegram_package, *extra_packages):
-        if package is not None:
-            run("pnpm", "exec", "pi", "install", "-l", "--approve", package, cwd=bot_dir, env=agent_env)
+    for package in packages:
+        run("pnpm", "exec", "pi", "install", "-l", "--approve", package, cwd=bot_dir, env=agent_env)
     run("pnpm", "exec", "pi", "list", cwd=bot_dir, env=agent_env)
 
 

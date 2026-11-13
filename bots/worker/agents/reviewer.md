@@ -2,8 +2,6 @@
 name: reviewer
 description: Inspect a bounded result and run requested checks with evidence
 tools: read, grep, find, ls, bash
-extensions: false
-skills: false
 allowed_subagents: none
 prompt_mode: replace
 inherit_context: false

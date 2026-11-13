@@ -177,9 +177,10 @@ Set `WORKER_BOT_COUNT` explicitly: `1` is the normal local example, `0` disables
 workers, and `N` selects `worker-1` through `worker-N`. Missing/invalid values fail
 before configuration or launch. This setting is not live autoscaling.
 
-Before configuration, stop CoS and select `defaultProvider` and `defaultModel` in
-`~/.battuta/pi-bots/cos-bot/.pi/settings.json`. Configuration provisions the nightly
-dream task; a missed run may execute when CoS next starts.
+Before configuration, stop CoS and set the required `BATTUTA_DREAM_MODEL` to an
+exact `provider/model-id` in the selected environment file. It has no default and
+is independent of conversational model preferences. Configuration provisions the
+nightly dream task; a missed run may execute when CoS next starts.
 
 ```bash
 battuta-bot-setup configure-release --root "$install_path" --env-file "$env_file"

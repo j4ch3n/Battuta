@@ -16,13 +16,13 @@ def catalog(tmp_path):
         source = hub / name
         source.mkdir(parents=True)
         (source / "SKILL.md").write_text(f"---\nname: {name}\n---\n")
-    manifest = tmp_path / "bots/example/skills.json"
+    manifest = tmp_path / "bots/example/bot.toml"
     manifest.parent.mkdir(parents=True)
-    manifest.write_text('{"skills":["research"]}')
+    manifest.write_text('[skills]\ninclude = ["research"]\n')
     return hub, manifest
 
 
-@pytest.mark.parametrize("text", ["{", "null", "[]", "{}", '{"skills":[],"role":"cos"}', '{"skills":"research"}', '{"skills":[1]}', '{"skills":["research","research"]}', '{"skills":["missing"]}', '{"skills":["../research"]}', '{"skills":["/research"]}', '{"skills":["Research"]}'])
+@pytest.mark.parametrize("text", ["{", "null", "[]", "", '[skills]\ninclude=[]\nrole="cos"', '[skills]\ninclude="research"', '[skills]\ninclude=[1]', '[skills]\ninclude=["research","research"]', '[skills]\ninclude=["missing"]', '[skills]\ninclude=["../research"]', '[skills]\ninclude=["/research"]', '[skills]\ninclude=["Research"]'])
 def test_invalid_manifest_is_rejected(tmp_path, text):
     hub, manifest = catalog(tmp_path)
     manifest.write_text(text)
@@ -33,7 +33,7 @@ def test_invalid_manifest_is_rejected(tmp_path, text):
 @pytest.mark.parametrize("names", [["note-taking", "research"], []])
 def test_selection_preserves_order_and_accepts_empty(tmp_path, names):
     hub, manifest = catalog(tmp_path)
-    manifest.write_text(json.dumps({"skills": names}))
+    manifest.write_text("[skills]\ninclude = " + json.dumps(names))
     assert skills.load_selection(manifest, hub) == names
 
 
@@ -55,10 +55,10 @@ def test_index_content_is_not_repaired_by_working_tree(tmp_path):
     git = lambda *args: subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)
     git("init", "-q")
     git("add", ".")
-    manifest.write_text('{"skills":["missing"]}')
+    manifest.write_text('[skills]\ninclude=["missing"]')
     skills.check_manifests(tmp_path, staged=True)
     git("add", ".")
-    manifest.write_text('{"skills":["research"]}')
+    manifest.write_text('[skills]\ninclude=["research"]')
     with pytest.raises(click.ClickException):
         skills.check_manifests(tmp_path, staged=True)
     git("add", ".")
@@ -72,9 +72,9 @@ def test_index_content_is_not_repaired_by_working_tree(tmp_path):
 def test_all_profiles_include_worker(tmp_path):
     catalog(tmp_path)
     skills.check_manifests(tmp_path)
-    worker = tmp_path / "bots/worker/skills.json"
+    worker = tmp_path / "bots/worker/bot.toml"
     worker.parent.mkdir()
-    worker.write_text('{"skills":["missing"]}')
+    worker.write_text('[skills]\ninclude=["missing"]')
     with pytest.raises(click.ClickException):
         skills.check_manifests(tmp_path)
 
@@ -90,3 +90,14 @@ def test_staged_symlinks_are_not_regular_manifest_or_entry_files(tmp_path, targe
     subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
     with pytest.raises(click.ClickException):
         skills.check_manifests(tmp_path, staged=True)
+
+
+@pytest.mark.parametrize("role,outbound,peer", [
+    ("cos", "communicate-with-manager", "communicate-with-cos"),
+    ("manager", "communicate-with-cos", "communicate-with-manager"),
+])
+def test_communication_profiles_select_only_their_outbound_skill(role, outbound, peer):
+    root = Path(__file__).parents[3]
+    selected = skills.load_selection(root / f"bots/{role}-bot/bot.toml", root / "skills-hub")
+    assert outbound in selected
+    assert peer not in selected

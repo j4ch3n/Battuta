@@ -19,6 +19,27 @@ def test_shared_launcher_rejects_invalid_mode_from_an_unrelated_cwd(tmp_path):
 
 
 class RunDevTests(LauncherFixture):
+    def test_manager_manifest_controls_private_directory_and_missing_defaults(self):
+        profile = self.root / "bots/manager-bot"
+        manifest = profile / "bot.toml"
+        manifest.write_text(manifest.read_text().replace('pi_coding_agent_dir = "manager-bot/.pi"', 'pi_coding_agent_dir = "custom-manager/.pi"'))
+        private = self.home / ".battuta/pi-bots/custom-manager"
+        (self.home / ".battuta/pi-bots/manager-bot").rename(private)
+        pi = profile / "node_modules/.bin/pi"
+        pi.write_text(f"#!{sys.executable}\nimport os\nprint(os.environ['PI_CODING_AGENT_DIR'])\n")
+        result = self.run_launcher("prod", existing=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        command = next(call[-1] for call in self.commands() if "AGENT_ROLE=manager" in call[-1])
+        pane = subprocess.run(["bash", "-c", command], capture_output=True, text=True)
+        self.assertEqual(pane.returncode, 0, pane.stderr)
+        self.assertEqual(pane.stdout.strip(), str(private / ".pi"))
+        settings = private / ".pi/settings.json"
+        self.assertEqual(json.loads(settings.read_text())["defaultThinkingLevel"], "medium")
+        settings.write_text("{}")
+        again = subprocess.run(["bash", "-c", command], capture_output=True, text=True)
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertEqual(settings.read_text(), "{}")
+
     def test_configured_worker_count_controls_distinct_panes(self):
         for count in (0, 1, 3):
             with self.subTest(count=count):

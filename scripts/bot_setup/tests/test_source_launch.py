@@ -9,6 +9,7 @@ import click
 import pytest
 
 from bot_setup.source_launch import run_source_worker
+from skill_fixtures import manifest_text
 
 
 @pytest.mark.parametrize("count,worker", [(None, "worker-1"), ("invalid", "worker-1"), ("0", "worker-1"), ("1", "worker-2")])
@@ -21,6 +22,7 @@ def test_unselected_worker_stops_before_provisioning(tmp_path, monkeypatch, coun
     cli = root / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
     cli.parent.mkdir(parents=True)
     cli.touch()
+    (root / "bots/worker/bot.toml").write_text(manifest_text("worker", []))
     env_file = root / ".env"
     env_file.write_text("SUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\n" + (f"WORKER_BOT_COUNT={count}\n" if count is not None else ""))
     bot = tmp_path / "private" / worker

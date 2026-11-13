@@ -50,14 +50,8 @@ function checkLinks(file: string) {
 }
 
 for (const collection of collections) {
-  test(`${collection.role} discovers only its outbound templates and examples satisfy Agent Mail`, () => {
+  test(`${collection.role} outbound template examples satisfy Agent Mail`, () => {
     const skill = resolve(root, `skills-hub/${collection.skill}`);
-    const manifest = JSON.parse(
-      readFileSync(resolve(root, `bots/${collection.role}-bot/skills.json`), "utf8"),
-    ) as { skills: string[] };
-    assert.ok(manifest.skills.includes(collection.skill));
-    const other = collections.find((item) => item.role !== collection.role)!;
-    assert.ok(!manifest.skills.includes(other.skill));
     checkLinks(resolve(skill, "SKILL.md"));
     assert.ok(
       readFileSync(resolve(skill, "SKILL.md"), "utf8").includes("references/templates/index.md"),

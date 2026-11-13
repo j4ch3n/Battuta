@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from bot_setup.browser import configure_browser
 from bot_setup.mcp import configure_mcp
+from skill_fixtures import manifest_text
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -29,7 +30,7 @@ class WorkerLauncherTests(unittest.TestCase):
             scripts = root / "scripts/bot_setup"
             scripts.mkdir(parents=True)
             shutil.copy2(ROOT / "scripts/bot_setup/run-worker.sh", scripts / "run-worker.sh")
-            bot = root / "private workers/worker-1"
+            bot = self.home / ".battuta/pi-bots/worker-1"
             (bot / ".pi").mkdir(parents=True)
             (bot / ".pi/settings.json").write_text("{}")
             (bot / ".pi/mcp.json").write_text("{}")
@@ -37,6 +38,7 @@ class WorkerLauncherTests(unittest.TestCase):
             cli = runtime / "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
             cli.parent.mkdir(parents=True)
             cli.write_text("fixture")
+            (root / "bots/worker/bot.toml").write_text(manifest_text("worker", []))
             configure_browser(root / "bots/worker", bot, home=self.home, bot="worker-1")
             binary = root / "bin"
             binary.mkdir()
@@ -71,6 +73,10 @@ class WorkerLauncherTests(unittest.TestCase):
             shutil.copy2(ROOT / "scripts/bot_setup/run-worker.sh", scripts / "run-worker.sh")
             profile = root / "bots/worker"
             (profile / ".pi").mkdir(parents=True)
+            (profile / "bot.toml").write_text(manifest_text("worker", []).replace(
+                'pi_coding_agent_dir = "{instance}/.pi"',
+                'pi_coding_agent_dir = "{instance}/runtime/.pi"',
+            ))
             (profile / "AGENTS.md").write_text("profile instructions")
             (profile / ".pi/settings.json").write_text(json.dumps({
                 "extensions": ["../extension/assignment-worker/index.ts"],
@@ -86,20 +92,21 @@ class WorkerLauncherTests(unittest.TestCase):
             binary = root / "bin"
             binary.mkdir()
             node = binary / "node"
-            real_node = shutil.which("node")
-            node.write_text(f'#!/bin/sh\nif [ "$1" = "--input-type=module" ]; then exec "{real_node}" "$@"; fi\nprintf "%s\\n" "$PI_CODING_AGENT_DIR" "$PWD"\n')
+            node.write_text('#!/bin/sh\nprintf "%s\\n" "$PI_CODING_AGENT_DIR" "$PWD" "$BATTUTA_BOT_NAME"\n')
             node.chmod(0o755)
             chromium = binary / "chromium-browser"
             chromium.write_text("#!/bin/sh\nexit 99\n")
             chromium.chmod(0o700)
             (root / ".env").write_text("WORKER_BOT_COUNT=1\nSUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n")
-            bot = root / "new private instances/worker-1"
+            bot = self.home / ".battuta/pi-bots/worker-1/runtime"
             env = {**os.environ, "PATH": f"{binary}:{os.environ['PATH']}"}
             args = ["bash", str(scripts / "run-worker.sh"), "--bot-dir", str(bot)]
             first = subprocess.run(args, env=env, capture_output=True, text=True)
             self.assertEqual(first.returncode, 0, first.stderr)
-            self.assertEqual(first.stdout.splitlines(), [str(bot / ".pi"), str(profile)])
+            self.assertEqual(first.stdout.splitlines(), [str(bot / ".pi"), str(profile), "worker-1"])
             settings = json.loads((bot / ".pi/settings.json").read_text())
+            self.assertEqual(settings["defaultThinkingLevel"], "high")
+            self.assertTrue(settings["defaultModel"])
             self.assertEqual(settings["extensions"], [str(profile / "extension/assignment-worker/index.ts")])
             self.assertEqual(settings["packages"], [{"source": "npm:pi-web-access@0.43.0", "skills": []}, "npm:custom"])
             self.assertEqual(settings["skills"], [str(root / "skills-hub/research")])
@@ -135,7 +142,8 @@ class WorkerLauncherTests(unittest.TestCase):
             cli = root / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
             cli.parent.mkdir(parents=True)
             cli.write_text("fixture")
-            bot = root / "private workers/worker-1"
+            (root / "bots/worker/bot.toml").write_text(manifest_text("worker", []))
+            bot = self.home / ".battuta/pi-bots/worker-1"
             (bot / ".pi").mkdir(parents=True)
             (bot / ".pi/settings.json").write_text("{}")
             env_file = root / ".env"

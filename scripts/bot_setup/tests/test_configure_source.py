@@ -1,6 +1,7 @@
 """Clean source configuration installs Telegram for CoS only."""
 
 import json
+import tomllib
 from pathlib import Path
 from unittest.mock import patch
 
@@ -21,7 +22,7 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
     names = skill_catalog(
         tmp_path,
         role,
-        json.loads((Path(__file__).parents[3] / "bots/manager-bot/skills.json").read_text())["skills"]
+        tomllib.loads((Path(__file__).parents[3] / "bots/manager-bot/bot.toml").read_text())["skills"]["include"]
         if role == "manager"
         else None,
     )
@@ -40,14 +41,14 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
     assert any("pi-scheduler" in source for source in sources) == (role == "cos")
     if role == "cos":
         assert runtime.call_args_list[0].args[:2] == ("pnpm", "--dir")
-        assert runtime.call_args_list[1].args == ("node", str(tmp_path / "memory-client/configure-scheduler.mjs"), "--initialize")
-        dream = runtime.call_args_list[2]
+        dream = next(call for call in runtime.call_args_list if call.args[0] == "node")
         assert dream.args == ("node", str(tmp_path / "memory-client/configure-dream.mjs"), str(bot))
         assert dream.kwargs["env"]["PI_CODING_AGENT_DIR"] == str(tmp_path / "home/.battuta/pi-bots/cos-bot/.pi")
     else:
-        runtime.assert_not_called()
+        assert all(call.args[0] == "pnpm" for call in runtime.call_args_list)
     pi = bot / ".pi"
     runtime_pi = tmp_path / f"home/.battuta/pi-bots/{role}-bot/.pi"
+    assert json.loads((runtime_pi / "settings.json").read_text())["defaultThinkingLevel"] == ("low" if role == "cos" else "medium")
     assert (runtime_pi / "telegram.json").exists() == (role == "cos")
     assert all((pi / "skills" / name).is_symlink() for name in names)
     assert json.loads((pi / "settings.json").read_text())["battutaMemoryCapture"]["enabled"] == (role == "cos")

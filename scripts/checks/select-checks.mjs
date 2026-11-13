@@ -47,7 +47,7 @@ const mail =
   changed("skills-hub/communicate-with-") ||
   changed("skills-hub/project-management/") ||
   changed("skills-hub/execute-assignment/") ||
-  files.some((file) => /^bots\/(?:cos-bot|manager-bot|worker)\/skills\.json$/.test(file));
+  files.some((file) => /^bots\/(?:cos-bot|manager-bot|worker)\/bot\.toml$/.test(file));
 const artifacts =
   changed("project-context-cli/") ||
   changed("scripts/packaging/") ||

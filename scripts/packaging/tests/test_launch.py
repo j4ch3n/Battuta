@@ -10,6 +10,7 @@ import sys
 import pytest
 
 from battuta_packaging.bundle import ENTRY_OUTPUTS
+from skill_fixtures import manifest_text
 
 
 @pytest.fixture
@@ -23,6 +24,7 @@ def installed(tmp_path):
     for profile in ("cos-bot", "manager-bot", "worker"):
         bot = root / "bots" / profile
         (bot / ".pi/skills").mkdir(parents=True, exist_ok=True)
+        (bot / "bot.toml").write_text(manifest_text(profile.removesuffix("-bot"), []))
         (bot / "AGENTS.md").write_text("instructions")
         (bot / ".pi/settings.json").write_text("{}")
         cli = bot / "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
@@ -92,6 +94,31 @@ def test_launch_rejects_incomplete_packages_without_installing(installed, damage
     assert "install-runtime" in result.stderr
     assert result.stdout == ""
     assert package.exists() == (damage != "missing")
+
+
+def test_nested_worker_runtime_directory_retains_logical_identity(installed):
+    root, home, env_file, node = installed
+    profile = root / "bots/worker"
+    manifest = profile / "bot.toml"
+    manifest.write_text(manifest.read_text().replace(
+        'pi_coding_agent_dir = "{instance}/.pi"',
+        'pi_coding_agent_dir = "{instance}/runtime/.pi"',
+    ))
+    private = home / ".battuta/pi-bots/worker-1"
+    (private / "runtime").mkdir()
+    (private / ".pi").rename(private / "runtime/.pi")
+    (private / "runtime/.pi/settings.json").unlink()
+    result = subprocess.run(
+        [sys.executable, "-m", "battuta_packaging.cli", "run-bot", "--root", str(root),
+         "--bot", "worker-1", "--env-file", str(env_file), "--node", str(node), "--mode", "service"],
+        env={**os.environ, "HOME": str(home), "PATH": str(home / "bin") + os.pathsep + os.environ["PATH"]},
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["env"]["BATTUTA_BOT_NAME"] == "worker-1"
+    assert output["env"]["PI_CODING_AGENT_DIR"] == str(private / "runtime/.pi")
+    assert json.loads((private / "runtime/.pi/settings.json").read_text())["defaultThinkingLevel"] == "high"
 
 
 def test_maintenance_refuses_active_service(installed, monkeypatch):

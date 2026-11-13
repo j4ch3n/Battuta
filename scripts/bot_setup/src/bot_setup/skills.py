@@ -5,29 +5,13 @@ import re
 import stat
 import subprocess
 from os.path import relpath
-from typing import Annotated
 
 import click
-from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError, field_validator
-
-
-class SkillManifest(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid", hide_input_in_errors=True)
-    skills: list[Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")]]
-
-    @field_validator("skills")
-    @classmethod
-    def unique(cls, names: list[str]) -> list[str]:
-        if len(names) != len(set(names)):
-            raise ValueError("Duplicate skill names")
-        return names
+from .manifest import parse_manifest
 
 
 def _selection(text: str, manifest: Path) -> list[str]:
-    try:
-        return SkillManifest.model_validate_json(text).skills
-    except ValidationError as error:
-        raise click.ClickException(f"Invalid skill manifest: {manifest}") from error
+    return parse_manifest(text, manifest).skills.include
 
 
 def load_selection(manifest: Path, catalog: Path) -> list[str]:
@@ -45,7 +29,7 @@ def load_selection(manifest: Path, catalog: Path) -> list[str]:
 
 def check_manifests(root: Path, *, staged: bool = False) -> None:
     if not staged:
-        manifests = sorted((root / "bots").glob("*/skills.json"))
+        manifests = sorted((root / "bots").glob("*/bot.toml"))
         if not manifests:
             raise click.ClickException("Missing skill manifests")
         for manifest in manifests:
@@ -60,7 +44,7 @@ def check_manifests(root: Path, *, staged: bool = False) -> None:
         if stage != "0":
             raise click.ClickException(f"Unresolved conflict in skill index: {path}")
         entries[path] = (mode, oid)
-    manifests = [path for path in entries if re.fullmatch(r"bots/[^/]+/skills\.json", path)]
+    manifests = [path for path in entries if re.fullmatch(r"bots/[^/]+/bot\.toml", path)]
     if not manifests:
         raise click.ClickException("Missing skill manifests in Git index")
     for manifest in manifests:

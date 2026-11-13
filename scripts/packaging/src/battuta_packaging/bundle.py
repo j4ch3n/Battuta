@@ -10,8 +10,9 @@ import tarfile
 import click
 from bot_setup.browser import browser_defaults
 from bot_setup.skills import load_selection
-from bot_setup.install import TELEGRAM_PACKAGE, SCHEDULE_PACKAGE
-from bot_setup.subagents import WEB_PACKAGE, WORKER_SUBAGENT_PACKAGE
+from bot_setup.files import prepare_files
+from bot_setup.manifest import load_profile
+from bot_setup.subagents import render_worker_agents
 
 PROFILES = ("cos-bot", "manager-bot", "worker")
 SHARED = ("agent-mail", "project-spec", "memory-client")
@@ -53,7 +54,9 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         raise click.ClickException("Release tag and Python tool version must match")
     if destination.is_symlink() or (destination.exists() and (not destination.is_dir() or any(destination.iterdir()))):
         raise click.ClickException("Release destination must be an empty regular directory")
-    selections = {profile: load_selection(source / "bots" / profile / "skills.json", source / "skills-hub") for profile in PROFILES}
+    selections = {profile: load_selection(source / "bots" / profile / "bot.toml", source / "skills-hub") for profile in PROFILES}
+    manifests = {profile: load_profile(source / "bots" / profile / "bot.toml", profile.removesuffix("-bot")) for profile in PROFILES}
+    worker_agents = render_worker_agents(source / "bots/worker", manifests["worker"])
     for names in selections.values():
         for name in names:
             skill = source / "skills-hub" / name
@@ -67,11 +70,7 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         for name in ("package.json", "pnpm-lock.yaml"):
             shutil.copy2(source / component / name, package / name)
         (package / "dist").mkdir()
-    packages = {
-        "cos-bot": [TELEGRAM_PACKAGE, WEB_PACKAGE, SCHEDULE_PACKAGE],
-        "manager-bot": [WEB_PACKAGE],
-        "worker": [WEB_PACKAGE, WORKER_SUBAGENT_PACKAGE],
-    }
+    packages = {profile: manifest.packages.pi.copy() for profile, manifest in manifests.items()}
     for profile in PROFILES:
         bot = destination / "bots" / profile
         (bot / ".pi/extensions").mkdir(parents=True)
@@ -82,7 +81,8 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         manifest = json.loads((bot / "package.json").read_text())
         manifest["type"] = "module"
         write_json(bot / "package.json", manifest)
-        (bot / "AGENTS.md").write_text("\n".join(path.read_text() for path in (source / "bots/AGENTS_shared.md", original / "AGENTS_dedicated.md")))
+        shutil.copy2(original / "bot.toml", bot / "bot.toml")
+        prepare_files(source, bot, bot, [rule for rule in manifests[profile].files if rule.destination == "profile"], source_profile=original, context="release")
         for name in selections[profile]:
             shutil.copytree(source / "skills-hub" / name, bot / ".pi/skills" / name)
         (bot / ".pi/skills").mkdir(exist_ok=True)
@@ -93,7 +93,10 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
             extensions += ["../../_shared/memory-client/dist/index.js", "extensions/index.js"]
         if profile == "worker":
             extensions += ["extensions/index.js"]
-            shutil.copytree(original / "agents", bot / ".pi/agents")
+            agents = bot / ".pi/agents"
+            agents.mkdir()
+            for name, content in worker_agents.items():
+                (agents / name).write_bytes(content)
         settings = {"packages": packages[profile], "extensions": extensions, "battutaMemoryCapture": {"enabled": profile == "cos-bot"}}
         if profile != "manager-bot":
             browser_defaults(settings)

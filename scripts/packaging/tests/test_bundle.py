@@ -9,6 +9,7 @@ import click
 import pytest
 
 from battuta_packaging import bundle
+from skill_fixtures import manifest_text
 
 
 @pytest.fixture
@@ -28,15 +29,16 @@ def source(tmp_path, monkeypatch):
     for profile in ("cos-bot", "manager-bot", "worker"):
         path = root / "bots" / profile
         (path / "AGENTS_dedicated.md").write_text(profile)
-        (path / "skills.json").write_text('{"skills":["research"]}')
+        (path / "bot.toml").write_text(manifest_text(profile.removesuffix("-bot"), ["research"]))
         (path / ".pi").mkdir()
         (path / ".pi/auth.json").write_text("private-sentinel")
         (path / ".pi/settings.json").write_text('{"defaultModel":"private-model"}')
         (path / ".pi/web-search.json").write_text("{}")
         if profile == "worker":
             (path / "agents").mkdir()
-            (path / "agents/researcher.md").write_text("Research fixture")
-            (path / "agents/reviewer.md").write_text("Review fixture")
+            (path / "agents/researcher.md").write_text("---\nname: researcher\n---\nResearch fixture")
+            (path / "agents/reviewer.md").write_text("---\nname: reviewer\n---\nReview fixture")
+            (path / "agents/unselected.md").write_text("Not selected")
     skill = root / "skills-hub/research"
     skill.mkdir(parents=True)
     for name in ("SKILL.md", "LICENSE", "tools.md"):
@@ -67,7 +69,13 @@ def test_staged_archive_is_bot_only(source, tmp_path):
             assert not any("pi-subagents" in package for package in settings["packages"])
         if profile == "worker":
             assert "npm:@tintinweb/pi-subagents@0.24.0" in settings["packages"]
-            assert (bot / ".pi/agents/researcher.md").read_text() == "Research fixture"
+            researcher = (bot / ".pi/agents/researcher.md").read_text()
+            reviewer = (bot / ".pi/agents/reviewer.md").read_text()
+            assert 'skills: ["research"]' in researcher
+            assert 'extensions: ["pi-web-access"]' in researcher
+            assert "skills: false" in reviewer
+            assert "extensions: false" in reviewer
+            assert not (bot / ".pi/agents/unselected.md").exists()
         assert any("pi-browser-use" in package for package in settings["packages"]) == (profile != "manager-bot")
         if profile != "manager-bot":
             assert settings["pi-browser-use"]["headless"] is True

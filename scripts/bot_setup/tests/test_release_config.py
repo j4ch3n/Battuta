@@ -6,6 +6,7 @@ import click
 import pytest
 
 from bot_setup import release
+from skill_fixtures import manifest_text
 
 
 @pytest.fixture
@@ -16,6 +17,7 @@ def deployment(tmp_path, monkeypatch):
     for role in ("cos-bot", "manager-bot", "worker"):
         bot = root / "bots" / role
         (bot / ".pi/skills").mkdir(parents=True)
+        (bot / "bot.toml").write_text(manifest_text(role.removesuffix("-bot"), []))
         (bot / "AGENTS.md").write_text(role)
         (bot / ".pi/settings.json").write_text("{}")
         (bot / ".pi/web-search.json").write_text('{"fetchContent":{"userAgent":"fixture"}}')
@@ -27,12 +29,12 @@ def deployment(tmp_path, monkeypatch):
     return root, home, env_file
 
 
-def test_release_provisions_dream_with_private_model_settings(deployment, monkeypatch):
+def test_release_provisions_dream_before_scheduler_initialization(deployment, monkeypatch):
     root, home, env_file = deployment
     calls = []
     monkeypatch.setattr(release, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
     release.configure_release(root, env_file=env_file, home=home)
-    args, kwargs = calls[1]
+    args, kwargs = calls[0]
     assert args == ("node", str(root / "bots/_shared/memory-client/dist/configure-dream.js"), str(root / "bots/cos-bot"))
     assert kwargs["env"]["PI_CODING_AGENT_DIR"] == str(home / ".battuta/pi-bots/cos-bot/.pi")
 
@@ -62,11 +64,20 @@ def test_release_preserves_private_state_and_regenerates_owned_files(deployment)
         assert (private_pi / "mcp.json").stat().st_mode & 0o777 == 0o600
         assert not (private_pi.parent / "AGENTS.md").exists()
         if bot == "manager-bot":
-            assert not (private_pi / "settings.json").exists()
+            assert json.loads((private_pi / "settings.json").read_text())["defaultThinkingLevel"] == "medium"
         else:
             browser = json.loads((private_pi / "settings.json").read_text())["pi-browser-use"]
             assert browser["userDataDir"] == str(private_pi / "browser-research")
     assert not (home / ".pi").exists()
+
+
+def test_fresh_release_defaults_survive_browser_setup(deployment):
+    root, home, env_file = deployment
+    release.configure_release(root, env_file=env_file, home=home)
+    for bot, thinking in (("cos-bot", "low"), ("manager-bot", "medium"), ("worker-1", "high"), ("worker-2", "high")):
+        settings = json.loads((home / ".battuta/pi-bots" / bot / ".pi/settings.json").read_text())
+        assert settings["defaultThinkingLevel"] == thinking
+        assert settings["defaultModel"]
 
 
 @pytest.mark.parametrize("conflict", ["symlink", "resource", "malformed"])

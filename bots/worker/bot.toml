@@ -1,0 +1,70 @@
+[bot]
+role = "worker"
+env_prefix = "WORKER"
+
+[runtime]
+pi_coding_agent_dir = "{instance}/.pi"
+
+[defaults]
+provider = "openai"
+model = "gpt-6.1-terra"
+thinking = "high"
+
+[packages]
+pi = [
+  "npm:pi-web-access@0.43.0",
+  "npm:@amaster.ai/pi-browser-use@0.1.38",
+  "npm:@tintinweb/pi-subagents@0.24.0",
+]
+node_projects = ["bots/worker/extension/assignment-worker", "agent-mail"]
+
+[[files]]
+operation = "concatenate"
+sources = [
+  { root = "repository", path = "bots/AGENTS_shared.md" },
+  { root = "profile", path = "AGENTS_dedicated.md" },
+]
+target = "AGENTS.md"
+destination = "profile"
+policy = "replace"
+
+[[files]]
+operation = "copy"
+sources = [{ root = "profile", path = ".pi/web-search.json" }]
+target = ".pi/web-search.json"
+destination = "private"
+policy = "create-only"
+optional = true
+
+[setup]
+steps = ["worker-profile"]
+
+[[subagents.agents]]
+path = "agents/researcher.md"
+inherit_parent_skills = ["research"]
+extensions = ["pi-web-access"]
+
+[[subagents.agents]]
+path = "agents/reviewer.md"
+inherit_parent_skills = []
+extensions = []
+
+[[files]]
+operation = "copy"
+sources = [{ root = "profile", path = ".pi/mcp.json" }]
+context = "source"
+target = ".pi/mcp.json"
+destination = "private"
+policy = "create-only"
+
+[skills]
+include = [
+  "todo",
+  "note-taking",
+  "draft-writing",
+  "execute-assignment",
+  "research",
+  "browser-evidence",
+  "artifacts",
+  "prd",
+]

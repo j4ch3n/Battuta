@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from bot_setup.configure import configure_source, configure_worker
+from skill_fixtures import manifest_text
 
 
 class WorkerSetupTests(unittest.TestCase):
@@ -18,7 +19,7 @@ class WorkerSetupTests(unittest.TestCase):
         self.profile.mkdir(parents=True)
         (self.root / "bots/AGENTS_shared.md").write_text("shared fixture")
         (self.profile / "AGENTS_dedicated.md").write_text("dedicated fixture")
-        (self.profile / "skills.json").write_text(json.dumps({"skills": ["execute-assignment", "research"]}))
+        (self.profile / "bot.toml").write_text(manifest_text("worker", ["execute-assignment", "research"]))
         for name in ("execute-assignment", "research"):
             skill = self.root / "skills-hub" / name
             skill.mkdir(parents=True)
@@ -56,17 +57,62 @@ class WorkerSetupTests(unittest.TestCase):
         self.assertTrue(any((self.profile / ".pi" / value).resolve() == self.runtime / "index.ts" for value in settings["extensions"]))
         self.assertTrue(all((self.profile / ".pi" / value).exists() for value in settings["skills"]))
         self.assertIn("npm:@tintinweb/pi-subagents@0.24.0", settings["packages"])
-        self.assertEqual((self.profile / ".pi/agents/researcher.md").read_text(), (self.profile / "agents/researcher.md").read_text())
+        researcher = (self.profile / ".pi/agents/researcher.md").read_text()
+        reviewer = (self.profile / ".pi/agents/reviewer.md").read_text()
+        self.assertIn('skills: ["research"]', researcher)
+        self.assertIn('extensions: ["pi-web-access"]', researcher)
+        self.assertIn("skills: false", reviewer)
+        self.assertIn("extensions: false", reviewer)
+
+    def test_invalid_subagent_configuration_fails_before_install_or_writes(self):
+        manifest = self.profile / "bot.toml"
+        original = manifest.read_text()
+        for old, new in [
+            ('agents/researcher.md', '../outside.md'),
+            ('agents/researcher.md', 'agents/missing.md'),
+            ('inherit_parent_skills = ["research"]', 'inherit_parent_skills = ["missing"]'),
+            ('extensions = ["pi-web-access"]', 'extensions = ["uninstalled"]'),
+            ('agents/reviewer.md', 'agents/researcher.md'),
+        ]:
+            with self.subTest(change=new):
+                manifest.write_text(original.replace(old, new))
+                with patch("bot_setup.configure.run") as run, self.assertRaises(Exception):
+                    configure_source(self.root, role="worker", env_file=self.env)
+                run.assert_not_called()
+                self.assertFalse((self.profile / "AGENTS.md").exists())
+        manifest.write_text(original)
+
+    def test_conflicting_prompt_frontmatter_fails_before_writes(self):
+        prompt = self.profile / "agents/researcher.md"
+        prompt.write_text("---\nname: researcher\nskills: other\n---\nFixture")
+        with patch("bot_setup.configure.run") as run, self.assertRaises(Exception):
+            configure_source(self.root, role="worker", env_file=self.env)
+        run.assert_not_called()
+        self.assertFalse((self.profile / "AGENTS.md").exists())
+
+    def test_prompt_paths_are_profile_relative_and_symlinks_are_rejected(self):
+        manifest = self.profile / "bot.toml"
+        manifest.write_text(manifest.read_text().replace("agents/researcher.md", "prompts/custom.md"))
+        prompt = self.profile / "prompts/custom.md"
+        prompt.parent.mkdir()
+        prompt.write_text("---\nname: researcher\n---\nCustom location")
+        self.prepare()
+        assert "Custom location" in (self.profile / ".pi/agents/custom.md").read_text()
+        prompt.unlink()
+        prompt.symlink_to(self.profile / "agents/researcher.md")
+        with patch("bot_setup.configure.run") as run, self.assertRaises(Exception):
+            configure_source(self.root, role="worker", env_file=self.env)
+        run.assert_not_called()
 
     def test_agent_updates_preserve_custom_definitions_and_private_state(self):
         self.prepare()
         configure_worker(self.root, bot_dir=self.bot)
         custom = self.bot / ".pi/agents/custom.md"
         custom.write_text("Custom definition")
-        (self.profile / "agents/researcher.md").write_text("Updated researcher")
+        (self.profile / "agents/researcher.md").write_text("---\nname: researcher\n---\nUpdated researcher")
         self.prepare()
         configure_worker(self.root, bot_dir=self.bot)
-        self.assertEqual((self.bot / ".pi/agents/researcher.md").read_text(), "Updated researcher")
+        self.assertIn("Updated researcher", (self.bot / ".pi/agents/researcher.md").read_text())
         self.assertEqual(custom.read_text(), "Custom definition")
         (self.bot / ".pi/agents/researcher.md").write_text("Private customization")
         with self.assertRaisesRegex(Exception, "custom subagent"):

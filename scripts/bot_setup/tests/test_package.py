@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -12,7 +13,7 @@ import unittest
 class PackageTests(unittest.TestCase):
     def test_help_and_refresh_from_unrelated_directory(self):
         with tempfile.TemporaryDirectory(dir="/tmp") as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             home = root / "home"
             process_env = {**os.environ, "HOME": str(home)}
             for command in ([], ["configure"], ["refresh-telegram"], ["skills", "check"]):
@@ -20,6 +21,9 @@ class PackageTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
             env = root / "private.env"
             env.write_text("COS_TELEGRAM_TOKEN=101:private-cos\nTELEGRAM_ALLOWED_USER_ID=123\n")
+            profile = root / "bots/cos-bot"
+            profile.mkdir(parents=True)
+            shutil.copy2(Path(__file__).parents[3] / "bots/cos-bot/bot.toml", profile / "bot.toml")
             result = subprocess.run([sys.executable, "-m", "bot_setup.cli", "refresh-telegram", "--root", str(root), str(env)], cwd="/tmp", env=process_env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             for role in ("cos",):

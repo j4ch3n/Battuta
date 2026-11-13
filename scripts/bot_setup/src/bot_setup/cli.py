@@ -10,8 +10,7 @@ from .configure import configure_source, configure_worker
 from .release import configure_release, validate_private_home
 from .env import read_env
 from .instances import instance_paths, worker_names
-from .source_launch import run_source_worker
-from .install import TELEGRAM_PACKAGE
+from .source_launch import run_source_worker, run_source_bot
 from .json_config import write_config
 from .telegram import prepare_telegram_config
 
@@ -32,6 +31,23 @@ def workers(env_file):
         click.echo(name)
 
 
+@main.command("agent-dir")
+@click.option("--root", type=DIRECTORY, required=True)
+@click.option("--bot", required=True)
+def agent_dir(root, bot):
+    """Print the manifest-derived private PI_CODING_AGENT_DIR."""
+    click.echo(instance_paths(root, Path.home(), bot)[2] / ".pi")
+
+
+@main.command("run-source")
+@click.option("--root", type=DIRECTORY, required=True)
+@click.option("--bot", type=click.Choice(["cos-bot", "manager-bot"]), required=True)
+@click.option("--env-file", type=FILE, required=True)
+def run_source(root, bot, env_file):
+    """Launch a prepared source CoS or Manager without overriding model choices."""
+    run_source_bot(root, bot=bot, env_file=env_file)
+
+
 @main.command("env-example")
 def env_example():
     """Print the release's credential-free environment template."""
@@ -43,7 +59,7 @@ def env_example():
 
 @main.command("run-worker")
 @click.option("--root", type=DIRECTORY, required=True)
-@click.option("--bot-dir", type=DIRECTORY, required=True)
+@click.option("--bot-dir", type=click.Path(file_okay=False, path_type=Path, resolve_path=True), required=True)
 @click.option("--env-file", type=FILE, required=True)
 @click.option("--node", type=click.Path(exists=True, dir_okay=False, path_type=Path, resolve_path=True), required=True)
 def run_worker(root, bot_dir, env_file, node):
@@ -75,7 +91,7 @@ def browser_executable(profile, bot_dir, bot):
 @click.option("--bot-dir", type=click.Path(file_okay=False, path_type=Path, resolve_path=True))
 @click.option("--env-file", type=FILE)
 @click.option("--env-prefix")
-@click.option("--telegram-package", default=TELEGRAM_PACKAGE)
+@click.option("--telegram-package", help="Override the CoS Telegram package selected by bot.toml.")
 def configure(root, role, bot_dir, env_file, env_prefix, telegram_package):
     """Configure a source-checkout bot."""
     configure_source(root, role=role, bot_dir=bot_dir, env_file=env_file, env_prefix=env_prefix, telegram_package=telegram_package)

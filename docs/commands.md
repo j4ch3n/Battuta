@@ -23,7 +23,7 @@ Run source-checkout commands from the repository root. See [development](../.age
 
 `make dev` and `make prod` only launch or attach; an existing tmux session is reattached without reloading settings. Dev functions use `supabase/.env` separately.
 
-Before configuring CoS, stop it and select its private default provider and model. CoS setup provisions the nightly dream; see [memory setup](memory-service-setup.md#nightly-cos-dream-setup).
+Before configuring CoS, stop it and set the required `BATTUTA_DREAM_MODEL=provider/model-id` in the selected environment file. Bot `bot.toml` files provide initial private model/thinking defaults only when settings are missing; see [bot setup manifests](bot-setup.md). CoS setup provisions the nightly dream independently; see [memory setup](memory-service-setup.md#nightly-cos-dream-setup).
 
 `WORKER_BOT_COUNT` is required in both source environment files: `0` selects no
 workers, `1` is the normal local setting, and `N` selects worker-1 through worker-N.
@@ -45,6 +45,7 @@ acceptance is separate from setup checks.
 - `scripts/checks/lint-staged-code.mjs` applies runtime-specific linting to staged code through lint-staged/Husky.
 - `uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role cos` generates bot instructions and runtime configuration; use `--role manager` for Manager or `configure --help` for workspace/environment overrides.
 - `scripts/bot_setup/run-dev.sh` implements the shared `dev` and `prod` tmux launch modes.
+- `battuta-bot-setup agent-dir --root DIR --bot cos-bot|manager-bot|worker-N` prints the manifest-derived absolute `PI_CODING_AGENT_DIR` without creating files. `run-source --root DIR --bot cos-bot|manager-bot --env-file FILE` is the source tmux launch boundary; it initialises missing preferences but does not override saved model choices.
 - `uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role worker` prepares the source worker profile; add `--bot-dir DIRECTORY` for explicit source-instance configuration. `bash scripts/bot_setup/run-worker.sh --bot-dir DIRECTORY [--env-file FILE]` launches ordinary interactive Pi under the instance lock. Release configuration uses installed `battuta-bot-setup configure-release --root DIR --env-file FILE`; installed `battuta-packaging run-bot` requires explicit bot, Node, environment and launch mode. See [worker runtime](workers.md).
 - `make refresh-telegram ENV_FILE=.env` calls the setup package's `refresh-telegram` command to update CoS's Telegram configuration without reinstalling packages or regenerating instructions.
 - `battuta-project` manages project initialization, context indexes, and GitHub/Linear association with explicit project targets. `list --json` exposes read-only structured discovery under the fixed `~/.battuta/projects` root; there is no shared project selection or root override. See the [project-management skill](../skills-hub/project-management/SKILL.md) and its [command reference](../skills-hub/project-management/references/commands.md). Shared assignment/TODO MCP and local note mechanics live in [assignment runtime](assignments.md); no task or note-editing CLI is required.

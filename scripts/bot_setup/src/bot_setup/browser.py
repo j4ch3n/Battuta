@@ -6,10 +6,9 @@ import sys
 
 import click
 
-from .instances import instance_paths
+from .instances import profile_identity
 from .json_config import read_config, write_config
 
-BROWSER_PACKAGE = "npm:@amaster.ai/pi-browser-use@0.1.38"
 BROWSER_DEFAULTS = {"sessionMode": "persistent", "headless": True, "viewport": "1440x900"}
 
 
@@ -21,19 +20,18 @@ def browser_defaults(settings: dict) -> None:
     for key, value in BROWSER_DEFAULTS.items():
         if key in section and (section[key] != value or type(section[key]) is not type(value)):
             raise click.ClickException(f"Conflicting pi-browser-use.{key}")
-    settings["packages"] = packages if BROWSER_PACKAGE in packages else [*packages, BROWSER_PACKAGE]
     settings["pi-browser-use"] = {**section, **BROWSER_DEFAULTS}
 
 
-def browser_directories(home: Path, bot: str) -> tuple[Path, Path]:
-    role, _, private = instance_paths(home, home, bot)
+def browser_directories(home: Path, bot: str, private: Path) -> tuple[Path, Path]:
+    role, _ = profile_identity(bot)
     if role == "manager":
         raise click.ClickException("Manager does not use a browser")
     return private / ".pi/browser-research", home / ".battuta/browser-screenshot"
 
 
 def browser_settings(profile: Path, private: Path, *, home: Path, bot: str) -> dict:
-    directory, screenshots = browser_directories(home, bot)
+    directory, screenshots = browser_directories(home, bot, private)
     for base in (directory, screenshots):
         for path in (base, *base.parents):
             if path == home:
@@ -66,7 +64,7 @@ def browser_settings(profile: Path, private: Path, *, home: Path, bot: str) -> d
 
 def configure_browser(profile: Path, private: Path, *, home: Path, bot: str) -> None:
     settings = browser_settings(profile, private, home=home, bot=bot)
-    for directory in browser_directories(home, bot):
+    for directory in browser_directories(home, bot, private):
         directory.mkdir(parents=True, mode=0o700, exist_ok=True)
         directory.chmod(0o700)
     write_config(private / ".pi/settings.json", settings, ".browser-")
@@ -74,7 +72,7 @@ def configure_browser(profile: Path, private: Path, *, home: Path, bot: str) -> 
 
 def validate_browser(profile: Path, private: Path, *, home: Path, bot: str, path: str | None = None) -> dict[str, str]:
     expected = browser_settings(profile, private, home=home, bot=bot)
-    if read_config(private / ".pi/settings.json") != expected or not all(directory.is_dir() for directory in browser_directories(home, bot)):
+    if read_config(private / ".pi/settings.json") != expected or not all(directory.is_dir() for directory in browser_directories(home, bot, private)):
         raise click.ClickException(f"Configure the private browser first: {private}")
     executable = shutil.which("chromium-browser", path=path)
     if executable:

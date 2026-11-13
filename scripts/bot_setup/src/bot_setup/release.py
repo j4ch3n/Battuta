@@ -12,6 +12,9 @@ from .install import run
 from .json_config import read_config, write_config
 from .mcp import mcp_payload, validate_memory_url
 from .telegram import telegram_payload
+from .manifest import load_profile
+from .files import prepare_files
+from .runtime import initialize_settings_if_missing
 
 
 def validate_private_home(bot_home: Path) -> None:
@@ -47,17 +50,24 @@ def configure_release(root: Path, *, env_file: Path, home: Path) -> None:
     telegram["profiles"]["default"]["botToken"] = "${COS_TELEGRAM_TOKEN}"
     outputs = []
     browsers = []
+    instances = []
+    private_paths = set()
     for bot in names:
         role, profile, private = instance_paths(root, home, bot)
+        manifest = load_profile(profile / "bot.toml", role)
+        if manifest.defaults is None or private in private_paths:
+            raise click.ClickException("Missing defaults or overlapping private instance paths")
+        private_paths.add(private)
         if not (profile / "AGENTS.md").is_file() or not (profile / ".pi/settings.json").is_file():
             raise click.ClickException(f"Missing installed role profile: {profile}")
         validate_private_home(private)
+        instances.append((profile, private, manifest))
         if role != "manager":
             browser_settings(profile, private, home=home, bot=bot)
             browsers.append((bot, profile, private))
         payload = mcp_payload(role=role, supabase_url=values["SUPABASE_URL"], memory_url=url)
         outputs.append((private / ".pi/mcp.json", payload))
-        outputs.append((private / ".pi/web-search.json", read_config(profile / ".pi/web-search.json")))
+        read_config(profile / ".pi/web-search.json")
         if role == "cos":
             outputs.append((private / ".pi/telegram.json", telegram))
     helper = root / "bots/_shared/memory-client/dist/configure-scheduler.js"
@@ -67,8 +77,11 @@ def configure_release(root: Path, *, env_file: Path, home: Path) -> None:
     if not dream.is_file():
         raise click.ClickException(f"Missing compiled dream helper: {dream}")
     # Provision only after every instance has passed preflight; never start a bot.
-    dream_env = {**os.environ, **values, "HOME": str(home), "PI_CODING_AGENT_DIR": str(home / ".battuta/pi-bots/cos-bot/.pi")}
-    run("node", str(helper), "--initialize", env=dream_env)
+    for profile, private, manifest in instances:
+        initialize_settings_if_missing(private / ".pi", manifest.defaults)
+        prepare_files(root, profile, private, [rule for rule in manifest.files if rule.destination == "private"], context="release")
+    cos_private = instance_paths(root, home, "cos-bot")[2]
+    dream_env = {**os.environ, **values, "HOME": str(home), "PI_CODING_AGENT_DIR": str(cos_private / ".pi")}
     run("node", str(dream), str(root / "bots/cos-bot"), env=dream_env)
     for bot, profile, private in browsers:
         configure_browser(profile, private, home=home, bot=bot)

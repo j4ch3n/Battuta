@@ -68,7 +68,7 @@ sys.exit(int(os.environ.get("FAIL_CHILD", "0")))
         git = self.bin / "git"
         git.write_text(f"#!{sys.executable}\nimport os, sys\nsys.stdout.write(os.environ['CHANGED_FILE'] + chr(0))\n")
         git.chmod(0o700)
-        for changed in ("skills-hub/project-management/SKILL.md", "skills-hub/execute-assignment/SKILL.md", "bots/worker/skills.json"):
+        for changed in ("skills-hub/project-management/SKILL.md", "skills-hub/execute-assignment/SKILL.md", "bots/worker/bot.toml"):
             with self.subTest(changed=changed):
                 self.env["CHANGED_FILE"] = changed
                 result = self.runner("select-checks.mjs", "base", "head")

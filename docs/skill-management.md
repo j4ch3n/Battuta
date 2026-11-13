@@ -7,11 +7,15 @@ templates, scripts, assets, and required license notices. Contributor skills
 stay in `.agents/skills/`; executable packages such as `project-context-cli/`
 stay outside the catalog.
 
-Each profile declares an ordered selection in `bots/<profile>/skills.json`:
+Each profile declares an ordered selection in `bots/<profile>/bot.toml`:
 
-```json
-{ "skills": ["project-management", "note-taking"] }
+```toml
+[skills]
+include = ["project-management", "note-taking"]
 ```
+
+Other sections declare setup and private runtime defaults; see
+[bot setup manifests](bot-setup.md). There is no separate skill-selection JSON file.
 
 These selections do not grant tools or permissions. Local source configuration
 creates relative `.pi/skills/<name>` links into the catalog for Pi discovery;
@@ -37,8 +41,9 @@ The owning implementation is `scripts/bot_setup/`; packaging reuses it.
 
 Release builds copy complete selected skills, including nested resources and
 notices, into each role's `.pi/skills/`. They generate `AGENTS.md` and compile
-extensions during the build. The archive contains no `skills-hub/` or source
-selection manifests; `bots/release.json` records the resolved selections. Pi
+extensions during the build. The archive contains no `skills-hub/` source
+catalog. Releases retain each `bot.toml` for private setup and launch;
+`bots/release.json` records the resolved selections. Pi
 discovers the installed role's resources natively. Worker instances share one
 installed worker role while retaining separate private state; no discovery links
 or skill copies are created in persistent bot homes during release setup.

@@ -5,10 +5,12 @@ from pathlib import Path
 import subprocess
 
 import click
-from bot_setup.browser import validate_browser
+from bot_setup.browser import validate_browser, configure_browser
 from bot_setup.env import read_env, required
 from bot_setup.instances import acquire_instance_lock, instance_paths, worker_names
 from bot_setup.release import validate_private_home
+from bot_setup.manifest import load_profile
+from bot_setup.runtime import initialize_settings_if_missing
 
 from .runtime import check_node, check_packages
 
@@ -46,6 +48,14 @@ def run_bot(root: Path, *, bot: str, env_file: Path, node: Path, mode: str) -> N
         for name in ("AGENTS.override.md", "AGENTS.md", "AGENTS.MD", "CLAUDE.md", "CLAUDE.MD"):
             if (ancestor / name).exists():
                 raise click.ClickException(f"Unexpected ancestor instructions: {ancestor / name}")
+    acquire_instance_lock(private)
+    manifest = load_profile(profile / "bot.toml", role)
+    if manifest.defaults is None:
+        raise click.ClickException("Bot manifest requires defaults")
+    fresh = not (private / ".pi/settings.json").exists()
+    initialize_settings_if_missing(private / ".pi", manifest.defaults)
+    if fresh and role != "manager":
+        configure_browser(profile, private, home=Path.home(), bot=bot)
     env = {**os.environ, **values, "AGENT_ROLE": role, "BATTUTA_BOT_NAME": bot, "PI_CODING_AGENT_DIR": str(private / ".pi")}
     env["PATH"] = str(node.parent) + os.pathsep + env.get("PATH", "")
     if role != "manager":
@@ -58,7 +68,6 @@ def run_bot(root: Path, *, bot: str, env_file: Path, node: Path, mode: str) -> N
         subprocess.run([str(node), str(helper), "--check"], env=env, check=True)
     else:
         env = {key: value for key, value in env.items() if "TELEGRAM" not in key and not key.startswith("PI_SCHEDULER")}
-    acquire_instance_lock(private)
     os.umask(0o077)
     os.chdir(profile)
     # Pi's offline flag prevents startup package installs, not provider requests.

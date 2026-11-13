@@ -6,6 +6,8 @@ import os
 import re
 
 import click
+from .manifest import load_manifest
+from .runtime import resolve_agent_dir
 
 
 def worker_names(values: dict[str, str], env_file: Path) -> list[str]:
@@ -19,7 +21,7 @@ def worker_names(values: dict[str, str], env_file: Path) -> list[str]:
     return [f"worker-{number}" for number in range(1, count + 1)]
 
 
-def instance_paths(root: Path, home: Path, bot: str) -> tuple[str, Path, Path]:
+def profile_identity(bot: str) -> tuple[str, str]:
     if bot in {"cos-bot", "manager-bot"}:
         role = bot.removesuffix("-bot")
         profile = bot
@@ -27,7 +29,14 @@ def instance_paths(root: Path, home: Path, bot: str) -> tuple[str, Path, Path]:
         role, profile = "worker", "worker"
     else:
         raise click.ClickException("Bot must be cos-bot, manager-bot, or worker-N (N >= 1)")
-    return role, root / "bots" / profile, home / ".battuta/pi-bots" / bot
+    return role, profile
+
+
+def instance_paths(root: Path, home: Path, bot: str) -> tuple[str, Path, Path]:
+    role, name = profile_identity(bot)
+    profile = root / "bots" / name
+    manifest = load_manifest(profile / "bot.toml")
+    return role, profile, resolve_agent_dir(manifest, bot, home).parent
 
 
 def acquire_instance_lock(bot_home: Path) -> int:
