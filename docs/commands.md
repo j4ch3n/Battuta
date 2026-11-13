@@ -23,7 +23,7 @@ Run source-checkout commands from the repository root. See [development](../.age
 
 `make dev` and `make prod` only launch or attach; an existing tmux session is reattached without reloading settings. Dev functions use `supabase/.env` separately.
 
-Before configuring CoS, stop it and select its private default provider and model. CoS setup provisions the nightly dream; see [memory setup](memory-service-setup.md#nightly-cos-dream-setup).
+Before configuring CoS, stop it and set the required `BATTUTA_DREAM_MODEL=provider/model-id` in the selected environment file. Conversational bots initially use Pi's automatic model/thinking selection. CoS setup provisions the nightly dream independently; see [memory setup](memory-service-setup.md#nightly-cos-dream-setup).
 
 `WORKER_BOT_COUNT` is required in both source environment files: `0` selects no
 workers, `1` is the normal local setting, and `N` selects worker-1 through worker-N.

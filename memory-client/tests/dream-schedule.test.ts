@@ -101,7 +101,7 @@ test("offline reconciliation upgrades the owned legacy prompt without enabling o
   expect(reconcileDreamSchedule(upgraded, now)).toEqual(upgraded);
 });
 test.each([false, true])(
-  "explicit offline setup preserves private model settings (separate agent dir: %s)",
+  "environment-selected dream setup preserves private preferences (separate agent dir: %s)",
   async (separate) => {
     const dir = await mkdtemp(join(tmpdir(), "dream-setup-"));
     dirs.push(dir);
@@ -128,6 +128,7 @@ test.each([false, true])(
       ...(separate ? { PI_CODING_AGENT_DIR: agent } : {}),
       PI_SCHEDULER_STATE_FILE: store,
       BATTUTA_MEMORY_DATA_DIR: data,
+      BATTUTA_DREAM_MODEL: "dream/first",
     };
     const configure = () =>
       promisify(execFile)(process.execPath, ["configure-dream.mjs", dir], { env });
@@ -142,8 +143,15 @@ test.each([false, true])(
     expect(await readFile(store, "utf8")).toBe(first);
     expect(JSON.parse(await readFile(join(data, "dream-config.json"), "utf8"))).toEqual({
       version: 1,
-      model: "p/m",
+      model: "dream/first",
     });
+    env.BATTUTA_DREAM_MODEL = "dream/second";
+    await configure();
+    expect(JSON.parse(await readFile(join(data, "dream-config.json"), "utf8"))).toEqual({
+      version: 1,
+      model: "dream/second",
+    });
+    expect(await readFile(store, "utf8")).toBe(first);
     const { extensions } = JSON.parse(await readFile(join(dir, ".pi/settings.json"), "utf8")) as {
       extensions: string[];
     };
@@ -164,10 +172,7 @@ test("Pi loads the configured relative dream extension", async () => {
   const agent = join(dir, "agent");
   await mkdir(join(dir, ".pi"));
   await mkdir(agent);
-  await writeFile(
-    join(dir, ".pi/settings.json"),
-    JSON.stringify({ defaultProvider: "p", defaultModel: "m" }),
-  );
+  await writeFile(join(dir, ".pi/settings.json"), JSON.stringify({}));
   const store = join(dir, "jobs.json");
   await initializeSchedulerStore(store);
   vi.stubEnv("AGENT_ROLE", "cos");
@@ -177,6 +182,7 @@ test("Pi loads the configured relative dream extension", async () => {
       PI_CODING_AGENT_DIR: join(dir, ".pi"),
       PI_SCHEDULER_STATE_FILE: store,
       BATTUTA_MEMORY_DATA_DIR: join(dir, "memory"),
+      BATTUTA_DREAM_MODEL: "dream/explicit",
     },
   });
   const loader = new DefaultResourceLoader({
@@ -189,27 +195,43 @@ test("Pi loads the configured relative dream extension", async () => {
   expect(loaded.errors).toEqual([]);
   expect(loaded.extensions.some((extension) => extension.tools.has("memory_dream"))).toBe(true);
 });
-test.each([{}, { defaultProvider: "p", defaultModel: "model with spaces" }])(
-  "invalid defaults %j leave scheduler and settings unchanged",
-  async (settings) => {
+test.each(
+  [undefined, "", " ", "missing-provider", "p/model with spaces"].flatMap((model) =>
+    [false, true].map((saved) => ({ model, saved })),
+  ),
+)(
+  "invalid dream environment $model leaves state unchanged (saved config: $saved)",
+  async ({ model, saved }) => {
     const dir = await mkdtemp(join(tmpdir(), "dream-unconfigured-"));
     dirs.push(dir);
     const store = join(dir, "stable/jobs.json");
     await initializeSchedulerStore(store);
     await mkdir(join(dir, ".pi"));
-    const settingsText = JSON.stringify(settings);
+    const settingsText = JSON.stringify({ defaultProvider: "p", defaultModel: "m" });
     await writeFile(join(dir, ".pi/settings.json"), settingsText);
+    const data = join(dir, "memory");
+    const modelPath = join(data, "dream-config.json");
+    const modelText = JSON.stringify({ version: 1, model: "dream/saved" });
+    if (saved) {
+      await mkdir(data);
+      await writeFile(modelPath, modelText);
+    }
+    const env = { ...process.env };
+    delete env.BATTUTA_DREAM_MODEL;
+    if (model !== undefined) env.BATTUTA_DREAM_MODEL = model;
     const before = await readFile(store, "utf8");
     await expect(
       promisify(execFile)(process.execPath, ["configure-dream.mjs", dir], {
         env: {
-          ...process.env,
+          ...env,
           PI_SCHEDULER_STATE_FILE: store,
-          BATTUTA_MEMORY_DATA_DIR: join(dir, "memory"),
+          BATTUTA_MEMORY_DATA_DIR: data,
         },
       }),
     ).rejects.toThrow();
     expect(await readFile(store, "utf8")).toBe(before);
     expect(await readFile(join(dir, ".pi/settings.json"), "utf8")).toBe(settingsText);
+    if (saved) expect(await readFile(modelPath, "utf8")).toBe(modelText);
+    else await expect(readFile(modelPath)).rejects.toMatchObject({ code: "ENOENT" });
   },
 );

@@ -88,10 +88,10 @@ for value in data['requires']:
             run(node, "--input-type=module", "-e", code)
             env_file = work / ".env.prod"
             template = run(str(installed["battuta-bot-setup"][0] / "battuta-bot-setup"), "env-example", capture_output=True).stdout
-            env_file.write_text(template + "\nWORKER_BOT_COUNT=2\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\nLINEAR_API_TOKEN=fixture\nCOS_TELEGRAM_TOKEN=101:fixture\nTELEGRAM_ALLOWED_USER_ID=123\n")
+            env_file.write_text(template + "\nWORKER_BOT_COUNT=2\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\nLINEAR_API_TOKEN=fixture\nCOS_TELEGRAM_TOKEN=101:fixture\nTELEGRAM_ALLOWED_USER_ID=123\nBATTUTA_DREAM_MODEL=fixture/model\n")
             agent = Path(env["HOME"]) / ".battuta/pi-bots/cos-bot/.pi"
             agent.mkdir(parents=True)
-            (agent / "settings.json").write_text('{"defaultProvider":"fixture","defaultModel":"model"}')
+            (agent / "settings.json").write_text("{}")
             run(str(installed["battuta-bot-setup"][0] / "battuta-bot-setup"), "configure-release", "--root", str(root), "--env-file", str(env_file))
             self.assertTrue((Path(env["HOME"]) / ".battuta/pi-bots/worker-2/.pi/mcp.json").is_file())
             self.assertFalse((root / "skills-hub").exists())

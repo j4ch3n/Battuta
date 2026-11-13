@@ -13,13 +13,11 @@ const [directory] = process.argv.slice(2);
 const agent = join(directory, ".pi");
 const data = join(directory, "memory");
 process.env.BATTUTA_MEMORY_DATA_DIR = data;
+process.env.BATTUTA_DREAM_MODEL = "offline/dream";
 process.env.PI_SCHEDULER_STATE_FILE = join(directory, "schedule-prompts.json");
 await initializeSchedulerStore(process.env.PI_SCHEDULER_STATE_FILE);
 await mkdir(agent, { recursive: true });
-await writeFile(
-  join(agent, "settings.json"),
-  JSON.stringify({ defaultProvider: "offline", defaultModel: "dream" }),
-);
+await writeFile(join(agent, "settings.json"), JSON.stringify({}));
 await configureDream(directory);
 process.umask(0o077);
 process.env.PI_SCHEDULER_CATCHUP_MAX = "1";

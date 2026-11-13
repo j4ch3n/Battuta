@@ -10,6 +10,13 @@ import { dreamConfigSchema } from "./dream-config.ts";
 // Run only during operator-invoked configuration, with the CoS stopped. Never
 // edit the scheduler's store concurrently with its in-process read/modify/write.
 export async function configureDream(botDirectory) {
+  const parsed = dreamConfigSchema.safeParse({
+    version: 1,
+    model: process.env.BATTUTA_DREAM_MODEL,
+  });
+  if (!parsed.success)
+    throw new Error("BATTUTA_DREAM_MODEL is required and must use provider/model-id");
+  const model = parsed.data;
   const directory = join(botDirectory, ".pi");
   const settingsPath = join(directory, "settings.json");
   const storePath = schedulerStorePath();
@@ -19,19 +26,6 @@ export async function configureDream(botDirectory) {
   const settings = settingsText ? JSON.parse(settingsText) : {};
   if (!settings || typeof settings !== "object" || Array.isArray(settings))
     throw new Error("Invalid CoS settings");
-  const modelText = await optionalText(modelPath);
-  const agentDirectory = process.env.PI_CODING_AGENT_DIR ?? directory;
-  const modelSettings =
-    agentDirectory === directory
-      ? settings
-      : JSON.parse((await optionalText(join(agentDirectory, "settings.json"))) ?? "{}");
-  if (!modelText && (!modelSettings.defaultProvider || !modelSettings.defaultModel))
-    throw new Error("Configure CoS defaultProvider/defaultModel before dream setup");
-  const model = dreamConfigSchema.parse(
-    modelText
-      ? JSON.parse(modelText)
-      : { version: 1, model: `${modelSettings.defaultProvider}/${modelSettings.defaultModel}` },
-  );
   const store = await readSchedulerStore(storePath);
   const result = reconcileDreamSchedule(store, new Date().toISOString());
   if (
