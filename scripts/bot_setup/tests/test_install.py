@@ -9,7 +9,7 @@ import click
 
 from fixtures import ConfigFixture
 
-from bot_setup.install import install_packages  # noqa: E402
+from bot_setup.install import TELEGRAM_PACKAGE, install_packages  # noqa: E402
 
 
 class InstallTests(ConfigFixture):
@@ -30,10 +30,10 @@ class InstallTests(ConfigFixture):
     def test_installs_only_telegram_with_bot_local_state(self):
         bot = self.root / "bots/cos-bot"
         with patch("bot_setup.install.shutil.which", return_value="pnpm"), patch("bot_setup.install.subprocess.run") as run:
-            install_packages(bot, "npm:@llblab/pi-telegram@0.57.3")
+            install_packages(bot, TELEGRAM_PACKAGE)
         self.assertEqual([call.args[0] for call in run.call_args_list], [
             ("pnpm", "install", "--frozen-lockfile"),
-            ("pnpm", "exec", "pi", "install", "-l", "--approve", "npm:@llblab/pi-telegram@0.57.3"),
+            ("pnpm", "exec", "pi", "install", "-l", "--approve", TELEGRAM_PACKAGE),
             ("pnpm", "exec", "pi", "list"),
         ])
         for call in run.call_args_list:

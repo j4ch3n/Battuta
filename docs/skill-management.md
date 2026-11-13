@@ -53,6 +53,9 @@ into the catalog.
 The Worker profile selects `artifacts` for commissioned creation and authorized
 publication; Manager selects `artifact-review` for independent editorial judgment.
 CoS retains final owner communication and intent/authority, not production tooling.
+Its dedicated instructions own everyday voice and Telegram message-form judgment;
+the Telegram extension's bundled `telegram-bridge` skill owns bridge syntax and
+delivery mechanics. Neither location grants transport permissions.
 
 CoS and Manager select `project-management` for the project lifecycle and managed
 document operations within their respective authority. Workers select
