@@ -36,7 +36,7 @@ instructions.
    fixed path. Confirm the tool succeeded and the file exists before reporting it.
 4. Report the page URL, observed result, and saved evidence path through the
    existing coordination route. Workers return evidence to Manager; Manager can
-   relay it to CoS. Only CoS has Telegram access: use the `active-telegram-message`
+   relay it to CoS. Only CoS has Telegram access: use the `telegram-bridge`
    skill when an authorized owner conversation needs the screenshot.
 
 ## Evidence and recovery
