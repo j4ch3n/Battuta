@@ -17,5 +17,5 @@ def skill_catalog(root: Path, role: str, names=None) -> list[str]:
         (source / "references/tools.md").write_text(f"{name} tools")
     bot = root / f"bots/{role}-bot"
     bot.mkdir(parents=True, exist_ok=True)
-    (bot / "skills.json").write_text(json.dumps({"skills": names}))
+    (bot / "bot.toml").write_text("[skills]\ninclude = " + json.dumps(names))
     return names

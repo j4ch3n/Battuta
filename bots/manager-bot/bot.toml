@@ -1,0 +1,16 @@
+[skills]
+include = [
+  "communicate-with-cos",
+  "coordinate-workers",
+  "define-assignments",
+  "note-taking",
+  "draft-writing",
+  "todo",
+  "project-management",
+  "project-memory",
+  "ticket-writing",
+  "research",
+  "artifact-review",
+  "problem-framing",
+  "prd",
+]

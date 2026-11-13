@@ -53,7 +53,7 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         raise click.ClickException("Release tag and Python tool version must match")
     if destination.is_symlink() or (destination.exists() and (not destination.is_dir() or any(destination.iterdir()))):
         raise click.ClickException("Release destination must be an empty regular directory")
-    selections = {profile: load_selection(source / "bots" / profile / "skills.json", source / "skills-hub") for profile in PROFILES}
+    selections = {profile: load_selection(source / "bots" / profile / "bot.toml", source / "skills-hub") for profile in PROFILES}
     for names in selections.values():
         for name in names:
             skill = source / "skills-hub" / name

@@ -15,9 +15,9 @@ def test_commit_hook_uses_staged_selection_and_release_gate_uses_checkout(tmp_pa
     entry = tmp_path / "skills-hub/research/SKILL.md"
     entry.parent.mkdir(parents=True)
     entry.write_text("research")
-    manifest = tmp_path / "bots/worker/skills.json"
+    manifest = tmp_path / "bots/worker/bot.toml"
     manifest.parent.mkdir(parents=True)
-    manifest.write_text('{"skills":["research"]}')
+    manifest.write_text('[skills]\ninclude=["research"]')
     binary = tmp_path / "node_modules/.bin"
     binary.mkdir(parents=True)
     uv = binary / "uv"
@@ -40,12 +40,12 @@ os.execv(sys.executable, [sys.executable, "-m", "bot_setup.cli", *sys.argv[6:]])
     assert result.returncode == 0, result.stderr
     assert (tmp_path / "next-task").exists()
     (tmp_path / "next-task").unlink()
-    manifest.write_text('{"skills":["missing"]}')
+    manifest.write_text('[skills]\ninclude=["missing"]')
     git("add", "bots")
-    manifest.write_text('{"skills":["research"]}')
+    manifest.write_text('[skills]\ninclude=["research"]')
     result = run("bash", str(ROOT / ".husky/pre-commit"))
     assert result.returncode != 0
     assert not (tmp_path / "next-task").exists()
     assert run("pnpm", "check:skills").returncode == 0
-    manifest.write_text('{"skills":["missing"]}')
+    manifest.write_text('[skills]\ninclude=["missing"]')
     assert run("pnpm", "check:skills").returncode != 0

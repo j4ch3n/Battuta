@@ -1,6 +1,7 @@
 """Clean source configuration installs Telegram for CoS only."""
 
 import json
+import tomllib
 from pathlib import Path
 from unittest.mock import patch
 
@@ -21,7 +22,7 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
     names = skill_catalog(
         tmp_path,
         role,
-        json.loads((Path(__file__).parents[3] / "bots/manager-bot/skills.json").read_text())["skills"]
+        tomllib.loads((Path(__file__).parents[3] / "bots/manager-bot/bot.toml").read_text())["skills"]["include"]
         if role == "manager"
         else None,
     )

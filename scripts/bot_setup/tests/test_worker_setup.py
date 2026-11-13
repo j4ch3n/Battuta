@@ -18,7 +18,7 @@ class WorkerSetupTests(unittest.TestCase):
         self.profile.mkdir(parents=True)
         (self.root / "bots/AGENTS_shared.md").write_text("shared fixture")
         (self.profile / "AGENTS_dedicated.md").write_text("dedicated fixture")
-        (self.profile / "skills.json").write_text(json.dumps({"skills": ["execute-assignment", "research"]}))
+        (self.profile / "bot.toml").write_text('[skills]\ninclude=["execute-assignment","research"]')
         for name in ("execute-assignment", "research"):
             skill = self.root / "skills-hub" / name
             skill.mkdir(parents=True)

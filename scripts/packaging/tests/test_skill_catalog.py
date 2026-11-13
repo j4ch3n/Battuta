@@ -33,7 +33,7 @@ class SkillCatalogTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir="/tmp") as directory:
             root = Path(directory)
             shutil.copytree(ROOT / "skills-hub", root / "skills-hub")
-            for manifest in (ROOT / "bots").glob("*/skills.json"):
+            for manifest in (ROOT / "bots").glob("*/bot.toml"):
                 target = root / manifest.relative_to(ROOT)
                 target.parent.mkdir(parents=True)
                 shutil.copy2(manifest, target)

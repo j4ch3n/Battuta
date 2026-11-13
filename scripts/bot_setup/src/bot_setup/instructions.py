@@ -11,8 +11,8 @@ def configure_instructions(bot_dir: Path, *, role: Literal["cos", "manager"], ro
     if role not in {"cos", "manager"}:
         raise click.ClickException(f"Unknown bot role: {role}")
     root = (root or bot_dir.parent.parent).resolve()
-    manifest = bot_dir / "skills.json"
-    names = load_selection(manifest if manifest.exists() else root / f"bots/{role}-bot/skills.json", root / "skills-hub")
+    manifest = bot_dir / "bot.toml"
+    names = load_selection(manifest if manifest.exists() else root / f"bots/{role}-bot/bot.toml", root / "skills-hub")
     write_instructions(bot_dir, root=root)
     link_selected_skills(bot_dir, root / "skills-hub", names)
 

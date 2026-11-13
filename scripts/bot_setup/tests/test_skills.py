@@ -18,7 +18,7 @@ def test_source_setup_links_selected_skills_idempotently(tmp_path, role, names):
     bot = tmp_path / f"bots/{role}-bot"
     (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
     (bot / "AGENTS_dedicated.md").write_text("Dedicated")
-    manifest = bot / "skills.json"
+    manifest = bot / "bot.toml"
     before = manifest.read_bytes()
     for _ in range(2):
         configure_instructions(bot, role=role, root=tmp_path)
@@ -34,7 +34,7 @@ def test_source_setup_links_selected_skills_idempotently(tmp_path, role, names):
 def test_invalid_selection_does_not_write_instructions(tmp_path):
     skill_catalog(tmp_path, "cos")
     bot = tmp_path / "bots/cos-bot"
-    (bot / "skills.json").write_text(json.dumps({"skills": ["missing"]}))
+    (bot / "bot.toml").write_text('[skills]\ninclude=["missing"]')
     (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
     (bot / "AGENTS_dedicated.md").write_text("Dedicated")
     with pytest.raises(click.ClickException):
@@ -49,7 +49,7 @@ def test_custom_workspace_manifest_controls_local_discovery(tmp_path):
     bot.mkdir()
     (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
     (bot / "AGENTS_dedicated.md").write_text("Dedicated")
-    (bot / "skills.json").write_text('{"skills":["note-taking"]}')
+    (bot / "bot.toml").write_text('[skills]\ninclude=["note-taking"]')
     configure_instructions(bot, role="cos", root=tmp_path)
     assert {entry.name for entry in (bot / ".pi/skills").iterdir()} == {"note-taking"}
 
@@ -59,7 +59,7 @@ def test_generated_discovery_paths_are_git_ignored(tmp_path, role):
     root = Path(__file__).resolve().parents[3]
     (tmp_path / ".gitignore").write_text((root / f"bots/{role}-bot/.gitignore").read_text())
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-    result = subprocess.run(["git", "check-ignore", "--stdin"], cwd=tmp_path, input=".pi/skills/memory\n.pi/skills/custom\n.pi/mail-sessions/example.jsonl\n.pi/sessions/example.jsonl\n.pi/settings.json\nskills.json\n", text=True, capture_output=True)
+    result = subprocess.run(["git", "check-ignore", "--stdin"], cwd=tmp_path, input=".pi/skills/memory\n.pi/skills/custom\n.pi/mail-sessions/example.jsonl\n.pi/sessions/example.jsonl\n.pi/settings.json\nbot.toml\n", text=True, capture_output=True)
     assert set(result.stdout.splitlines()) == {".pi/skills/memory", ".pi/skills/custom", ".pi/mail-sessions/example.jsonl", ".pi/sessions/example.jsonl"}
 
 
@@ -72,7 +72,7 @@ def test_reselection_removes_only_owned_links_and_preserves_custom_content(tmp_p
     skills = bot / ".pi/skills"
     custom = skills / "custom"
     custom.write_text("Private content")
-    (bot / "skills.json").write_text('{"skills":["research"]}')
+    (bot / "bot.toml").write_text('[skills]\ninclude=["research"]')
     configure_instructions(bot, role="manager", root=tmp_path)
     assert (skills / "research").is_symlink()
     assert not (skills / "note-taking").exists()

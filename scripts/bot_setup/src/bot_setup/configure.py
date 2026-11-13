@@ -86,7 +86,7 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
     required(values, "SUPABASE_SECRET_KEY", env_file)
     assignment_server(supabase_url)
     memory_url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
-    names = load_selection(root / "bots/worker/skills.json", root / "skills-hub")
+    names = load_selection(root / "bots/worker/bot.toml", root / "skills-hub")
     shared = root / "bots/AGENTS_shared.md"
     dedicated = profile / "AGENTS_dedicated.md"
     content = "\n".join(path.read_text() for path in (shared, dedicated))

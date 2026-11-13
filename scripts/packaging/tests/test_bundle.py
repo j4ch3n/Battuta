@@ -28,7 +28,7 @@ def source(tmp_path, monkeypatch):
     for profile in ("cos-bot", "manager-bot", "worker"):
         path = root / "bots" / profile
         (path / "AGENTS_dedicated.md").write_text(profile)
-        (path / "skills.json").write_text('{"skills":["research"]}')
+        (path / "bot.toml").write_text('[skills]\ninclude=["research"]')
         (path / ".pi").mkdir()
         (path / ".pi/auth.json").write_text("private-sentinel")
         (path / ".pi/settings.json").write_text('{"defaultModel":"private-model"}')

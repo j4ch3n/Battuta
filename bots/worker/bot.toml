@@ -1,0 +1,11 @@
+[skills]
+include = [
+  "todo",
+  "note-taking",
+  "draft-writing",
+  "execute-assignment",
+  "research",
+  "browser-evidence",
+  "artifacts",
+  "prd",
+]
