@@ -7,6 +7,7 @@ import click
 
 from .browser import browser_settings, configure_browser
 from .json_config import read_config, write_config
+from .subagents import prepare_worker_agents
 
 
 def validate_worker_settings(settings: dict) -> None:
@@ -72,6 +73,7 @@ def copy_worker_profile(profile: Path, bot_dir: Path) -> None:
     mcp["mcpServers"] = {**destination_servers, **source_servers}
     mcp["mcpServers"]["memory"] = {"enabled": False}
     # Validate every input before creating or changing any instance files.
+    prepare_worker_agents(profile / ".pi/agents", bot_dir, settings)
     bot_dir.mkdir(parents=True, exist_ok=True)
     write_config(bot_dir / ".pi/settings.json", settings, ".settings-")
     configure_browser(profile, bot_dir, home=Path.home(), bot=bot_dir.name)

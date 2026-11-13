@@ -16,7 +16,7 @@ from .json_config import read_config, write_config
 from .mcp import assignment_server, configure_mcp, validate_memory_url
 from .memory import configure_memory_settings
 from .release import validate_private_home
-from .subagents import WEB_PACKAGE, remove_manager_subagents
+from .subagents import WEB_PACKAGE, WORKER_SUBAGENT_PACKAGE, prepare_worker_agents, remove_manager_subagents
 from .telegram import prepare_telegram_config
 from .skills import load_selection
 from .workers import copy_worker_profile, validate_worker_settings
@@ -108,6 +108,10 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
             extensions.append(value)
     settings["extensions"] = extensions
     settings["battutaMemoryCapture"] = {"enabled": False}
+    packages = settings.get("packages", [])
+    if WORKER_SUBAGENT_PACKAGE not in packages:
+        packages.append(WORKER_SUBAGENT_PACKAGE)
+    settings["packages"] = packages
     if "research" in names:
         packages = settings.get("packages", [])
         if WEB_PACKAGE not in packages:
@@ -116,6 +120,12 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
     selected = [relpath(root / "skills-hub" / name, path.parent) for name in names]
     settings["skills"] = list(dict.fromkeys([*settings.get("skills", []), *selected]))
     bot_dir.mkdir(parents=True, exist_ok=True)
+    prepare_worker_agents(profile / "agents", bot_dir, settings)
     (bot_dir / "AGENTS.md").write_text(content)
     write_config(path, settings, ".settings-")
     configure_mcp(bot_dir, role="worker", memory_url=memory_url, supabase_url=supabase_url)
+    if not shared_catalog:
+        agent_env = {**os.environ, "PI_CODING_AGENT_DIR": str(bot_dir / ".pi")}
+        for package in (WEB_PACKAGE, WORKER_SUBAGENT_PACKAGE):
+            run(str(runtime / "node_modules/.bin/pi"), "install", "-l", "--approve",
+                package, cwd=bot_dir, env=agent_env)

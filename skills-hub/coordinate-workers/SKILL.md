@@ -27,7 +27,7 @@ Plan complete assignments using todo, with ordered initial TODOs and existing pr
 
 Receive completed/blocked summaries through Agent Mail and inspect authoritative state and actual evidence. Worker extension code owns execution-state writes and mandatory result delivery. Manager reviews verification evidence and integrates results and reports meaningful outcomes, risks, and decisions to CoS; reported success is not owner acceptance.
 
-For blockers, cancel/replace the assignment or cancel unfinished TODOs, append replacements, and reactivate explicitly. Preserve completed evidence. Dependencies cannot be edited and cancelled prerequisites do not unlock dependents; replace affected downstream plans when needed. No terminal reopening, age-based reclaim, nested delegation, or original-worker affinity. Escalate product/authority decisions to CoS with a recommendation.
+For blockers, cancel/replace the assignment or cancel unfinished TODOs, append replacements, and reactivate explicitly. Preserve completed evidence. Dependencies cannot be edited and cancelled prerequisites do not unlock dependents; replace affected downstream plans when needed. No terminal reopening, age-based reclaim, nested assignments, or original-worker affinity. Escalate product/authority decisions to CoS with a recommendation.
 
 For example, sequence two assignments that edit the same workspace through an
 immutable dependency and inspect their asynchronous evidence before integrating.

@@ -109,7 +109,7 @@ claim tokens are bound by code, not tool arguments.
 - Unresolvable input, authority, runtime, or verification gaps require a truthful
   blocked report. Final prose, model idleness, and a successful tool exit are not
   proof of success. Never invent approvals or acceptance.
-- Follow the bound TODO sequence; no per-TODO workers or nested delegation.
+- Follow the bound TODO sequence; no per-TODO workers or nested assignments.
   Manager decides replanning and recovery after a blocker.
 - The 45-minute lease timestamp is informational only. Do not renew, release,
   reclaim, or stop solely because it elapsed.
