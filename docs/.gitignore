@@ -1,3 +1,5 @@
-# Local Superpowers artifacts
-/superpowers/
+# Plans and specs are maintained under superpowers; other artifacts stay local.
+/superpowers/*
+!/superpowers/plans/
+!/superpowers/spec/
 /plans/

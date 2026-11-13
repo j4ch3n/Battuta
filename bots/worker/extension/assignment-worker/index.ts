@@ -71,6 +71,9 @@ export default function worker(pi: ExtensionAPI) {
     context = ctx;
     pi.setActiveTools([
       "codemode",
+      "Agent",
+      "get_subagent_result",
+      "steer_subagent",
       "web_search",
       "web_fetch",
       "read",
