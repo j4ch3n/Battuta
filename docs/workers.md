@@ -1,6 +1,6 @@
 # Persistent assignment workers
 
-`bots/worker/extension/assignment-worker/` is a worker-only Pi extension. Each
+`assignment-worker/` is a worker-only Pi extension. Each
 worker is an ordinary long-lived interactive Pi CLI instance. A fixed
 set of operator-started workers competes for whole assignments; no pool manager,
 dispatch queue, result queue, or scheduler daemon is introduced.
@@ -37,6 +37,9 @@ and instructions are not prerequisites. Missing shared MCP configuration stops
 launch with a setup command rather than synthesizing endpoints.
 Optional full setup prepares `bots/worker` from its `bot.toml` and copies its
 configuration into instances. Instances share extension/dependency/catalog resources.
+The profile's manifest selects `assignment-worker/index.ts`; source setup links
+it into the profile's `.pi/extensions/`, while release assembly stages a compiled
+package there. Instance settings do not register that discovered extension again.
 Authentication and runtime state are private, never copied. Pi natively discovers the prepared
 skills, packages, extensions, and instructions. Runtime code does not parse the
 manifest or implement a custom resource loader.

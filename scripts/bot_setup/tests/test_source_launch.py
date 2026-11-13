@@ -19,9 +19,10 @@ def test_unselected_worker_stops_before_provisioning(tmp_path, monkeypatch, coun
     scripts = root / "scripts/bot_setup"
     scripts.mkdir(parents=True)
     shutil.copy2(Path(__file__).resolve().parents[3] / "scripts/bot_setup/run-worker.sh", scripts / "run-worker.sh")
-    cli = root / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
+    cli = root / "assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
     cli.parent.mkdir(parents=True)
     cli.touch()
+    (root / "bots/worker").mkdir(parents=True)
     (root / "bots/worker/bot.toml").write_text(manifest_text("worker", []))
     env_file = root / ".env"
     env_file.write_text("SUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\n" + (f"WORKER_BOT_COUNT={count}\n" if count is not None else ""))

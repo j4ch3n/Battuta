@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tomllib
 
 import pytest
 
@@ -25,6 +26,12 @@ def installed(tmp_path):
         bot = root / "bots" / profile
         (bot / ".pi/skills").mkdir(parents=True, exist_ok=True)
         (bot / "bot.toml").write_text(manifest_text(profile.removesuffix("-bot"), []))
+        for extension in tomllib.loads((bot / "bot.toml").read_text())["extensions"]:
+            package = bot / ".pi/extensions" / extension["name"]
+            (package / "dist").mkdir(parents=True)
+            (package / "dist/index.js").write_text("export default () => {}")
+            (package / "package.json").write_text("{}")
+            (package / "pnpm-lock.yaml").write_text("")
         (bot / "AGENTS.md").write_text("instructions")
         (bot / ".pi/settings.json").write_text("{}")
         cli = bot / "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"

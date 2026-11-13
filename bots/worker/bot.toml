@@ -16,7 +16,11 @@ pi = [
   "npm:@amaster.ai/pi-browser-use@0.1.38",
   "npm:@tintinweb/pi-subagents@0.24.0",
 ]
-node_projects = ["bots/worker/extension/assignment-worker", "agent-mail"]
+node_projects = ["assignment-worker", "agent-mail"]
+
+[[extensions]]
+name = "assignment-worker"
+source = "assignment-worker/index.ts"
 
 [[files]]
 operation = "concatenate"

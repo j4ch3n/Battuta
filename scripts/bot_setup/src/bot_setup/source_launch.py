@@ -21,7 +21,7 @@ def run_source_worker(root: Path, *, bot_dir: Path, env_file: Path, node: Path) 
         raise click.ClickException("Worker is outside the configured WORKER_BOT_COUNT")
     for key in ("SUPABASE_URL", "SUPABASE_SECRET_KEY"):
         required(values, key, env_file)
-    cli = root / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
+    cli = root / "assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
     if not cli.is_file():
         raise click.ClickException("Prepare the source worker runtime first")
     matches = [name for name in selected if instance_paths(root, Path.home(), name)[2].absolute() == bot_dir.absolute()]
@@ -56,20 +56,16 @@ def run_source_bot(root: Path, *, bot: str, env_file: Path) -> None:
         configure_browser(profile, private, home=Path.home(), bot=bot)
     env = {**os.environ, **values, "AGENT_ROLE": role, "BATTUTA_BOT_NAME": bot, "PI_CODING_AGENT_DIR": str(private / ".pi")}
     env.setdefault("BATTUTA_MEMORY_URL", "http://127.0.0.1:8901/mcp")
-    extensions = ["agent-mail", "project-spec"]
     if role == "cos":
         env.update(validate_browser(profile, private, home=Path.home(), bot=bot, path=env.get("PATH")))
         scheduler = root / "memory-client/configure-scheduler.mjs"
         for option, key in (("--print-path", "PI_SCHEDULER_STATE_FILE"), ("--print-catchup", "PI_SCHEDULER_CATCHUP_MAX")):
             env[key] = subprocess.check_output(["node", str(scheduler), option], env=env, text=True).strip()
         subprocess.run(["node", str(scheduler), "--check"], env=env, check=True)
-        extensions.append("memory-client")
     else:
         env = {key: value for key, value in env.items() if "TELEGRAM" not in key and not key.startswith("PI_SCHEDULER")}
     cli = profile / "node_modules/.bin/pi"
     args = [str(cli), "--approve", "--continue", "--session-dir", str(private / ".pi/mail-sessions")]
-    for extension in extensions:
-        args.extend(["--extension", str(root / extension / "index.ts")])
     os.umask(0o077)
     os.chdir(profile)
     os.execve(str(cli), args, env)

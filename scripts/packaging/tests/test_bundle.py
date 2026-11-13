@@ -3,6 +3,7 @@
 import json
 import io
 import tarfile
+import tomllib
 from pathlib import Path
 
 import click
@@ -28,13 +29,16 @@ def source(tmp_path, monkeypatch):
     (root / "package.json").write_text('{"packageManager":"pnpm@10.20.0"}')
     (root / "bots").mkdir()
     (root / "bots/AGENTS_shared.md").write_text("shared")
-    for name in ("agent-mail", "project-spec", "memory-client", "bots/cos-bot", "bots/manager-bot", "bots/worker/extension/assignment-worker"):
+    for name in ("agent-mail", "project-spec", "memory-client", "bots/cos-bot", "bots/manager-bot", "assignment-worker"):
         path = root / name
         path.mkdir(parents=True, exist_ok=True)
         (path / "package.json").write_text('{"type":"module","dependencies":{}}')
         (path / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n")
+        (path / "index.ts").write_text("export default () => {}")
+    (root / "memory-client/dream-extension.ts").write_text("export default () => {}")
     for profile in ("cos-bot", "manager-bot", "worker"):
         path = root / "bots" / profile
+        path.mkdir(parents=True, exist_ok=True)
         (path / "AGENTS_dedicated.md").write_text(profile)
         (path / "bot.toml").write_text(manifest_text(profile.removesuffix("-bot"), ["research"]))
         (path / ".pi").mkdir()
@@ -53,10 +57,16 @@ def source(tmp_path, monkeypatch):
     # The package boundary returns selections; packaging owns copying and validation.
     monkeypatch.setattr(bundle, "load_selection", lambda manifest, catalog: ["research"])
     monkeypatch.setattr(bundle.subprocess, "check_output", lambda *args, **kwargs: "a" * 40)
-    monkeypatch.setattr(bundle, "compile_bots", lambda source, destination: [
-        (destination / relative).write_text("export default function () {}")
-        for relative in bundle.ENTRY_OUTPUTS
-    ])
+    def compile_fixture(source, destination):
+        outputs = list(bundle.ENTRY_OUTPUTS)
+        for profile in bundle.PROFILES:
+            entries = json.loads((destination / "bots" / profile / ".pi/extension-build.json").read_text())
+            outputs.extend(f"bots/{profile}/.pi/extensions/{entry['name']}/dist/index.js" for entry in entries)
+        for relative in outputs:
+            path = destination / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("export default function () {}")
+    monkeypatch.setattr(bundle, "compile_bots", compile_fixture)
     return root
 
 
@@ -76,6 +86,13 @@ def test_staged_archive_separates_documentation_and_bots(source, tmp_path):
         assert (bot / ".pi/skills/research/LICENSE").read_text() == "LICENSE"
         assert not (bot / ".pi/auth.json").exists()
         settings = json.loads((bot / ".pi/settings.json").read_text())
+        assert "extensions" not in settings
+        entries = tomllib.loads((bot / "bot.toml").read_text())["extensions"]
+        assert {entry.name for entry in (bot / ".pi/extensions").iterdir()} == {entry["name"] for entry in entries}
+        for entry in entries:
+            package = bot / ".pi/extensions" / entry["name"]
+            assert (package / "dist/index.js").is_file()
+            assert json.loads((package / "package.json").read_text())["pi"]["extensions"] == ["dist/index.js"]
         assert "defaultModel" not in settings
         assert "skills-hub" not in json.dumps(settings)
         assert not (bot / ".pi/skills/research").is_symlink()
@@ -97,12 +114,53 @@ def test_staged_archive_separates_documentation_and_bots(source, tmp_path):
             assert "userDataDir" not in settings["pi-browser-use"]
     assert not list(target.rglob("*.ts"))
     assert not list(target.rglob("node_modules"))
+    assert not list(target.rglob("extension-build.json"))
     moved = tmp_path / "relocated"
     target.rename(moved)
     bundle.validate_bundle(moved)
     (moved / "bots/worker/.pi/skills/research/SKILL.md").unlink()
     with pytest.raises(click.ClickException):
         bundle.validate_bundle(moved)
+
+
+def test_bundled_workspace_dependencies_are_not_installed_at_runtime(source, tmp_path):
+    manifest_path = source / "assignment-worker/package.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["dependencies"] = {"@battuta/agent-mail": "workspace:*", "typebox": "1.3.27"}
+    manifest_path.write_text(json.dumps(manifest))
+    target = tmp_path / "release"
+    bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
+    for path in (
+        target / "bots/worker/package.json",
+        target / "bots/worker/.pi/extensions/assignment-worker/package.json",
+    ):
+        assert json.loads(path.read_text())["dependencies"] == {"typebox": "1.3.27"}
+
+
+def test_memory_release_retains_workspace_overrides(source, tmp_path):
+    root_manifest = source / "package.json"
+    data = json.loads(root_manifest.read_text())
+    data["pnpm"] = {"overrides": {"example": "1.2.3"}}
+    root_manifest.write_text(json.dumps(data))
+    target = tmp_path / "release"
+    bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
+    paths = [target / "bots/_shared/memory-client/package.json"]
+    paths.extend(
+        package / "package.json"
+        for package in (target / "bots/cos-bot/.pi/extensions").iterdir()
+        if json.loads((package / "package.json").read_text()).get("pnpm")
+    )
+    assert paths
+    for path in paths:
+        assert json.loads(path.read_text())["pnpm"]["overrides"] == {"example": "1.2.3"}
+
+
+def test_missing_built_extension_is_rejected(source, tmp_path):
+    target = tmp_path / "release"
+    bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
+    (target / "bots/worker/.pi/extensions/assignment-worker/dist/index.js").unlink()
+    with pytest.raises(click.ClickException):
+        bundle.validate_bundle(target)
 
 
 def test_extracts_only_bots_from_archive_with_documentation(source, tmp_path):

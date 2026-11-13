@@ -70,7 +70,7 @@ jobs:
         env:
           COMPONENT: ${{ matrix.component }}
       - uses: actions/upload-artifact@v4
-        if: always() && matrix.component != 'bots/cos-bot'
+        if: always()
         with:
           name: coverage-${{ strategy.job-index }}-${{ github.workflow }}-${{ github.run_attempt }}
           path: ${{ matrix.component }}/coverage/
@@ -131,9 +131,9 @@ jobs:
           version: "0.11.19"
           enable-cache: true
           cache-dependency-glob: ${{ matrix.group == 'scripts' && 'scripts/**/uv.lock' || format('{0}/uv.lock', matrix.group) }}
-      - name: Install scheduler setup/launcher runtime dependencies
+      - name: Install workspace dependencies
         if: matrix.group == 'scripts'
-        run: pnpm --dir memory-client install --frozen-lockfile --prod
+        run: pnpm install --frozen-lockfile
       - run: node scripts/checks/check-support.mjs "$GROUP"
         env:
           GROUP: ${{ matrix.group }}

@@ -29,13 +29,14 @@ const all =
       [
         "package.json",
         "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
         "eslint.config.mjs",
         ".node-version",
         ".deno-version",
       ].includes(file),
   );
-const worker = "bots/worker/extension/assignment-worker";
-const node = ["agent-mail", "project-spec", "memory-client", worker, "bots/cos-bot"];
+const worker = "assignment-worker";
+const node = ["agent-mail", "project-spec", "memory-client", worker];
 const python = ["memory-service", "artifact-service", "project-context-cli"];
 const functions = readdirSync(resolve(root, "supabase/functions"), { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && !entry.name.startsWith("_"))

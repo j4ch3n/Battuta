@@ -116,7 +116,7 @@ class RunDevTests(LauncherFixture):
                 self.assertNotIn("supabase-test", pane.stdout + pane.stderr)
 
     def test_dev_missing_worker_prerequisite_fails_before_creating_session(self):
-        paths = [self.root / "bots/worker/extension/assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"]
+        paths = [self.root / "assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"]
         for path in paths:
             with self.subTest(path=path):
                 backup = path.with_name(path.name + ".saved")
@@ -248,8 +248,7 @@ print(json.dumps({"role": os.environ["AGENT_ROLE"], "token": os.environ.get("LIN
                             private_pi = str(self.home / ".battuta/pi-bots/manager-bot/.pi")
                             self.assertEqual(result["agentDir"], private_pi)
                             self.assertEqual(result["args"][result["args"].index("--session-dir") + 1], f"{private_pi}/mail-sessions")
-                        self.assertIn(str(self.root / "project-spec/index.ts"), result["args"])
-                        self.assertEqual(str(self.root / "memory-client/index.ts") in result["args"], "AGENT_ROLE=cos" in command[-1])
+                        self.assertNotIn("--extension", result["args"])
                 self.assertEqual(self.commands()[-1], ["attach-session", "-t", f"=battuta-{mode}"])
 
     def test_existing_session_only_attaches(self):

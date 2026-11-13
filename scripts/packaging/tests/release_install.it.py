@@ -83,7 +83,8 @@ for value in data['requires']:
             run(str(installed["battuta-packaging"][0] / "battuta-packaging"), "extract-bots", "--archive", str(assets / f"battuta-{tag}-linux-arm64.tar.gz"), "--root", str(root))
             node = shutil.which("node", path=env["PATH"])
             run(str(installed["battuta-packaging"][0] / "battuta-packaging"), "install-runtime", "--root", str(root), "--node", node)
-            entries = ["bots/_shared/agent-mail/dist/index.js", "bots/_shared/project-spec/dist/index.js", "bots/_shared/memory-client/dist/index.js", "bots/_shared/memory-client/dist/dream-extension.js", "bots/cos-bot/.pi/extensions/index.js", "bots/worker/.pi/extensions/index.js"]
+            entries = [str(path.relative_to(root)) for path in (root / "bots").glob("*/.pi/extensions/*/dist/index.js")]
+            self.assertTrue(entries)
             code = "for (const name of " + json.dumps(entries) + ") { const m = await import(" + json.dumps(str(root) + "/") + "+name); if(typeof m.default !== 'function') throw new Error(name); }"
             run(node, "--input-type=module", "-e", code)
             env_file = work / ".env.prod"
@@ -97,10 +98,8 @@ for value in data['requires']:
             self.assertFalse((root / "skills-hub").exists())
             # Only disposable schedule/config files: no scheduler or model is running.
             settings = json.loads((root / "bots/cos-bot/.pi/settings.json").read_text())
-            dream = [path for path in settings["extensions"] if "dream-extension" in path]
-            self.assertEqual(len(dream), 1)
-            self.assertFalse(Path(dream[0]).is_absolute())
-            self.assertTrue((root / "bots/cos-bot/.pi" / dream[0]).is_file())
+            self.assertNotIn("extensions", settings)
+            self.assertTrue((root / "bots/cos-bot/.pi/extensions/dream/dist/index.js").is_file())
             run(str(installed["battuta-memory"][1] / "bin/python"), "-c", "import sqlite3,sqlite_vec,onnxruntime,tokenizers; c=sqlite3.connect(':memory:'); c.enable_load_extension(True); sqlite_vec.load(c); c.close(); assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()")
 
 

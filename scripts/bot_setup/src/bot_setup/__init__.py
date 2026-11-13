@@ -4,12 +4,10 @@ from .env import read_env, required
 from .install import install_packages, warn_running_session
 from .instructions import configure_instructions
 from .mcp import configure_mcp
-from .memory import configure_memory_settings
 from .telegram import configure_telegram
 
 __all__ = [
     "configure_mcp",
-    "configure_memory_settings",
     "configure_instructions",
     "configure_telegram",
     "install_packages",

@@ -14,6 +14,14 @@ thinking = "medium"
 pi = ["npm:pi-web-access@0.43.0"]
 node_projects = ["agent-mail", "project-spec", "memory-client"]
 
+[[extensions]]
+name = "agent-mail"
+source = "agent-mail/index.ts"
+
+[[extensions]]
+name = "project-spec"
+source = "project-spec/index.ts"
+
 [[files]]
 operation = "concatenate"
 sources = [
@@ -33,7 +41,7 @@ policy = "create-only"
 optional = true
 
 [setup]
-steps = ["mcp", "memory-settings"]
+steps = ["mcp"]
 
 [skills]
 include = [

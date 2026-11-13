@@ -34,6 +34,10 @@ def install_runtime(root: Path, *, node: Path) -> None:
     if "pnpm@" + actual != metadata["packageManager"]:
         raise click.ClickException("pnpm must match the release metadata")
     directories = [root / "bots/_shared" / name for name in SHARED] + [root / "bots" / profile for profile in PROFILES]
+    directories += [
+        path.parent for profile in PROFILES
+        for path in (root / "bots" / profile / ".pi/extensions").glob("*/package.json")
+    ]
     for directory in directories:
         subprocess.run([pnpm, "install", "--prod", "--frozen-lockfile"], cwd=directory, env=env, check=True)
     for profile in PROFILES:

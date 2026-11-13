@@ -8,19 +8,16 @@ import subprocess
 import tarfile
 
 import click
-from bot_setup.browser import browser_defaults
 from bot_setup.skills import load_selection
 from bot_setup.files import prepare_files
 from bot_setup.manifest import load_profile
 from bot_setup.subagents import render_worker_agents
+from bot_setup.extensions import profile_settings, source_extension_links
 
 PROFILES = ("cos-bot", "manager-bot", "worker")
-SHARED = ("agent-mail", "project-spec", "memory-client")
+SHARED = ("memory-client",)
 ENTRY_OUTPUTS = (
-    "bots/_shared/agent-mail/dist/index.js", "bots/_shared/project-spec/dist/index.js",
-    "bots/_shared/memory-client/dist/index.js", "bots/_shared/memory-client/dist/dream-extension.js",
     "bots/_shared/memory-client/dist/configure-scheduler.js", "bots/_shared/memory-client/dist/configure-dream.js",
-    "bots/cos-bot/.pi/extensions/index.js", "bots/worker/.pi/extensions/index.js",
 )
 
 
@@ -51,6 +48,16 @@ def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, indent=2) + "\n")
 
 
+def release_manifest(manifest: dict) -> dict:
+    for section in ("dependencies", "devDependencies", "optionalDependencies"):
+        if section in manifest:
+            manifest[section] = {
+                name: version for name, version in manifest[section].items()
+                if not version.startswith("workspace:")
+            }
+    return manifest
+
+
 def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) -> None:
     if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag) or not tool_version.startswith(tag[1:] + "+g"):
         raise click.ClickException("Release tag and Python tool version must match")
@@ -58,6 +65,14 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         raise click.ClickException("Release destination must be an empty regular directory")
     selections = {profile: load_selection(source / "bots" / profile / "bot.toml", source / "skills-hub") for profile in PROFILES}
     manifests = {profile: load_profile(source / "bots" / profile / "bot.toml", profile.removesuffix("-bot")) for profile in PROFILES}
+    for profile, manifest in manifests.items():
+        source_extension_links(source, destination / "bots" / profile, manifest.extensions)
+        for extension in manifest.extensions:
+            owner = source / Path(extension.source).parent
+            for name in ("package.json", "pnpm-lock.yaml"):
+                path = owner / name
+                if path.is_symlink() or not path.is_file():
+                    raise click.ClickException(f"Missing regular extension package file: {path}")
     worker_agents = render_worker_agents(source / "bots/worker", manifests["worker"])
     for names in selections.values():
         for name in names:
@@ -77,22 +92,28 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         shutil.copy2(source / relative, target)
     shutil.copytree(source / "docs", destination / "docs", ignore=shutil.ignore_patterns("superpowers"))
     node_version = (source / ".node-version").read_text().strip()
-    package_manager = json.loads((source / "package.json").read_text())["packageManager"]
+    root_manifest = json.loads((source / "package.json").read_text())
+    package_manager = root_manifest["packageManager"]
+    overrides = root_manifest.get("pnpm", {}).get("overrides", {})
     for component in SHARED:
         package = destination / "bots/_shared" / component
         package.mkdir(parents=True)
         for name in ("package.json", "pnpm-lock.yaml"):
             shutil.copy2(source / component / name, package / name)
+        if overrides:
+            metadata = json.loads((package / "package.json").read_text())
+            metadata.setdefault("pnpm", {})["overrides"] = overrides
+            write_json(package / "package.json", metadata)
         (package / "dist").mkdir()
     packages = {profile: manifest.packages.pi.copy() for profile, manifest in manifests.items()}
     for profile in PROFILES:
         bot = destination / "bots" / profile
         (bot / ".pi/extensions").mkdir(parents=True)
         original = source / "bots" / profile
-        runtime = original / "extension/assignment-worker" if profile == "worker" else original
+        runtime = source / "assignment-worker" if profile == "worker" else original
         for name in ("package.json", "pnpm-lock.yaml"):
             shutil.copy2(runtime / name, bot / name)
-        manifest = json.loads((bot / "package.json").read_text())
+        manifest = release_manifest(json.loads((bot / "package.json").read_text()))
         manifest["type"] = "module"
         write_json(bot / "package.json", manifest)
         shutil.copy2(original / "bot.toml", bot / "bot.toml")
@@ -100,27 +121,36 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         for name in selections[profile]:
             shutil.copytree(source / "skills-hub" / name, bot / ".pi/skills" / name)
         (bot / ".pi/skills").mkdir(exist_ok=True)
-        extensions = ["../node_modules/@earendil-works/pi-coding-agent/dist/extensions/mcp/index.js", "../node_modules/@earendil-works/pi-coding-agent/dist/extensions/codemode/index.js"]
-        if profile in {"cos-bot", "manager-bot"}:
-            extensions += [f"../../_shared/{name}/dist/index.js" for name in ("agent-mail", "project-spec")]
-        if profile == "cos-bot":
-            extensions += ["../../_shared/memory-client/dist/index.js", "extensions/index.js"]
+        for extension in manifests[profile].extensions:
+            entry = Path(extension.source)
+            owner = source / entry.parent
+            if entry.is_absolute() or ".." in entry.parts or not (source / entry).resolve().is_relative_to(source.resolve()) or not (source / entry).is_file():
+                raise click.ClickException(f"Invalid extension source: {extension.source}")
+            package = bot / ".pi/extensions" / extension.name
+            package.mkdir()
+            for name in ("package.json", "pnpm-lock.yaml"):
+                shutil.copy2(owner / name, package / name)
+            metadata = release_manifest(json.loads((package / "package.json").read_text()))
+            if entry.parent.name == "memory-client" and overrides:
+                metadata.setdefault("pnpm", {})["overrides"] = overrides
+            metadata["type"] = "module"
+            metadata["pi"] = {"extensions": ["dist/index.js"]}
+            write_json(package / "package.json", metadata)
+        write_json(bot / ".pi/extension-build.json", [entry.model_dump() for entry in manifests[profile].extensions])
         if profile == "worker":
-            extensions += ["extensions/index.js"]
             agents = bot / ".pi/agents"
             agents.mkdir()
             for name, content in worker_agents.items():
                 (agents / name).write_bytes(content)
-        settings = {"packages": packages[profile], "extensions": extensions, "battutaMemoryCapture": {"enabled": profile == "cos-bot"}}
-        if profile != "manager-bot":
-            browser_defaults(settings)
-            packages[profile] = settings["packages"]
+        settings = profile_settings(manifests[profile], browser=profile != "manager-bot")
         write_json(bot / ".pi/settings.json", settings)
         shutil.copy2(original / ".pi/web-search.json", bot / ".pi/web-search.json")
     for relative in ENTRY_OUTPUTS:
         (destination / relative).parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source / "LICENSE", destination / "bots/LICENSE")
     compile_bots(source, destination)
+    for profile in PROFILES:
+        (destination / "bots" / profile / ".pi/extension-build.json").unlink()
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip()
     write_json(destination / "bots/release.json", {"tag": tag, "commit": commit, "toolVersion": tool_version, "node": node_version, "packageManager": package_manager, "skills": selections, "packages": packages})
     validate_bundle(destination)
@@ -137,6 +167,13 @@ def validate_bundle(root: Path) -> dict:
                 raise ValueError(relative)
         for profile in PROFILES:
             bot = root / "bots" / profile
+            manifest = load_profile(bot / "bot.toml", profile.removesuffix("-bot"))
+            for extension in manifest.extensions:
+                package = bot / ".pi/extensions" / extension.name
+                for name in ("dist/index.js", "package.json", "pnpm-lock.yaml"):
+                    path = package / name
+                    if path.is_symlink() or not path.is_file():
+                        raise ValueError(f"extension: {path}")
             if not (bot / "AGENTS.md").is_file():
                 raise ValueError(profile)
             selected = bot / ".pi/skills"

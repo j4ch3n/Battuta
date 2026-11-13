@@ -4,6 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@10.20.0",
   "dependencies": {
+    "@battuta/agent-mail": "workspace:*",
     "@earendil-works/pi-coding-agent": "1.5.2",
     "@modelcontextprotocol/client": "2.4.0",
     "@supabase/supabase-js": "2.117.2",
@@ -18,7 +19,7 @@
   },
   "scripts": {
     "check": "tsc --noEmit",
-    "test": "vitest run --project unit",
+    "test": "vitest run --project unit && vitest run --project integration tests/mail-package.integration.test.ts tests/notify.integration.test.ts",
     "test:coverage": "vitest run --project unit --coverage",
     "test:integration": "vitest run --project integration"
   }

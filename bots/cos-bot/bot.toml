@@ -19,6 +19,22 @@ pi = [
 ]
 node_projects = ["agent-mail", "project-spec", "memory-client"]
 
+[[extensions]]
+name = "agent-mail"
+source = "agent-mail/index.ts"
+
+[[extensions]]
+name = "project-spec"
+source = "project-spec/index.ts"
+
+[[extensions]]
+name = "memory-client"
+source = "memory-client/index.ts"
+
+[[extensions]]
+name = "dream"
+source = "memory-client/dream-extension.ts"
+
 [[files]]
 operation = "concatenate"
 sources = [
@@ -38,7 +54,7 @@ policy = "create-only"
 optional = true
 
 [setup]
-steps = ["telegram", "mcp", "memory-settings", "browser", "dream"]
+steps = ["telegram", "mcp", "browser", "dream"]
 
 [skills]
 include = [

@@ -1,26 +1,39 @@
 import { build } from "esbuild";
 import { readFile, cp, mkdir } from "node:fs/promises";
 import { resolve, dirname, join } from "node:path";
+import { createRequire } from "node:module";
 
 const [source, destination] = process.argv.slice(2).map((path) => resolve(path));
 if (!source || !destination) throw new Error("Usage: build-bots.mjs SOURCE DESTINATION");
 const entries = {
-  "agent-mail/index.ts": "bots/_shared/agent-mail/dist/index.js",
-  "project-spec/index.ts": "bots/_shared/project-spec/dist/index.js",
-  "memory-client/index.ts": "bots/_shared/memory-client/dist/index.js",
-  "memory-client/dream-extension.ts": "bots/_shared/memory-client/dist/dream-extension.js",
   "memory-client/configure-scheduler.mjs": "bots/_shared/memory-client/dist/configure-scheduler.js",
   "memory-client/configure-dream.mjs": "bots/_shared/memory-client/dist/configure-dream.js",
-  "bots/cos-bot/.pi/extensions/cos-bot/index.ts": "bots/cos-bot/.pi/extensions/index.js",
-  "bots/worker/extension/assignment-worker/index.ts": "bots/worker/.pi/extensions/index.js",
 };
-for (const [entry, output] of Object.entries(entries)) {
+const builds = Object.entries(entries).map(([entry, output]) => ({ entry, output }));
+for (const profile of ["cos-bot", "manager-bot", "worker"]) {
+  const map = JSON.parse(
+    await readFile(join(destination, "bots", profile, ".pi/extension-build.json"), "utf8"),
+  );
+  for (const { name, source: entry } of map)
+    builds.push({ entry, output: `bots/${profile}/.pi/extensions/${name}/dist/index.js` });
+}
+for (const { entry, output } of builds) {
   const outfile = join(destination, output);
   const result = await build({
     entryPoints: [join(source, entry)],
     outfile,
     bundle: true,
     packages: "external",
+    plugins: [
+      {
+        name: "bundle-workspace",
+        setup(build) {
+          build.onResolve({ filter: /^@battuta\// }, (args) => ({
+            path: createRequire(args.importer).resolve(args.path),
+          }));
+        },
+      },
+    ],
     platform: "node",
     format: "esm",
     target: "node24",
@@ -28,9 +41,7 @@ for (const [entry, output] of Object.entries(entries)) {
     metafile: true,
     write: true,
   });
-  const owner = output.includes("/_shared/")
-    ? dirname(dirname(outfile))
-    : resolve(dirname(outfile), "../..");
+  const owner = dirname(dirname(outfile));
   const manifest = JSON.parse(await readFile(join(owner, "package.json"), "utf8"));
   for (const item of Object.values(result.metafile.outputs)) {
     for (const imported of item.imports.filter((value) => value.external)) {
@@ -46,3 +57,11 @@ for (const [entry, output] of Object.entries(entries)) {
 const prompts = join(destination, "bots/_shared/memory-client/dist/prompts");
 await mkdir(dirname(prompts), { recursive: true });
 await cp(join(source, "memory-client/prompts"), prompts, { recursive: true });
+for (const { entry, output } of builds) {
+  if (entry.startsWith("memory-client/"))
+    await cp(
+      join(source, "memory-client/prompts"),
+      join(dirname(join(destination, output)), "prompts"),
+      { recursive: true },
+    );
+}

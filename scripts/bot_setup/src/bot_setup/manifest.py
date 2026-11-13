@@ -49,7 +49,7 @@ class FileRule(Section):
 
 
 class Setup(Section):
-    steps: list[Literal["telegram", "mcp", "memory-settings", "browser", "dream", "worker-profile"]]
+    steps: list[Literal["telegram", "mcp", "browser", "dream", "worker-profile"]]
 
 
 class Runtime(Section):
@@ -72,6 +72,19 @@ class Subagents(Section):
     agents: list[Subagent]
 
 
+class Extension(Section):
+    name: Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")]
+    source: str
+
+    @field_validator("source")
+    @classmethod
+    def relative_source(cls, source: str) -> str:
+        path = Path(source)
+        if path.is_absolute() or ".." in path.parts or not path.name or path.suffix not in {".ts", ".js"}:
+            raise ValueError("Extension source must be a repository-relative entry point")
+        return source
+
+
 class BotManifest(Section):
     skills: Skills
     bot: Identity | None = None
@@ -81,6 +94,14 @@ class BotManifest(Section):
     runtime: Runtime | None = None
     defaults: Defaults | None = None
     subagents: Subagents | None = None
+    extensions: list[Extension] = Field(default_factory=list)
+
+    @field_validator("extensions")
+    @classmethod
+    def unique_extensions(cls, entries: list[Extension]) -> list[Extension]:
+        if len({entry.name for entry in entries}) != len(entries):
+            raise ValueError("Duplicate extension names")
+        return entries
 
 
 def parse_manifest(text: str, path: Path) -> BotManifest:
@@ -104,8 +125,8 @@ def load_profile(path: Path, role: str) -> BotManifest:
     if manifest.bot is None or manifest.bot.role != role or manifest.setup is None:
         raise click.ClickException(f"Missing or conflicting bot/setup sections: {path}")
     allowed = {
-        "cos": {"telegram", "mcp", "memory-settings", "browser", "dream"},
-        "manager": {"mcp", "memory-settings"},
+        "cos": {"telegram", "mcp", "browser", "dream"},
+        "manager": {"mcp"},
         "worker": {"worker-profile"},
     }[role]
     if len(set(manifest.setup.steps)) != len(manifest.setup.steps) or not set(manifest.setup.steps) <= allowed:
