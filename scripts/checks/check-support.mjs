@@ -18,7 +18,7 @@ function pythonTests(directory, project) {
   const tests = resolve(root, directory);
   run(
     "uv",
-    project.startsWith("scripts/")
+    project.startsWith("scripts/") || project === "speech-service"
       ? [...prefix, "-m", "pytest", tests, "-q"]
       : [...prefix, "-m", "unittest", "discover", "-s", tests, "-v"],
   );
@@ -32,6 +32,7 @@ function pythonTests(directory, project) {
 const groups = {
   scripts: ["scripts/bot_setup", "scripts/packaging"],
   "memory-service": ["memory-service"],
+  "speech-service": ["speech-service"],
   "artifact-service": ["artifact-service"],
   "project-context-cli": ["project-context-cli"],
 };

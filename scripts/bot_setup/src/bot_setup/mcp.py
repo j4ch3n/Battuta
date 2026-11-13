@@ -65,6 +65,7 @@ def mcp_payload(*, role: Literal["cos", "manager", "worker"], supabase_url: str,
     else:
         servers["memory"] = {"enabled": False}
     servers["assignments"] = assignment
+    servers["speech"] = {"url": "http://127.0.0.1:8902/mcp", "exposure": "codemode"} if role in {"cos", "worker"} else {"enabled": False}
     if role == "worker":
         assignment["exposure"] = "hidden"
         assignment["toolExposure"] = {name: "codemode" for name in ("list_assignments", "get_assignment", "prepare_notes", "locate_notes")}

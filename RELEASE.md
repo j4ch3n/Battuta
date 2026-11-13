@@ -79,7 +79,7 @@ Download these assets from the selected GitHub Release into a separate download
 directory, not the installation:
 
 - `battuta-vX.Y.Z-linux-arm64.tar.gz` and its `.sha256`.
-- Five wheels: `battuta-project`, `battuta-artifacts`, `battuta-memory`,
+- Six wheels: `battuta-project`, `battuta-artifacts`, `battuta-memory`, `battuta-speech`,
   `battuta-bot-setup`, and `battuta-packaging` (wheel filenames use underscores).
 - `python-tools-version.txt` and `python-tools-SHA256SUMS`.
 
@@ -105,12 +105,12 @@ uv reads that metadata automatically; there are no separate constraint files,
 source installations, or `--with` arguments.
 
 ```bash
-for package in battuta-project battuta-artifacts battuta-memory battuta-bot-setup battuta-packaging; do
+for package in battuta-project battuta-artifacts battuta-memory battuta-speech battuta-bot-setup battuta-packaging; do
   wheel="${package//-/_}-$tool_version-py3-none-any.whl"
   uv tool install --managed-python --python 3.12 --no-build "./$wheel"
 done
 export PATH="$(uv tool dir --bin):$PATH"
-for command in battuta-project battuta-artifact battuta-memory battuta-bot-setup battuta-packaging; do
+for command in battuta-project battuta-artifact battuta-memory battuta-speech battuta-bot-setup battuta-packaging; do
   "$command" --help >/dev/null
 done
 ```
@@ -120,7 +120,7 @@ All commands must succeed. A direct wheel URL also works with
 additionally verifies the downloaded top-level wheel checksums and refuses native
 source compilation. Pins are not a dependency hash lock or an offline wheelhouse.
 
-All five tools need their own installation so their CLI commands are exposed.
+All six tools need their own installation so their CLI commands are exposed.
 An internal dependency inside another tool's environment does not expose its CLI.
 Project registrations live under `~/.battuta/projects`. Initializing a project
 from GitHub also requires Git and the GitHub CLI (`gh`), authenticated as the bot
@@ -207,9 +207,11 @@ battuta-memory model install
 battuta-memory model verify --json
 battuta-memory doctor --json
 battuta-artifact setup
+battuta-packaging install-speech
+battuta-packaging verify-speech
 ```
 
-These provision the memory model/data and artifact schema without starting bots.
+These provision the memory model/data, artifact schema, and speech assets without starting bots.
 Every command must succeed. Optional offline model input and detailed native
 prerequisites belong to the component guides below. Do not invoke a model provider,
 authenticate Pi, or message bots as a setup check.
@@ -221,7 +223,7 @@ battuta-packaging install-services --root "$install_path" \
   --env-file "$env_file" --node "$node"
 ```
 
-This writes CoS, Manager, memory, artifact, and `battuta-worker@.service` definitions.
+This writes CoS, Manager, memory, artifact, speech, and `battuta-worker@.service` definitions.
 It prints the exact reload/activation commands for the configured count, but does
 not execute them. Conflicting units, symlinks, and excess running workers stop setup.
 `--replace` requires explicit approval and stopped affected services; review custom
@@ -298,6 +300,7 @@ the owner confirms it.
 | -------------------------------------- | ------------------------------------------------------------------------------- |
 | Pi, Telegram, agent mail, project-spec | Compiled bundle plus install-runtime; remote Supabase is provisioned separately |
 | Shared memory and nightly CoS dream    | [Memory setup](docs/memory-service-setup.md)                                    |
+| Shared speech MCP                      | [Speech setup](docs/speech-service-setup.md)                                    |
 | Artifact service and CLI               | [Artifact setup](docs/artifact-service-setup.md)                                |
 | Project-management CLI                 | Installed with the Python wheels above                                          |
 | Assignment MCP                         | [Assignment setup](docs/assignments-setup.md)                                   |

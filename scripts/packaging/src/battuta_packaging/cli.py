@@ -62,6 +62,30 @@ def runtime(root, node):
     install_runtime(root, node=node)
 
 
+@main.command("install-speech")
+def install_speech():
+    """Download and verify release speech assets."""
+    from .speech_models import install_models
+
+    try:
+        install_models(Path.home())
+    except (OSError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    click.echo("Speech assets installed")
+
+
+@main.command("verify-speech")
+def verify_speech():
+    """Verify provisioned speech assets."""
+    from .speech_models import verify_models
+
+    try:
+        verify_models(Path.home())
+    except (OSError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+    click.echo("Speech assets verified")
+
+
 @main.command("run-bot")
 @click.option("--root", required=True, type=click.Path(exists=True, file_okay=False, path_type=Path, resolve_path=True))
 @click.option("--bot", required=True)
@@ -84,18 +108,18 @@ def services(root, env_file, node, replace):
 
 
 @main.command("run-component")
-@click.option("--component", required=True, type=click.Choice(["memory", "artifacts"]))
+@click.option("--component", required=True, type=click.Choice(["memory", "artifacts", "speech"]))
 @click.option("--env-file", required=True, type=click.Path(exists=True, dir_okay=False, path_type=Path))
 def component(component, env_file):
     """Run an installed application server with its private environment."""
-    command = "battuta-memory" if component == "memory" else "battuta-artifact"
+    command = {"memory": "battuta-memory", "artifacts": "battuta-artifact", "speech": "battuta-speech"}[component]
     executable = shutil.which(command)
     if not executable:
         raise click.ClickException(f"Install {command} from the matching release wheel first")
     env = {**os.environ, **read_env(env_file)}
     env = {key: value for key, value in env.items() if "TELEGRAM" not in key}
     os.umask(0o077)
-    os.execve(executable, [executable, "serve"], env)
+    os.execve(executable, [executable] if component == "speech" else [executable, "serve"], env)
 
 
 if __name__ == "__main__":

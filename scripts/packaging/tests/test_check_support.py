@@ -26,7 +26,7 @@ class SupportChecksTests(unittest.TestCase):
                 shutil.copyfile(ROOT / name, path)
             else:
                 path.touch()
-        for directory in ("scripts/bot_setup/tests", "scripts/packaging/tests", "memory-service/tests", "artifact-service/tests", "project-context-cli/tests"):
+        for directory in ("scripts/bot_setup/tests", "scripts/packaging/tests", "memory-service/tests", "speech-service/tests", "artifact-service/tests", "project-context-cli/tests"):
             folder = self.root / directory
             folder.mkdir(parents=True)
             (folder / "test_unit.py").touch()
@@ -53,12 +53,12 @@ class SupportChecksTests(unittest.TestCase):
     def test_runs_unit_discovery_and_each_integration_in_its_package_environment(self):
         result, calls = self.run_checks()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(calls), 15)
-        for index, project in enumerate(("scripts/bot_setup", "scripts/packaging", "memory-service", "artifact-service", "project-context-cli")):
+        self.assertEqual(len(calls), 18)
+        for index, project in enumerate(("scripts/bot_setup", "scripts/packaging", "memory-service", "speech-service", "artifact-service", "project-context-cli")):
             group = calls[index * 3:index * 3 + 3]
             prefix = ["run", "--project", str(self.root / project), "--locked"]
             self.assertTrue(all(call[:len(prefix)] == prefix for call in group), group)
-            self.assertIn("pytest" if project.startswith("scripts/") else "discover", group[0])
+            self.assertIn("pytest" if project.startswith("scripts/") or project == "speech-service" else "discover", group[0])
             self.assertTrue(group[1][-1].endswith("/a.it.py"), group)
             self.assertTrue(group[2][-1].endswith("/b.it.py"), group)
 
