@@ -2,8 +2,6 @@
 name: researcher
 description: Gather evidence for a bounded question and return concise cited findings
 tools: read, grep, find, ls, ext:pi-web-access
-extensions: [pi-web-access]
-skills: research
 allowed_subagents: none
 prompt_mode: replace
 inherit_context: false

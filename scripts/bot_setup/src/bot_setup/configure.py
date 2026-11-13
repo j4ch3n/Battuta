@@ -16,7 +16,7 @@ from .json_config import read_config, write_config
 from .mcp import assignment_server, configure_mcp, validate_memory_url
 from .memory import configure_memory_settings
 from .release import validate_private_home
-from .subagents import prepare_worker_agents, prepare_worker_research, remove_manager_subagents
+from .subagents import prepare_worker_agents, prepare_worker_skill, remove_manager_subagents, render_worker_agents
 from .telegram import prepare_telegram_config
 from .skills import load_selection, link_selected_skills
 from .workers import copy_worker_profile, validate_worker_settings
@@ -117,6 +117,8 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
     assignment_server(supabase_url)
     memory_url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
     names = load_selection(root / "bots/worker/bot.toml", root / "skills-hub")
+    agents = render_worker_agents(profile, manifest)
+    inherited = {name for agent in manifest.subagents.agents for name in agent.inherit_parent_skills}
     path = bot_dir / ".pi/settings.json"
     settings = read_config(path)
     validate_worker_settings(settings)
@@ -139,18 +141,17 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
         if package not in packages:
             packages.append(package)
     settings["packages"] = packages
-    if "research" in names:
-        prepare_worker_research(root / "skills-hub/research", bot_dir, settings)
+    for name in sorted(inherited):
+        prepare_worker_skill(root / "skills-hub" / name, bot_dir, settings)
     selected = [
-        relpath(bot_dir / ".pi/skills/research" if name == "research" else root / "skills-hub" / name, path.parent)
+        relpath(bot_dir / ".pi/skills" / name if name in inherited else root / "skills-hub" / name, path.parent)
         for name in names
     ]
     existing = settings.get("skills", [])
-    if "research" in names:
-        existing = [value for value in existing if value != relpath(root / "skills-hub/research", path.parent)]
+    existing = [value for value in existing if value not in [relpath(root / "skills-hub" / name, path.parent) for name in inherited]]
     settings["skills"] = list(dict.fromkeys([*existing, *selected]))
     bot_dir.mkdir(parents=True, exist_ok=True)
-    prepare_worker_agents(profile / "agents", bot_dir, settings)
+    prepare_worker_agents(agents, bot_dir, settings)
     prepare_files(root, profile, bot_dir, [rule for rule in manifest.files if rule.destination == "profile"])
     write_config(path, settings, ".settings-")
     configure_mcp(bot_dir, role="worker", memory_url=memory_url, supabase_url=supabase_url)

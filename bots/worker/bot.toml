@@ -39,6 +39,16 @@ optional = true
 [setup]
 steps = ["worker-profile"]
 
+[[subagents.agents]]
+path = "agents/researcher.md"
+inherit_parent_skills = ["research"]
+extensions = ["pi-web-access"]
+
+[[subagents.agents]]
+path = "agents/reviewer.md"
+inherit_parent_skills = []
+extensions = []
+
 [[files]]
 operation = "copy"
 sources = [{ root = "profile", path = ".pi/mcp.json" }]

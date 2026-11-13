@@ -62,6 +62,16 @@ class Defaults(Section):
     thinking: Literal["off", "minimal", "low", "medium", "high", "xhigh"]
 
 
+class Subagent(Section):
+    path: str
+    inherit_parent_skills: list[str]
+    extensions: list[str]
+
+
+class Subagents(Section):
+    agents: list[Subagent]
+
+
 class BotManifest(Section):
     skills: Skills
     bot: Identity | None = None
@@ -70,6 +80,7 @@ class BotManifest(Section):
     setup: Setup | None = None
     runtime: Runtime | None = None
     defaults: Defaults | None = None
+    subagents: Subagents | None = None
 
 
 def parse_manifest(text: str, path: Path) -> BotManifest:

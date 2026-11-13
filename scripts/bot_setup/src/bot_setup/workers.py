@@ -102,7 +102,11 @@ def copy_worker_profile(profile: Path, bot_dir: Path) -> None:
     mcp["mcpServers"] = {**destination_servers, **source_servers}
     mcp["mcpServers"]["memory"] = {"enabled": False}
     # Validate every input before creating or changing any instance files.
-    prepare_worker_agents(profile / ".pi/agents", bot_dir, settings)
+    manifest = load_manifest(profile / "bot.toml")
+    if manifest.subagents is None:
+        raise click.ClickException("Worker manifest requires subagents")
+    agents = {Path(agent.path).name: (profile / ".pi/agents" / Path(agent.path).name).read_bytes() for agent in manifest.subagents.agents}
+    prepare_worker_agents(agents, bot_dir, settings)
     bot_dir.mkdir(parents=True, exist_ok=True)
     if not (bot_dir / ".pi/settings.json").exists():
         manifest = load_manifest(profile / "bot.toml")
