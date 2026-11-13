@@ -10,7 +10,7 @@ TypeScript on Node.js and Deno, the Pi coding-agent runtime, Telegram, Linear, a
 
 ## Working conventions
 
-- Store implementation plans under `docs/superpowers/plans/` and design/specification documents under `docs/superpowers/spec/`.
+- Store implementation plans under `docs/superpowers/plans/` and design/specification documents under `docs/superpowers/specs/`. Keep these local; do not commit plans or specs.
 - Name new ticket branches `agent/<ticket>-<short-description>`, using a lowercase ticket identifier and fewer than four hyphen-separated description words (for example, `agent/fis-46-constitution-tool`).
 - Follow surrounding code and runtime-specific formatting, linting, and typing rules.
 - Scan related code before adding logic; reuse existing helpers and refactor duplication within the affected scope. Avoid unrelated rewrites.
