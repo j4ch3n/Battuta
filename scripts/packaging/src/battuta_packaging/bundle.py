@@ -11,7 +11,7 @@ import click
 from bot_setup.browser import browser_defaults
 from bot_setup.skills import load_selection
 from bot_setup.install import TELEGRAM_PACKAGE, SCHEDULE_PACKAGE
-from bot_setup.subagents import WEB_PACKAGE, SUBAGENT_PACKAGE, configure_subagents
+from bot_setup.subagents import WEB_PACKAGE
 
 PROFILES = ("cos-bot", "manager-bot", "worker")
 SHARED = ("agent-mail", "project-spec", "memory-client")
@@ -69,7 +69,7 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         (package / "dist").mkdir()
     packages = {
         "cos-bot": [TELEGRAM_PACKAGE, WEB_PACKAGE, SCHEDULE_PACKAGE],
-        "manager-bot": [WEB_PACKAGE, SUBAGENT_PACKAGE],
+        "manager-bot": [WEB_PACKAGE],
         "worker": [WEB_PACKAGE],
     }
     for profile in PROFILES:
@@ -97,9 +97,6 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         if profile != "manager-bot":
             browser_defaults(settings)
             packages[profile] = settings["packages"]
-        if profile == "manager-bot":
-            configure_subagents(settings, bot)
-            settings["subagents"]["defaultExtensions"] = [".pi/npm/node_modules/pi-web-access/dist"]
         write_json(bot / ".pi/settings.json", settings)
         shutil.copy2(original / ".pi/web-search.json", bot / ".pi/web-search.json")
     for relative in ENTRY_OUTPUTS:

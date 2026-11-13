@@ -16,7 +16,7 @@ from .json_config import read_config, write_config
 from .mcp import assignment_server, configure_mcp, validate_memory_url
 from .memory import configure_memory_settings
 from .release import validate_private_home
-from .subagents import SUBAGENT_PACKAGE, WEB_PACKAGE, configure_subagents
+from .subagents import WEB_PACKAGE, remove_manager_subagents
 from .telegram import prepare_telegram_config
 from .skills import load_selection
 from .workers import copy_worker_profile, validate_worker_settings
@@ -67,9 +67,9 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
     else:
         path = bot_dir / ".pi/settings.json"
         settings = read_config(path)
-        configure_subagents(settings, bot_dir)
+        remove_manager_subagents(settings)
         write_config(path, settings, ".settings-")
-        extra = (WEB_PACKAGE, SUBAGENT_PACKAGE)
+        extra = (WEB_PACKAGE,)
     install_packages(bot_dir, telegram_package if role == "cos" else None, extra_packages=extra)
     warn_running_session(bot_dir)
 

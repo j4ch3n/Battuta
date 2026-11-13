@@ -59,6 +59,8 @@ def test_staged_archive_is_bot_only(source, tmp_path):
         assert not (bot / ".pi/auth.json").exists()
         settings = json.loads((bot / ".pi/settings.json").read_text())
         assert "defaultModel" not in settings
+        if profile == "manager-bot":
+            assert not any("pi-subagents" in package for package in settings["packages"])
         assert any("pi-browser-use" in package for package in settings["packages"]) == (profile != "manager-bot")
         if profile != "manager-bot":
             assert settings["pi-browser-use"]["headless"] is True

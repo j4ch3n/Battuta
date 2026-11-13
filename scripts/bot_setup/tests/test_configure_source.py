@@ -36,7 +36,7 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
             configure_source(tmp_path, role=role)
     sources = [call.args[-1] for call in install.call_args_list if "install" in call.args and "-l" in call.args]
     assert any("pi-telegram" in source for source in sources) == (role == "cos")
-    assert any("pi-subagents" in source for source in sources) == (role == "manager")
+    assert not any("pi-subagents" in source for source in sources)
     assert any("pi-scheduler" in source for source in sources) == (role == "cos")
     if role == "cos":
         assert runtime.call_args_list[0].args[:2] == ("pnpm", "--dir")
