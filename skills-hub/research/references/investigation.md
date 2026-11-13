@@ -3,7 +3,7 @@
 ## Establish the question and boundaries
 
 Identify the purpose (understand, explore, compare, decide or verify), audience,
-current assumptions, relevant owner context, geography/time horizon and practical
+current assumptions, relevant supplied context, geography/time horizon and practical
 constraints. Read supplied context before asking questions. Clarify only gaps
 that could materially change the investigation. Do not turn an operational task
 into a discovery interview.
@@ -41,7 +41,7 @@ permission to bypass access controls or substitute an invented finding.
 ## Follow discoveries without losing purpose
 
 Unexplained evidence and useful unused retrieved material can suggest a better
-question. Pursue it when it could change the owner's understanding; do not append
+question. Pursue it when it could change the answer; do not append
 novelty for a quota. Revisit the provisional frame when contradictory findings
 accumulate. Preserve disagreement instead of averaging incompatible claims.
 

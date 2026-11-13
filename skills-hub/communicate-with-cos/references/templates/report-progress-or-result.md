@@ -3,8 +3,8 @@
 Use when a requested action is ongoing or verified. State the action's status, not the feature's overall acceptance or release status.
 
 Apply this pattern to authorized implementation and other substantive work as
-well as investigation. Manager owns planning, execution/coordination, and
-verification; CoS owns the final owner communication. Report decisions needed
+well as investigation. Manager owns planning, assignment coordination and review
+of worker execution/verification evidence; CoS owns final owner communication. Report decisions needed
 to CoS rather than sending the owner a direct fallback message.
 
 ## Progress example
@@ -25,8 +25,8 @@ Tool: `reply_agent_message`. This fictional probe request has one requirement: `
     "request": null,
     "result": {
       "state": "in_progress",
-      "accomplished": ["Prepared the representative-input probe."],
-      "remaining": ["Run the probe and compare its result with the current milestone acceptance."],
+      "accomplished": ["Commissioned the worker assignment for the representative-input probe."],
+      "remaining": ["Obtain worker probe results and review them against milestone acceptance."],
       "checks": [
         {
           "expectation": "Report whether the import timeout fits milestone 1.",
@@ -69,7 +69,7 @@ Tool: `send_agent_message`. A progress reply consumed the single direct reply, s
     "result": {
       "state": "complete",
       "accomplished": [
-        "Ran the representative-input probe and compared it with the current acceptance boundary."
+        "Reviewed the worker-run representative-input probe against the current acceptance boundary."
       ],
       "remaining": [],
       "checks": [

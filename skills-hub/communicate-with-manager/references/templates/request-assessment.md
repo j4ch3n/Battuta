@@ -14,7 +14,7 @@ Tool: `send_agent_message`. This fictional import feature illustrates the messag
     "schema_version": 1,
     "summary": "Recommend the smallest useful milestone for project import.",
     "context": [
-      "Project: atlas. The project is confirmed; determine the assessment plan and record complete assignments/TODOs as needed.",
+      "Project: atlas. The project is confirmed; frame the assessment and create complete assignments/TODOs for worker investigation.",
       "Desired outcome: import a project and see a final success or failure result.",
       "The proposal also includes bulk import, automatic retries, and live progress.",
       "Budget means bounded scope and tradeoffs. Assessment only; implementation is not authorized."
@@ -69,7 +69,7 @@ Tool: `send_agent_message`.
     "options": [],
     "recommendation": null,
     "request": {
-      "action": "Investigate, break down, plan, and execute or coordinate the authorized milestone.",
+      "action": "Frame and break down the milestone, commission worker investigation/implementation/verification through assignments, and coordinate dependencies and review.",
       "requirements": ["Import one valid project and report its final success or failure result.", "Verify the milestone against its acceptance criteria."],
       "expected_response": "Return the deliverable, verification evidence, remaining uncertainty, and product or authority decisions needed."
     },

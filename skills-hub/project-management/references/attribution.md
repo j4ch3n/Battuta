@@ -22,7 +22,7 @@ The summary prompt, Markdown reference, and CLI Jinja skeleton are Battuta-speci
 - The consolidated binding distinguishes a verified commissioned worktree from the registered default checkout. Tool guidance names CoS as the product-decision authority rather than attributing decisions to a skill.
 - Natural-language requests supply upstream input placeholders; workflow spellings route to responsibility references instead of requiring slash commands.
 - Setup-script calls are replaced by explicit feature/artifact resolution and direct shared-template reads. The CLI resolves project/checkout context; spec tools resolve managed documents. Prompts and templates use returned references rather than prescribe filesystem layout.
-- Prerequisites are established from artifact contents rather than command history. Research examples use the current runtime's tools, with inline investigation when delegation is unavailable.
+- Prerequisites are established from artifact contents rather than command history. Research uses available tools within the commission; unavailable tools or evidence are reported through the established route.
 - Constitution reads resolve the adopted named principles document through spec tools; CoS persists amendments as complete new versions. An empty legacy scaffold is not adopted principles.
 - Specification setup selects a document name and uses managed authoring; preset resolution and feature-state persistence are replaced by shared-template reads and request-local document context.
 - Managed document setup and template references resolve through spec tools rather than fixed filenames. Checklist persistence follows Manager ownership and complete canonical replacements rather than upstream per-domain append files.

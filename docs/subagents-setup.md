@@ -1,64 +1,79 @@
-# Manager subagent setup
+# Worker subagent setup
 
-Manager uses the native MIT `pi-subagents@0.82.1` package with Pi 1.3.0. CoS does not
-install it. There is no Battuta child runtime or separate child credential.
+Workers use `@tintinweb/pi-subagents@0.24.0` with Pi 1.3.0. Manager uses assignment
+workers, not this extension. There is no Battuta child runtime or new credential.
 
-## Source setup
+## Source installation
 
-Run the normal Manager configuration from the repository root:
+From the repository root, prepare the shared worker profile:
 
 ```sh
-uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role manager
+uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role worker
 ```
 
-For a custom workspace, add `--bot-dir /absolute/path/to/manager-workspace`. Setup
-registers and installs the pinned package and `pi-web-access@0.43.0`, then uses
-Pi's own settings and the package's bundled agents/skill. Restart Manager afterward.
+Setup installs the pinned extension and copies maintained definitions from
+`bots/worker/agents/` to the native `.pi/agents/` discovery directory.
+It also prepares a real copy of `research` and its references under
+`bots/worker/.pi/skills/research/`: native subagent preloading does not follow
+catalog links or Pi's configured skill paths. Re-run setup after skill changes;
+privately modified prepared files are not overwritten.
+Reconfigure existing instances explicitly:
 
-Release builds generate Manager's project settings. `battuta-packaging
-install-runtime` installs pinned packages inside the installation and resolves
-the native web-access path there. Private settings/authentication stay in
-`~/.battuta/pi-bots/manager-bot/.pi`; they are not copied into the installation.
-Unexpected private executable resources stop setup rather than trigger a migration.
+```sh
+uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role worker --bot-dir "$HOME/.battuta/pi-bots/worker-1"
+```
 
-## Authentication
+Repeat for each configured worker. Stop workers before maintenance and restart
+afterward. Setup preserves private authentication and unrelated custom resources.
+If a managed definition was privately edited, setup refuses to overwrite it;
+inspect and move the customization to a distinct type before reconfiguring.
 
-Children use the normal Pi agent directory and authentication store, selected
-provider/model, home, environment, and requested working directory. Log in once
-in Manager's Pi environment, including for an `openai-codex` subscription. Do not create
-a child API key or copy `auth.json`. Native Pi handles authentication and refresh.
+## Installed releases
 
-For headless/Telegram Manager, use the same `PI_CODING_AGENT_DIR` when performing the
-initial interactive Pi login. A login under a different home or agent directory
-is not automatically available to Manager or its children.
+Release builds copy definitions to `bots/worker/.pi/agents/`. The normal release
+`install-runtime` step installs the pinned package; workers discover definitions
+from the installed role directory. No manual agent-file copy or separate child
+login is needed. Authenticate in the worker's normal Pi environment; do not copy
+private authentication into a release or child folder.
 
-## Child extension selection
+## Types and context
 
-Setup writes upstream `subagents` settings inside Manager's `.pi/settings.json`:
+- `researcher` uses local inspection and the installed web-access extension.
+- `reviewer` uses inspection tools and shell commands for requested checks.
 
-- `defaultExtensions` names only the absolute path to the installed web-access
-  package's `dist` directory. An explicit list disables ambient extension loading
-  for both foreground and background children.
-- Native role overrides include the web tools in their tool allowlists. Scouts,
-  reviewers, researchers, evidence auditors, and oracles get read/search tools;
-  workers and delegates also get shell/edit/write tools.
-- Skills, project/global instructions, and forked conversation are excluded by
-  default through native role settings. No additional context-switch interface
-  is added by Battuta.
+Both use standalone prompts, no inherited conversation or ambient skills, and no
+further delegation. The researcher explicitly preloads only `research`; the
+reviewer preloads no skills. Only the researcher loads web access; neither loads the assignment
+worker lifecycle extension. Worker instructions explain when to use each type;
+the extension supplies native `Agent` tool help.
 
-Telegram, Agent Mail, Linear/MCP, memory, and the assignment MCP connection are not
-inherited. A separately configured worker profile has assignment MCP metadata,
-but these bounded children do not automatically consume it. Upstream's internal child coordination hooks are not parent plugins.
-The package provides its own tool help and parent-only orchestration skill;
-use its native `subagent` tool rather than `bounded_subagents`.
+These are trusted processes, not a sandbox. Subagents return findings to their
+parent rather than completing its assignment; shell/environment access is not
+a security boundary. The parent finishes needed child work before reporting its
+TODO complete and reviews evidence rather than treating child completion as
+assignment completion.
 
-Existing native customization is preserved. This is an upstream **default**, not
-an immutable security policy: role/project settings, explicit skill requests,
-custom agent definitions, and host-required extensions can change the effective
-configuration. Review them if the exact allowlist matters. Setting
-`defaultExtensions: []` disables ambient plugins entirely; remove web tools from
-the relevant role allowlists too, or upstream will correctly report missing tools.
+## Installation checks: no model calls
 
-Children are trusted workers, not a sandbox. Workers edit the real workspace and
-can run commands with the same user's file/environment access. Manager still reviews
-changes and verification evidence; child output is not product acceptance.
+```sh
+test -f bots/worker/.pi/npm/node_modules/@tintinweb/pi-subagents/package.json
+test -f bots/worker/.pi/agents/researcher.md
+test -f bots/worker/.pi/agents/reviewer.md
+test -f bots/worker/.pi/skills/research/SKILL.md
+test -f bots/worker/.pi/skills/research/references/investigation.md
+```
+
+Inspect the package version and both definitions, then verify instance copies
+under `$HOME/.battuta/pi-bots/worker-N/.pi/agents/`. For releases, inspect the
+equivalent files inside the installation. Missing files or an incorrect version
+mean setup is incomplete; stop rather than starting workers.
+
+## Separate manual functional checks
+
+With a test-only assignment and normal worker authentication, ask a researcher
+for a bounded source-backed answer and a reviewer to run a harmless local test.
+Confirm the custom types resolve, web tools work, reviewer reports actual
+commands/results, and neither starts an assignment coordinator or registers
+`report_execution_result`. Confirm the parent integrates their evidence and only
+the bound worker reports execution once. Do not use production assignments or
+send production mail merely to validate installation.

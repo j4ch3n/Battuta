@@ -39,6 +39,9 @@ class WorkerSetupTests(unittest.TestCase):
             path.write_text("export default () => {};")
         (self.profile / ".pi").mkdir()
         (self.profile / ".pi/web-search.json").write_text('{"fetchContent":{"userAgent":"fixture mobile browser"}}')
+        (self.profile / "agents").mkdir()
+        (self.profile / "agents/researcher.md").write_text("---\nname: researcher\n---\nResearch fixture.")
+        (self.profile / "agents/reviewer.md").write_text("---\nname: reviewer\n---\nReview fixture.")
 
     def prepare(self):
         with patch("bot_setup.configure.run") as run:
@@ -48,10 +51,64 @@ class WorkerSetupTests(unittest.TestCase):
     def test_source_preparation_registers_shared_native_resources_without_starting_pi(self):
         run = self.prepare()
         self.assertTrue(run.called)
-        self.assertTrue(all(call.args[0] == "pnpm" for call in run.call_args_list))
+        self.assertTrue(any(call.args[0] == str(self.runtime / "node_modules/.bin/pi") and call.args[-1] == "npm:@tintinweb/pi-subagents@0.24.0" for call in run.call_args_list))
         settings = json.loads((self.profile / ".pi/settings.json").read_text())
         self.assertTrue(any((self.profile / ".pi" / value).resolve() == self.runtime / "index.ts" for value in settings["extensions"]))
         self.assertTrue(all((self.profile / ".pi" / value).exists() for value in settings["skills"]))
+        self.assertIn("npm:@tintinweb/pi-subagents@0.24.0", settings["packages"])
+        self.assertEqual((self.profile / ".pi/agents/researcher.md").read_text(), (self.profile / "agents/researcher.md").read_text())
+
+    def test_agent_updates_preserve_custom_definitions_and_private_state(self):
+        self.prepare()
+        configure_worker(self.root, bot_dir=self.bot)
+        custom = self.bot / ".pi/agents/custom.md"
+        custom.write_text("Custom definition")
+        (self.profile / "agents/researcher.md").write_text("Updated researcher")
+        self.prepare()
+        configure_worker(self.root, bot_dir=self.bot)
+        self.assertEqual((self.bot / ".pi/agents/researcher.md").read_text(), "Updated researcher")
+        self.assertEqual(custom.read_text(), "Custom definition")
+        (self.bot / ".pi/agents/researcher.md").write_text("Private customization")
+        with self.assertRaisesRegex(Exception, "custom subagent"):
+            configure_worker(self.root, bot_dir=self.bot)
+
+    def test_research_preload_has_real_files_and_references(self):
+        research = self.root / "skills-hub/research"
+        (research / "references").mkdir()
+        reference = research / "references/evidence.md"
+        reference.write_text("Evidence fixture")
+        self.prepare()
+        prepared = self.profile / ".pi/skills/research"
+        self.assertTrue(prepared.is_dir())
+        self.assertFalse(prepared.is_symlink())
+        self.assertEqual((prepared / "SKILL.md").read_bytes(), (research / "SKILL.md").read_bytes())
+        self.assertEqual((prepared / "references/evidence.md").read_text(), "Evidence fixture")
+        settings = json.loads((self.profile / ".pi/settings.json").read_text())
+        selected = [(self.profile / ".pi" / path).resolve() for path in settings["skills"]]
+        self.assertIn(prepared, selected)
+        self.assertNotIn(research, selected)
+        reference.write_text("Updated evidence fixture")
+        self.prepare()
+        self.assertEqual((prepared / "references/evidence.md").read_text(), "Updated evidence fixture")
+
+    def test_research_preload_preserves_custom_content(self):
+        self.prepare()
+        prepared = self.profile / ".pi/skills/research"
+        prepared.mkdir(parents=True, exist_ok=True)
+        (prepared / "SKILL.md").write_text("Private custom research")
+        with self.assertRaisesRegex(Exception, "custom"):
+            self.prepare()
+        self.assertEqual((prepared / "SKILL.md").read_text(), "Private custom research")
+
+    def test_research_preload_refuses_symlinked_directory(self):
+        skills = self.profile / ".pi/skills"
+        skills.mkdir()
+        outside = self.root / "custom-skills"
+        outside.mkdir()
+        (skills / "research").symlink_to(outside, target_is_directory=True)
+        with self.assertRaisesRegex(Exception, "custom"):
+            self.prepare()
+        self.assertEqual(list(outside.iterdir()), [])
 
     def test_copies_prepared_settings_and_instructions_without_installing_or_copying_private_state(self):
         self.prepare()

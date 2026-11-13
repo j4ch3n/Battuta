@@ -33,6 +33,10 @@ def source(tmp_path, monkeypatch):
         (path / ".pi/auth.json").write_text("private-sentinel")
         (path / ".pi/settings.json").write_text('{"defaultModel":"private-model"}')
         (path / ".pi/web-search.json").write_text("{}")
+        if profile == "worker":
+            (path / "agents").mkdir()
+            (path / "agents/researcher.md").write_text("Research fixture")
+            (path / "agents/reviewer.md").write_text("Review fixture")
     skill = root / "skills-hub/research"
     skill.mkdir(parents=True)
     for name in ("SKILL.md", "LICENSE", "tools.md"):
@@ -59,6 +63,11 @@ def test_staged_archive_is_bot_only(source, tmp_path):
         assert not (bot / ".pi/auth.json").exists()
         settings = json.loads((bot / ".pi/settings.json").read_text())
         assert "defaultModel" not in settings
+        if profile == "manager-bot":
+            assert not any("pi-subagents" in package for package in settings["packages"])
+        if profile == "worker":
+            assert "npm:@tintinweb/pi-subagents@0.24.0" in settings["packages"]
+            assert (bot / ".pi/agents/researcher.md").read_text() == "Research fixture"
         assert any("pi-browser-use" in package for package in settings["packages"]) == (profile != "manager-bot")
         if profile != "manager-bot":
             assert settings["pi-browser-use"]["headless"] is True

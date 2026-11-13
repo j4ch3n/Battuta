@@ -41,10 +41,6 @@ def install_runtime(root: Path, *, node: Path) -> None:
         local_env = {**env, "PI_CODING_AGENT_DIR": str(bot / ".pi")}
         for package in metadata["packages"][profile]:
             subprocess.run([pnpm, "exec", "pi", "install", "-l", "--approve", package], cwd=bot, env=local_env, check=True)
-        if profile == "manager-bot":
-            settings = read_config(bot / ".pi/settings.json")
-            settings.setdefault("subagents", {})["defaultExtensions"] = [str(bot / ".pi/npm/node_modules/pi-web-access/dist")]
-            write_json(bot / ".pi/settings.json", settings)
     write_json(root / "bots/runtime.json", {"node": str(node)})
 
 

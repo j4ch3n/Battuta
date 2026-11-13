@@ -11,7 +11,7 @@ import click
 from bot_setup.browser import browser_defaults
 from bot_setup.skills import load_selection
 from bot_setup.install import TELEGRAM_PACKAGE, SCHEDULE_PACKAGE
-from bot_setup.subagents import WEB_PACKAGE, SUBAGENT_PACKAGE, configure_subagents
+from bot_setup.subagents import WEB_PACKAGE, WORKER_SUBAGENT_PACKAGE
 
 PROFILES = ("cos-bot", "manager-bot", "worker")
 SHARED = ("agent-mail", "project-spec", "memory-client")
@@ -69,8 +69,8 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         (package / "dist").mkdir()
     packages = {
         "cos-bot": [TELEGRAM_PACKAGE, WEB_PACKAGE, SCHEDULE_PACKAGE],
-        "manager-bot": [WEB_PACKAGE, SUBAGENT_PACKAGE],
-        "worker": [WEB_PACKAGE],
+        "manager-bot": [WEB_PACKAGE],
+        "worker": [WEB_PACKAGE, WORKER_SUBAGENT_PACKAGE],
     }
     for profile in PROFILES:
         bot = destination / "bots" / profile
@@ -93,13 +93,11 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
             extensions += ["../../_shared/memory-client/dist/index.js", "extensions/index.js"]
         if profile == "worker":
             extensions += ["extensions/index.js"]
+            shutil.copytree(original / "agents", bot / ".pi/agents")
         settings = {"packages": packages[profile], "extensions": extensions, "battutaMemoryCapture": {"enabled": profile == "cos-bot"}}
         if profile != "manager-bot":
             browser_defaults(settings)
             packages[profile] = settings["packages"]
-        if profile == "manager-bot":
-            configure_subagents(settings, bot)
-            settings["subagents"]["defaultExtensions"] = [".pi/npm/node_modules/pi-web-access/dist"]
         write_json(bot / ".pi/settings.json", settings)
         shutil.copy2(original / ".pi/web-search.json", bot / ".pi/web-search.json")
     for relative in ENTRY_OUTPUTS:

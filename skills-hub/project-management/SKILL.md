@@ -15,8 +15,9 @@ Start at the current task or decision; do not restart a healthy project.
 
 CoS decides high-level intent, scope, priorities, and product acceptance within
 the owner's mandate. Manager develops complementary requirements, technical
-detail, executable briefs, and delivery recommendations. Questions that change
-product intent go to `cos`; CoS asks the owner when confirmed context and its
+detail, executable briefs, and delivery recommendations. Plan the next useful
+milestone from current evidence; review results and adapt subsequent work.
+Questions that change product intent go to `cos`; CoS asks the owner when confirmed context and its
 mandate cannot establish the answer. These are authority and recipient roles,
 not invoker restrictions; loading this skill grants no tools or permissions.
 
@@ -78,14 +79,13 @@ provided. These are document methodologies, not automatic lifecycle gates.
 | [Analyze](references/analyze/prompt.md) | Read-only consistency and coverage findings across documents |
 | [Constitution](references/constitution/prompt.md) | Adopted project-wide principles in the canonical versioned `Constitution` |
 
-Commission substantial drafting to Manager, or use prd for requirements and
-draft-writing for prose when performing that commissioned work. Use research for
-investigation. This skill provides project lifecycle and document integration,
-not competing specialist workflows. CoS persists complete
-immutable document versions and terminal go/no-go with rationale. Manager authors
-substantive detailed content and saves only its canonical checklist/review through
-its tools. Use the [metadata contract](references/spec-metadata.md) for returned
-details; do not patch managed files or JSON directly. Refinement creates a new
+Use prd for requirements, draft-writing for prose and research for investigation.
+Apply these methods within the invoking agent's existing mandate.
+This skill provides project lifecycle and document integration, not competing
+specialist workflows. CoS persists complete immutable document versions and
+terminal go/no-go with rationale. Manager commissions and reviews substantive
+detailed content and authors/saves its canonical checklist/review through its
+tools. Use the [metadata contract](references/spec-metadata.md) for returned details; do not patch managed files or JSON directly. Refinement creates a new
 version while open. No saved document or product decision authorizes execution.
 
 ## Workspace binding
@@ -130,8 +130,9 @@ source-relative plans/tasks. Do not create or switch branches merely to author
 documents. Replace command tokens/placeholders with real artifact references.
 Evaluate prerequisites from actual artifact content, not command history. Report
 stale/missing documents, including tasks inconsistent with an updated plan; do
-not silently regenerate them during review. Use available research tools; when
-delegation is unavailable, investigate inline rather than installing a runtime.
+not silently regenerate them during review. Use available tools within the
+commission's authority; report unavailable tools or evidence through the
+established route rather than installing another runtime or inventing results.
 
 **Inactive upstream integration sections:** do not execute Pre-Execution Checks,
 Mandatory Post-Execution Hooks, Post-Execution Checks, “Check for extension hooks,”

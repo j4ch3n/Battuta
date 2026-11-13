@@ -297,8 +297,8 @@ the owner confirms it.
 | Project-management CLI                 | [Project-management installation](skills-hub/project-management/references/installation.md) |
 | Assignment MCP                         | [Assignment setup](docs/assignments-setup.md)                                               |
 | Workers and numbered instances         | [Worker setup](docs/workers-setup.md)                                                       |
+| Worker researcher/reviewer subagents   | [Subagent setup](docs/subagents-setup.md)                                                   |
 | CoS and worker browsers                | [Browser setup](docs/browser-setup.md)                                                      |
-| Manager native subagents               | [Subagent setup](docs/subagents-setup.md)                                                   |
 | Google CLI                             | [Google setup](docs/gogcli-setup.md)                                                        |
 | Luma                                   | [Luma setup](docs/luma-setup.md)                                                            |
 | CoS scheduler                          | [Scheduler](docs/scheduler.md)                                                              |

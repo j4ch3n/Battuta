@@ -13,9 +13,10 @@ to resolve the next product or authority question.
 ## Roles and boundaries
 
 `cos` is the Agent Mail recipient for product commitments, owner clarification,
-and final owner communication. Manager and Worker are evidence sources for
-substantive investigation and execution. These roles do not restrict invocation
-or transfer their tools and authority. The report route does not authorize direct
+and final owner communication. Manager commissions and reviews substantive work;
+Workers execute its investigation, implementation, artifact production and
+execution verification. These roles do not restrict invocation or transfer their
+tools and authority. The report route does not authorize direct
 owner contact or product commitments.
 
 ## Workflow
@@ -27,9 +28,10 @@ owner contact or product commitments.
     Respect their uncertainty and freshness. Use `project-memory` when selected
     to retrieve relevant project/global context; ask CoS for missing or stale
     owner context. Return findings/corrections with original event references.
-2. Investigate and plan the smallest complete outcome; execute or coordinate
-   within the available runtime when authorized. Distinguish observations,
-   inference, uncertainty, consequences, and meaningful deferred scope.
+2. Establish the assessed result within the commission and the invoking agent's
+   existing authority. Distinguish observations, inference, uncertainty and
+   deferred scope. Report unavailable tools, inputs or delegation honestly,
+   with the observed blocker and a bounded recovery recommendation.
 3. Choose an outbound example from the [template index](references/templates/index.md).
    Report findings, progress, evidence-backed conclusions, blockers,
    recommendations, or a specific decision needed through Agent Mail to `cos`.
@@ -41,8 +43,9 @@ owner contact or product commitments.
    Done/cancelled notes freeze; blocked working material remains editable.
 4. Escalate missing authority, consequential product questions, and material
    scope changes to CoS. Follow settled scope unless new evidence or a concrete
-   blocker requires reassessment. CoS-only save tools do not transfer authorship
-   of your substantive work; send proposed content for persistence where needed.
+   blocker requires reassessment. CoS-only save tools do not transfer responsibility
+   for commissioning and reviewing substantive work; send reviewed proposed content
+   for persistence where needed.
 
 Separate investigation completed, execution authorized, implemented, reviewed,
 verified, and ready for product acceptance. Budget means scope alternatives

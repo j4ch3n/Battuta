@@ -11,11 +11,11 @@ A synthesis handoff contains:
 
 | Part                            | What it establishes                                                     |
 | ------------------------------- | ----------------------------------------------------------------------- |
-| Question and purpose            | What the owner wants to understand or decide                            |
+| Question and purpose            | What the requester wants to understand or decide                        |
 | Takeaway                        | The best-supported answer at this point                                 |
 | Mechanism                       | How the actors, constraints and consequences connect                    |
 | Changed understanding           | Which evidence revised the starting assumption                          |
-| Owner relevance                 | Why confirmed goals/context change the interpretation                   |
+| Relevance                       | Why confirmed goals/context change the interpretation                   |
 | Alternative and counterevidence | The strongest competing explanation or option                           |
 | Uncertainty                     | What is unknown and what would change the answer                        |
 | Provenance                      | Sources and their limits, with calculations/assumptions distinguishable |
@@ -33,14 +33,12 @@ technical capability does not automatically support its commercial implication.
   before they are used to justify a conclusion?
 - Does the strongest alternative receive the same evaluation criteria? Does a
   contradictory observation change confidence or narrow the conclusion?
-- Is owner context relevant and confirmed, rather than speculation or unrelated
-  personal detail? What did the owner learn that they did not know already?
+- Is supplied context relevant and confirmed, rather than speculation or unrelated
+  personal detail? What did the requester learn that they did not know already?
 
 For exploratory work, provide an understandable default explanation and then offer
-a meaningful branch the owner can steer. Do not require a choice of unfamiliar
+a meaningful branch the requester can steer. Do not require a choice of unfamiliar
 frames before orientation. No mind map, expert transcript or decision is mandatory.
 
-Use artifacts for commissioned narrative, format and interaction design; use
-artifact-review when independent judgement is needed for the requested sharing stage.
-If it exposes a missing evidential link, investigate or label that gap; polished
-prose and animation cannot establish the missing fact.
+Check for missing evidential links before handing off. Investigate or label each
+gap; polished prose and presentation cannot establish a missing fact.

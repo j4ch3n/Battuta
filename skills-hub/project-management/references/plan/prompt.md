@@ -119,14 +119,16 @@ Command ends after Phase 1 design. Report branch, IMPL_PLAN path, and generated 
    - For each dependency → best practices task
    - For each integration → patterns task
 
-2. **Generate and dispatch research agents**:
+2. **Resolve the bounded research questions within the commission**:
 
    ```text
-   For each unknown in Technical Context:
-     Task: "Research {unknown} for {feature context}"
-   For each technology choice:
-     Task: "Find best practices for {tech} in {domain}"
+   For each unknown: establish the evidence needed for the current milestone.
+   For each technology choice: inspect relevant practices and constraints.
    ```
+
+   Use delegated assistance only within existing authority and tools. Missing
+   authority or consequential scope gaps go to the responsible requester.
+   Do not create a new assignment or scheduler from a bound execution task.
 
 3. **Consolidate findings** in `research.md` using format:
    - Decision: [what was chosen]

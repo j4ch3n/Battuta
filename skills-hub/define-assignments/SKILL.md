@@ -1,6 +1,6 @@
 ---
 name: define-assignments
-description: Use when translating an approved ticket into bounded technical assignments for implementation agents.
+description: Use when translating an authorized commission into bounded assignments for discovery, production, implementation or verification.
 ---
 
 # Define assignments
@@ -20,7 +20,11 @@ execution authority.
 
 ## How and why
 
-Determine the smallest complete solution, integration boundaries, acceptance
+Plan the next useful milestone from current evidence. When discovery is needed,
+make it a bounded assignment first, then use its findings to shape later work.
+A complete assignment is not a complete prediction of the whole project.
+
+Determine the milestone's outcome, integration boundaries, acceptance
 checks, and existing assignment prerequisites. Use todo to create each assignment
 with its complete initial TODO batch atomically, not create-then-append initial
 planning. Include explicit project, authority, inputs, expected deliverables,
