@@ -32,10 +32,12 @@ def extract_bundle(archive: Path, destination: Path) -> None:
             members = contents.getmembers()
             for member in members:
                 parts = PurePosixPath(member.name).parts
-                if not parts or parts[0] != "bots" or ".." in parts or not (member.isfile() or member.isdir()):
-                    raise click.ClickException("Archive must contain only regular files/directories below bots/")
+                if (not parts or parts[0] not in {"bots", "docs", "skills-hub", ".agents", "memory-service", "RELEASE.md"}
+                        or ".." in parts or member.name.startswith("/")
+                        or not (member.isfile() or member.isdir())):
+                    raise click.ClickException("Archive contains an unsafe or unexpected member")
             destination.mkdir(parents=True, exist_ok=True)
-            contents.extractall(destination, members=members, filter="data")
+            contents.extractall(destination, members=[member for member in members if PurePosixPath(member.name).parts[0] == "bots"], filter="data")
     except (OSError, tarfile.TarError) as error:
         raise click.ClickException("Cannot extract bot archive; stop and inspect the verified input") from error
     validate_bundle(destination)
@@ -62,6 +64,19 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
             skill = source / "skills-hub" / name
             if any(path.is_symlink() for path in [skill, *skill.rglob("*")]):
                 raise click.ClickException(f"Skill resources must not be symlinks: {name}")
+    for relative in ("docs", "skills-hub/project-management", "RELEASE.md",
+                     ".agents/skills/battuta-setup/references/development.md",
+                     ".agents/skills/battuta-verify/references/checks.md", "memory-service/DESIGN.md"):
+        path = source / relative
+        if any(item.is_symlink() for item in [path, *path.rglob("*")]):
+            raise click.ClickException(f"Documentation must not contain symlinks: {relative}")
+    for relative in ("RELEASE.md", ".agents/skills/battuta-setup/references/development.md",
+                     ".agents/skills/battuta-verify/references/checks.md", "memory-service/DESIGN.md"):
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source / relative, target)
+    shutil.copytree(source / "docs", destination / "docs", ignore=shutil.ignore_patterns("superpowers"))
+    shutil.copytree(source / "skills-hub/project-management", destination / "skills-hub/project-management")
     node_version = (source / ".node-version").read_text().strip()
     package_manager = json.loads((source / "package.json").read_text())["packageManager"]
     for component in SHARED:

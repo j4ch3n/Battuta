@@ -18,6 +18,13 @@ def source(tmp_path, monkeypatch):
     root.mkdir()
     (root / ".node-version").write_text("24.21.0\n")
     (root / "LICENSE").write_text("repository license")
+    (root / "RELEASE.md").write_text("[Setup](docs/setup.md)")
+    (root / "docs").mkdir()
+    (root / "docs/setup.md").write_text("setup")
+    for name in ("skills-hub/project-management/references/installation.md", "skills-hub/project-management/references/commands.md", "skills-hub/project-management/SKILL.md", ".agents/skills/battuta-setup/references/development.md", ".agents/skills/battuta-verify/references/checks.md", "memory-service/DESIGN.md"):
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("guide")
     (root / "package.json").write_text('{"packageManager":"pnpm@10.20.0"}')
     (root / "bots").mkdir()
     (root / "bots/AGENTS_shared.md").write_text("shared")
@@ -53,10 +60,14 @@ def source(tmp_path, monkeypatch):
     return root
 
 
-def test_staged_archive_is_bot_only(source, tmp_path):
+def test_staged_archive_separates_documentation_and_bots(source, tmp_path):
     target = tmp_path / "release"
     bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
-    assert {p.name for p in target.iterdir()} == {"bots"}
+    assert (target / "RELEASE.md").is_file()
+    assert (target / "docs/setup.md").read_text() == "setup"
+    assert (target / "skills-hub/project-management/references/installation.md").is_file()
+    assert (target / ".agents/skills/battuta-setup/references/development.md").is_file()
+    assert (target / "memory-service/DESIGN.md").is_file()
     assert (target / "bots/LICENSE").read_text() == "repository license"
     for profile in ("cos-bot", "manager-bot", "worker"):
         bot = target / "bots" / profile
@@ -90,6 +101,19 @@ def test_staged_archive_is_bot_only(source, tmp_path):
         bundle.validate_bundle(moved)
 
 
+def test_extracts_only_bots_from_archive_with_documentation(source, tmp_path):
+    staged = tmp_path / "staged"
+    bundle.stage_bots(source, staged, tag="v1.2.3", tool_version="1.2.3+gabc1234")
+    archive = tmp_path / "release.tar.gz"
+    with tarfile.open(archive, "w:gz") as output:
+        for path in staged.iterdir():
+            output.add(path, arcname=path.name)
+    target = tmp_path / "install"
+    bundle.extract_bundle(archive, target)
+    assert (target / "bots/release.json").is_file()
+    assert {path.name for path in target.iterdir()} == {"bots"}
+
+
 def test_stage_rejects_nonempty_and_symlink_targets(source, tmp_path):
     target = tmp_path / "release"
     target.mkdir()
@@ -110,6 +134,14 @@ def test_skill_escape_fails_before_writing(source, tmp_path):
     assert not target.exists()
 
 
+def test_documentation_symlink_is_rejected(source, tmp_path):
+    (source / "docs/escape.md").symlink_to(tmp_path / "private")
+    target = tmp_path / "release"
+    with pytest.raises(click.ClickException):
+        bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
+    assert not target.exists()
+
+
 @pytest.mark.parametrize("member", ["../escape", "/absolute", "bots/../escape", "other/file"])
 def test_archive_traversal_is_rejected_before_extraction(tmp_path, member):
     archive = tmp_path / "release.tar.gz"
@@ -117,6 +149,20 @@ def test_archive_traversal_is_rejected_before_extraction(tmp_path, member):
         info = tarfile.TarInfo(member)
         info.size = 1
         output.addfile(info, io.BytesIO(b"x"))
+    target = tmp_path / "install"
+    with pytest.raises(click.ClickException):
+        bundle.extract_bundle(archive, target)
+    assert not target.exists()
+
+
+@pytest.mark.parametrize("kind", [tarfile.SYMTYPE, tarfile.LNKTYPE, tarfile.FIFOTYPE])
+def test_documentation_special_members_are_rejected(tmp_path, kind):
+    archive = tmp_path / "release.tar.gz"
+    with tarfile.open(archive, "w:gz") as output:
+        info = tarfile.TarInfo("docs/unsafe")
+        info.type = kind
+        info.linkname = "../escape"
+        output.addfile(info)
     target = tmp_path / "install"
     with pytest.raises(click.ClickException):
         bundle.extract_bundle(archive, target)
