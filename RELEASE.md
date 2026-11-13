@@ -29,8 +29,7 @@ human acceptance, not agent-run setup checks.
     worker-2/.pi/
 ```
 
-The archive contains `RELEASE.md` and referenced documentation separately from
-`bots/`, which contains compiled JavaScript, generated instructions,
+The `bots/` directory contains compiled JavaScript, generated instructions,
 complete per-role skills, resources, notices, and dependency manifests/lockfiles.
 No source runtime catalog, Node executable, or dependency environments are bundled.
 JavaScript dependencies and Pi packages are installed **inside the installation**.
@@ -98,19 +97,6 @@ tool_version="$(cat python-tools-version.txt)"
 
 Both checksum checks must report `OK` for every asset. Never extract or install an
 unverified download.
-
-To read this guide and its local references from the verified archive, extract
-documentation into a separate empty directory, not the installation:
-
-```bash
-mkdir -p release-docs
-test -z "$(ls -A release-docs)"
-tar -xzf "battuta-$version-linux-arm64.tar.gz" -C release-docs RELEASE.md docs skills-hub .agents memory-service
-```
-
-An agent can then read `release-docs/RELEASE.md` and follow it. Downloading the
-archive and checksum and extracting these documentation paths is the bootstrap
-step; the remaining wheel assets are still required for installation.
 
 ## 2. Install self-describing Python wheels
 
