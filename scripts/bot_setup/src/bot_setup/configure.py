@@ -61,7 +61,6 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
         write_config(path, settings, ".settings-")
         run("pnpm", "--dir", str(root / "memory-client"), "install", "--frozen-lockfile")
         dream_env = {**os.environ, **values, "PI_CODING_AGENT_DIR": str(private / ".pi")}
-        run("node", str(root / "memory-client/configure-scheduler.mjs"), "--initialize", env=dream_env)
         run("node", str(root / "memory-client/configure-dream.mjs"), str(bot_dir), env=dream_env)
         extra = (SCHEDULE_PACKAGE,)
     else:

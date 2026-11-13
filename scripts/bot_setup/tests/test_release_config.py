@@ -27,12 +27,12 @@ def deployment(tmp_path, monkeypatch):
     return root, home, env_file
 
 
-def test_release_provisions_dream_with_private_model_settings(deployment, monkeypatch):
+def test_release_provisions_dream_before_scheduler_initialization(deployment, monkeypatch):
     root, home, env_file = deployment
     calls = []
     monkeypatch.setattr(release, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
     release.configure_release(root, env_file=env_file, home=home)
-    args, kwargs = calls[1]
+    args, kwargs = calls[0]
     assert args == ("node", str(root / "bots/_shared/memory-client/dist/configure-dream.js"), str(root / "bots/cos-bot"))
     assert kwargs["env"]["PI_CODING_AGENT_DIR"] == str(home / ".battuta/pi-bots/cos-bot/.pi")
 

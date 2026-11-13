@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { atomicPrivateWrite, optionalText } from "./dream-files.ts";
 import { reconcileDreamSchedule } from "./dream-schedule.ts";
 import { schedulerStorePath } from "./scheduler-config.ts";
-import { readSchedulerStore } from "./scheduler-store.ts";
+import { initializeSchedulerStore, readSchedulerStore } from "./scheduler-store.ts";
 import { dreamConfigSchema } from "./dream-config.ts";
 
 // Run only during operator-invoked configuration, with the CoS stopped. Never
@@ -26,13 +26,14 @@ export async function configureDream(botDirectory) {
   const settings = settingsText ? JSON.parse(settingsText) : {};
   if (!settings || typeof settings !== "object" || Array.isArray(settings))
     throw new Error("Invalid CoS settings");
-  const store = await readSchedulerStore(storePath);
-  const result = reconcileDreamSchedule(store, new Date().toISOString());
   if (
     settings.extensions !== undefined &&
     (!Array.isArray(settings.extensions) || settings.extensions.some((e) => typeof e !== "string"))
   )
     throw new Error("Invalid CoS extensions");
+  await initializeSchedulerStore(storePath);
+  const store = await readSchedulerStore(storePath);
+  const result = reconcileDreamSchedule(store, new Date().toISOString());
   const suffix = import.meta.url.endsWith(".js") ? "js" : "ts";
   const extension = fileURLToPath(new URL(`./dream-extension.${suffix}`, import.meta.url));
   settings.extensions = (settings.extensions ?? []).filter(

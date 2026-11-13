@@ -68,7 +68,6 @@ def configure_release(root: Path, *, env_file: Path, home: Path) -> None:
         raise click.ClickException(f"Missing compiled dream helper: {dream}")
     # Provision only after every instance has passed preflight; never start a bot.
     dream_env = {**os.environ, **values, "HOME": str(home), "PI_CODING_AGENT_DIR": str(home / ".battuta/pi-bots/cos-bot/.pi")}
-    run("node", str(helper), "--initialize", env=dream_env)
     run("node", str(dream), str(root / "bots/cos-bot"), env=dream_env)
     for bot, profile, private in browsers:
         configure_browser(profile, private, home=home, bot=bot)

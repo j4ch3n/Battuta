@@ -40,8 +40,7 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
     assert any("pi-scheduler" in source for source in sources) == (role == "cos")
     if role == "cos":
         assert runtime.call_args_list[0].args[:2] == ("pnpm", "--dir")
-        assert runtime.call_args_list[1].args == ("node", str(tmp_path / "memory-client/configure-scheduler.mjs"), "--initialize")
-        dream = runtime.call_args_list[2]
+        dream = runtime.call_args_list[1]
         assert dream.args == ("node", str(tmp_path / "memory-client/configure-dream.mjs"), str(bot))
         assert dream.kwargs["env"]["PI_CODING_AGENT_DIR"] == str(tmp_path / "home/.battuta/pi-bots/cos-bot/.pi")
     else:

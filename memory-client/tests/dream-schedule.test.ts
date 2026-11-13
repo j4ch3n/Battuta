@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { DREAM_PROMPT, ownedDreamTask, reconcileDreamSchedule } from "../dream-schedule.ts";
-import { initializeSchedulerStore } from "../scheduler-store.ts";
+import { initializeSchedulerStore, readSchedulerStore } from "../scheduler-store.ts";
 
 const now = "2026-10-21T12:00:00.000Z";
 const dirs: string[] = [];
@@ -174,7 +174,6 @@ test("Pi loads the configured relative dream extension", async () => {
   await mkdir(agent);
   await writeFile(join(dir, ".pi/settings.json"), JSON.stringify({}));
   const store = join(dir, "jobs.json");
-  await initializeSchedulerStore(store);
   vi.stubEnv("AGENT_ROLE", "cos");
   await promisify(execFile)(process.execPath, ["configure-dream.mjs", dir], {
     env: {
@@ -194,18 +193,21 @@ test("Pi loads the configured relative dream extension", async () => {
   const loaded = loader.getExtensions();
   expect(loaded.errors).toEqual([]);
   expect(loaded.extensions.some((extension) => extension.tools.has("memory_dream"))).toBe(true);
+  expect((await readSchedulerStore(store)).tasks).toHaveLength(1);
 });
 test.each(
   [undefined, "", " ", "missing-provider", "p/model with spaces"].flatMap((model) =>
-    [false, true].map((saved) => ({ model, saved })),
+    [false, true].flatMap((saved) =>
+      [false, true].map((storeExists) => ({ model, saved, storeExists })),
+    ),
   ),
 )(
-  "invalid dream environment $model leaves state unchanged (saved config: $saved)",
-  async ({ model, saved }) => {
+  "invalid dream environment $model leaves state unchanged (saved config: $saved, store: $storeExists)",
+  async ({ model, saved, storeExists }) => {
     const dir = await mkdtemp(join(tmpdir(), "dream-unconfigured-"));
     dirs.push(dir);
     const store = join(dir, "stable/jobs.json");
-    await initializeSchedulerStore(store);
+    if (storeExists) await initializeSchedulerStore(store);
     await mkdir(join(dir, ".pi"));
     const settingsText = JSON.stringify({ defaultProvider: "p", defaultModel: "m" });
     await writeFile(join(dir, ".pi/settings.json"), settingsText);
@@ -219,7 +221,7 @@ test.each(
     const env = { ...process.env };
     delete env.BATTUTA_DREAM_MODEL;
     if (model !== undefined) env.BATTUTA_DREAM_MODEL = model;
-    const before = await readFile(store, "utf8");
+    const before = storeExists ? await readFile(store, "utf8") : undefined;
     await expect(
       promisify(execFile)(process.execPath, ["configure-dream.mjs", dir], {
         env: {
@@ -229,7 +231,8 @@ test.each(
         },
       }),
     ).rejects.toThrow();
-    expect(await readFile(store, "utf8")).toBe(before);
+    if (storeExists) expect(await readFile(store, "utf8")).toBe(before);
+    else await expect(stat(join(dir, "stable"))).rejects.toMatchObject({ code: "ENOENT" });
     expect(await readFile(join(dir, ".pi/settings.json"), "utf8")).toBe(settingsText);
     if (saved) expect(await readFile(modelPath, "utf8")).toBe(modelText);
     else await expect(readFile(modelPath)).rejects.toMatchObject({ code: "ENOENT" });
