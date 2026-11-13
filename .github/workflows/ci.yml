@@ -70,7 +70,7 @@ jobs:
         env:
           COMPONENT: ${{ matrix.component }}
       - uses: actions/upload-artifact@v4
-        if: always() && matrix.component != 'cos-extension'
+        if: always()
         with:
           name: coverage-${{ strategy.job-index }}-${{ github.workflow }}-${{ github.run_attempt }}
           path: ${{ matrix.component }}/coverage/

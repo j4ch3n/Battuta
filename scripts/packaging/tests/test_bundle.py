@@ -29,7 +29,7 @@ def source(tmp_path, monkeypatch):
     (root / "package.json").write_text('{"packageManager":"pnpm@10.20.0"}')
     (root / "bots").mkdir()
     (root / "bots/AGENTS_shared.md").write_text("shared")
-    for name in ("agent-mail", "project-spec", "memory-client", "bots/cos-bot", "bots/manager-bot", "assignment-worker", "cos-extension"):
+    for name in ("agent-mail", "project-spec", "memory-client", "bots/cos-bot", "bots/manager-bot", "assignment-worker"):
         path = root / name
         path.mkdir(parents=True, exist_ok=True)
         (path / "package.json").write_text('{"type":"module","dependencies":{}}')

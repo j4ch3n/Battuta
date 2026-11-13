@@ -34,7 +34,6 @@ export default defineConfig(
       "project-spec/**/*.ts",
       "memory-client/**/*.ts",
       "assignment-worker/**/*.ts",
-      "cos-extension/**/*.ts",
       "bots/**/.pi/extensions/**/*.ts",
     ],
     extends: [js.configs.recommended, tseslint.configs.recommendedTypeChecked],

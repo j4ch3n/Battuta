@@ -6,7 +6,7 @@ import click
 import pytest
 
 from bot_setup.extensions import prepare_source_extensions, profile_settings
-from bot_setup.manifest import Extension, parse_manifest
+from bot_setup.manifest import Extension, load_profile, parse_manifest
 
 
 def test_prepares_and_reconciles_only_owned_links(tmp_path: Path):
@@ -116,6 +116,13 @@ def test_generated_settings_use_only_manifest_and_role_defaults(role):
     assert settings["battutaMemoryCapture"]["enabled"] == (role == "cos")
     assert ("pi-browser-use" in settings) == (role != "manager")
     assert not {"extensions", "defaultModel", "deviceId"} & settings.keys()
+
+
+def test_cos_manifest_selects_only_existing_non_cos_extensions():
+    root = Path(__file__).parents[3]
+    manifest = load_profile(root / "bots/cos-bot/bot.toml", "cos")
+    assert "cos" not in {extension.name for extension in manifest.extensions}
+    assert all((root / extension.source).is_file() for extension in manifest.extensions)
 
 
 @pytest.mark.parametrize("source", ["../other.ts", "/tmp/other.ts", "missing.ts"])

@@ -17,7 +17,7 @@ pi = [
   "npm:@jl1990/pi-scheduler@0.5.1",
   "npm:@amaster.ai/pi-browser-use@0.1.38",
 ]
-node_projects = ["agent-mail", "project-spec", "memory-client", "cos-extension"]
+node_projects = ["agent-mail", "project-spec", "memory-client"]
 
 [[extensions]]
 name = "agent-mail"
@@ -34,10 +34,6 @@ source = "memory-client/index.ts"
 [[extensions]]
 name = "dream"
 source = "memory-client/dream-extension.ts"
-
-[[extensions]]
-name = "cos"
-source = "cos-extension/index.ts"
 
 [[files]]
 operation = "concatenate"
