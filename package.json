@@ -6,9 +6,17 @@
   "engines": {
     "node": ">=24.21.0"
   },
+  "pnpm": {
+    "overrides": {
+      "@earendil-works/pi-ai": "1.5.2",
+      "@earendil-works/pi-agent-core": "1.5.2",
+      "@earendil-works/pi-codemode": "1.5.2",
+      "@earendil-works/pi-tui": "1.5.2"
+    }
+  },
   "scripts": {
     "prepare": "husky",
-    "setup:node-checks": "pnpm --dir agent-mail install --frozen-lockfile && pnpm --dir project-spec install --frozen-lockfile && pnpm --dir memory-client install --frozen-lockfile && pnpm --dir assignment-worker install --frozen-lockfile && pnpm --dir bots/cos-bot install --frozen-lockfile && pnpm --dir bots/manager-bot install --frozen-lockfile",
+    "setup:node-checks": "pnpm install --frozen-lockfile",
     "setup:checks": "pnpm setup:node-checks && uv sync --project scripts/bot_setup --locked && uv sync --project scripts/packaging --locked",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

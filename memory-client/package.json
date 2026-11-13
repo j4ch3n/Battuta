@@ -4,14 +4,6 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.20.0",
-  "pnpm": {
-    "overrides": {
-      "@earendil-works/pi-ai": "1.5.2",
-      "@earendil-works/pi-agent-core": "1.5.2",
-      "@earendil-works/pi-codemode": "1.5.2",
-      "@earendil-works/pi-tui": "1.5.2"
-    }
-  },
   "scripts": {
     "check": "tsc --noEmit",
     "test": "vitest run",

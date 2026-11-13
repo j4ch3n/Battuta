@@ -123,6 +123,38 @@ def test_staged_archive_separates_documentation_and_bots(source, tmp_path):
         bundle.validate_bundle(moved)
 
 
+def test_bundled_workspace_dependencies_are_not_installed_at_runtime(source, tmp_path):
+    manifest_path = source / "assignment-worker/package.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["dependencies"] = {"@battuta/agent-mail": "workspace:*", "typebox": "1.3.27"}
+    manifest_path.write_text(json.dumps(manifest))
+    target = tmp_path / "release"
+    bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
+    for path in (
+        target / "bots/worker/package.json",
+        target / "bots/worker/.pi/extensions/assignment-worker/package.json",
+    ):
+        assert json.loads(path.read_text())["dependencies"] == {"typebox": "1.3.27"}
+
+
+def test_memory_release_retains_workspace_overrides(source, tmp_path):
+    root_manifest = source / "package.json"
+    data = json.loads(root_manifest.read_text())
+    data["pnpm"] = {"overrides": {"example": "1.2.3"}}
+    root_manifest.write_text(json.dumps(data))
+    target = tmp_path / "release"
+    bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
+    paths = [target / "bots/_shared/memory-client/package.json"]
+    paths.extend(
+        package / "package.json"
+        for package in (target / "bots/cos-bot/.pi/extensions").iterdir()
+        if json.loads((package / "package.json").read_text()).get("pnpm")
+    )
+    assert paths
+    for path in paths:
+        assert json.loads(path.read_text())["pnpm"]["overrides"] == {"example": "1.2.3"}
+
+
 def test_missing_built_extension_is_rejected(source, tmp_path):
     target = tmp_path / "release"
     bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")

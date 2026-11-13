@@ -22,6 +22,13 @@ Node dependency versions remain in `package.json` and lockfiles. Secrets stay in
 environment files and private state, never TOML. Browser/MCP configuration and
 worker resource ownership retain their specialised validation and merge rules.
 
+The root pnpm workspace owns source dependency resolution and its root lockfile.
+Dependencies between local packages use `workspace:*` and named package exports.
+The individual package lockfiles are retained separately for standalone release
+installations; update and verify them when changing a package's dependencies.
+Release builds bundle local workspace imports and omit those bundled dependencies
+from the installed package manifests.
+
 ## Extension discovery and generated settings
 
 Each profile declares its extensions in TOML:

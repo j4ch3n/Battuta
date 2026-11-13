@@ -1,0 +1,7 @@
+packages:
+  - agent-mail
+  - assignment-worker
+  - memory-client
+  - project-spec
+  - bots/cos-bot
+  - bots/manager-bot

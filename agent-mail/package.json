@@ -1,7 +1,12 @@
 {
-  "name": "battuta-agent-mail",
+  "name": "@battuta/agent-mail",
   "private": true,
   "type": "module",
+  "exports": {
+    "./content": "./content.ts",
+    "./schemas": "./schemas.ts",
+    "./transport": "./transport.ts"
+  },
   "packageManager": "pnpm@10.20.0",
   "dependencies": {
     "@supabase/supabase-js": "^2.57.0",

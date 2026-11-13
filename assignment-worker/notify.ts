@@ -1,7 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Content, validate, type MessageReference } from "../agent-mail/schemas.ts";
-import { validateContent, MAX_CONTENT_BYTES, type MessageContent } from "../agent-mail/content.ts";
-import { sendProgrammaticMail, UncertainWriteError } from "../agent-mail/transport.ts";
+import { Content, validate, type MessageReference } from "@battuta/agent-mail/schemas";
+import {
+  validateContent,
+  MAX_CONTENT_BYTES,
+  type MessageContent,
+} from "@battuta/agent-mail/content";
+import { sendProgrammaticMail, UncertainWriteError } from "@battuta/agent-mail/transport";
 import type { Detail, ExecutionSessions, MailDelivery } from "./types.ts";
 
 function brief(value: string, limit = 300) {

@@ -48,6 +48,16 @@ def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, indent=2) + "\n")
 
 
+def release_manifest(manifest: dict) -> dict:
+    for section in ("dependencies", "devDependencies", "optionalDependencies"):
+        if section in manifest:
+            manifest[section] = {
+                name: version for name, version in manifest[section].items()
+                if not version.startswith("workspace:")
+            }
+    return manifest
+
+
 def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) -> None:
     if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag) or not tool_version.startswith(tag[1:] + "+g"):
         raise click.ClickException("Release tag and Python tool version must match")
@@ -82,12 +92,18 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         shutil.copy2(source / relative, target)
     shutil.copytree(source / "docs", destination / "docs", ignore=shutil.ignore_patterns("superpowers"))
     node_version = (source / ".node-version").read_text().strip()
-    package_manager = json.loads((source / "package.json").read_text())["packageManager"]
+    root_manifest = json.loads((source / "package.json").read_text())
+    package_manager = root_manifest["packageManager"]
+    overrides = root_manifest.get("pnpm", {}).get("overrides", {})
     for component in SHARED:
         package = destination / "bots/_shared" / component
         package.mkdir(parents=True)
         for name in ("package.json", "pnpm-lock.yaml"):
             shutil.copy2(source / component / name, package / name)
+        if overrides:
+            metadata = json.loads((package / "package.json").read_text())
+            metadata.setdefault("pnpm", {})["overrides"] = overrides
+            write_json(package / "package.json", metadata)
         (package / "dist").mkdir()
     packages = {profile: manifest.packages.pi.copy() for profile, manifest in manifests.items()}
     for profile in PROFILES:
@@ -97,7 +113,7 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         runtime = source / "assignment-worker" if profile == "worker" else original
         for name in ("package.json", "pnpm-lock.yaml"):
             shutil.copy2(runtime / name, bot / name)
-        manifest = json.loads((bot / "package.json").read_text())
+        manifest = release_manifest(json.loads((bot / "package.json").read_text()))
         manifest["type"] = "module"
         write_json(bot / "package.json", manifest)
         shutil.copy2(original / "bot.toml", bot / "bot.toml")
@@ -114,7 +130,9 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
             package.mkdir()
             for name in ("package.json", "pnpm-lock.yaml"):
                 shutil.copy2(owner / name, package / name)
-            metadata = json.loads((package / "package.json").read_text())
+            metadata = release_manifest(json.loads((package / "package.json").read_text()))
+            if entry.parent.name == "memory-client" and overrides:
+                metadata.setdefault("pnpm", {})["overrides"] = overrides
             metadata["type"] = "module"
             metadata["pi"] = {"extensions": ["dist/index.js"]}
             write_json(package / "package.json", metadata)

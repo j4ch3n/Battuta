@@ -1,6 +1,7 @@
 import { build } from "esbuild";
 import { readFile, cp, mkdir } from "node:fs/promises";
 import { resolve, dirname, join } from "node:path";
+import { createRequire } from "node:module";
 
 const [source, destination] = process.argv.slice(2).map((path) => resolve(path));
 if (!source || !destination) throw new Error("Usage: build-bots.mjs SOURCE DESTINATION");
@@ -23,6 +24,16 @@ for (const { entry, output } of builds) {
     outfile,
     bundle: true,
     packages: "external",
+    plugins: [
+      {
+        name: "bundle-workspace",
+        setup(build) {
+          build.onResolve({ filter: /^@battuta\// }, (args) => ({
+            path: createRequire(args.importer).resolve(args.path),
+          }));
+        },
+      },
+    ],
     platform: "node",
     format: "esm",
     target: "node24",

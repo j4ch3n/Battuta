@@ -29,6 +29,7 @@ const all =
       [
         "package.json",
         "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
         "eslint.config.mjs",
         ".node-version",
         ".deno-version",
