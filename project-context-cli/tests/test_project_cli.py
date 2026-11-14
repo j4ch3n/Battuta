@@ -25,6 +25,14 @@ class CliTests(ProjectTestCase):
         self.assertEqual(result.exit_code, 0, result.output)
         return result.output
 
+    def test_remove_rejects_unsafe_or_unknown_project_before_artifact_access(self):
+        for name in ("../other", "missing"):
+            with self.subTest(name=name), patch("battuta_project.registry.subprocess.run") as run:
+                result = self.runner.invoke(main, ["remove", name])
+                self.assertNotEqual(result.exit_code, 0)
+                run.assert_not_called()
+                self.assertTrue(self.project.root.exists())
+
     def test_init_reports_explicit_next_command_without_selection(self):
         output = self.invoke("init", "harbor-web", "--github", "https://github.com/team/harbor-web")
         self.assertIn("Initialized project: harbor-web", output)

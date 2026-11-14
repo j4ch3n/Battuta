@@ -5,6 +5,55 @@ from pathlib import Path
 
 
 class RegistryTests(unittest.TestCase):
+    def test_deregister_project_withdraws_owned_and_path_artifacts_only(self):
+        from battuta_artifacts.registry import Registry, migrate
+
+        migrate(self.path)
+        registry = Registry(self.path)
+        root = Path(self.tmp.name) / "atlas"
+        root.mkdir()
+        source = root / "source.md"
+        source.write_text("keep me")
+        for slug, project, path, status in (
+            ("owned", "atlas", "/outside", "draft"),
+            ("path", None, str(root), "published"),
+            ("other", "other", str(root.parent / "atlas-other"), "published"),
+        ):
+            registry.register(slug=slug, title=slug, description=slug, source_root=path,
+                              entry_path="source.md", format="markdown", files={"source.md": "text/markdown"},
+                              project=project, name=slug if project else None, status=status)
+        self.assertEqual(set(registry.deregister_project("atlas", root)), {"owned", "path"})
+        self.assertEqual([item["slug"] for item in registry.list()], ["other"])
+        self.assertEqual(source.read_text(), "keep me")
+
+    def test_deregister_project_rolls_back_on_failure(self):
+        from battuta_artifacts.registry import Registry, migrate
+
+        migrate(self.path)
+        registry = Registry(self.path)
+        for slug in ("one", "two"):
+            registry.register(slug=slug, title=slug, description=slug, source_root="/atlas",
+                              entry_path="index.html", format="html", files={"index.html": "text/html"},
+                              project="atlas", name=slug)
+        with sqlite3.connect(self.path) as db:
+            db.execute("""CREATE TRIGGER refuse_delete BEFORE DELETE ON artifacts
+                       WHEN OLD.slug = 'two' BEGIN SELECT RAISE(ABORT, 'blocked'); END""")
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "blocked"):
+            registry.deregister_project("atlas", Path("/atlas"))
+        self.assertEqual({item["slug"] for item in registry.list()}, {"one", "two"})
+
+    def test_deregister_project_finds_allowlisted_files_below_project(self):
+        from battuta_artifacts.registry import Registry, migrate
+
+        migrate(self.path)
+        registry = Registry(self.path)
+        root = Path(self.tmp.name) / "atlas"
+        registry.register(slug="nested", title="Nested", description="Nested",
+                          source_root=self.tmp.name, entry_path="index.html", format="html",
+                          files={"index.html": "text/html", "atlas/report.md": "text/markdown"})
+        self.assertEqual(registry.deregister_project("atlas", root), ["nested"])
+        self.assertEqual(registry.list(), [])
+
     def test_upgrade_preserves_published_records_and_defaults_new_rows_to_draft(self):
         from alembic import command
         from sqlalchemy import URL, create_engine

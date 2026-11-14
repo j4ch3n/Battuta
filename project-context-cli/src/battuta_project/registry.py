@@ -1,8 +1,10 @@
 """Filesystem-owned project discovery, initialization, and associations."""
 
 from pathlib import Path
+import json
 import shutil
 import subprocess
+import tempfile
 
 import click
 from jinja2 import TemplateError
@@ -51,6 +53,46 @@ class ProjectRegistry:
 
     def list_projects(self) -> list[ProjectContext]:
         return [self.load(name) for name in self.names()]
+
+    def remove(self, name: str) -> None:
+        project = self.load(name)
+        try:
+            result = subprocess.run(
+                ["battuta-artifact", "--json", "deregister-project", "--", name],
+                capture_output=True, text=True,
+            )
+        except OSError as error:
+            raise click.ClickException(f"Artifact withdrawal failed; project remains at {project.root}: {error}") from error
+        try:
+            response = json.loads(result.stdout)
+            if result.returncode or response.get("ok") is not True:
+                raise ValueError(response.get("error", {}).get("message", result.stderr or "unknown error"))
+            removed = response["artifacts_removed"]
+            if not isinstance(removed, list) or not all(isinstance(slug, str) for slug in removed):
+                raise ValueError("invalid artifact withdrawal response")
+        except (ValueError, KeyError, AttributeError) as error:
+            raise click.ClickException(
+                f"Artifact withdrawal failed or its result is unknown; project remains at {project.root}: "
+                f"{error}; process stderr: {result.stderr.strip() or '(empty)'}"
+            ) from error
+        destination = None
+        try:
+            trash = Path.home() / ".Trash"
+            trash.mkdir(mode=0o700, exist_ok=True)
+            if trash.is_symlink() or not trash.is_dir():
+                raise OSError(f"Trash must be a real directory: {trash}")
+            destination = Path(tempfile.mkdtemp(prefix=f"{name}-", dir=trash))
+            project.root.rename(destination / name)
+        except OSError as error:
+            if destination is not None:
+                try:
+                    destination.rmdir()
+                except OSError:
+                    pass
+            raise click.ClickException(
+                f"Project move failed: {error}; project remains at {project.root}; "
+                f"artifacts deregistered: {', '.join(removed) or 'none'}"
+            ) from error
 
     @staticmethod
     def _write_project(directory: Path, config: ProjectConfig) -> None:

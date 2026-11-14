@@ -59,6 +59,14 @@ The command returns a numbered Markdown list sorted by project name. Each entry 
 
 Listing discovers projects from `project.yaml` markers, validates configurations and checkouts, and does not read spec inventories or contact Linear. Hidden directories, symlinked project directories, non-directory entries, and directories without markers are excluded. An absent store reports that no Battuta project store has been initialized; an existing empty registry reports `No registered projects.` Both suggest `battuta-project init <project-name>` and succeed without creating state. A malformed configuration, unsafe marker, or invalid checkout reports an error rather than a partial successful catalog.
 
+## Remove a project
+
+```sh
+battuta-project remove atlas
+```
+
+Ensure no worker is using the project before removing it; the command does not check or stop workers. It requires the installed `battuta-artifact` command and its configured registry. It withdraws the project's artifacts, then moves the complete project folder to Trash. Published artifact links stop working. Shared memory, assignment history, and remote projects remain unchanged. If the move fails after withdrawal, the error identifies the deregistered artifacts and retained project; their registrations are not restored.
+
 For automation, `--json` writes only `{"projects":["atlas","beacon"]}` to stdout, preserving directory spelling and sorting names. A missing or empty registry returns `{"projects":[]}` without creating files. Invalid registrations fail with a nonzero exit and a diagnostic on stderr. Project discovery always uses `~/.battuta/projects`; there is no root override or shared current selection.
 
 ## Linear projects

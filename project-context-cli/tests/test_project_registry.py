@@ -15,6 +15,51 @@ from battuta_project.models import LinearConfig
 
 
 class RegistryTests(unittest.TestCase):
+    def test_remove_preserves_tree_and_deregisters(self):
+        project = self.registry.init("atlas")
+        self.registry.init("other")
+        hidden = project.root / ".hidden"
+        hidden.write_text("important")
+        external = Path(self.temp.name) / "external"
+        external.write_text("untouched")
+        (project.root / "link").symlink_to(external)
+        trash = Path(self.temp.name) / ".Trash"
+        trash.mkdir()
+        (trash / "atlas").mkdir()
+        (trash / "atlas" / "existing").write_text("existing")
+        self.run.return_value = subprocess.CompletedProcess([], 0, '{"ok":true,"artifacts_removed":["a"]}', "")
+        self.run.side_effect = None
+        self.registry.remove("atlas")
+        self.assertEqual(self.registry.names(), ["other"])
+        moved = next(trash.glob("atlas-*/atlas"))
+        self.assertEqual((moved / ".hidden").read_text(), "important")
+        self.assertTrue((moved / "link").is_symlink())
+        self.assertEqual(external.read_text(), "untouched")
+        self.assertEqual((trash / "atlas" / "existing").read_text(), "existing")
+        with self.assertRaises(click.ClickException):
+            self.registry.remove("atlas")
+
+    def test_remove_fails_closed_and_reports_partial_state(self):
+        project = self.registry.init("atlas")
+        self.run.side_effect = None
+        self.run.return_value = subprocess.CompletedProcess([], 5, '{"ok":false,"error":{"message":"database unavailable"}}', "")
+        with self.assertRaisesRegex(click.ClickException, "database unavailable"):
+            self.registry.remove("atlas")
+        self.assertTrue(project.root.exists())
+        self.run.return_value = subprocess.CompletedProcess([], 0, '{"ok":true,"artifacts_removed":["report"]}', "")
+        with patch("pathlib.Path.rename", side_effect=OSError("disk failure")):
+            with self.assertRaisesRegex(click.ClickException, "disk failure.*report"):
+                self.registry.remove("atlas")
+        self.assertTrue(project.root.exists())
+
+    def test_remove_reports_artifact_process_stderr_when_output_is_not_json(self):
+        project = self.registry.init("atlas")
+        self.run.side_effect = None
+        self.run.return_value = subprocess.CompletedProcess([], 1, "", "artifact process crashed")
+        with self.assertRaisesRegex(click.ClickException, "artifact process crashed"):
+            self.registry.remove("atlas")
+        self.assertTrue(project.root.exists())
+
     def test_loading_projects_preserves_work_files(self):
         self.registry.init("atlas")
         self.registry.init("harbor")
