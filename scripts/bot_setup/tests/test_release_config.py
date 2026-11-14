@@ -35,11 +35,11 @@ def test_release_provisions_dream_before_scheduler_initialization(deployment, mo
     monkeypatch.setattr(release, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
     release.configure_release(root, env_file=env_file, home=home)
     args, kwargs = calls[0]
-    assert args == ("node", str(root / "bots/_shared/memory-client/dist/configure-dream.js"), str(root / "bots/cos-bot"))
+    assert args == ("node", str(root / "bots/_shared/memory-client/dist/configure-dream.js"), str(root / "bots/cos-bot"), "--release")
     assert kwargs["env"]["PI_CODING_AGENT_DIR"] == str(home / ".battuta/pi-bots/cos-bot/.pi")
 
 
-def test_release_preserves_private_state_and_regenerates_owned_files(deployment):
+def test_release_preserves_existing_files_and_reports_skips(deployment, capsys):
     root, home, env_file = deployment
     pi = home / ".battuta/pi-bots/cos-bot/.pi"
     pi.mkdir(parents=True)
@@ -49,23 +49,27 @@ def test_release_preserves_private_state_and_regenerates_owned_files(deployment)
         path.parent.mkdir(exist_ok=True)
         path.write_text(data)
     (pi / "mcp.json").write_text('{"mcpServers":{"obsolete":{}}}')
+    mcp = (pi / "mcp.json").read_bytes()
     release.configure_release(root, env_file=env_file, home=home)
-    release.configure_release(root, env_file=env_file, home=home)
-    settings = json.loads((pi / "settings.json").read_text())
-    assert settings["defaultModel"] == "personal"
-    assert settings["theme"] == "light"
+    output = capsys.readouterr().out
+    assert (pi / "settings.json").read_text() == private["settings.json"]
+    assert (pi / "mcp.json").read_bytes() == mcp
+    assert str(pi / "settings.json") in output
+    assert str(pi / "mcp.json") in output
+    assert "skipped" in output.lower()
     assert {name: (pi / name).read_text() for name in private if name != "settings.json"} == {name: data for name, data in private.items() if name != "settings.json"}
-    assert "obsolete" not in json.loads((pi / "mcp.json").read_text())["mcpServers"]
     for bot in ("cos-bot", "manager-bot", "worker-1", "worker-2"):
         private_pi = home / ".battuta/pi-bots" / bot / ".pi"
         servers = json.loads((private_pi / "mcp.json").read_text())["mcpServers"]
-        assert servers["assignments"]["headers"] == {"apikey": "${SUPABASE_SECRET_KEY}"}
+        if bot != "cos-bot":
+            assert servers["assignments"]["headers"] == {"apikey": "${SUPABASE_SECRET_KEY}"}
         assert (private_pi / "telegram.json").exists() == (bot == "cos-bot")
-        assert (private_pi / "mcp.json").stat().st_mode & 0o777 == 0o600
+        if bot != "cos-bot":
+            assert (private_pi / "mcp.json").stat().st_mode & 0o777 == 0o600
         assert not (private_pi.parent / "AGENTS.md").exists()
         if bot == "manager-bot":
             assert json.loads((private_pi / "settings.json").read_text())["defaultThinkingLevel"] == "medium"
-        else:
+        elif bot != "cos-bot":
             browser = json.loads((private_pi / "settings.json").read_text())["pi-browser-use"]
             assert browser["userDataDir"] == str(private_pi / "browser-research")
     assert not (home / ".pi").exists()
@@ -79,6 +83,28 @@ def test_fresh_release_defaults_survive_browser_setup(deployment):
         assert settings["defaultThinkingLevel"] == thinking
         assert settings["defaultModel"]
 
+
+def test_repeated_release_leaves_created_files_unchanged(deployment, capsys):
+    root, home, env_file = deployment
+    release.configure_release(root, env_file=env_file, home=home)
+    paths = list((home / ".battuta/pi-bots").rglob("*.json"))
+    before = {path: path.read_bytes() for path in paths}
+    capsys.readouterr()
+    release.configure_release(root, env_file=env_file, home=home)
+    assert {path: path.read_bytes() for path in paths} == before
+    output = capsys.readouterr().out
+    assert all(str(path) in output for path in paths)
+
+
+def test_existing_browser_preferences_are_left_untouched(deployment, capsys):
+    root, home, env_file = deployment
+    path = home / ".battuta/pi-bots/cos-bot/.pi/settings.json"
+    path.parent.mkdir(parents=True)
+    original = '{"pi-browser-use":{"headless":false}}'
+    path.write_text(original)
+    release.configure_release(root, env_file=env_file, home=home)
+    assert path.read_text() == original
+    assert "browser" in capsys.readouterr().out.lower()
 
 @pytest.mark.parametrize("conflict", ["symlink", "resource", "malformed"])
 def test_preflight_all_instances_before_any_write(deployment, conflict):

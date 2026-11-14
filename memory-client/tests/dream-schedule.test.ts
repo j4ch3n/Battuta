@@ -161,6 +161,125 @@ test.each([false, true])(
     });
   },
 );
+test("release dream setup preserves existing shared files", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "dream-release-"));
+  dirs.push(dir);
+  const store = join(dir, "jobs.json");
+  const data = join(dir, "memory");
+  const model = join(data, "dream-config.json");
+  await initializeSchedulerStore(store);
+  await mkdir(data);
+  await writeFile(model, '{"version":1,"model":"owner/model"}');
+  const before = await readFile(store, "utf8");
+  await promisify(execFile)(process.execPath, ["configure-dream.mjs", dir, "--release"], {
+    env: {
+      ...process.env,
+      PI_SCHEDULER_STATE_FILE: store,
+      BATTUTA_MEMORY_DATA_DIR: data,
+      BATTUTA_DREAM_MODEL: "dream/new",
+    },
+  });
+  expect(await readFile(store, "utf8")).toBe(before);
+  expect(await readFile(model, "utf8")).toBe('{"version":1,"model":"owner/model"}');
+});
+test.each(["store", "model"])(
+  "release dream setup creates only the missing %s counterpart",
+  async (existing) => {
+    const dir = await mkdtemp(join(tmpdir(), "dream-release-mixed-"));
+    dirs.push(dir);
+    const store = join(dir, "jobs.json");
+    const data = join(dir, "memory");
+    const model = join(data, "dream-config.json");
+    await mkdir(data);
+    if (existing === "store") await initializeSchedulerStore(store);
+    else await writeFile(model, '{"version":1,"model":"owner/model"}');
+    const path = existing === "store" ? store : model;
+    const before = await readFile(path, "utf8");
+    const { stdout } = await promisify(execFile)(
+      process.execPath,
+      ["configure-dream.mjs", dir, "--release"],
+      {
+        env: {
+          ...process.env,
+          PI_SCHEDULER_STATE_FILE: store,
+          BATTUTA_MEMORY_DATA_DIR: data,
+          BATTUTA_DREAM_MODEL: "dream/new",
+        },
+      },
+    );
+    expect(await readFile(path, "utf8")).toBe(before);
+    expect(JSON.parse(stdout)).toEqual(
+      expect.arrayContaining([
+        { path, created: false },
+        { path: existing === "store" ? model : store, created: true },
+      ]),
+    );
+  },
+);
+test("release dream setup refuses a symlinked config", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "dream-release-link-"));
+  dirs.push(dir);
+  const data = join(dir, "memory");
+  await mkdir(data);
+  const original = join(dir, "original");
+  await writeFile(original, "private");
+  await symlink(original, join(data, "dream-config.json"));
+  await expect(
+    promisify(execFile)(process.execPath, ["configure-dream.mjs", dir, "--release"], {
+      env: {
+        ...process.env,
+        PI_SCHEDULER_STATE_FILE: join(dir, "jobs.json"),
+        BATTUTA_MEMORY_DATA_DIR: data,
+        BATTUTA_DREAM_MODEL: "dream/new",
+      },
+    }),
+  ).rejects.toThrow();
+  expect(await readFile(original, "utf8")).toBe("private");
+});
+test("release dream setup refuses a symlinked parent directory", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "dream-release-parent-"));
+  dirs.push(dir);
+  const real = join(dir, "real");
+  await mkdir(real);
+  await symlink(real, join(dir, "memory"));
+  await expect(
+    promisify(execFile)(process.execPath, ["configure-dream.mjs", dir, "--release"], {
+      env: {
+        ...process.env,
+        PI_SCHEDULER_STATE_FILE: join(dir, "jobs.json"),
+        BATTUTA_MEMORY_DATA_DIR: join(dir, "memory"),
+        BATTUTA_DREAM_MODEL: "dream/new",
+      },
+    }),
+  ).rejects.toThrow();
+  await expect(stat(join(real, "dream-config.json"))).rejects.toMatchObject({ code: "ENOENT" });
+});
+test("concurrent release dream setups do not replace each other's files", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "dream-release-race-"));
+  dirs.push(dir);
+  const store = join(dir, "jobs.json");
+  const model = join(dir, "memory/dream-config.json");
+  const run = (value: string) =>
+    promisify(execFile)(process.execPath, ["configure-dream.mjs", dir, "--release"], {
+      env: {
+        ...process.env,
+        PI_SCHEDULER_STATE_FILE: store,
+        BATTUTA_MEMORY_DATA_DIR: join(dir, "memory"),
+        BATTUTA_DREAM_MODEL: value,
+      },
+    });
+  const outputs = await Promise.all([run("dream/first"), run("dream/second")]);
+  const results = outputs.flatMap(
+    ({ stdout }) => JSON.parse(stdout) as { path: string; created: boolean }[],
+  );
+  for (const path of [store, model]) {
+    expect(results.filter((item) => item.path === path && item.created)).toHaveLength(1);
+    expect(results.filter((item) => item.path === path && !item.created)).toHaveLength(1);
+  }
+  const config = JSON.parse(await readFile(model, "utf8")) as { model: string };
+  expect(["dream/first", "dream/second"]).toContain(config.model);
+  expect((await readSchedulerStore(store)).tasks).toHaveLength(1);
+});
 test("Pi discovers the prepared project-local dream extension", async () => {
   const dir = await mkdtemp(join(tmpdir(), "dream-relative-"));
   dirs.push(dir);

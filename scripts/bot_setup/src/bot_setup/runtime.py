@@ -31,13 +31,13 @@ def resolve_agent_dir(manifest: BotManifest, instance: str, home: Path) -> Path:
     return target
 
 
-def initialize_settings_if_missing(agent_dir: Path, defaults: Defaults, *, initial_settings: dict | None = None) -> None:
+def initialize_settings_if_missing(agent_dir: Path, defaults: Defaults, *, initial_settings: dict | None = None) -> bool:
     path = safe_path(agent_dir, "settings.json")
     if path.exists():
         if not path.is_file():
             raise click.ClickException(f"Expected private regular settings: {path}")
         read_config(path)
-        return
+        return False
     content = json.dumps({
         **(initial_settings or {}),
         "defaultProvider": defaults.provider,
@@ -46,3 +46,5 @@ def initialize_settings_if_missing(agent_dir: Path, defaults: Defaults, *, initi
     }, indent=2) + "\n"
     if not write_file(path, content.encode(), policy="create-only"):
         read_config(path)
+        return False
+    return True
