@@ -168,9 +168,10 @@ test("queued tool calls recheck disablement even while startup work is active", 
   const store = await readSchedulerStore(path);
   store.tasks[0].enabled = false;
   await writeFile(path, JSON.stringify(store));
-  await expect(h.tools[0].execute("queued", {}, undefined, undefined, h.ctx)).rejects.toThrow(
-    "Dream unavailable: configure an enabled nightly dream model and retry.",
-  );
+  expect(await h.tools[0].execute("queued", {}, undefined, undefined, h.ctx)).toMatchObject({
+    isError: true,
+    details: { status: "unavailable" },
+  });
   finish({ status: "complete", summary: "Nothing material changed." });
   await first;
   expect(run).toHaveBeenCalledTimes(1);
@@ -195,7 +196,7 @@ test("a cancelled caller does not wait for already-active startup work", async (
         pending,
         new Promise((resolve) => setTimeout(() => resolve("still waiting"), 50)),
       ]),
-    ).rejects.toThrow("Dream cancelled: retry the next eligible scheduled run.");
+    ).resolves.toMatchObject({ isError: true, details: { status: "cancelled" } });
   } finally {
     finish({ status: "complete", summary: "Nothing material changed." });
     await pending.catch(() => {});
@@ -210,9 +211,10 @@ test.each([
   { prompt: "Changed prompt" },
 ])("rejects absent, disabled, mismatched or unsafe dream configuration %j", async (job) => {
   const h = await harness("cos", job);
-  await expect(h.tools[0].execute("id", {}, undefined, undefined, h.ctx)).rejects.toThrow(
-    "Dream unavailable: configure an enabled nightly dream model and retry.",
-  );
+  expect(await h.tools[0].execute("id", {}, undefined, undefined, h.ctx)).toMatchObject({
+    isError: true,
+    details: { status: "unavailable", error: { code: "unavailable" } },
+  });
   expect(run).not.toHaveBeenCalled();
 });
 test("shutdown reports cancellation and outages expose no private error", async () => {
@@ -226,7 +228,7 @@ test("shutdown reports cancellation and outages expose no private error", async 
   const result = h.tools[0].execute("id", {}, undefined, undefined, h.ctx);
   await vi.waitFor(() => expect(run).toHaveBeenCalled());
   await h.hooks.get("session_shutdown")!({}, h.ctx);
-  await expect(result).rejects.toThrow("Dream cancelled: retry the next eligible scheduled run.");
+  await expect(result).resolves.toMatchObject({ isError: true, details: { status: "cancelled" } });
   expect(JSON.stringify(h.status.mock.calls)).not.toContain("SECRET");
 });
 
@@ -234,9 +236,12 @@ test("worker failures return a safe actionable status", async () => {
   run.mockRejectedValueOnce(new Error("SECRET profile validation failure"));
   const h = await harness();
 
-  await expect(h.tools[0].execute("id", {}, undefined, undefined, h.ctx)).rejects.toThrow(
-    "Dream failed: review private operational logs and retry.",
-  );
+  const result = await h.tools[0].execute("id", {}, undefined, undefined, h.ctx);
+  expect(result).toMatchObject({
+    isError: true,
+    details: { status: "failed", error: { code: "unexpected_error" } },
+  });
+  expect(JSON.stringify(result)).not.toContain("SECRET");
   expect(JSON.stringify(h.status.mock.calls)).not.toContain("SECRET");
 });
 
@@ -267,9 +272,10 @@ test("whole-run deadline settles even when a memory transport ignores cancellati
   const deadline = new AbortController();
   const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(deadline.signal);
   const pending = h.tools[0].execute("id", {}, undefined, undefined, h.ctx);
-  const rejected = expect(pending).rejects.toThrow(
-    "Dream timed out: review availability and retry the next eligible scheduled run.",
-  );
+  const rejected = expect(pending).resolves.toMatchObject({
+    isError: true,
+    details: { status: "timed_out" },
+  });
   await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1));
   expect(timeout).toHaveBeenCalledWith(600000);
   deadline.abort();

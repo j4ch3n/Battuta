@@ -7,6 +7,7 @@ import { DreamExecutionError, type DreamFailure, executeDream } from "./dream-ex
 import { recordDreamUsage } from "./dream-usage.ts";
 import { abortable } from "./abortable.ts";
 import type { DreamOutcome } from "./dream-result.ts";
+import { dreamDiagnostic } from "./dream-errors.ts";
 
 export default function dreamExtension(pi: ExtensionAPI) {
   if (process.env.AGENT_ROLE !== "cos") return;
@@ -54,7 +55,11 @@ export default function dreamExtension(pi: ExtensionAPI) {
         failed: "Dream failed: review private operational logs and retry.",
       };
       ctx.ui.setStatus("memory-dream", `Memory dream ${failure.replace("_", " ")}`);
-      throw new Error(messages[failure], { cause: error });
+      if (error instanceof DreamExecutionError) throw error;
+      throw new DreamExecutionError(failure, {
+        ...dreamDiagnostic(error, configured ? "execution" : "setup"),
+        ...(configured ? {} : { code: "unavailable", message: messages.unavailable }),
+      });
     }
   }
   pi.registerTool({
@@ -64,11 +69,30 @@ export default function dreamExtension(pi: ExtensionAPI) {
       "Run the explicitly configured memory dream. On success, report successful completion and the returned public summary. For partial, already completed without a summary, or failed runs, report the actual status honestly. Never request or repeat private reflections. Does not accept custom prompts or models.",
     parameters: Type.Object({}, { additionalProperties: false }),
     async execute(_id, _params, signal, _update, ctx) {
-      const result = await execute(ctx, signal);
-      return {
-        content: [{ type: "text", text: JSON.stringify(result) }],
-        details: result,
-      };
+      try {
+        const result = await execute(ctx, signal);
+        return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
+      } catch (error) {
+        const failure = error instanceof DreamExecutionError ? error.failure : "failed";
+        const result = {
+          status: failure,
+          error:
+            error instanceof DreamExecutionError && error.diagnostic
+              ? error.diagnostic
+              : failure === "unavailable"
+                ? {
+                    stage: "setup",
+                    code: "unavailable",
+                    message: "Configured dream model is unavailable.",
+                  }
+                : dreamDiagnostic(error, "execution"),
+        };
+        return {
+          isError: true,
+          content: [{ type: "text", text: JSON.stringify(result) }],
+          details: result,
+        };
+      }
     },
   });
   pi.on("session_start", (_event, ctx) => {

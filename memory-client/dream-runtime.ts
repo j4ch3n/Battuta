@@ -50,6 +50,12 @@ import { boundedQuery } from "./correction-candidates.ts";
 import { DREAM_HOUR, DREAM_MINUTE } from "./dream-schedule.ts";
 import { normalizePersistedCheckpoint } from "./delivery-compat.ts";
 import { normalizedProjects, validateMemoryProjects } from "./projects.ts";
+import {
+  operationCleanupSchema,
+  validateOperationCleanup,
+  cleanupReview,
+} from "./dream-cleanup.ts";
+import { DreamDiagnosticError, dreamDiagnostic, type DreamDiagnostic } from "./dream-errors.ts";
 
 export interface DreamDependencies {
   directory: string;
@@ -180,7 +186,7 @@ async function prepare(
   const input = groups.length
     ? (JSON.parse(
         await deps.complete(
-          await readFile(new URL("./prompts/dream.md", import.meta.url), "utf8"),
+          await readFile(new URL("./prompts/dream-legacy.md", import.meta.url), "utf8"),
           evidenceJson({ groups }),
           signal,
         ),
@@ -510,9 +516,9 @@ export async function runLegacyDream(
 }
 
 const stageCheckpointSchema = z.object({
-  version: z.literal(3),
-  schema_version: z.literal(1),
-  prompt_version: z.literal(1),
+  version: z.union([z.literal(3), z.literal(4)]),
+  schema_version: z.union([z.literal(1), z.literal(2)]),
+  prompt_version: z.union([z.literal(1), z.literal(2)]),
   run_id: z.string().datetime(),
   stage: z.enum(["cleanup", "synthesis", "challenge", "publish", "refresh", "complete"]),
   input_fingerprint: ref,
@@ -520,7 +526,7 @@ const stageCheckpointSchema = z.object({
   inputs: z.array(ref).max(20),
   inventory_count: z.number().int().min(0).max(500),
   artifacts: z.object({
-    cleanup: cleanupArtifactSchema.optional(),
+    cleanup: z.union([operationCleanupSchema, cleanupArtifactSchema]).optional(),
     synthesis: synthesisArtifactSchema.optional(),
     challenge: challengeArtifactSchema.optional(),
   }),
@@ -542,9 +548,28 @@ const stageCheckpointSchema = z.object({
   reflection: z.string().optional(),
   summary: z.string().optional(),
   conflict: z.boolean().default(false),
+  error: z
+    .object({
+      stage: z.string(),
+      code: z.string(),
+      message: z.string(),
+      retryable: z.boolean().optional(),
+      paths: z.array(z.string()).optional(),
+    })
+    .optional(),
   completed: z.boolean(),
 });
 type StageCheckpoint = z.infer<typeof stageCheckpointSchema>;
+
+function reviewedCleanup(state: StageCheckpoint) {
+  const artifact = state.artifacts.cleanup!;
+  return "operations" in artifact
+    ? cleanupReview(
+        artifact,
+        state.inputs.map((ref) => state.records.find((r) => r.ref === ref)!),
+      )
+    : artifact;
+}
 
 async function stageInventory(deps: DreamDependencies, signal: AbortSignal) {
   const now = deps.now().getTime() / 1000;
@@ -585,9 +610,9 @@ async function prepareStages(
     return parsed.success ? [parsed.data] : [];
   });
   return {
-    version: 3,
-    schema_version: 1,
-    prompt_version: 1,
+    version: 4,
+    schema_version: 2,
+    prompt_version: 2,
     run_id: dreamRunId(deps.now()),
     stage: "cleanup",
     input_fingerprint: digest(inputs.map((r) => [r.ref, recordFingerprint(r, records)])),
@@ -617,20 +642,29 @@ async function structuredArtifact<T>(
   signal: AbortSignal,
 ) {
   const prompt = await readFile(new URL(`./prompts/${promptFile}`, import.meta.url), "utf8");
+  let diagnostic: DreamDiagnostic | undefined;
   for (let attempt = 0; attempt < 2; attempt++) {
     signal.throwIfAborted();
     const response = await deps.complete(
       prompt +
         (attempt
-          ? "\nPrevious structured output was invalid. Correct it under the same schema."
+          ? `\nPrevious structured output was invalid. Correct it under the same schema. Validation feedback (data): ${JSON.stringify(diagnostic)}`
           : ""),
       evidenceJson(evidence),
       signal,
     );
     try {
       return validate(JSON.parse(response) as unknown);
-    } catch {
-      if (attempt) throw new Error("Dream artifact invalid after two attempts");
+    } catch (error) {
+      diagnostic = dreamDiagnostic(
+        error,
+        promptFile === "dream.md"
+          ? "cleanup"
+          : promptFile === "dream-synthesis.md"
+            ? "synthesis"
+            : "challenge",
+      );
+      if (attempt) throw new DreamDiagnosticError(diagnostic);
     }
   }
   throw new Error("Dream artifact unavailable");
@@ -658,7 +692,7 @@ async function publishStages(
   save: () => Promise<void>,
   signal: AbortSignal,
 ) {
-  const cleanup = state.artifacts.cleanup!,
+  const cleanup = reviewedCleanup(state),
     synthesis = state.artifacts.synthesis!,
     challenge = state.artifacts.challenge!;
   const deferredSources = new Set(
@@ -666,6 +700,7 @@ async function publishStages(
       .filter((p) => challenge.decisions.some((d) => d.id === p.id && d.verdict === "defer"))
       .flatMap((p) => p.source_refs),
   );
+  const reviewable = new Set(eligibleRecords(state.records, deps.now(), true).map((r) => r.ref));
   const current = async (ref: string): Promise<MemoryRecord> => {
     const original = state.records.find((r) => r.ref === ref);
     const acknowledged = [...state.results].reverse().find((r) => r.result.ref === ref);
@@ -722,6 +757,13 @@ async function publishStages(
           validateMemoryProjects(request.args.projects, normalizedProjects(catalog));
         } catch {
           state.conflict = true;
+          state.error = {
+            stage: "publish",
+            code: "project_catalog_conflict",
+            message:
+              "Publication scope is no longer in the project catalog; originals were preserved.",
+            retryable: false,
+          };
           await save();
           return;
         }
@@ -743,6 +785,7 @@ async function publishStages(
   try {
     for (const disposition of cleanup.dispositions.filter((d) => d.disposition === "retain")) {
       if (deferredSources.has(disposition.ref)) continue;
+      if (state.version === 4 && !reviewable.has(disposition.ref)) continue;
       await dispatch(`retain:${disposition.ref}`, async () => {
         const original = await current(disposition.ref);
         const m = await metadata(disposition.memory_metadata ?? retainedMetadata(original));
@@ -818,19 +861,25 @@ async function publishStages(
       });
     }
     for (const disposition of cleanup.dispositions.filter(
-      (d) => d.disposition === "replace" || d.disposition === "merge",
+      (d) => d.disposition === "replace" || d.disposition === "merge" || d.disposition === "retire",
     )) {
       if (
         deferredSources.has(disposition.ref) ||
-        !state.results.some((r) => r.id === `fact:${disposition.replacement_id}`)
+        (disposition.disposition !== "retire" &&
+          !state.results.some((r) => r.id === `fact:${disposition.replacement_id}`))
       )
         continue;
       await dispatch(`retire:${disposition.ref}`, async () => {
         const original = await current(disposition.ref);
         const replacement = state.results.find((r) => r.id === `fact:${disposition.replacement_id}`)
           ?.result.ref;
-        if (!replacement) throw new Error("Cannot retire without acknowledged replacement");
-        const target = await current(replacement);
+        if (!replacement && disposition.disposition !== "retire")
+          throw new Error("Cannot retire without acknowledged replacement");
+        const target = replacement ? await current(replacement) : undefined;
+        if (target?.ref === original.ref)
+          throw Object.assign(new Error("Replacement must be distinct from retired sources"), {
+            retryable: false,
+          });
         return {
           name: "memory_set_metadata",
           args: {
@@ -839,11 +888,12 @@ async function publishStages(
             idempotency_key: `dream:${state.run_id}:retire:${original.ref}`,
             memory_metadata: {
               ...retainedMetadata(original),
-              stage: "durable",
+              stage: state.version === 4 ? retainedMetadata(original).stage : "durable",
               status: "superseded",
+              ...(state.version === 4 ? { evidence: [] } : {}),
             },
-            replacement_ref: target.ref,
-            evidence: [{ ref: target.ref, revision: target.revision }],
+            ...(state.version === 3 && target ? { replacement_ref: target.ref } : {}),
+            evidence: target ? [{ ref: target.ref, revision: target.revision }] : [],
           },
         };
       });
@@ -852,6 +902,7 @@ async function publishStages(
     if (!(error instanceof Error) || !("retryable" in error) || error.retryable !== false)
       throw error;
     state.conflict = true;
+    state.error = dreamDiagnostic(error, "publish");
     await save();
   }
 }
@@ -867,7 +918,7 @@ export async function runDream(
   const header = priorText
     ? z.object({ version: z.number(), completed: z.boolean() }).parse(JSON.parse(priorText))
     : undefined;
-  if (header && header.version !== 3 && !header.completed) {
+  if (header && header.version < 3 && !header.completed) {
     await runLegacyDream(deps, signal, true);
     return runDream(deps, signal);
   }
@@ -878,22 +929,23 @@ export async function runDream(
       ? z.object({ version: z.number() }).parse(JSON.parse(raw))
       : undefined;
     const previous =
-      previousHeader?.version === 3
+      previousHeader && previousHeader.version >= 3
         ? stageCheckpointSchema.parse(normalizePersistedCheckpoint(JSON.parse(raw!)))
         : undefined;
     const legacy =
-      raw && previousHeader?.version !== 3
+      raw && previousHeader && previousHeader.version < 3
         ? checkpointSchema.parse(normalizePersistedCheckpoint(JSON.parse(raw))).results
         : [];
     if (previous?.completed && previous.run_id === dreamRunId(deps.now()))
       return previous.pending.length || previous.conflict
-        ? { status: "partial" }
+        ? { status: "partial", ...(previous.error ? { error: previous.error } : {}) }
         : { status: "complete", summary: previous.summary ?? "Memory review completed." };
     deps.onStage?.("inventory");
     let state =
       previous &&
       !previous.completed &&
-      (previous.run_id === dreamRunId(deps.now()) || Object.keys(previous.requests).length > 0)
+      ((previous.version === 4 && previous.run_id === dreamRunId(deps.now())) ||
+        Object.keys(previous.requests).length > 0)
         ? previous
         : await prepareStages(deps, previous, previous?.legacy_receipts ?? legacy, signal);
     const save = () => atomicPrivateWrite(path, JSON.stringify(state));
@@ -916,7 +968,7 @@ export async function runDream(
     const inputs = state.inputs.map((ref) => state.records.find((r) => r.ref === ref)!);
     if (!inputs.length && !state.artifacts.cleanup) {
       state.artifacts = {
-        cleanup: { facts: [], dispositions: [] },
+        cleanup: { operations: [] },
         synthesis: { proposals: [] },
         challenge: { decisions: [] },
       };
@@ -929,7 +981,7 @@ export async function runDream(
         deps,
         "dream.md",
         { inputs, context: state.records },
-        (value) => validateCleanup(value, inputs, state.records),
+        (value) => validateOperationCleanup(value, inputs, state.records),
         signal,
       );
       state.stage = "synthesis";
@@ -941,7 +993,7 @@ export async function runDream(
         deps,
         "dream-synthesis.md",
         { inputs, cleanup: state.artifacts.cleanup, context: state.records },
-        (value) => validateSynthesis(value, state.artifacts.cleanup!, inputs, state.records),
+        (value) => validateSynthesis(value, reviewedCleanup(state), inputs, state.records),
         signal,
       );
       state.stage = "challenge";
@@ -984,18 +1036,26 @@ export async function runDream(
           contrary,
           context: state.records,
         },
-        (value) => validateChallenge(value, state.artifacts.synthesis!),
+        (value) => {
+          const artifact = validateChallenge(value, state.artifacts.synthesis!);
+          if (artifact.decisions.some((d) => d.verdict === "defer"))
+            throw new Error("Challenge must accept or reject");
+          return artifact;
+        },
         signal,
       );
       state.stage = "publish";
       await save();
     }
-    validateCleanup(state.artifacts.cleanup, inputs, state.records);
-    validateSynthesis(state.artifacts.synthesis, state.artifacts.cleanup, inputs, state.records);
+    if ("operations" in state.artifacts.cleanup)
+      validateOperationCleanup(state.artifacts.cleanup, inputs, state.records);
+    else validateCleanup(state.artifacts.cleanup, inputs, state.records);
+    const cleanup = reviewedCleanup(state);
+    validateSynthesis(state.artifacts.synthesis, cleanup, inputs, state.records);
     validateChallenge(state.artifacts.challenge, state.artifacts.synthesis);
     if (
       state.inventory_count +
-        state.artifacts.cleanup.facts.length +
+        cleanup.facts.length +
         state.artifacts.synthesis.proposals.filter((p) =>
           state.artifacts.challenge!.decisions.some((d) => d.id === p.id && d.verdict !== "defer"),
         ).length >
@@ -1034,11 +1094,11 @@ export async function runDream(
         .flatMap((p) => p.source_refs),
     );
     for (const ref of deferredSources) delete state.reviewed[ref];
-    for (const d of state.artifacts.cleanup.dispositions.filter((d) => d.disposition === "defer"))
+    for (const d of cleanup.dispositions.filter((d) => d.disposition === "defer"))
       delete state.reviewed[d.ref];
     const reviewable = new Set(eligibleRecords(valid, deps.now(), true).map((r) => r.ref));
     if (!state.conflict) {
-      for (const d of state.artifacts.cleanup.dispositions) {
+      for (const d of cleanup.dispositions) {
         const current = valid.find((r) => r.ref === d.ref);
         const ack = state.results.find((r) => r.id === `retain:${d.ref}`);
         const expected =
@@ -1046,7 +1106,7 @@ export async function runDream(
         if (
           current &&
           d.disposition === "retain" &&
-          reviewable.has(current.ref) &&
+          (state.version === 4 || reviewable.has(current.ref)) &&
           expected === current.revision &&
           !deferredSources.has(d.ref)
         )
@@ -1082,12 +1142,26 @@ export async function runDream(
         })),
       }),
     );
-    state.summary = state.conflict
-      ? "Memory review stopped on conflicting evidence; pending work was preserved."
-      : state.artifacts.cleanup.dispositions
-          .filter((d) => d.disposition !== "defer")
-          .map((d) => d.reason)
-          .join(" ") || "No memory changes were needed.";
+    const output = state.artifacts.cleanup;
+    state.summary =
+      "operations" in output
+        ? output.operations
+            .filter((op) =>
+              op.type === "retire"
+                ? state.results.some((r) => r.id === `retire:${op.ref}`)
+                : state.results.some((r) => r.id === `fact:${op.id}`) &&
+                  (op.type === "add" ||
+                    (op.type === "merge" ? op.refs : [op.ref]).every((ref) =>
+                      state.results.some((r) => r.id === `retire:${ref}`),
+                    )),
+            )
+            .map((op) => op.summary)
+            .join(" ") || "No memory changes were needed."
+        : cleanup.dispositions
+            .filter((d) => d.disposition !== "defer")
+            .map((d) => d.reason)
+            .join(" ") || "No memory changes were needed.";
+    if (state.conflict) state.summary += " Some operations stopped on conflicting evidence.";
     if (!state.reflection) {
       deps.onStage?.("reflection");
       state.reflection = await createDreamReflection(
@@ -1111,7 +1185,7 @@ export async function runDream(
     state.completed = true;
     await save();
     return state.pending.length || state.conflict
-      ? { status: "partial" }
+      ? { status: "partial", ...(state.error ? { error: state.error } : {}) }
       : { status: "complete", summary: state.summary };
   } finally {
     release();

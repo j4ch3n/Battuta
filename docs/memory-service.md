@@ -209,11 +209,19 @@ conflicts with setup and requires explicit manual removal by the owner first.
 Missing-stage, temporal and changed durable evidence is pending regardless of age.
 The first-release guard is 500 stored records (including inactive history) and
 200,000 bytes of input. Overflow fails visibly. At most 20 pending inputs are
-selected by oldest attempt then ref; failed/deferred/unselected work remains pending.
+selected by oldest attempt then ref; failed execution and unselected work remain
+visible. There is no model-directed defer or interpretation revisit queue.
 
 Cleanup, synthesis and challenge are separate validated structured calls, with one
 invalid-output retry per stage. Publication saves facts/metadata, challenged claims,
-then acknowledged replacements' retirements. Review never strengthens confidence.
+then acknowledged replacements' retirements. Cleanup returns only add, replace,
+merge and retire operations; unmentioned selected memories are reviewed unchanged.
+Cleanup facts preserve conversation attribution without memory dependencies.
+Retirement marks the stored record superseded, clears its outgoing evidence and
+does not record a replacement reference. Retired content remains stored but is
+excluded from ordinary recall. Existing dependent claims are not automatically
+rewired and remain ineligible when their evidence is invalid.
+Challenge accepts or rejects; it does not defer. Review never strengthens confidence.
 Explicitly rejected interpretations remain excluded from ordinary recall. Old graph
 tools/data are retained maintenance views, not mandatory v3 stages.
 
@@ -224,17 +232,25 @@ It receives actual acknowledged changes, not hidden reasoning or the CoS transcr
 One invalid-output rewrite is allowed. The public summary comes from applied
 operations, never the private reflection.
 
-Checkpoint v3 stores stage/version, input fingerprint, validated artifacts, frozen
+Checkpoint v4 stores stage/version, input fingerprint, validated artifacts, frozen
 requests, acknowledgements, reviewed fingerprints and pending attempts. Stale
 unpublished stages rebase; acknowledged/uncertain requests retain their identities.
-Pending version-1/2 journaled mutations finish before v3, without rerunning old
+Unpublished version-3 artifacts without frozen requests rebuild from fresh evidence;
+frozen version-3 requests retain their identities and complete their saved publication.
+Pending version-1/2 journaled mutations finish before v4, without rerunning old
 graph/profile generation or inventing lifecycle review completion.
 
-Successful tools return `complete` and their saved public summary. Pending/deferred
+Successful tools return `complete` and their saved public summary. Unselected/invalid
 work or a terminal conflict returns `partial`; errors/cancellation/timeouts are not
 success. Scheduler delivery itself does not prove the real CoS model called the
 tool. The host uses the configured Pi completion/model, fresh evidence, no tools,
 and existing ten-minute caller/shutdown cancellation. No provider fallback is added.
+
+Failures return a structured error containing stage, code, sanitized message and
+retryability when known. The invalid-output retry receives the specific safe
+validation cause; `dream-errors.jsonl` records safe diagnostics without raw invalid
+output, credentials, private memory text or reflections. Unknown exceptions retain
+their stage but do not expose unchecked exception text.
 
 ## Cutover and verification
 

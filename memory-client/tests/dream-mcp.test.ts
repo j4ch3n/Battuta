@@ -29,6 +29,29 @@ vi.mock("@modelcontextprotocol/sdk/client/index.js", () => ({
 }));
 import { MemoryMcpClient } from "../mcp-client.ts";
 import { record } from "./fixtures/record.ts";
+import { DreamDiagnosticError } from "../dream-errors.ts";
+
+test("preserves safe MCP error details but not arbitrary server messages", async () => {
+  const client = new MemoryMcpClient("http://127.0.0.1:8901/mcp");
+  transport.result = {
+    isError: true,
+    structuredContent: {
+      ok: false,
+      error: { code: "revision_conflict", message: "private malicious text", retryable: false },
+    },
+  };
+  try {
+    await client.call("memory_get", { ref: "a".repeat(64) }, new AbortController().signal);
+    expect.unreachable();
+  } catch (error) {
+    expect(error).toBeInstanceOf(DreamDiagnosticError);
+    expect((error as DreamDiagnosticError).diagnostic).toMatchObject({
+      code: "revision_conflict",
+      retryable: false,
+    });
+    expect(String(error)).not.toContain("private malicious text");
+  }
+});
 
 test.each([{ projects: ["unknown"] }, { projects: [] }, { projects: ["global", "atlas"] }])(
   "rejects invalid direct writes before opening transport: %j",

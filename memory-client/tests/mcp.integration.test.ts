@@ -65,7 +65,8 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
         });
         server!.stderr!.on("data", (chunk: Buffer) => {
           output += chunk.toString();
-          if (output.includes("Application startup complete")) {
+          // Application startup finishes before Uvicorn binds the listening socket.
+          if (output.includes("Uvicorn running on")) {
             clearTimeout(timer);
             resolve();
           }
@@ -288,20 +289,9 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
           prepareProjects,
           now: () => new Date(),
           call: (name, args, abort, catalog) => client.call(name, args, abort, catalog),
-          complete: (prompt, evidence) => {
+          complete: (prompt) => {
             if (prompt.includes("Stage: cleanup")) {
-              const input = JSON.parse(evidence) as { inputs: { ref: string }[] };
-              return Promise.resolve(
-                JSON.stringify({
-                  facts: [],
-                  dispositions: input.inputs.map((r) => ({
-                    ref: r.ref,
-                    disposition: "retain",
-                    reason:
-                      "Preserved the attributed purchase without inferring an enduring preference",
-                  })),
-                }),
-              );
+              return Promise.resolve('{"operations":[]}');
             }
             if (prompt.includes("Stage: synthesis")) return Promise.resolve('{"proposals":[]}');
             if (prompt.includes("Stage: challenge")) return Promise.resolve('{"decisions":[]}');
@@ -414,6 +404,100 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
         promoted.content,
         "Owner reported returning the NS2; it is no longer owned.",
       ]);
+      const returned = records.find((r) => r.content.includes("returning"))!;
+      const extra = (await client.call(
+        "memory_remember",
+        {
+          content: "The Nintendo console was returned to the seller.",
+          projects: returned.projects,
+          sources: returned.sources,
+          kind: "event",
+          memory_metadata: returned.memory_metadata,
+          idempotency_key: "return-detail",
+        },
+        signal,
+      )) as { ref: string };
+      const m = returned.memory_metadata!;
+      const metadata = {
+        knowledge_type: m.knowledge_type,
+        confidence: m.confidence,
+        keywords: m.keywords,
+        mentioned_at: m.mentioned_at,
+        expires_at: m.expires_at,
+        rationale: m.rationale,
+      };
+      await runDream(
+        {
+          directory: join(directory, "merge-state"),
+          now: () => new Date(),
+          prepareProjects,
+          call: (name, args, abort, catalog) => client.call(name, args, abort, catalog),
+          complete: (prompt) =>
+            Promise.resolve(
+              prompt.includes("Stage: cleanup")
+                ? JSON.stringify({
+                    operations: [
+                      {
+                        id: "merge-return",
+                        type: "merge",
+                        refs: [returned.ref, extra.ref],
+                        content: "The owner no longer owns the returned Nintendo console.",
+                        kind: "event",
+                        memory_metadata: metadata,
+                        summary: "Merged the return details.",
+                      },
+                    ],
+                  })
+                : prompt.includes("Stage: synthesis")
+                  ? '{"proposals":[]}'
+                  : prompt.includes("Stage: challenge")
+                    ? '{"decisions":[]}'
+                    : "I consolidated the return details.",
+            ),
+        },
+        signal,
+      );
+      await stop();
+      await start();
+      for (const ref of [returned.ref, extra.ref]) {
+        const retired = (await client.call(
+          "memory_get",
+          { ref, include_history: true },
+          signal,
+        )) as {
+          active: boolean;
+          memory_metadata: { evidence: unknown[] };
+          superseded_by: string | null;
+        };
+        expect(retired.active).toBe(false);
+        expect(retired.memory_metadata.evidence).toEqual([]);
+        expect(retired.superseded_by).toBeNull();
+      }
+      for (const query of [
+        { keywords: ["Nintendo"] },
+        { semantic_query: "Nintendo console return" },
+      ]) {
+        const result = (await client.call(
+          "memory_recall",
+          { ...query, selector: "global", limit: 20 },
+          signal,
+        )) as {
+          records: {
+            ref: string;
+            content: string;
+            sources: unknown[];
+            memory_metadata: { evidence: unknown[] };
+          }[];
+        };
+        expect(result.records.some((r) => r.ref === returned.ref || r.ref === extra.ref)).toBe(
+          false,
+        );
+        const merged = result.records.find(
+          (r) => r.content === "The owner no longer owns the returned Nintendo console.",
+        );
+        expect(merged?.memory_metadata.evidence).toEqual([]);
+        expect(merged?.sources).toEqual(returned.sources);
+      }
     } finally {
       await stop();
       vi.unstubAllEnvs();

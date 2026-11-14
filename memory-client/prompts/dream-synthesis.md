@@ -13,11 +13,12 @@ confidence:supported|tentative|disputed, status:active, keywords, mentioned_at,
 expires_at, rationale, and evidence. Every interpretation needs direct supporting
 links and a concise rationale; include known contrary evidence as contradicts
 links. Links are {ref,revision,relation:supports|contradicts,requirement:historical|current}.
-source_refs covers all links and at least one reviewed input. Defer interpretations
-based on unresolved/deferred inputs. No numerical belief probabilities.
+source_refs covers all links and at least one reviewed input. Omit uncertain
+interpretations and interpretations depending on retired inputs without replacements.
+No numerical belief probabilities.
 
 If cleanup replaces linked evidence, explicitly cite its proposed content through
-cleanup_evidence:[{id:"cleanup-fact-id",relation:"supports",requirement:"historical"}].
+cleanup_evidence:[{id:"cleanup-operation-id",relation:"supports",requirement:"historical"}].
 Keep original source_refs/evidence for validation; runtime substitutes only the
 explicitly cited, acknowledged cleanup output. Never assume replacement content
 supports the same interpretation merely because lineage exists.

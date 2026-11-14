@@ -7,6 +7,13 @@ from battuta_memory.server import create_protocol_server
 
 
 class ProtocolTests(unittest.IsolatedAsyncioTestCase):
+    async def test_known_memory_conflict_is_actionable_without_exposing_unknown_errors(self):
+        service = SimpleNamespace(get=AsyncMock(side_effect=ValueError("Memory changed since inventory")))
+        async with create_connected_server_and_client_session(create_protocol_server(lambda: service)) as client:
+            result = await client.call_tool("memory_get", {"ref": "a" * 64})
+            self.assertEqual(result.structuredContent["error"]["message"], "Memory changed since inventory")
+            self.assertFalse(result.structuredContent["error"]["retryable"])
+
     async def test_public_records_translate_only_typed_memberships(self):
         record = {"ref": "a" * 64, "scope": {"global": False, "projects": ["atlas"]},
             "metadata": {"scope": "user supplied"}, "revision": "b" * 64}
