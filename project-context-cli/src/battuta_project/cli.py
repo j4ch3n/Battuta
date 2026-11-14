@@ -71,6 +71,14 @@ def list_projects(as_json: bool):
 
 @main.command()
 @click.argument("project_name")
+def remove(project_name: str):
+    """Withdraw project artifacts and move the project to Trash."""
+    ProjectRegistry().remove(project_name)
+    click.echo(f"Removed project: {project_name}")
+
+
+@main.command()
+@click.argument("project_name")
 @click.pass_obj
 def explain(token: str, project_name: str):
     """Show project summary, artifact paths, URLs, guidance, and checkout tree."""

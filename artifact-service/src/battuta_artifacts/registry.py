@@ -178,3 +178,18 @@ class Registry:
             item = self._find(db, slug)
             self._expect(item, expected_revision)
             db.execute("DELETE FROM artifacts WHERE id=?", (item["id"],))
+
+    def deregister_project(self, project: str, root: Path) -> "list[str]":
+        with self.connect(write=True) as db:
+            db.execute("BEGIN IMMEDIATE")
+            rows = db.execute("SELECT id, slug, project, source_root FROM artifacts ORDER BY slug").fetchall()
+            root = root.resolve()
+            selected = []
+            for row in rows:
+                source = Path(row["source_root"]).resolve()
+                files = db.execute("SELECT public_path FROM artifact_files WHERE artifact_id=?", (row["id"],))
+                if (row["project"] == project or source.is_relative_to(root)
+                        or any((source / item["public_path"]).is_relative_to(root) for item in files)):
+                    selected.append(row)
+            db.executemany("DELETE FROM artifacts WHERE id=?", [(row["id"],) for row in selected])
+            return [row["slug"] for row in selected]

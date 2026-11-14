@@ -233,6 +233,19 @@ def deregister(ctx, slug, expected_revision, json_output):
     output(ctx, json_output, message=f"Deregistered {slug}; source files unchanged.")
 
 
+@main.command("deregister-project")
+@click.argument("project")
+@json_option
+@click.pass_context
+def deregister_project(ctx, project, json_output):
+    """Withdraw all artifacts owned by a registered project."""
+    from battuta_project.registry import ProjectRegistry
+
+    root = ProjectRegistry().load(project).root
+    slugs = registry().deregister_project(project, root)
+    output(ctx, json_output, artifacts_removed=slugs)
+
+
 @main.command()
 @click.option("--port", default=8000, type=click.IntRange(min=0, max=65535), show_default=True)
 def serve(port):
