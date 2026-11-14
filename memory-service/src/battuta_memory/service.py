@@ -240,7 +240,9 @@ class MemoryService:
             prior = current.get("memory_metadata")
             withdrawal = prior is not None and metadata["status"] in {"stale", "superseded", "rejected"} and (
                 metadata == {**prior, "status": metadata["status"]}
-                or (metadata["status"] == "superseded" and metadata == {**prior, "status": "superseded", "evidence": []}))
+                or (metadata["status"] == "superseded" and (
+                    metadata == {**prior, "status": "superseded", "evidence": []}
+                    or (request.replacement_ref is not None and metadata == {**prior, "stage": "durable", "status": "superseded"}))))
             if prior is not None and metadata["status"] == "superseded" and not withdrawal:
                 raise ValueError("Retirement cannot change memory metadata")
             if not withdrawal:

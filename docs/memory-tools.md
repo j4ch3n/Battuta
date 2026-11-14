@@ -74,4 +74,14 @@ Conversation tools do not directly edit the owner profile. When a request includ
 
 ## Approved private dream
 
+Cleanup proposes add, replace, merge and retire changes; omitted inputs are reviewed
+unchanged. Retirement marks records inactive without secure erasure, clears outgoing
+evidence, and does not link to a replacement. Active evidence dependencies remain
+validated. There is no defer or interpretation revisit queue.
+
+Failed dream calls return `isError:true` and structured details with `status` and
+`error` (`stage`, `code`, sanitized `message`, optional `retryable`/`paths`).
+Use those details to explain the failure rather than invent a cause. Raw model
+responses, private memory text and reflections are not error diagnostics.
+
 When an enabled, explicitly configured nightly dream requests it, call the CoS-only `memory_dream({})` tool once. It accepts no custom prompt or model. On `complete`, report that the tool ran successfully and convey its public `summary` of memory operations (including when no memory changes were needed); keep the report concise. This summary does not describe the later owner-profile refresh. For `partial`, `already_completed` (an older completed run without a public summary), cancellation, timeout, unavailability, or failure, report the actual status honestly without inventing a summary or claiming full success. Never request or repeat private reflections. Disabled or unconfigured dreams fail closed. A scheduler delivery marker does not prove the dream ran or the profile changed.

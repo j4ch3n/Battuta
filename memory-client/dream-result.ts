@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { atomicPrivateWrite, optionalText } from "./dream-files.ts";
 import { redact } from "./privacy.ts";
+import type { DreamDiagnostic } from "./dream-errors.ts";
 
 export type DreamComplete = (
   prompt: string,
@@ -9,7 +10,8 @@ export type DreamComplete = (
 ) => Promise<string>;
 
 export type DreamOutcome =
-  { status: "complete"; summary: string } | { status: "partial" | "already_completed" };
+  | { status: "complete"; summary: string }
+  | { status: "partial" | "already_completed"; error?: DreamDiagnostic };
 
 export async function createDreamReflection(
   complete: DreamComplete,

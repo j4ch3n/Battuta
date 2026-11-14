@@ -3,6 +3,17 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { z } from "zod";
 import { memoryRecordSchema, memoryProjectsSchema } from "./records.ts";
 import { normalizedProjects, validateMemoryProjects } from "./projects.ts";
+import { DreamDiagnosticError } from "./dream-errors.ts";
+
+const memoryErrors: Record<string, string> = {
+  revision_conflict: "Memory changed since inventory; review fresh evidence.",
+  evidence_conflict: "Memory evidence changed or is inactive.",
+  scope_conflict: "Memory scope does not match its evidence or replacement.",
+  invalid_request: "Invalid request or conflicting memory state.",
+  embedding_limit: "Memory content exceeds the embedding token limit; shorten it.",
+  backend_unavailable: "Memory backend unavailable; retry later.",
+  inactive_memory: "Memory is inactive or was not found.",
+};
 
 export class MemoryMcpClient {
   constructor(
@@ -73,11 +84,23 @@ export class MemoryMcpClient {
         signal,
       });
       const envelope = result.structuredContent as
-        { ok?: boolean; data?: unknown; error?: { retryable?: boolean } } | undefined;
-      if (result.isError || !envelope?.ok || envelope.data === undefined)
-        throw Object.assign(new Error("Dream memory operation unavailable or conflicting"), {
-          retryable: envelope?.error?.retryable !== false,
-        });
+        | { ok?: boolean; data?: unknown; error?: { code?: string; retryable?: boolean } }
+        | undefined;
+      if (result.isError || !envelope?.ok || envelope.data === undefined) {
+        const code = envelope?.error?.code ?? "backend_unavailable";
+        const safeCode = Object.hasOwn(memoryErrors, code) ? code : "backend_unavailable";
+        throw Object.assign(
+          new DreamDiagnosticError({
+            stage: "memory",
+            code: safeCode,
+            message: memoryErrors[safeCode],
+            retryable: envelope?.error?.retryable !== false,
+          }),
+          {
+            retryable: envelope?.error?.retryable !== false,
+          },
+        );
+      }
       return envelope.data;
     } finally {
       await client.close();

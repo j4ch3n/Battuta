@@ -40,6 +40,22 @@ class StorageFixture(unittest.IsolatedAsyncioTestCase):
 
 
 class MutationTests(StorageFixture):
+    async def test_frozen_v3_retirement_can_promote_stage_without_changing_claim(self):
+        from battuta_memory.contracts import SetMetadataRequest
+        from test_records import SOURCE, fact
+        values = dict(projects=["global"], sources=[SOURCE], memory_metadata=fact()["memory_metadata"])
+        old = await self.service.remember(RememberRequest(content="Legacy original", **values))
+        new = await self.service.remember(RememberRequest(content="Legacy replacement", **values))
+        original = await self.adapter.get(old["ref"])
+        replacement = await self.adapter.get(new["ref"])
+        request = SetMetadataRequest(ref=old["ref"], expected_revision=original["revision"],
+            idempotency_key="legacy-frozen-retire", replacement_ref=new["ref"],
+            memory_metadata={**original["memory_metadata"], "stage": "durable", "status": "superseded"},
+            evidence=[{"ref": new["ref"], "revision": replacement["revision"]}])
+        receipt = await self.service.set_metadata(request)
+        self.assertEqual(await self.service.set_metadata(request), receipt)
+        self.assertFalse((await self.adapter.get(old["ref"]))["active"])
+
     async def test_retire_derived_claim_after_support_withdrawal(self):
         from battuta_memory.contracts import SetMetadataRequest, GetRequest
         from test_records import SOURCE, fact

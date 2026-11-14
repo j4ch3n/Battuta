@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
 import { selectUnprocessed, validateCleanup } from "../dream-stages.ts";
+import { validateOperationCleanup } from "../dream-cleanup.ts";
 import { runDream, type DreamDependencies } from "../dream-runtime.ts";
 import { record } from "./fixtures/record.ts";
 import { digest } from "../capture-queue.ts";
@@ -25,6 +26,124 @@ test.each(["hypothesis", "synthesized-observation"] as const)(
 );
 
 const dirs: string[] = [];
+function factMetadata(record: MemoryRecord) {
+  const m = record.memory_metadata!;
+  return {
+    knowledge_type: m.knowledge_type,
+    confidence: m.confidence,
+    keywords: m.keywords,
+    mentioned_at: m.mentioned_at,
+    expires_at: m.expires_at,
+    rationale: m.rationale,
+  };
+}
+test("cleanup accepts an empty operation list and rejects deferral", () => {
+  const input = record();
+  expect(validateOperationCleanup({ operations: [] }, [input], [input])).toEqual({
+    operations: [],
+  });
+  expect(() =>
+    validateOperationCleanup({ operations: [], deferred_refs: [input.ref] }, [input], [input]),
+  ).toThrow();
+});
+
+test("cleanup accepts a standalone replacement without lifecycle dependencies", () => {
+  const input = record();
+  const memory_metadata = factMetadata(input);
+  const proposal = {
+    operations: [
+      {
+        id: "rewrite",
+        type: "replace",
+        ref: input.ref,
+        content: "Reworded attributed fact",
+        kind: "observation",
+        memory_metadata,
+        summary: "Reworded the fact.",
+      },
+    ],
+  };
+  expect(validateOperationCleanup(proposal, [input], [input])).toEqual(proposal);
+});
+
+test("cleanup rejects replacements colliding under Python whitespace normalization", () => {
+  const input = record();
+  expect(() =>
+    validateOperationCleanup(
+      {
+        operations: [
+          {
+            id: "collision",
+            type: "replace",
+            ref: input.ref,
+            content: "\u0085" + input.content,
+            kind: input.kind,
+            summary: "Reworded.",
+            memory_metadata: factMetadata(input),
+          },
+        ],
+      },
+      [input],
+      [input],
+    ),
+  ).toThrow();
+});
+
+test("retirement cannot target an acknowledged replacement with the same ref", async () => {
+  const f = await fixture();
+  const original = [...f.records.values()][0];
+  const complete = f.deps.complete,
+    call = f.deps.call;
+  f.deps.complete = (prompt, evidence, signal) =>
+    prompt.includes("Stage: cleanup")
+      ? Promise.resolve(
+          JSON.stringify({
+            operations: [
+              {
+                id: "rewrite",
+                type: "replace",
+                ref: original.ref,
+                content: "Different proposed wording",
+                kind: "event",
+                summary: "Reworded.",
+                memory_metadata: factMetadata(original),
+              },
+            ],
+          }),
+        )
+      : complete(prompt, evidence, signal);
+  f.deps.call = (name, args, signal, catalog) =>
+    name === "memory_remember"
+      ? Promise.resolve({ ref: original.ref, revision: original.revision })
+      : call(name, args, signal, catalog);
+  await runDream(f.deps, new AbortController().signal);
+  expect(f.records.has(original.ref)).toBe(true);
+  expect(f.writes).toEqual([]);
+});
+
+test("cleanup validates operation scopes, target uniqueness, and evidence-free metadata", () => {
+  const a = record(),
+    b = record("b".repeat(64));
+  const memory_metadata = factMetadata(a);
+  const fact = { content: "Combined facts", kind: "observation", memory_metadata };
+  const merge = { id: "combine", type: "merge", refs: [a.ref, b.ref], summary: "Merged.", ...fact };
+  const add = { id: "add", type: "add", source_refs: [a.ref], summary: "Added.", ...fact };
+  const retire = { id: "retire", type: "retire", ref: a.ref, summary: "Retired." };
+  for (const operation of [merge, add, retire])
+    expect(
+      validateOperationCleanup({ operations: [operation] }, [a, b], [a, b]).operations,
+    ).toHaveLength(1);
+  for (const operations of [
+    [{ ...merge, refs: [a.ref] }],
+    [retire, { ...retire, id: "second" }],
+    [merge, { ...add, id: "combine" }],
+    [{ ...add, memory_metadata: { ...memory_metadata, evidence: [] } }],
+    [{ ...merge, refs: [a.ref, "c".repeat(64)] }],
+  ])
+    expect(() => validateOperationCleanup({ operations }, [a, b], [a, b])).toThrow();
+  const other = { ...b, projects: ["other"] };
+  expect(() => validateOperationCleanup({ operations: [merge] }, [a, other], [a, other])).toThrow();
+});
 afterEach(async () => {
   await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
@@ -138,20 +257,10 @@ async function fixture() {
     prepareProjects: () => Promise.resolve(["atlas", "beacon", "global"]),
     directory,
     now: () => new Date("2026-11-06T04:00:00Z"),
-    complete: (prompt, evidence) => {
+    complete: (prompt) => {
       if (prompt.includes("Stage: cleanup")) {
         calls.push("cleanup");
-        const input = JSON.parse(evidence) as { inputs: MemoryRecord[] };
-        return Promise.resolve(
-          JSON.stringify({
-            facts: [],
-            dispositions: input.inputs.map((r) => ({
-              ref: r.ref,
-              disposition: "retain",
-              reason: "Useful attributed fact",
-            })),
-          }),
-        );
+        return Promise.resolve('{"operations":[]}');
       }
       if (prompt.includes("Stage: synthesis")) {
         calls.push("synthesis");
@@ -241,6 +350,296 @@ async function fixture() {
   };
 }
 
+test("a valid empty cleanup reviews selected inputs without content changes", async () => {
+  const f = await fixture();
+  const complete = f.deps.complete;
+  f.deps.complete = (prompt, evidence, signal) =>
+    prompt.includes("Stage: cleanup")
+      ? Promise.resolve('{"operations":[]}')
+      : complete(prompt, evidence, signal);
+  const original = [...f.records.values()][0];
+  await runDream(f.deps, new AbortController().signal);
+  expect(f.records.get(original.ref)?.content).toBe(original.content);
+  expect(f.records.get(original.ref)?.memory_metadata?.stage).toBe("durable");
+});
+
+test.each(["add", "replace", "merge", "retire"] as const)(
+  "%s publishes standalone facts and dependency-free retirement",
+  async (type) => {
+    const f = await fixture();
+    const first = [...f.records.values()][0];
+    const second = {
+      ...record("b".repeat(64)),
+      content: "Another source",
+      sources: [{ ...first.sources[0], entry_id: "second-entry" }],
+      review_fingerprint: "c".repeat(64),
+    };
+    f.records.set(second.ref, second);
+    const operation = {
+      id: "change",
+      type,
+      summary: "Applied change.",
+      ...(type === "merge"
+        ? { refs: [first.ref, second.ref] }
+        : type === "add"
+          ? { source_refs: [first.ref] }
+          : { ref: first.ref }),
+      ...(type === "retire"
+        ? {}
+        : { content: "New standalone fact", kind: "event", memory_metadata: factMetadata(first) }),
+    };
+    const complete = f.deps.complete;
+    const call = f.deps.call;
+    const retirements: Record<string, unknown>[] = [];
+    f.deps.call = (name, args, signal, catalog) => {
+      if (
+        name === "memory_set_metadata" &&
+        (args.memory_metadata as { status: string }).status === "superseded"
+      )
+        retirements.push(args);
+      return call(name, args, signal, catalog);
+    };
+    f.deps.complete = (prompt, evidence, signal) =>
+      prompt.includes("Stage: cleanup")
+        ? Promise.resolve(JSON.stringify({ operations: [operation] }))
+        : complete(prompt, evidence, signal);
+    await runDream(f.deps, new AbortController().signal);
+    expect(retirements).toHaveLength(type === "add" ? 0 : type === "merge" ? 2 : 1);
+    for (const args of retirements) {
+      expect(args.memory_metadata).toMatchObject({ status: "superseded", evidence: [] });
+      expect(args).not.toHaveProperty("replacement_ref");
+    }
+    const created = [...f.records.values()].find((r) => r.content === "New standalone fact");
+    if (type === "retire") expect(created).toBeUndefined();
+    else {
+      expect(created?.memory_metadata?.evidence).toEqual([]);
+      expect(created?.sources).toHaveLength(type === "merge" ? 2 : first.sources.length);
+    }
+    const state = JSON.parse(
+      await readFile(join(f.deps.directory, "dream-state.json"), "utf8"),
+    ) as {
+      artifacts: { cleanup: unknown };
+      summary: string;
+    };
+    expect(state.artifacts.cleanup).toEqual({ operations: [operation] });
+    expect(state.summary).toBe("Applied change.");
+  },
+);
+
+test("version-three unpublished checkpoint is rebuilt without losing review receipts", async () => {
+  const f = await fixture();
+  await runDream(f.deps, new AbortController().signal);
+  const path = join(f.deps.directory, "dream-state.json");
+  const state = JSON.parse(await readFile(path, "utf8")) as {
+    version: number;
+    schema_version: number;
+    prompt_version: number;
+    completed: boolean;
+    artifacts: Record<string, unknown>;
+    requests: Record<string, unknown>;
+    results: unknown[];
+    legacy_receipts: unknown[];
+    reviewed: Record<string, string>;
+  };
+  state.version = 3;
+  state.schema_version = 1;
+  state.prompt_version = 1;
+  state.completed = false;
+  state.artifacts = {};
+  state.requests = {};
+  state.results = [];
+  state.legacy_receipts = [{ ref: "e".repeat(64) }];
+  await writeFile(path, JSON.stringify(state));
+  await runDream(f.deps, new AbortController().signal);
+  const after = JSON.parse(await readFile(path, "utf8")) as typeof state;
+  expect(after.version).toBe(4);
+  expect(after.reviewed).toEqual(state.reviewed);
+  expect(after.legacy_receipts).toEqual(state.legacy_receipts);
+});
+
+test("version-three frozen request replays unchanged rather than regenerating cleanup", async () => {
+  const f = await fixture();
+  const original = [...f.records.values()][0];
+  f.loseNextAck();
+  await expect(runDream(f.deps, new AbortController().signal)).rejects.toThrow("lost ack");
+  const path = join(f.deps.directory, "dream-state.json");
+  const state = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+  state.version = 3;
+  state.schema_version = 1;
+  state.prompt_version = 1;
+  state.artifacts = {
+    cleanup: {
+      dispositions: [{ ref: original.ref, disposition: "retain", reason: "Reviewed unchanged." }],
+      facts: [],
+    },
+    synthesis: { proposals: [] },
+    challenge: { decisions: [] },
+  };
+  const frozen = state.requests;
+  await writeFile(path, JSON.stringify(state));
+  await runDream(f.deps, new AbortController().signal);
+  const after = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+  expect(after.requests).toEqual(frozen);
+  expect(f.writes).toHaveLength(1);
+  expect(f.calls.filter((v) => v === "cleanup")).toHaveLength(1);
+});
+
+test("a failed replacement creation cannot retire its original", async () => {
+  const f = await fixture();
+  const original = [...f.records.values()][0];
+  const complete = f.deps.complete,
+    call = f.deps.call;
+  f.deps.complete = (prompt, evidence, signal) =>
+    prompt.includes("Stage: cleanup")
+      ? Promise.resolve(
+          JSON.stringify({
+            operations: [
+              {
+                id: "rewrite",
+                type: "replace",
+                ref: original.ref,
+                content: "Rewritten fact",
+                kind: "event",
+                summary: "Reworded.",
+                memory_metadata: factMetadata(original),
+              },
+            ],
+          }),
+        )
+      : complete(prompt, evidence, signal);
+  f.deps.call = (name, args, signal, catalog) =>
+    name === "memory_remember"
+      ? Promise.reject(new Error("creation unavailable"))
+      : call(name, args, signal, catalog);
+  await expect(runDream(f.deps, new AbortController().signal)).rejects.toThrow(
+    "creation unavailable",
+  );
+  expect(f.records.has(original.ref)).toBe(true);
+  expect(f.writes).toEqual([]);
+});
+
+test("a lost retirement acknowledgement replays its frozen request only once", async () => {
+  const f = await fixture();
+  const original = [...f.records.values()][0];
+  const complete = f.deps.complete;
+  let cleanups = 0;
+  f.deps.complete = (prompt, evidence, signal) => {
+    if (prompt.includes("Stage: cleanup")) {
+      cleanups++;
+      return Promise.resolve(
+        JSON.stringify({
+          operations: [
+            { id: "retire", type: "retire", ref: original.ref, summary: "Retired obsolete fact." },
+          ],
+        }),
+      );
+    }
+    return complete(prompt, evidence, signal);
+  };
+  f.loseNextAck();
+  await expect(runDream(f.deps, new AbortController().signal)).rejects.toThrow("lost ack");
+  expect(f.records.has(original.ref)).toBe(false);
+  await runDream(f.deps, new AbortController().signal);
+  expect(f.writes).toHaveLength(1);
+  expect(cleanups).toBe(1);
+});
+
+test("withdrawal of a saved replacement before retirement preserves its original", async () => {
+  const f = await fixture();
+  const original = [...f.records.values()][0];
+  const complete = f.deps.complete,
+    call = f.deps.call;
+  let interrupt = true;
+  f.deps.complete = (prompt, evidence, signal) =>
+    prompt.includes("Stage: cleanup")
+      ? Promise.resolve(
+          JSON.stringify({
+            operations: [
+              {
+                id: "rewrite",
+                type: "replace",
+                ref: original.ref,
+                content: "New wording",
+                kind: "event",
+                summary: "Reworded.",
+                memory_metadata: factMetadata(original),
+              },
+            ],
+          }),
+        )
+      : complete(prompt, evidence, signal);
+  f.deps.call = (name, args, signal, catalog) =>
+    name === "memory_get" && args.ref !== original.ref && interrupt
+      ? Promise.reject(new Error("interrupted before retirement"))
+      : call(name, args, signal, catalog);
+  await expect(runDream(f.deps, new AbortController().signal)).rejects.toThrow(
+    "interrupted before retirement",
+  );
+  for (const r of f.records.values()) if (r.ref !== original.ref) f.records.delete(r.ref);
+  interrupt = false;
+  await expect(runDream(f.deps, new AbortController().signal)).rejects.toThrow();
+  expect(f.records.has(original.ref)).toBe(true);
+  expect(f.writes).toHaveLength(1);
+});
+
+test("cleanup retry receives a safe validation cause and exhausted output publishes nothing", async () => {
+  const f = await fixture();
+  const complete = f.deps.complete;
+  const feedback: string[] = [];
+  f.deps.complete = (prompt, evidence, signal) => {
+    if (prompt.includes("Stage: cleanup")) {
+      feedback.push(prompt);
+      return Promise.resolve('{"operations":[{"type":"retire","ref":"private-invalid-value"}]}');
+    }
+    return complete(prompt, evidence, signal);
+  };
+  await expect(runDream(f.deps, new AbortController().signal)).rejects.toMatchObject({
+    diagnostic: { stage: "cleanup", code: "invalid_artifact" },
+  });
+  expect(feedback).toHaveLength(2);
+  expect(feedback[1]).toContain("invalid_artifact");
+  expect(feedback[1]).not.toContain("private-invalid-value");
+  expect(f.writes).toEqual([]);
+  const state = JSON.parse(await readFile(join(f.deps.directory, "dream-state.json"), "utf8")) as {
+    artifacts: unknown;
+  };
+  expect(state.artifacts).toEqual({});
+});
+
+test("unchanged claims with withdrawn support stay untouched and do not create a revisit queue", async () => {
+  const f = await fixture();
+  const original = [...f.records.values()][0];
+  original.memory_metadata = {
+    ...original.memory_metadata!,
+    knowledge_type: "hypothesis",
+    confidence: "tentative",
+    rationale: "Previously supported",
+    evidence: [
+      {
+        ref: "e".repeat(64),
+        revision: "f".repeat(64),
+        relation: "supports",
+        requirement: "current",
+      },
+    ],
+  };
+  const call = f.deps.call;
+  f.deps.call = (name, args, signal, catalog) => {
+    if (name === "memory_get" && args.ref === original.ref)
+      return Promise.reject(
+        new Error("Withdrawn support must not be revalidated for unchanged claims"),
+      );
+    return call(name, args, signal, catalog);
+  };
+  await runDream(f.deps, new AbortController().signal);
+  expect(f.writes).toEqual([]);
+  expect(f.records.get(original.ref)?.memory_metadata?.stage).toBe("temporal");
+  const cleanupCalls = f.calls.filter((v) => v === "cleanup").length;
+  f.deps.now = () => new Date("2026-11-07T04:00:00Z");
+  await runDream(f.deps, new AbortController().signal);
+  expect(f.calls.filter((v) => v === "cleanup")).toHaveLength(cleanupCalls);
+});
+
 test("three enforced stages review old input while preserving malformed pending evidence and private owner text", async () => {
   const f = await fixture();
   await writeFile(join(f.deps.directory, "ME.md"), "Private untracked owner writing");
@@ -258,7 +657,7 @@ test("three enforced stages review old input while preserving malformed pending 
     version: number;
     pending: { ref: string }[];
   };
-  expect(state.version).toBe(3);
+  expect(state.version).toBe(4);
   expect(state.pending.map((p) => p.ref)).toContain("d".repeat(64));
 });
 
@@ -270,21 +669,15 @@ test("consolidated facts precede challenged claims and retirement; dependencies 
     if (prompt.includes("Stage: cleanup"))
       return Promise.resolve(
         JSON.stringify({
-          dispositions: [
-            {
-              ref: original.ref,
-              disposition: "replace",
-              replacement_id: "purchase",
-              reason: "Clarified supported console name",
-            },
-          ],
-          facts: [
+          operations: [
             {
               id: "purchase",
+              type: "replace",
+              ref: original.ref,
+              summary: "Clarified supported console name",
               content: "Owner reported buying a Nintendo Switch 2",
               kind: "event",
-              source_refs: [original.ref],
-              memory_metadata: original.memory_metadata,
+              memory_metadata: factMetadata(original),
             },
           ],
         }),
@@ -347,7 +740,7 @@ test("consolidated facts precede challenged claims and retirement; dependencies 
   expect(f.records.has(original.ref)).toBe(false);
 });
 
-test("deferred and unselected work remains pending, and earlier deferrals cannot starve the next bounded batch", async () => {
+test("unselected work stays in the next bounded batch without model deferral", async () => {
   const f = await fixture();
   const original = [...f.records.values()][0];
   const complete = f.deps.complete;
@@ -385,25 +778,25 @@ test("deferred and unselected work remains pending, and earlier deferrals cannot
       );
     if (prompt.includes("Stage: challenge") && input.synthesis?.proposals.length)
       return Promise.resolve(
-        '{"decisions":[{"id":"uncertain","verdict":"defer","reason":"Needs independent evidence"}]}',
+        '{"decisions":[{"id":"uncertain","verdict":"reject","reason":"Needs independent evidence"}]}',
       );
     return complete(prompt, evidence, signal);
   };
   await runDream(f.deps, new AbortController().signal);
-  expect(f.writes).toEqual([]);
-  expect(f.records.get(original.ref)?.memory_metadata?.stage).toBe("temporal");
+  expect(f.records.get(original.ref)?.memory_metadata?.stage).toBe("durable");
+  const writesBefore = f.writes.length;
   for (let i = 0; i < 21; i++) {
     const r = record(i.toString(16).padStart(64, "0"));
     f.records.set(r.ref, { ...r, review_fingerprint: digest(i) });
   }
   f.deps.now = () => new Date("2026-11-07T04:00:00Z");
   await runDream(f.deps, new AbortController().signal);
-  expect(f.writes).toHaveLength(20);
+  expect(f.writes.length - writesBefore).toBe(20);
   const state = JSON.parse(await readFile(join(f.deps.directory, "dream-state.json"), "utf8")) as {
     pending: { ref: string }[];
   };
-  expect(state.pending.map((p) => p.ref)).toContain(original.ref);
-  expect(state.pending).toHaveLength(3);
+  expect(state.pending.map((p) => p.ref)).not.toContain(original.ref);
+  expect(state.pending).toHaveLength(2);
 });
 
 test("lost acknowledgement replays frozen request across days, never repeats stage calls or the write", async () => {
@@ -429,24 +822,21 @@ test("invalid project publication leaves its originals intact without blocking a
     if (prompt.includes("Stage: cleanup"))
       return Promise.resolve(
         JSON.stringify({
-          dispositions: [atlas, beacon].map((r) => ({
-            ref: r.ref,
-            disposition: "replace",
-            replacement_id: r.projects[0],
-            reason: "Clarified fact",
-          })),
-          facts: [atlas, beacon].map((r) => ({
+          operations: [atlas, beacon].map((r) => ({
             id: r.projects[0],
+            type: "replace",
+            ref: r.ref,
+            summary: "Clarified fact",
             content: `Clarified ${r.projects[0]} fact`,
             kind: "event",
-            source_refs: [r.ref],
-            memory_metadata: r.memory_metadata,
+            memory_metadata: factMetadata(r),
           })),
         }),
       );
     return complete(prompt, evidence, signal);
   };
-  expect((await runDream(f.deps, new AbortController().signal)).status).toBe("partial");
+  const outcome = await runDream(f.deps, new AbortController().signal);
+  expect(outcome).toMatchObject({ status: "partial", error: { code: "project_catalog_conflict" } });
   expect(f.records.has(atlas.ref)).toBe(true);
   expect(f.records.has(beacon.ref)).toBe(false);
   expect([...f.records.values()].some((r) => r.content === "Clarified beacon fact")).toBe(true);

@@ -33,6 +33,18 @@ DESCRIPTIONS = {
     "global_relationships": "Read up to 100 current global relationship hints, or explicit stale/unavailable status. Hints are not canonical facts or authority.",
 }
 
+SAFE_ERRORS = {
+    "Memory changed since inventory": "revision_conflict",
+    "Memory evidence changed since inventory": "evidence_conflict",
+    "Memory evidence changed": "evidence_conflict",
+    "Cyclic memory evidence": "evidence_conflict",
+    "Evidence scope conflict": "scope_conflict",
+    "Invalid lifecycle replacement": "scope_conflict",
+    "Memory is inactive": "inactive_memory",
+    "Memory not found": "inactive_memory",
+    "Retirement cannot change memory metadata": "invalid_request",
+}
+
 
 def create_protocol_server(get_service):
     server = Server("battuta-memory")
@@ -66,6 +78,8 @@ def create_protocol_server(get_service):
             payload = {"ok": False, "error": {"code": "embedding_limit" if embedding_limit else "invalid_request" if validation else "backend_unavailable",
                 "message": "Semantic query exceeds 256 tokenizer tokens; shorten or split it" if embedding_limit else "Invalid request or conflicting memory state" if validation else "Memory backend unavailable; retry later",
                 "retryable": not validation}}
+            if validation and type(error) is ValueError and str(error) in SAFE_ERRORS:
+                payload["error"].update(code=SAFE_ERRORS[str(error)], message=str(error))
             return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=json.dumps(payload))], structuredContent=payload)
 
     return server

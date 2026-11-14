@@ -31,7 +31,7 @@ export const cleanupArtifactSchema = z
         z
           .object({
             ref,
-            disposition: z.enum(["retain", "replace", "merge", "defer"]),
+            disposition: z.enum(["retain", "replace", "merge", "retire", "defer"]),
             reason: text,
             replacement_id: id.optional(),
             memory_metadata: memoryMetadataSchema.optional(),
@@ -78,7 +78,18 @@ export type SynthesisArtifact = z.infer<typeof synthesisArtifactSchema>;
 export type ChallengeArtifact = z.infer<typeof challengeArtifactSchema>;
 
 export function recordFingerprint(record: MemoryRecord, records: MemoryRecord[]) {
-  if (record.review_fingerprint) return record.review_fingerprint;
+  if (record.review_fingerprint) {
+    const evidence = record.memory_metadata?.evidence ?? [];
+    if (!evidence.some((e) => !records.some((r) => r.ref === e.ref && r.revision === e.revision)))
+      return record.review_fingerprint;
+    return digest({
+      fingerprint: record.review_fingerprint,
+      evidence: evidence.map((e) => ({
+        ref: e.ref,
+        revision: records.find((r) => r.ref === e.ref)?.revision ?? null,
+      })),
+    });
+  }
   const meaningful = (r: MemoryRecord) => {
     const metadata = r.memory_metadata ? { ...r.memory_metadata } : undefined;
     if (metadata) delete (metadata as Partial<typeof metadata>).stage;
@@ -124,15 +135,7 @@ export function selectUnprocessed(records: unknown[], reviewed: Record<string, s
       valid.push(parsed.data);
   }
   return {
-    pending: valid.filter(
-      (r) =>
-        !r.memory_metadata ||
-        r.memory_metadata.stage === "temporal" ||
-        reviewed[r.ref] !== recordFingerprint(r, valid) ||
-        r.memory_metadata.evidence.some(
-          (e) => !valid.some((source) => source.ref === e.ref && source.revision === e.revision),
-        ),
-    ),
+    pending: valid.filter((r) => reviewed[r.ref] !== recordFingerprint(r, valid)),
     deferred,
   };
 }
@@ -253,10 +256,12 @@ export function validateSynthesis(
       throw new Error("Synthesis needs a reviewed input");
     if (
       claim.source_refs.some((ref) =>
-        cleanup.dispositions.some((d) => d.ref === ref && d.disposition === "defer"),
+        cleanup.dispositions.some(
+          (d) => d.ref === ref && (d.disposition === "defer" || d.disposition === "retire"),
+        ),
       )
     )
-      throw new Error("Synthesis cannot settle deferred evidence");
+      throw new Error("Synthesis cannot use retired or deferred evidence");
     for (const link of claim.cleanup_evidence)
       if (
         !cleanup.facts.some(

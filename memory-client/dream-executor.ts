@@ -9,11 +9,15 @@ import { MemoryMcpClient } from "./mcp-client.ts";
 import { loadProjectCatalog } from "./projects.ts";
 import { abortable } from "./abortable.ts";
 import type { DreamOutcome } from "./dream-result.ts";
+import { dreamDiagnostic, type DreamDiagnostic } from "./dream-errors.ts";
 
 export type DreamFailure = "unavailable" | "cancelled" | "timed_out" | "failed";
 
 export class DreamExecutionError extends Error {
-  constructor(readonly failure: DreamFailure) {
+  constructor(
+    readonly failure: DreamFailure,
+    readonly diagnostic?: DreamDiagnostic,
+  ) {
     super(failure);
   }
 }
@@ -88,6 +92,20 @@ export async function executeDream(
         : error instanceof Error && known.includes(error.message)
           ? error.message
           : "unexpected_error";
+    const diagnostic: DreamDiagnostic =
+      error instanceof DreamModelError
+        ? {
+            stage,
+            code: `model_${error.category}`,
+            message: `Dream model did not finish (${error.stopReason}; ${error.category}).`,
+          }
+        : failure === "cancelled" || failure === "timed_out"
+          ? {
+              stage,
+              code: failure,
+              message: `Dream ${failure.replace("_", " ")}. Frozen requests were preserved.`,
+            }
+          : dreamDiagnostic(error, stage);
     try {
       const directory = clientConfig().dataDirectory;
       await mkdir(directory, { recursive: true, mode: 0o700 });
@@ -100,6 +118,7 @@ export async function executeDream(
             stage,
             failure,
             reason,
+            diagnostic,
             ...(error instanceof DreamModelError
               ? { stopReason: error.stopReason, modelErrorCategory: error.category }
               : {}),
@@ -111,6 +130,6 @@ export async function executeDream(
     } catch {
       console.error("Could not write private dream diagnostics");
     }
-    throw new DreamExecutionError(failure);
+    throw new DreamExecutionError(failure, diagnostic);
   }
 }

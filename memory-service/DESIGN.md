@@ -205,12 +205,13 @@ CoS's existing scheduler requests the approved dream at local 05:30, with startu
 catch-up, the existing model selection and no tool-capable dream subagent.
 Missing-stage, temporal and changed durable evidence is pending regardless of age.
 Within the 500-record/200,000-byte guard, select at most 20 oldest-attempt inputs;
-deferred/unselected work remains explicit and cannot starve untouched inputs.
+unselected work remains explicit. New reviews have no model-directed defer or
+interpretation revisit queue.
 
 The extension hard-codes cleanup → synthesis → challenge → publication. Each model
 stage returns validated structured artifacts, with one invalid-output retry.
-Every selected input needs retain/replace/merge/defer; every synthesis needs an
-accept/reject/defer challenge. Challenge uses original evidence and contrary
+Cleanup emits only add/replace/merge/retire operations; omitted selected inputs are
+reviewed unchanged. Every synthesis needs an accept/reject challenge. Challenge uses original evidence and contrary
 scoped retrieval, not hidden reasoning. Empty synthesis is valid. With no eligible
 pending inputs, validated empty stages avoid unnecessary model calls.
 
@@ -234,12 +235,19 @@ Scheduler setup and catch-up use the same local 05:30 boundary and owned job ID.
 Existing 03:00 tasks are not migrated: ownership conflicts require manual owner
 removal before setup. No live scheduler changes are part of this update.
 
-Checkpoint v3 persists stage, input fingerprint, schema/prompt versions, validated
+Cleanup-created facts preserve conversation sources but have no outgoing memory
+dependencies. Retirements set status to superseded and clear outgoing evidence,
+without adding replacement references. Content stays stored; ordinary recall
+excludes retired memories and existing claims with invalid dependencies.
+
+Checkpoint v4 persists stage, input fingerprint, schema/prompt versions, validated
 artifacts, frozen requests, acknowledgements, reviewed fingerprints and pending
 attempt progress. A cross-process lock prevents concurrent runs. Resume stale
 unpublished stages against fresh evidence; never regenerate acknowledged/uncertain
 requests. Finish legacy journaled operations using their original identities before
 v3, without rerunning old graph/profile reasoning or inventing review completion.
+Unpublished version-3 proposals rebuild unless mutation requests are frozen; frozen
+requests retain their exact arguments and identities during publication recovery.
 On a later scheduled day, unpublished failed batches rotate by attempt order only
 when no mutation request is frozen; their pending work and legacy receipts remain.
 Oversized inventory and partial publication remain visibly incomplete.
