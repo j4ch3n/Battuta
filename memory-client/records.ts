@@ -66,7 +66,7 @@ export const memoryMetadataSchema = z
       m.knowledge_type === "fact" ||
       (m.confidence !== "confirmed" &&
         !!m.rationale &&
-        m.evidence.some((e) => e.relation === "supports")),
+        (m.status === "superseded" || m.evidence.some((e) => e.relation === "supports"))),
     "Derived claim needs support and rationale",
   );
 export type MemoryMetadata = z.infer<typeof memoryMetadataSchema>;

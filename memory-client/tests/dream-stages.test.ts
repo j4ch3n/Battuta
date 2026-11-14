@@ -6,7 +6,23 @@ import { selectUnprocessed, validateCleanup } from "../dream-stages.ts";
 import { runDream, type DreamDependencies } from "../dream-runtime.ts";
 import { record } from "./fixtures/record.ts";
 import { digest } from "../capture-queue.ts";
-import { memoryRecordSchema, type MemoryRecord } from "../records.ts";
+import { memoryMetadataSchema, memoryRecordSchema, type MemoryRecord } from "../records.ts";
+
+test.each(["hypothesis", "synthesized-observation"] as const)(
+  "retired %s can clear evidence without allowing unsupported active claims",
+  (knowledge_type) => {
+    const retired = {
+      ...record().memory_metadata!,
+      status: "superseded" as const,
+      knowledge_type,
+      confidence: "tentative" as const,
+      rationale: "Supported before retirement",
+      evidence: [],
+    };
+    expect(memoryMetadataSchema.safeParse(retired).success).toBe(true);
+    expect(memoryMetadataSchema.safeParse({ ...retired, status: "active" }).success).toBe(false);
+  },
+);
 
 const dirs: string[] = [];
 afterEach(async () => {

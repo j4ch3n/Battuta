@@ -7,6 +7,24 @@ from test_records import SOURCE, fact
 
 
 class RetrievalTests(StorageFixture):
+    async def test_retired_memory_and_dependent_claim_are_excluded_from_recall(self):
+        from sqlite_vec import serialize_float32
+        self.adapter.embed = lambda _: serialize_float32([1.0] + [0.0] * 383)
+        support = await self.note_with_metadata("Nintendo retired support", keywords=["Nintendo"])
+        source = await self.adapter.get(support["ref"])
+        metadata = {**fact()["memory_metadata"], "knowledge_type": "hypothesis", "confidence": "tentative",
+            "rationale": "A supported claim", "evidence": [{"ref": source["ref"], "revision": source["revision"],
+            "relation": "supports", "requirement": "current"}]}
+        claim = await self.service.remember(RememberRequest(content="Nintendo dependent claim", projects=["global"],
+            sources=[SOURCE], memory_metadata=metadata))
+        await self.service.set_metadata(SetMetadataRequest(ref=source["ref"], expected_revision=source["revision"],
+            idempotency_key="retire-source", memory_metadata={**source["memory_metadata"], "status": "superseded", "evidence": []}))
+        for query in ({"semantic_query": "Nintendo"}, {"keywords": ["Nintendo"]}):
+            result = await self.service.recall(RecallRequest(**query, include_expired=True))
+            self.assertEqual(result["records"], [])
+        current = await self.adapter.get(claim["ref"])
+        self.assertEqual(current["memory_metadata"]["evidence"], metadata["evidence"])
+
     async def test_independent_queries_and_default_all_scope(self):
         a = await self.note_with_metadata("Atlas console", project="atlas", keywords=["Nintendo"])
         b = await self.note_with_metadata("Beacon console", project="beacon", keywords=["Nintendo"])

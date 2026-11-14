@@ -117,7 +117,7 @@ class MemoryMetadata(Contract):
 
     @model_validator(mode="after")
     def supported_claim(self):
-        if self.knowledge_type != "fact" and (not self.rationale or not any(e.relation == "supports" for e in self.evidence)):
+        if self.knowledge_type != "fact" and (not self.rationale or (self.status != "superseded" and not any(e.relation == "supports" for e in self.evidence))):
             raise ValueError("Derived claims require supporting evidence and rationale")
         if self.knowledge_type != "fact" and self.confidence == "confirmed":
             raise ValueError("Inference is not owner confirmation")
