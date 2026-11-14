@@ -60,6 +60,9 @@ class MutationTests(StorageFixture):
             request = SetMetadataRequest(ref=claim["ref"], expected_revision=before["revision"],
                 idempotency_key=f"retire-{kind}", memory_metadata=retired)
             with self.assertRaises(ValueError):
+                await self.service.set_metadata(SetMetadataRequest(ref=claim["ref"], expected_revision=before["revision"],
+                    idempotency_key=f"tamper-{kind}", memory_metadata={**retired, "confidence": "disputed"}))
+            with self.assertRaises(ValueError):
                 await self.service.set_metadata(request.model_copy(update={"expected_revision": "0" * 64, "idempotency_key": f"stale-{kind}"}))
             await self.service.set_metadata(request)
             after = await self.adapter.get(claim["ref"], include_deleted=True)
