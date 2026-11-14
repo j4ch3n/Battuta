@@ -58,10 +58,9 @@ print('Assignment MCP configuration checks passed')
 PY
 ```
 
-Expected: the success line only; any assertion/missing file fails setup. Releases
-validate inputs before generating private configuration and regenerate owned MCP
-files completely, preserving OAuth grants and sessions rather than merging old
-servers. Restart bots separately only when authorized. Neither source nor release
+Expected: the success line only; any assertion/missing file fails setup. Release
+setup creates missing private MCP files and leaves existing files untouched. Review
+skipped configuration before starting bots. Restart bots separately only when authorized. Neither source nor release
 configuration starts worker sessions or changes bounded-subagent isolation defaults.
 
 Notes need no editor package or service: bots use Pi's file tools at returned

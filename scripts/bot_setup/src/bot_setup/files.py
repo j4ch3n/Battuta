@@ -50,8 +50,9 @@ def write_file(target: Path, content: bytes, *, policy: str) -> bool:
             os.unlink(temporary)
 
 
-def prepare_files(root: Path, profile: Path, private: Path, rules: list[FileRule], *, source_profile: Path | None = None, context: str = "source") -> None:
+def prepare_files(root: Path, profile: Path, private: Path, rules: list[FileRule], *, source_profile: Path | None = None, context: str = "source") -> list[tuple[Path, bool]]:
     pending = []
+    results = []
     targets = set()
     for rule in rules:
         if rule.context not in {"all", context}:
@@ -62,6 +63,7 @@ def prepare_files(root: Path, profile: Path, private: Path, rules: list[FileRule
             raise click.ClickException(f"Invalid or duplicate generated file: {target}")
         targets.add(target)
         if rule.policy == "create-only" and target.exists():
+            results.append((target, False))
             continue
         sources = [safe_path(root if source.root == "repository" else source_profile or profile, source.path) for source in rule.sources]
         if rule.operation == "copy" and len(sources) != 1:
@@ -74,4 +76,5 @@ def prepare_files(root: Path, profile: Path, private: Path, rules: list[FileRule
             raise click.ClickException(f"Cannot read setup file: {error.filename}") from error
         pending.append((target, content, rule.policy))
     for target, content, policy in pending:
-        write_file(target, content, policy=policy)
+        results.append((target, write_file(target, content, policy=policy)))
+    return results

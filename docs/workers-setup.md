@@ -71,8 +71,8 @@ All configured workers share the installed worker working directory; their
 `PI_CODING_AGENT_DIR` values point at separate private `.pi/` directories.
 
 `battuta-bot-setup configure-release --root DIR --env-file FILE` configures
-CoS/Manager and worker-1 through worker-N from `WORKER_BOT_COUNT`. It regenerates
-owned private configuration without copying or rewriting model/auth/session files.
+CoS/Manager and worker-1 through worker-N from `WORKER_BOT_COUNT`. It creates
+missing configuration and reports existing files left untouched.
 Unexpected custom executable resources stop setup rather than trigger a merge.
 
 Production uses `battuta-worker@N.service`. Unit generation does not enable or

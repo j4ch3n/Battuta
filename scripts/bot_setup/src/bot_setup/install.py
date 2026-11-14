@@ -8,9 +8,9 @@ import subprocess
 import click
 
 
-def run(*args: str, **kwargs: object) -> None:
+def run(*args: str, **kwargs: object):
     try:
-        subprocess.run(args, check=True, **kwargs)
+        return subprocess.run(args, check=True, **kwargs)
     except subprocess.CalledProcessError as error:
         raise click.ClickException(f"{args[0]} failed (exit {error.returncode})") from error
 

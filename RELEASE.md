@@ -34,14 +34,13 @@ complete per-role skills, resources, notices, and dependency manifests/lockfiles
 JavaScript dependencies and Pi packages are installed **inside the installation**.
 Python servers/CLIs are separate wheels installed into uv-managed environments.
 
-Private `settings.json`, `auth.json`, `models.json`, OAuth state, and sessions are
-preserved. Setup completely regenerates owned MCP, Telegram, and web-search files;
-it does not merge historical values. Installed project settings own resources but
-do not override the private model/provider defaults. Unexpected private resources,
-instructions, symlinks, or malformed settings stop setup for an owner decision.
+Existing private configuration, scheduler and dream files are left untouched.
+Setup creates missing files and summarizes created and untouched destinations.
+Existing settings also skip browser configuration; review skipped steps before
+launch. Unexpected private resources, instructions, symlinks, or malformed
+settings stop setup for an owner decision.
 
-CoS and workers also merge owned browser settings into their separate private
-`settings.json` files; unrelated preferences remain unchanged. Browser profiles
+Fresh CoS and worker settings include browser configuration. Browser profiles
 live under each bot's `.pi/browser-research/`, not inside the installation.
 Manager receives no browser configuration. Battuta does not provision global Pi
 settings; the browser extension's lower-priority global fallback is documented in

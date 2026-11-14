@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { atomicPrivateWrite } from "./dream-files.ts";
@@ -6,10 +6,11 @@ import { reconcileDreamSchedule } from "./dream-schedule.ts";
 import { schedulerStorePath } from "./scheduler-config.ts";
 import { initializeSchedulerStore, readSchedulerStore } from "./scheduler-store.ts";
 import { dreamConfigSchema } from "./dream-config.ts";
+import { lstat } from "node:fs/promises";
 
 // Run only during operator-invoked configuration, with the CoS stopped. Never
 // edit the scheduler's store concurrently with its in-process read/modify/write.
-export async function configureDream() {
+export async function configureDream(_directory, { release = false } = {}) {
   const parsed = dreamConfigSchema.safeParse({
     version: 1,
     model: process.env.BATTUTA_DREAM_MODEL,
@@ -20,6 +21,37 @@ export async function configureDream() {
   const storePath = schedulerStorePath();
   const dataDirectory = process.env.BATTUTA_MEMORY_DATA_DIR ?? join(homedir(), ".battuta/memory");
   const modelPath = join(dataDirectory, "dream-config.json");
+  if (release) {
+    for (const path of [dirname(modelPath), modelPath, dirname(storePath), storePath]) {
+      try {
+        const info = await lstat(path);
+        if (
+          info.isSymbolicLink() ||
+          (path === modelPath || path === storePath ? !info.isFile() : !info.isDirectory())
+        )
+          throw new Error(`Unsafe release destination: ${path}`);
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+      }
+    }
+    const emptyStore = { version: 2, revision: 0, tasks: [] };
+    const initial = reconcileDreamSchedule(emptyStore, new Date().toISOString());
+    const outcomes = [];
+    for (const [path, content] of [
+      [modelPath, model],
+      [storePath, initial],
+    ]) {
+      const created = await atomicPrivateWrite(path, JSON.stringify(content, null, 2) + "\n", {
+        createOnly: true,
+        preserveParentMode: path === storePath,
+      });
+      if (!created && !(await lstat(path)).isFile())
+        throw new Error(`Expected regular file: ${path}`);
+      outcomes.push({ path, created });
+    }
+    console.log(JSON.stringify(outcomes));
+    return;
+  }
   await initializeSchedulerStore(storePath);
   const store = await readSchedulerStore(storePath);
   const result = reconcileDreamSchedule(store, new Date().toISOString());
@@ -34,5 +66,5 @@ export async function configureDream() {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (!process.argv[2])
     throw new Error("Usage: node memory-client/configure-dream.mjs <CoS bot directory>");
-  await configureDream(resolve(process.argv[2]));
+  await configureDream(resolve(process.argv[2]), { release: process.argv[3] === "--release" });
 }

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
+import { chmod, link, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
@@ -12,11 +12,21 @@ export async function optionalText(path: string): Promise<string | undefined> {
   }
 }
 
+export function atomicPrivateWrite(
+  path: string,
+  content: string,
+  options: { preserveParentMode?: boolean; createOnly: true },
+): Promise<boolean>;
+export function atomicPrivateWrite(
+  path: string,
+  content: string,
+  options?: { preserveParentMode?: boolean },
+): Promise<void>;
 export async function atomicPrivateWrite(
   path: string,
   content: string,
-  options: { preserveParentMode?: boolean } = {},
-) {
+  options: { preserveParentMode?: boolean; createOnly?: boolean } = {},
+): Promise<boolean | void> {
   const directory = dirname(path);
   await mkdir(directory, { recursive: true, mode: 0o700 });
   if (!options.preserveParentMode) await chmod(directory, 0o700);
@@ -29,13 +39,23 @@ export async function atomicPrivateWrite(
     } finally {
       await file.close();
     }
-    await rename(temporary, path);
+    if (options.createOnly) {
+      try {
+        await link(temporary, path);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+        throw error;
+      }
+    } else {
+      await rename(temporary, path);
+    }
     const parent = await open(directory, "r");
     try {
       await parent.sync();
     } finally {
       await parent.close();
     }
+    return true;
   } finally {
     await unlink(temporary).catch((error) => {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
