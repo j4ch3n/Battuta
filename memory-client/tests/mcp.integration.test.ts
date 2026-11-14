@@ -65,7 +65,8 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
         });
         server!.stderr!.on("data", (chunk: Buffer) => {
           output += chunk.toString();
-          if (output.includes("Application startup complete")) {
+          // Application startup finishes before Uvicorn binds the listening socket.
+          if (output.includes("Uvicorn running on")) {
             clearTimeout(timer);
             resolve();
           }
