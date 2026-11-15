@@ -9,7 +9,7 @@ from .browser import configure_browser, validate_browser
 from .configure import configure_source, configure_worker
 from .release import configure_release, validate_private_home
 from .env import read_env
-from .instances import instance_paths, worker_names
+from .instances import instance_paths, worker_names, worker_environment
 from .source_launch import run_source_worker, run_source_bot
 from .json_config import write_config
 from .telegram import prepare_telegram_config
@@ -24,10 +24,15 @@ def main():
 
 
 @main.command("workers")
+@click.option("--root", type=DIRECTORY, required=True)
 @click.option("--env-file", type=FILE, required=True)
-def workers(env_file):
+def workers(root, env_file):
     """Print selected worker instance names without launching them."""
-    for name in worker_names(read_env(env_file), env_file):
+    values = read_env(env_file)
+    names = worker_names(values, env_file)
+    for name in names:
+        worker_environment(root, values, env_file, name)
+    for name in names:
         click.echo(name)
 
 

@@ -56,3 +56,11 @@ def test_unconfigured_instance_refuses(tmp_path):
     root = profile(tmp_path, "\n[worker]\ncapabilities=[]\n[worker.types.general]\ncapabilities=[]")
     with pytest.raises(click.ClickException):
         instances.worker_environment(root, {}, tmp_path / ".env", "worker-1")
+
+
+def test_unknown_capabilities_are_not_printed(tmp_path):
+    secret = "private-credential-sentinel"
+    root = profile(tmp_path, f'\n[worker]\ncapabilities=["{secret}"]\n[worker.types.general]\ncapabilities=[]')
+    with pytest.raises(click.ClickException) as error:
+        instances.worker_environment(root, {"BATTUTA_WORKER_1_TYPE": "general"}, tmp_path / ".env", "worker-1")
+    assert secret not in str(error.value)

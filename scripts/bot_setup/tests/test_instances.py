@@ -46,10 +46,19 @@ def test_invalid_instance(tmp_path, bot):
         instances.instance_paths(tmp_path, tmp_path, bot)
 
 
-def test_workers_cli(tmp_path):
+@pytest.mark.parametrize("kind", ["general", "misspelled"])
+def test_workers_cli(tmp_path, kind):
+    profile = tmp_path / "bots/worker"
+    profile.mkdir(parents=True)
+    (profile / "bot.toml").write_text('[worker]\ncapabilities=[]\n[worker.types.general]\ncapabilities=[]\n[skills]\ninclude=[]')
+    (profile / "abilities.json").write_text("{}")
     env_file = tmp_path / ".env"
-    env_file.write_text("BATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=general\n")
-    result = CliRunner().invoke(main, ["workers", "--env-file", str(env_file)])
+    env_file.write_text(f"BATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE={kind}\n")
+    result = CliRunner().invoke(main, ["workers", "--root", str(tmp_path), "--env-file", str(env_file)])
+    if kind != "general":
+        assert result.exit_code != 0
+        assert "worker-1\n" not in result.output
+        return
     assert result.exit_code == 0, result.output
     assert result.output.splitlines() == ["worker-1", "worker-2"]
 

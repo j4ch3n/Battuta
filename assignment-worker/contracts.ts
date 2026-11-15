@@ -173,7 +173,7 @@ export function parseAbilities(values: unknown): Set<string> {
   const unknown = abilities.filter((name) => !Object.hasOwn(abilityCatalog, name));
   if (unknown.length)
     throw new Error(
-      `Unknown configured specialist abilities: ${unknown.join(", ")}. Use exact names from the specialist catalog.`,
+      "Unknown configured specialist abilities in BATTUTA_WORKER_CAPABILITIES. Use exact names from the specialist catalog.",
     );
   return new Set(abilities);
 }

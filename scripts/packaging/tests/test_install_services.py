@@ -7,10 +7,15 @@ import click
 import pytest
 
 from battuta_packaging import services
+from skill_fixtures import manifest_text
 
 
 @pytest.fixture
 def deployment(tmp_path, monkeypatch):
+    profile = tmp_path / "release/bots/worker"
+    profile.mkdir(parents=True)
+    (profile / "bot.toml").write_text(manifest_text("worker", []))
+    (profile / "abilities.json").write_text("{}")
     env_file = tmp_path / ".env.prod"
     env_file.write_text("BATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=general\nBATTUTA_WORKER_3_TYPE=general\nCOS_TELEGRAM_TOKEN=private-sentinel\n")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
@@ -18,6 +23,17 @@ def deployment(tmp_path, monkeypatch):
     monkeypatch.setattr(services.subprocess, "check_output", lambda *a, **k: str(tmp_path / "tool-bin") + "\n")
     monkeypatch.setattr(services.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stdout=""))
     return tmp_path / "release", env_file, Path("/tools/node"), tmp_path / "config/systemd/user"
+
+
+def test_unknown_type_fails_before_service_side_effects(deployment, monkeypatch):
+    root, env, node, units = deployment
+    env.write_text("BATTUTA_WORKER_1_TYPE=misspelled\n")
+    calls = []
+    monkeypatch.setattr(services.subprocess, "run", lambda *a, **k: calls.append(a))
+    with pytest.raises(click.ClickException, match="worker type"):
+        services.install_services(root, env_file=env, node=node)
+    assert not calls
+    assert not units.exists()
 
 
 @pytest.mark.parametrize("count", [0, 1, 3])

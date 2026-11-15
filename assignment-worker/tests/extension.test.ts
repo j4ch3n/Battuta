@@ -241,36 +241,46 @@ test("a bound native extension dispatches its TODO through Pi without a host sen
   await handlers.get("session_shutdown")!({}, ctx);
 });
 
-test.each([undefined, "", "{", "null", "{}", '["mobile_browse"]', "[1]"])(
-  "invalid configured capabilities %j refuse before networking or a model turn",
-  async (value) => {
-    vi.useFakeTimers();
-    vi.stubEnv("BATTUTA_WORKER_CAPABILITIES", value);
-    const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
-    const sendMessage = vi.fn();
-    worker({
-      on: (name: string, fn: unknown) => handlers.set(name, fn as never),
-      registerTool: vi.fn(),
-      registerCommand: vi.fn(),
-      sendMessage,
-      sendUserMessage: vi.fn(),
-      setActiveTools: vi.fn(),
-    } as unknown as ExtensionAPI);
-    const ctx = {
-      isIdle: () => true,
-      hasPendingMessages: () => false,
-      sessionManager: { getEntries: () => [], getSessionId: () => crypto.randomUUID() },
-    } as unknown as ExtensionContext;
-    vi.stubEnv("SUPABASE_URL", "http://127.0.0.1:54321");
-    vi.stubEnv("SUPABASE_SECRET_KEY", "local-test-key");
-    try {
-      await expect(handlers.get("session_start")!({ reason: "startup" }, ctx)).rejects.toThrow();
-      expect(backend.subscribe).not.toHaveBeenCalled();
-      expect(backend.list).not.toHaveBeenCalled();
-      expect(sendMessage).not.toHaveBeenCalled();
-    } finally {
-      await handlers.get("session_shutdown")!({}, ctx);
-      vi.unstubAllEnvs();
-    }
-  },
-);
+test.each([
+  undefined,
+  "",
+  "{",
+  "null",
+  "{}",
+  '["mobile_browse"]',
+  "[1]",
+  "private-credential-sentinel",
+])("invalid configured capabilities %j refuse before networking or a model turn", async (value) => {
+  vi.useFakeTimers();
+  vi.stubEnv("BATTUTA_WORKER_CAPABILITIES", value);
+  const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
+  const sendMessage = vi.fn();
+  worker({
+    on: (name: string, fn: unknown) => handlers.set(name, fn as never),
+    registerTool: vi.fn(),
+    registerCommand: vi.fn(),
+    sendMessage,
+    sendUserMessage: vi.fn(),
+    setActiveTools: vi.fn(),
+  } as unknown as ExtensionAPI);
+  const ctx = {
+    isIdle: () => true,
+    hasPendingMessages: () => false,
+    sessionManager: { getEntries: () => [], getSessionId: () => crypto.randomUUID() },
+  } as unknown as ExtensionContext;
+  vi.stubEnv("SUPABASE_URL", "http://127.0.0.1:54321");
+  vi.stubEnv("SUPABASE_SECRET_KEY", "local-test-key");
+  try {
+    await expect(handlers.get("session_start")!({ reason: "startup" }, ctx)).rejects.toThrow();
+    if (value === "private-credential-sentinel")
+      await expect(handlers.get("session_start")!({ reason: "startup" }, ctx)).rejects.not.toThrow(
+        "private-cr",
+      );
+    expect(backend.subscribe).not.toHaveBeenCalled();
+    expect(backend.list).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
+  } finally {
+    await handlers.get("session_shutdown")!({}, ctx);
+    vi.unstubAllEnvs();
+  }
+});

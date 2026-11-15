@@ -66,7 +66,13 @@ export default function worker(pi: ExtensionAPI) {
     if (!workerId) throw new Error("BATTUTA_BOT_NAME must identify the worker bot");
     const configured = process.env.BATTUTA_WORKER_CAPABILITIES;
     if (!configured) throw new Error("BATTUTA_WORKER_CAPABILITIES must contain configured JSON");
-    const capabilities = [...parseAbilities(JSON.parse(configured))];
+    let values: unknown;
+    try {
+      values = JSON.parse(configured);
+    } catch {
+      throw new Error("BATTUTA_WORKER_CAPABILITIES must contain valid JSON");
+    }
+    const capabilities = [...parseAbilities(values)];
     context = ctx;
     pi.setActiveTools([
       "codemode",

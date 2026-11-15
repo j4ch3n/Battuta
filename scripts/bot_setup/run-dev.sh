@@ -29,7 +29,7 @@ for program in "${programs[@]}"; do
 done
 
 [[ -f "$env_file" ]] || { printf 'Missing %s; create it from .env.example\n' "$env_file" >&2; exit 1; }
-worker_list="$(uv run --project "$repo_dir/scripts/bot_setup" --locked battuta-bot-setup workers --env-file "$env_file")"
+worker_list="$(uv run --project "$repo_dir/scripts/bot_setup" --locked battuta-bot-setup workers --root "$repo_dir" --env-file "$env_file")"
 bot_agent_dir="$(uv run --project "$repo_dir/scripts/bot_setup" --locked battuta-bot-setup agent-dir --root "$repo_dir" --bot cos-bot)"
 manager_agent_dir="$(uv run --project "$repo_dir/scripts/bot_setup" --locked battuta-bot-setup agent-dir --root "$repo_dir" --bot manager-bot)"
 bot_private="${bot_agent_dir%/.pi}"

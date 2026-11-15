@@ -45,7 +45,7 @@ def worker_environment(root: Path, values: dict[str, str], env_file: Path, bot: 
     for capabilities in [worker.capabilities, *(entry.capabilities for entry in worker.types.values())]:
         unknown = set(capabilities) - catalog.keys()
         if unknown:
-            raise click.ClickException("Unknown worker capabilities: " + ", ".join(sorted(unknown)))
+            raise click.ClickException("Unknown worker capabilities in bot.toml; use canonical catalog names")
     capabilities = sorted(set(worker.capabilities) | set(worker.types[kind].capabilities))
     return {"BATTUTA_WORKER_CAPABILITIES": json.dumps(capabilities)}
 
