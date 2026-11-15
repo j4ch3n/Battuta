@@ -76,7 +76,7 @@ unchanged: JavaScript Date conversion loses PostgreSQL microseconds.
 | `record_todo_result`                  | Code-owned completed/blocked report, summary/evidence and required blocker for blocked; block assignment and TODO atomically                   |
 | `block_assignment`                    | Code-owned claim-bound runtime blocker, also blocking a running TODO                                                                           |
 | `finish_assignment`                   | Code-owned current-claim completion only for a nonempty all-done/cancelled TODO set                                                            |
-| `prepare_notes` / `locate_notes`      | Establish/locate a host-neutral notes_ref and current editability; project/assignment ID only                                                  |
+| `prepare_notes` / `locate_notes`      | Return the caller-local absolute notes_path and current editability; project/assignment ID only                                                |
 
 Mutations serialize on the parent assignment row. Claims fence execution; TODO
 writes also compare exact `expected_updated_at`. Terminal work cannot reopen.
@@ -106,14 +106,23 @@ attempts mandatory Manager mail once. A mail failure never rolls back execution.
 
 ## Local working material
 
-Note tools return a relative `notes_ref`, not a remote absolute path:
+Note tools return a top-level absolute `notes_path` resolved for the caller.
+The database reference remains relative to the projects root:
 
 ```text
-projects/<project>/work/<assignment-id>/note.md
+<project>/work/<assignment-id>/note.md
 ```
 
-Resolve it under the caller's expanded local `~/.battuta` root. Preparation is
-idempotent and takes no root argument. Historical `assignment.notes_path` metadata
+The launcher computes the existing `~/.battuta/projects` root and supplies its
+percent-encoded absolute path in the `X-Battuta-Projects-Root` MCP header through
+the code-owned `BATTUTA_PROJECTS_ROOT_HEADER` environment value. This is transport
+metadata, never a model-facing argument or a configurable project-root override.
+Deno decodes once, validates an absolute traversal-free path, and resolves the
+canonical assignment reference per request; no caller root is cached or stored.
+Missing/invalid roots refuse note operations before database writes; other tools
+remain available. The server does not inspect the caller's filesystem or expand
+the server's home. Preparation is idempotent and takes no root tool argument.
+Historical `assignment.notes_path` metadata
 and files are preserved; that field is not a local write destination. New metadata
 uses the relative reference. Deploy the migration and matching clients together.
 

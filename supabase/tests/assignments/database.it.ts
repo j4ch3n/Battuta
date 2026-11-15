@@ -407,7 +407,7 @@ Deno.test(
         "notes_unprepared",
       );
       const prepared = await rpc(sql, "assignment_prepare_notes", [project, a.id]);
-      assert.equal(prepared.notes_ref, `projects/${project}/work/${a.id}/note.md`);
+      assert.equal(prepared.notes_ref, `${project}/work/${a.id}/note.md`);
       assert.deepEqual(await rpc(sql, "assignment_prepare_notes", [project, a.id]), prepared);
       const claim = await rpc(sql, "assignment_claim", [project, a.id]);
       assert.equal((await rpc(sql, "assignment_locate_notes", [project, a.id])).editable, true);

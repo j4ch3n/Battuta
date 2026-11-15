@@ -1,6 +1,6 @@
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import { toolContracts, type ToolName, type NotesResult } from "./contracts.ts";
-import { noteGuidance } from "./notes.ts";
+import { noteGuidance, projectsRootHeader, resolveNotePath } from "./notes.ts";
 import { unknownAbilities } from "./abilities.ts";
 
 export type Rpc = (
@@ -44,12 +44,12 @@ const operations: Record<ToolName, { rpc: string; description: string }> = {
   prepare_notes: {
     rpc: "assignment_prepare_notes",
     description:
-      "Establish a host-neutral assignment note reference. Resolve it under your own local ~/.battuta root; files are not synchronized or created by the server.",
+      "Prepare assignment notes and return their full local path and editing guidance. Files are not synchronized or created by the server.",
   },
   locate_notes: {
     rpc: "assignment_locate_notes",
     description:
-      "Get the host-neutral note reference before editing; resolve it locally. Closed assignments return frozen/read-only guidance.",
+      "Get the full local note path before editing. Closed assignments return frozen/read-only guidance.",
   },
   claim_assignment: {
     rpc: "assignment_claim",
@@ -84,85 +84,106 @@ const operations: Record<ToolName, { rpc: string; description: string }> = {
 };
 
 export function createAssignmentHandler(rpc: Rpc): (request: Request) => Promise<Response> {
-  const handler = createMcpHandler(() => {
-    const server = new McpServer({ name: "battuta-assignments", version: "0.1.0" });
-    for (const [key, contract] of Object.entries(toolContracts)) {
-      const name = key as ToolName;
-      server.registerTool(
-        name,
-        {
-          description: operations[name].description,
-          inputSchema: contract.input,
-          outputSchema: contract.output,
-          annotations: {
-            readOnlyHint: ["list_assignments", "get_assignment", "locate_notes"].includes(name),
-            destructiveHint: false,
+  return (request) => {
+    const handler = createMcpHandler(() => {
+      const server = new McpServer({ name: "battuta-assignments", version: "0.1.0" });
+      for (const [key, contract] of Object.entries(toolContracts)) {
+        const name = key as ToolName;
+        server.registerTool(
+          name,
+          {
+            description: operations[name].description,
+            inputSchema: contract.input,
+            outputSchema: contract.output,
+            annotations: {
+              readOnlyHint: ["list_assignments", "get_assignment", "locate_notes"].includes(name),
+              destructiveHint: false,
+            },
           },
-        },
-        async (args: Record<string, unknown>) => {
-          let result: Record<string, unknown>;
-          const input = contract.input.safeParse(args);
-          if (!input.success) {
-            const result = {
-              ok: false,
-              code: "invalid_input",
-              message: input.error.issues
-                .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
-                .join("; "),
-            };
-            return {
-              structuredContent: result,
-              content: [{ type: "text" as const, text: result.message }],
-              isError: true,
-            };
-          }
-          const proposals =
-            "require_abilities" in input.data
-              ? input.data.require_abilities
-              : "abilities" in input.data
-                ? input.data.abilities
-                : [];
-          const refusal = unknownAbilities(proposals as string[]);
-          if (refusal) {
-            const result = contract.output.parse(refusal);
-            return {
-              structuredContent: result,
-              content: [{ type: "text" as const, text: refusal.message }],
-              isError: true,
-            };
-          }
-          try {
-            const params = Object.fromEntries(
-              Object.entries(input.data).map(([field, value]) => [`p_${field}`, value]),
-            );
-            const { data, error } = await rpc(operations[name].rpc, params);
-            if (error) throw new Error("RPC failed");
-            result = contract.output.parse(data);
-            if (result.ok && (name === "prepare_notes" || name === "locate_notes")) {
-              result = { ...result, guidance: noteGuidance(result as NotesResult) };
+          async (args: Record<string, unknown>) => {
+            let result: Record<string, unknown>;
+            const input = contract.input.safeParse(args);
+            if (!input.success) {
+              const result = {
+                ok: false,
+                code: "invalid_input",
+                message: input.error.issues
+                  .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+                  .join("; "),
+              };
+              return {
+                structuredContent: result,
+                content: [{ type: "text" as const, text: result.message }],
+                isError: true,
+              };
             }
-          } catch {
-            result = {
-              ok: false,
-              code: "backend_error",
-              message:
-                "Operation could not be confirmed. Inspect the assignment before retrying any write.",
+            const isNotes = name === "prepare_notes" || name === "locate_notes";
+            const root = isNotes
+              ? projectsRootHeader.safeParse(request.headers.get("X-Battuta-Projects-Root"))
+              : undefined;
+            if (root && !root.success) {
+              const result = {
+                ok: false,
+                code: "invalid_input",
+                message:
+                  "Local note storage is not configured correctly. Ask the operator to refresh the bot's assignment MCP configuration and restart it. Do not guess a storage path.",
+              };
+              return {
+                structuredContent: result,
+                content: [{ type: "text" as const, text: result.message }],
+                isError: true,
+              };
+            }
+            const proposals =
+              "require_abilities" in input.data
+                ? input.data.require_abilities
+                : "abilities" in input.data
+                  ? input.data.abilities
+                  : [];
+            const refusal = unknownAbilities(proposals as string[]);
+            if (refusal) {
+              const result = contract.output.parse(refusal);
+              return {
+                structuredContent: result,
+                content: [{ type: "text" as const, text: refusal.message }],
+                isError: true,
+              };
+            }
+            try {
+              const params = Object.fromEntries(
+                Object.entries(input.data).map(([field, value]) => [`p_${field}`, value]),
+              );
+              const { data, error } = await rpc(operations[name].rpc, params);
+              if (error) throw new Error("RPC failed");
+              result = contract.output.parse(
+                root?.success ? resolveNotePath(data, root.data) : data,
+              );
+              if (result.ok && isNotes) {
+                result = { ...result, guidance: noteGuidance(result as NotesResult) };
+              }
+            } catch {
+              result = {
+                ok: false,
+                code: "backend_error",
+                message:
+                  "Operation could not be confirmed. Inspect the assignment before retrying any write.",
+              };
+            }
+            return {
+              structuredContent: result,
+              content: [
+                {
+                  type: "text" as const,
+                  text: result.ok === false ? String(result.message) : JSON.stringify(result),
+                },
+              ],
+              isError: result.ok === false,
             };
-          }
-          return {
-            structuredContent: result,
-            content: [
-              {
-                type: "text" as const,
-                text: result.ok === false ? String(result.message) : JSON.stringify(result),
-              },
-            ],
-            isError: result.ok === false,
-          };
-        },
-      );
-    }
-    return server;
-  });
-  return (request) => handler.fetch(request);
+          },
+        );
+      }
+      return server;
+    });
+    return handler.fetch(request);
+  };
 }

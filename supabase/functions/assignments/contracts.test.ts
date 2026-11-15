@@ -85,6 +85,14 @@ Deno.test("strict explicit tool inputs preserve short identity and microsecond t
     true,
   );
   assert.equal(toolContracts.prepare_notes.input.safeParse(target).success, true);
+  for (const name of ["prepare_notes", "locate_notes"] as const) {
+    for (const field of ["root", "projects_root", "notes_path"]) {
+      assert.equal(
+        toolContracts[name].input.safeParse({ ...target, [field]: "/chosen/by/model" }).success,
+        false,
+      );
+    }
+  }
 });
 
 Deno.test("creation publishes complete plans and listing may omit project", () => {

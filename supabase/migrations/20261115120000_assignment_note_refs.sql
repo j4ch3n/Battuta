@@ -10,7 +10,7 @@ begin
   select * into v_row from public.assignments
     where project=p_project and id=p_assignment_id for update;
   if not found then return public.assignment_error('not_found'); end if;
-  v_ref:='projects/'||p_project||'/work/'||p_assignment_id||'/note.md';
+  v_ref:=p_project||'/work/'||p_assignment_id||'/note.md';
   if v_row.status not in ('done','cancelled') and v_row.notes_path is null then
     if not p_prepare then
       return public.assignment_error('notes_unprepared',jsonb_build_object('assignment',public.assignment_view(v_row)));

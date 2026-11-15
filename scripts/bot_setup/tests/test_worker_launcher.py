@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from urllib.parse import unquote
 from unittest.mock import patch
 
 from bot_setup.browser import configure_browser
@@ -96,7 +97,7 @@ class WorkerLauncherTests(unittest.TestCase):
             binary = root / "bin"
             binary.mkdir()
             node = binary / "node"
-            node.write_text('#!/bin/sh\nprintf "%s\\n" "$PI_CODING_AGENT_DIR" "$PWD" "$BATTUTA_BOT_NAME"\n')
+            node.write_text('#!/bin/sh\nprintf "%s\\n" "$PI_CODING_AGENT_DIR" "$PWD" "$BATTUTA_BOT_NAME" "$BATTUTA_PROJECTS_ROOT_HEADER"\n')
             node.chmod(0o755)
             chromium = binary / "chromium-browser"
             chromium.write_text("#!/bin/sh\nexit 99\n")
@@ -107,7 +108,9 @@ class WorkerLauncherTests(unittest.TestCase):
             args = ["bash", str(scripts / "run-worker.sh"), "--bot-dir", str(bot)]
             first = subprocess.run(args, env=env, capture_output=True, text=True)
             self.assertEqual(first.returncode, 0, first.stderr)
-            self.assertEqual(first.stdout.splitlines(), [str(bot / ".pi"), str(profile), "worker-1"])
+            lines = first.stdout.splitlines()
+            self.assertEqual(lines[:3], [str(bot / ".pi"), str(profile), "worker-1"])
+            self.assertEqual(unquote(lines[3]), str(self.home / ".battuta/projects"))
             settings = json.loads((bot / ".pi/settings.json").read_text())
             self.assertEqual(settings["defaultThinkingLevel"], "high")
             self.assertTrue(settings["defaultModel"])

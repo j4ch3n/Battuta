@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tomllib
+from urllib.parse import unquote
 
 import pytest
 
@@ -71,11 +72,14 @@ def installed(tmp_path):
 @pytest.mark.parametrize("bot", ["cos-bot", "manager-bot", "worker-1", "worker-2"])
 def test_launch_cwd_private_state_and_credentials(installed, bot):
     root, home, env_file, node = installed
+    with env_file.open("a") as stream:
+        stream.write("BATTUTA_PROJECTS_ROOT_HEADER=must-not-override-derived-root\n")
     if bot == "manager-bot":
         (home / "bin/chromium-browser").unlink()
     result = subprocess.run([sys.executable, "-m", "battuta_packaging.cli", "run-bot", "--root", str(root), "--bot", bot, "--env-file", str(env_file), "--node", str(node), "--mode", "service"], env={**os.environ, "HOME": str(home), "PATH": str(home / "bin") + os.pathsep + os.environ["PATH"]}, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     output = json.loads(result.stdout)
+    assert unquote(output["env"]["BATTUTA_PROJECTS_ROOT_HEADER"]) == str(home / ".battuta/projects")
     assert output["cwd"] == str(root / "bots" / ("worker" if bot.startswith("worker-") else bot))
     assert output["env"]["PI_CODING_AGENT_DIR"] == str(home / ".battuta/pi-bots" / bot / ".pi")
     assert any("TELEGRAM" in key for key in output["env"]) == (bot == "cos-bot")

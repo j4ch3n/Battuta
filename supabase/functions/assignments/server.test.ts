@@ -20,14 +20,20 @@ const assignment = {
   ready: true,
 };
 
-async function call(rpc: Rpc, name: string, args: Record<string, unknown>) {
-  const handler = createAssignmentHandler(rpc);
+async function call(
+  rpc: Rpc,
+  name: string,
+  args: Record<string, unknown>,
+  rootHeader: string | null = encodeURIComponent("/local/.battuta/projects"),
+  handler = createAssignmentHandler(rpc),
+) {
   const response = await handler(
     new Request("http://localhost/mcp", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json, text/event-stream",
+        ...(rootHeader === null ? {} : { "X-Battuta-Projects-Root": rootHeader }),
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
@@ -151,7 +157,7 @@ Deno.test("note tools return existing path and editability with user-facing guid
   for (const status of ["active", "in_process", "blocked", "done", "cancelled"]) {
     for (const tool of ["prepare_notes", "locate_notes"]) {
       const notes_path = "/old-host/.battuta/projects/Atlas/work/a3f91c2e/note.md";
-      const notes_ref = "projects/Atlas/work/a3f91c2e/note.md";
+      const notes_ref = "Atlas/work/a3f91c2e/note.md";
       const result = await call(
         () =>
           Promise.resolve({
@@ -190,8 +196,8 @@ Deno.test("note tools return existing path and editability with user-facing guid
           assignment_id: "a3f91c2e",
         },
       );
-      assert.equal(result.structuredContent.notes_ref, notes_ref);
-      assert.equal(result.structuredContent.notes_path, undefined);
+      assert.equal(result.structuredContent.notes_ref, undefined);
+      assert.equal(result.structuredContent.notes_path, `/local/.battuta/projects/${notes_ref}`);
       assert.equal(result.structuredContent.editable, !["done", "cancelled"].includes(status));
       assert.equal(typeof result.structuredContent.guidance, "string");
       assert.ok(result.structuredContent.guidance.trim().length > 0);
@@ -204,8 +210,9 @@ Deno.test(
   async () => {
     for (const notes_ref of [
       "/other-host/note.md",
-      "projects/../work/a3f91c2e/note.md",
-      "projects/Other/work/a3f91c2e/note.md",
+      "../work/a3f91c2e/note.md",
+      "Other/work/a3f91c2e/note.md",
+      "projects/Atlas/work/a3f91c2e/note.md",
     ]) {
       const response = await call(
         () =>
@@ -221,6 +228,104 @@ Deno.test(
     }
   },
 );
+
+Deno.test("note roots are caller metadata and invalid roots refuse before RPC", async () => {
+  for (const root of [
+    null,
+    "",
+    "relative",
+    "~/.battuta/projects",
+    "/local/../escape",
+    "/local/./projects",
+    "/local\\projects",
+    "/local/\u0000projects",
+    "/local/\nprojects",
+    "${PROJECTS_ROOT}",
+  ]) {
+    for (const name of ["prepare_notes", "locate_notes"]) {
+      let calls = 0;
+      const result = await call(
+        () => {
+          calls++;
+          return Promise.resolve({ data: null, error: null });
+        },
+        name,
+        { project: assignment.project, assignment_id: assignment.id },
+        root === null ? null : encodeURIComponent(root),
+      );
+      assert.equal(calls, 0);
+      assert.equal(result.isError, true);
+      assert.equal(result.structuredContent.code, "invalid_input");
+      assert.equal(result.content[0].text.startsWith("{"), false);
+    }
+  }
+  const malformed = await call(
+    () => {
+      throw new Error("must not reach RPC");
+    },
+    "prepare_notes",
+    { project: assignment.project, assignment_id: assignment.id },
+    "%ZZ",
+  );
+  assert.equal(malformed.structuredContent.code, "invalid_input");
+  const listed = await call(
+    () => Promise.resolve({ data: { ok: true, assignments: [] }, error: null }),
+    "list_assignments",
+    {},
+    null,
+  );
+  assert.equal(listed.isError, false);
+});
+
+Deno.test("note paths are resolved per request, decoding caller roots exactly once", async () => {
+  const rpc: Rpc = (_name, args) => {
+    assert.deepEqual(args, { p_project: assignment.project, p_assignment_id: assignment.id });
+    return Promise.resolve({
+      data: { ok: true, assignment, notes_ref: "Atlas/work/a3f91c2e/note.md", editable: true },
+      error: null,
+    });
+  };
+  const handler = createAssignmentHandler(rpc);
+  const roots = ["/home/worker-a/.battuta/projects/", "/Users/测试 space%2F#/.battuta/projects"];
+  const results = await Promise.all(
+    roots.map((root) =>
+      call(
+        rpc,
+        "prepare_notes",
+        { project: assignment.project, assignment_id: assignment.id },
+        encodeURIComponent(root),
+        handler,
+      ),
+    ),
+  );
+  for (const [index, result] of results.entries()) {
+    assert.equal(result.isError, false);
+    assert.equal(
+      result.structuredContent.notes_path,
+      `${roots[index].replace(/\/$/, "")}/Atlas/work/a3f91c2e/note.md`,
+    );
+    assert.equal(result.structuredContent.notes_ref, undefined);
+  }
+});
+
+Deno.test("closed unprepared notes have no invented local path", async () => {
+  const result = await call(
+    () =>
+      Promise.resolve({
+        data: {
+          ok: true,
+          assignment: { ...assignment, status: "done" },
+          notes_ref: null,
+          editable: false,
+        },
+        error: null,
+      }),
+    "locate_notes",
+    { project: assignment.project, assignment_id: assignment.id },
+  );
+  assert.equal(result.isError, false);
+  assert.equal(result.structuredContent.notes_path, null);
+});
 
 Deno.test(
   "claim-bound writes preserve exact claim tokens and incomplete recovery data is rejected",

@@ -38,6 +38,7 @@ export interface Result {
   todo: Todo;
   unfinished: Todo[];
   notes_ref: string | null;
+  notes_path: string | null;
   editable: boolean;
   reason?: string;
   missing_assignment_ids?: string[];

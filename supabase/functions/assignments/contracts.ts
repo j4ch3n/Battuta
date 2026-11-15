@@ -85,14 +85,24 @@ const failure = z.discriminatedUnion("code", [
 const assigned = z.object({ ok: z.literal(true), assignment });
 const detail = assigned.extend({ todos: z.array(todo) });
 const progressed = assigned.extend({ todo });
-const notes = z
+export const absolutePath = z
+  .string()
+  .min(1)
+  .refine(
+    (value) =>
+      value.startsWith("/") &&
+      !/[\\\p{Cc}]/u.test(value) &&
+      !value.split("/").some((part) => part === "." || part === ".."),
+    "Expected an absolute local path without traversal or control characters",
+  );
+const noteReference = z
   .object({
     ok: z.literal(true),
     assignment,
     notes_ref: z
       .string()
       .refine((value) => {
-        const match = /^projects\/(.+)\/work\/[0-9a-f]{8}\/note[.]md$/.exec(value);
+        const match = /^(.+)\/work\/[0-9a-f]{8}\/note[.]md$/.exec(value);
         return match !== null && project.safeParse(match[1]).success;
       }, "Expected a host-neutral assignment note reference")
       .nullable(),
@@ -102,10 +112,17 @@ const notes = z
   .refine(
     (value) =>
       value.notes_ref === null ||
-      value.notes_ref ===
-        `projects/${value.assignment.project}/work/${value.assignment.id}/note.md`,
+      value.notes_ref === `${value.assignment.project}/work/${value.assignment.id}/note.md`,
     "Note reference must identify this assignment",
   );
+export const noteReferenceResult = z.union([noteReference, failure]);
+const notes = z.object({
+  ok: z.literal(true),
+  assignment,
+  notes_path: absolutePath.nullable(),
+  editable: z.boolean(),
+  guidance: z.string().optional(),
+});
 export type NotesResult = z.infer<typeof notes>;
 const target = { project, assignment_id: id };
 const claim = { ...target, claimed_at: timestamp, claimed_by: text.nullable().default(null) };

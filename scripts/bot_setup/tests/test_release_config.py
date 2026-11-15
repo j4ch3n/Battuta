@@ -62,7 +62,10 @@ def test_release_preserves_existing_files_and_reports_skips(deployment, capsys):
         private_pi = home / ".battuta/pi-bots" / bot / ".pi"
         servers = json.loads((private_pi / "mcp.json").read_text())["mcpServers"]
         if bot != "cos-bot":
-            assert servers["assignments"]["headers"] == {"apikey": "${SUPABASE_SECRET_KEY}"}
+            assert servers["assignments"]["headers"] == {
+                "apikey": "${SUPABASE_SECRET_KEY}",
+                "X-Battuta-Projects-Root": "${BATTUTA_PROJECTS_ROOT_HEADER}",
+            }
         assert (private_pi / "telegram.json").exists() == (bot == "cos-bot")
         if bot != "cos-bot":
             assert (private_pi / "mcp.json").stat().st_mode & 0o777 == 0o600

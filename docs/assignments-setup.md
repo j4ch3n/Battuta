@@ -36,6 +36,11 @@ homes. Each role keeps its own tool restrictions. The assignment entry uses
 loopback HTTP is allowed for development. Runtime processes need the secret in
 their environment; configuration does not embed its value.
 
+The entry also sends `X-Battuta-Projects-Root: ${BATTUTA_PROJECTS_ROOT_HEADER}`.
+Source/release launchers derive and encode this value from the bot user's home;
+do not set it manually or ask the model to supply a root. Note operations fail
+before writing metadata when the header is missing or invalid.
+
 For source configuration, check files without invoking a model or
 mutating remote task state:
 
@@ -47,7 +52,10 @@ for profile in ('cos-bot', 'manager-bot', 'worker'):
     path = Path('bots') / profile / '.pi/mcp.json'
     entry = json.loads(path.read_text())['mcpServers']['assignments']
     assert entry['url'].endswith('/functions/v1/assignments')
-    assert entry['headers'] == {'apikey': '${SUPABASE_SECRET_KEY}'}
+    assert entry['headers'] == {
+        'apikey': '${SUPABASE_SECRET_KEY}',
+        'X-Battuta-Projects-Root': '${BATTUTA_PROJECTS_ROOT_HEADER}',
+    }
     if profile == 'worker':
         assert entry['exposure'] == 'hidden'
         assert set(entry['toolExposure']) == {'list_assignments', 'get_assignment', 'prepare_notes', 'locate_notes'}
@@ -64,8 +72,10 @@ skipped configuration before starting bots. Restart bots separately only when au
 configuration starts worker sessions or changes bounded-subagent isolation defaults.
 
 Deploy the matching migration and clients together: note tools now accept only
-project/assignment ID and return a relative `notes_ref`, not an absolute
-`notes_path`. No new credentials are required. Workers need write permission
+project/assignment ID and return the caller's full `notes_path`. Refresh generated
+MCP entries to include the new header and use the matching launchers; existing
+private files are preserved, so inspect skipped configuration before proceeding.
+No new credentials are required. Workers need write permission
 under their own expanded `~/.battuta` root; runtime code prepares only assignment
 scratch directories and preserves existing files. Notes need no editor service
 and are not synchronized. Project registration is not required for note-only

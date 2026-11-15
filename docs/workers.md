@@ -135,7 +135,7 @@ Concurrent workers may share project files. Manager must choose non-conflicting
 boundaries or dependencies. No locking or file synchronization is added; missing
 local input must be reported honestly rather than assumed to exist elsewhere.
 The bound execution message includes the resolved local workspace paths.
-Shared note tools return relative references, resolved under each host's root;
+Shared note tools return full local paths resolved for the calling bot;
 old absolute metadata must never be used as a local write target. Persist complete
 handoff content in TODO results; local notes alone are not cross-host evidence.
 
