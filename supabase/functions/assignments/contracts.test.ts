@@ -2,6 +2,38 @@ import assert from "node:assert/strict";
 import { toolContracts } from "./contracts.ts";
 
 const target = { project: "Atlas 地图", assignment_id: "a3f91c2e" };
+Deno.test("creation defaults specialist requirements and rejects malformed sets", () => {
+  const input = { project: "Atlas", goal: "Goal", initial_todos: ["Step"] };
+  assert.deepEqual(toolContracts.create_assignment.input.parse(input), {
+    ...input,
+    require_abilities: [],
+  });
+  for (const require_abilities of [null, "mobile_use", [null], [1]]) {
+    assert.equal(
+      toolContracts.create_assignment.input.safeParse({ ...input, require_abilities }).success,
+      false,
+    );
+  }
+});
+
+Deno.test("claim requires code-owned identity and an explicit ability set", () => {
+  assert.equal(toolContracts.claim_assignment.input.safeParse(target).success, false);
+  assert.deepEqual(
+    toolContracts.claim_assignment.input.parse({
+      ...target,
+      claim_by: "worker-uuid",
+      abilities: [],
+    }),
+    { ...target, claim_by: "worker-uuid", abilities: [] },
+  );
+  for (const claim_by of ["", " ", null, "bad\0id"]) {
+    assert.equal(
+      toolContracts.claim_assignment.input.safeParse({ ...target, claim_by, abilities: [] })
+        .success,
+      false,
+    );
+  }
+});
 Deno.test("strict explicit tool inputs preserve short identity and microsecond tokens", () => {
   for (const name of ["get_assignment", "locate_notes"] as const) {
     assert.equal(toolContracts[name].input.safeParse(target).success, true);
@@ -52,10 +84,7 @@ Deno.test("strict explicit tool inputs preserve short identity and microsecond t
       .success,
     true,
   );
-  assert.equal(
-    toolContracts.prepare_notes.input.safeParse({ ...target, root: "/home/bot/.battuta" }).success,
-    true,
-  );
+  assert.equal(toolContracts.prepare_notes.input.safeParse(target).success, true);
 });
 
 Deno.test("creation publishes complete plans and listing may omit project", () => {
@@ -102,6 +131,7 @@ Deno.test("creation publishes complete plans and listing may omit project", () =
 Deno.test("execution requires exact bound tokens and actionable refusal metadata", () => {
   const input = {
     ...target,
+    claim_by: "worker-uuid",
     claimed_at: "2026-11-04T12:00:00.123456+00:00",
     position: 1,
     expected_updated_at: "2026-11-04T12:00:01.654321+00:00",

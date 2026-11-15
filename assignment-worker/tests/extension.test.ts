@@ -32,6 +32,14 @@ vi.mock("@supabase/supabase-js", () => ({
     removeAllChannels: backend.remove,
   }),
 }));
+vi.mock("../workspace.ts", () => ({
+  ensureAssignmentWorkspace: vi.fn(() =>
+    Promise.resolve({
+      directory: "/private/assignment",
+      notePath: "/private/assignment/note.md",
+    }),
+  ),
+}));
 afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
@@ -41,10 +49,15 @@ test("factory is inert; session lifecycle owns one timer/socket and shutdown fen
   backend.list.mockResolvedValue({ ok: true, assignments: [] });
   const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
   const sendUserMessage = vi.fn();
+  const tools = new Map<
+    string,
+    { execute: (id: string, args: { abilities: string[] }) => Promise<unknown> }
+  >();
   let next: (_args: string, ctx: ExtensionContext) => Promise<void>;
   worker({
     on: (name: string, fn: unknown) => handlers.set(name, fn as never),
-    registerTool: vi.fn(),
+    registerTool: (tool: { name: string; execute: never }) => tools.set(tool.name, tool),
+    sendMessage: vi.fn(),
     registerCommand: (_name: string, options: { handler: typeof next }) => {
       next = options.handler;
     },
@@ -64,6 +77,9 @@ test("factory is inert; session lifecycle owns one timer/socket and shutdown fen
   expect(backend.subscribe).toHaveBeenCalledTimes(1);
   expect(vi.getTimerCount()).toBe(1);
   expect(sendUserMessage).toHaveBeenCalledWith("/worker-next", { expandPromptTemplates: true });
+  await next!("", ctx);
+  expect(backend.list).not.toHaveBeenCalled();
+  await tools.get("register_worker_abilities")!.execute("registration", { abilities: [] });
   await next!("", ctx);
   expect(backend.list).toHaveBeenCalledTimes(1);
   await vi.advanceTimersByTimeAsync(30000);
@@ -92,11 +108,15 @@ test("a bound native extension dispatches its TODO through Pi without a host sen
   });
   const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
   const sendMessage = vi.fn();
+  const tools = new Map<
+    string,
+    { execute: (id: string, args: { abilities: string[] }) => Promise<unknown> }
+  >();
   const setActiveTools = vi.fn();
   let next: (_args: string, ctx: ExtensionContext) => Promise<void>;
   worker({
     on: (name: string, fn: unknown) => handlers.set(name, fn as never),
-    registerTool: vi.fn(),
+    registerTool: (tool: { name: string; execute: never }) => tools.set(tool.name, tool),
     registerCommand: (_name: string, options: { handler: typeof next }) => {
       next = options.handler;
     },
@@ -126,6 +146,12 @@ test("a bound native extension dispatches its TODO through Pi without a host sen
   } as unknown as ExtensionContext;
   await handlers.get("session_start")!({ reason: "new" }, ctx);
   await next!("", ctx);
+  expect(backend.start).not.toHaveBeenCalled();
+  await expect(
+    tools.get("register_worker_abilities")!.execute("invalid", { abilities: ["mobile_use"] }),
+  ).rejects.toThrow(/catalog is empty/);
+  await tools.get("register_worker_abilities")!.execute("registration", { abilities: [] });
+  await next!("", ctx);
   expect(sendMessage).toHaveBeenCalledWith(
     {
       customType: "assignment-todo",
@@ -133,6 +159,7 @@ test("a bound native extension dispatches its TODO through Pi without a host sen
         assignment: row.assignment,
         todos: row.todos,
         current_todo: { ...row.todos[0], status: "in_progress" },
+        workspace: { directory: "/private/assignment", notePath: "/private/assignment/note.md" },
       }),
       display: true,
     },

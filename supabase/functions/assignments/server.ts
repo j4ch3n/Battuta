@@ -1,6 +1,7 @@
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import { toolContracts, type ToolName, type NotesResult } from "./contracts.ts";
 import { noteGuidance } from "./notes.ts";
+import { unknownAbilities } from "./abilities.ts";
 
 export type Rpc = (
   name: string,
@@ -43,12 +44,12 @@ const operations: Record<ToolName, { rpc: string; description: string }> = {
   prepare_notes: {
     rpc: "assignment_prepare_notes",
     description:
-      "Prepare a shared note path under an absolute local Battuta root, normally ~/.battuta after local expansion. Returns instructions, not a filesystem write.",
+      "Establish a host-neutral assignment note reference. Resolve it under your own local ~/.battuta root; files are not synchronized or created by the server.",
   },
   locate_notes: {
     rpc: "assignment_locate_notes",
     description:
-      "Get the shared local note path before editing; closed assignments return frozen/read-only guidance.",
+      "Get the host-neutral note reference before editing; resolve it locally. Closed assignments return frozen/read-only guidance.",
   },
   claim_assignment: {
     rpc: "assignment_claim",
@@ -111,7 +112,22 @@ export function createAssignmentHandler(rpc: Rpc): (request: Request) => Promise
             };
             return {
               structuredContent: result,
-              content: [{ type: "text" as const, text: JSON.stringify(result) }],
+              content: [{ type: "text" as const, text: result.message }],
+              isError: true,
+            };
+          }
+          const proposals =
+            "require_abilities" in input.data
+              ? input.data.require_abilities
+              : "abilities" in input.data
+                ? input.data.abilities
+                : [];
+          const refusal = unknownAbilities(proposals as string[]);
+          if (refusal) {
+            const result = contract.output.parse(refusal);
+            return {
+              structuredContent: result,
+              content: [{ type: "text" as const, text: refusal.message }],
               isError: true,
             };
           }
@@ -135,7 +151,12 @@ export function createAssignmentHandler(rpc: Rpc): (request: Request) => Promise
           }
           return {
             structuredContent: result,
-            content: [{ type: "text" as const, text: JSON.stringify(result) }],
+            content: [
+              {
+                type: "text" as const,
+                text: result.ok === false ? String(result.message) : JSON.stringify(result),
+              },
+            ],
             isError: result.ok === false,
           };
         },

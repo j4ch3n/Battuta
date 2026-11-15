@@ -19,6 +19,7 @@ test("code-owned client preserves exact execution targets and timestamp strings"
     project: "atlas",
     assignment_id: "1234abcd",
     claimed_at: "2026-11-04T12:00:00.123456+00:00",
+    claim_by: "test-worker",
     position: 1,
     expected_updated_at: "2026-11-04T12:00:01.654321+00:00",
   };
@@ -36,6 +37,7 @@ test("local session bindings never leak into strict remote MCP arguments", async
     project: "atlas",
     assignment_id: "1234abcd",
     claimed_at: "2026-11-04T12:00:00.123456+00:00",
+    claim_by: "test-worker",
     session_file: "private-session",
   };
   await client.get(binding);
@@ -75,7 +77,7 @@ test("business refusals retain authoritative recovery metadata", async () => {
     close: vi.fn(),
   });
   const error = await client
-    .claim({ project: "atlas", assignment_id: "1234abcd" })
+    .claim({ project: "atlas", assignment_id: "1234abcd", claim_by: "test-worker", abilities: [] })
     .catch((e: unknown) => e);
   expect(error).toBeInstanceOf(AssignmentRefusalError);
   expect((error as AssignmentRefusalError).refusal).toEqual(refusal);
@@ -89,7 +91,12 @@ test.each(["network", "malformed"])(
         : vi.fn().mockResolvedValue({ content: [], structuredContent: { ok: true } });
     const client = new AssignmentService({ callTool, close: vi.fn() });
     const error = await client
-      .claim({ project: "atlas", assignment_id: "1234abcd" })
+      .claim({
+        project: "atlas",
+        assignment_id: "1234abcd",
+        claim_by: "test-worker",
+        abilities: [],
+      })
       .catch((e: unknown) => e);
     expect(error).toBeInstanceOf(UncertainAssignmentWriteError);
     expect(String(error)).not.toContain("secret sentinel");
@@ -131,7 +138,12 @@ test.each([
       close: vi.fn(),
     });
     await expect(
-      client.claim({ project: "atlas", assignment_id: "1234abcd" }),
+      client.claim({
+        project: "atlas",
+        assignment_id: "1234abcd",
+        claim_by: "test-worker",
+        abilities: [],
+      }),
     ).rejects.toBeInstanceOf(UncertainAssignmentWriteError);
   },
 );

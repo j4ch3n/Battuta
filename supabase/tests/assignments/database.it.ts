@@ -396,53 +396,35 @@ Deno.test("all-cancelled or empty plans cannot be claimed", () =>
   }),
 );
 
-Deno.test("notes keep local path safety and freeze only terminal assignments", () =>
-  withDatabaseTest(async (sql, project) => {
-    const a = (await rpc(sql, "assignment_create", [project, "Goal", ["Step"], "", []])).assignment;
-    const invalidRoot = await rpc(sql, "assignment_prepare_notes", [project, a.id, null]);
-    assert.equal(invalidRoot.code, "invalid_input");
-    assert.equal(typeof invalidRoot.message, "string");
-    assert.equal(
-      (await rpc(sql, "assignment_locate_notes", [project, a.id])).code,
-      "notes_unprepared",
-    );
-    for (const root of ["~/root", "relative", "/a/../b", "/a/./b", "/a//b", "/a\\b", "/a\nb", ""])
+Deno.test(
+  "notes expose a host-neutral reference, preserve old paths and freeze terminal assignments",
+  () =>
+    withDatabaseTest(async (sql, project) => {
+      const a = (await rpc(sql, "assignment_create", [project, "Goal", ["Step"], "", []]))
+        .assignment;
       assert.equal(
-        (await rpc(sql, "assignment_prepare_notes", [project, a.id, root])).code,
-        "invalid_input",
+        (await rpc(sql, "assignment_locate_notes", [project, a.id])).code,
+        "notes_unprepared",
       );
-    const prepared = await rpc(sql, "assignment_prepare_notes", [
-      project,
-      a.id,
-      "/home/bot/.battuta",
-    ]);
-    assert.equal(
-      prepared.notes_path,
-      `/home/bot/.battuta/projects/${project}/work/${a.id}/note.md`,
-    );
-    assert.deepEqual(
-      await rpc(sql, "assignment_prepare_notes", [project, a.id, "/home/bot/.battuta/"]),
-      prepared,
-    );
-    const claim = await rpc(sql, "assignment_claim", [project, a.id]);
-    assert.equal((await rpc(sql, "assignment_locate_notes", [project, a.id])).editable, true);
-    await rpc(sql, "assignment_block", [project, a.id, claim.assignment.claimed_at, "Blocked"]);
-    assert.equal((await rpc(sql, "assignment_locate_notes", [project, a.id])).editable, true);
-    assert.equal(
-      (await rpc(sql, "assignment_prepare_notes", [project, a.id, "/other"])).code,
-      "notes_path_conflict",
-    );
-    await rpc(sql, "assignment_close", [project, a.id, "cancelled"]);
-    for (const operation of ["assignment_locate_notes", "assignment_prepare_notes"]) {
-      const frozen = await rpc(sql, operation, [
-        project,
-        a.id,
-        ...(operation.endsWith("prepare_notes") ? ["/other"] : []),
-      ]);
-      assert.equal(frozen.editable, false);
-      assert.equal(frozen.notes_path, prepared.notes_path);
-    }
-  }),
+      const prepared = await rpc(sql, "assignment_prepare_notes", [project, a.id]);
+      assert.equal(prepared.notes_ref, `projects/${project}/work/${a.id}/note.md`);
+      assert.deepEqual(await rpc(sql, "assignment_prepare_notes", [project, a.id]), prepared);
+      const claim = await rpc(sql, "assignment_claim", [project, a.id]);
+      assert.equal((await rpc(sql, "assignment_locate_notes", [project, a.id])).editable, true);
+      await rpc(sql, "assignment_block", [project, a.id, claim.assignment.claimed_at, "Blocked"]);
+      assert.equal((await rpc(sql, "assignment_locate_notes", [project, a.id])).editable, true);
+      const legacy = `/old-host/.battuta/projects/${project}/work/${a.id}/note.md`;
+      await sql`update public.assignments set notes_path=${legacy} where id=${a.id}`;
+      const relocated = await rpc(sql, "assignment_prepare_notes", [project, a.id]);
+      assert.equal(relocated.assignment.notes_path, legacy);
+      assert.equal(relocated.notes_ref, prepared.notes_ref);
+      await rpc(sql, "assignment_close", [project, a.id, "cancelled"]);
+      for (const operation of ["assignment_locate_notes", "assignment_prepare_notes"]) {
+        const frozen = await rpc(sql, operation, [project, a.id]);
+        assert.equal(frozen.editable, false);
+        assert.equal(frozen.notes_ref, prepared.notes_ref);
+      }
+    }),
 );
 
 Deno.test("append versus claim observes both serialized orderings", () =>
@@ -579,7 +561,7 @@ Deno.test("complete large reads and collision retries never overwrite existing r
           `create function pg_temp.assignment_test_uuid() returns uuid language sql as $$ select case when nextval('pg_temp.assignment_test_ids')=1 then '1234abcd-0000-4000-8000-000000000000'::uuid else 'abcd1234-0000-4000-8000-000000000000'::uuid end $$`,
         );
         const [{ definition }] =
-          await tx`select pg_get_functiondef('public.assignment_create(text,text,text[],text,text[])'::regprocedure) as definition`;
+          await tx`select pg_get_functiondef('public.assignment_create_plan(text,text,text[],text,text[])'::regprocedure) as definition`;
         await tx.unsafe(definition.replace("gen_random_uuid()", "pg_temp.assignment_test_uuid()"));
         assert.equal(
           (await rpc(tx, "assignment_create", [project, "Fresh", ["Step"], "", []])).assignment.id,

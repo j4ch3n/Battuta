@@ -89,18 +89,23 @@ Deno.test("remote MCP authenticates before discovery and exposes shared lifecycl
         ).result.code,
         "stale_update",
       );
-      const claimed = await call(manager, "claim_assignment", target);
-      const execution = { ...target, claimed_at: claimed.result.assignment.claimed_at };
+      const claim_by = "mcp-test-worker";
+      const claimed = await call(manager, "claim_assignment", {
+        ...target,
+        claim_by,
+        abilities: [],
+      });
+      const execution = { ...target, claim_by, claimed_at: claimed.result.assignment.claimed_at };
       const refused = await call(manager, "finish_assignment", execution);
       assert.equal(refused.isError, true);
       assert.deepEqual(
         refused.result.unfinished.map((t) => t.position),
         [1, 2],
       );
-      const notes = await call(cos, "prepare_notes", { ...target, root: "/home/bot/.battuta" });
+      const notes = await call(cos, "prepare_notes", target);
       assert.equal(
-        notes.result.notes_path,
-        `/home/bot/.battuta/projects/${project}/work/${target.assignment_id}/note.md`,
+        notes.result.notes_ref,
+        `projects/${project}/work/${target.assignment_id}/note.md`,
       );
       for (const todo of claimed.result.todos) {
         const started = await call(manager, "start_todo", {

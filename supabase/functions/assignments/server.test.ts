@@ -12,6 +12,8 @@ const assignment = {
   updated_at: "2026-11-04T12:00:00+00:00",
   closed_at: null,
   claimed_at: null,
+  claim_by: null,
+  require_abilities: [],
   lease_expired_at: null,
   blocker: null,
   dependencies: [],
@@ -44,6 +46,50 @@ async function call(rpc: Rpc, name: string, args: Record<string, unknown>) {
     : text;
   return JSON.parse(payload).result;
 }
+
+Deno.test(
+  "unknown specialists refuse before RPC with readable text and typed recovery data",
+  async () => {
+    for (const [name, input] of [
+      [
+        "create_assignment",
+        {
+          project: "Atlas",
+          goal: "Goal",
+          initial_todos: ["Step"],
+          require_abilities: ["mobile_browse"],
+        },
+      ],
+      [
+        "claim_assignment",
+        {
+          project: "Atlas",
+          assignment_id: "a3f91c2e",
+          claim_by: "worker-uuid",
+          abilities: ["mobile_use"],
+        },
+      ],
+    ] as const) {
+      let calls = 0;
+      const result = await call(
+        () => {
+          calls++;
+          return Promise.resolve({ data: null, error: null });
+        },
+        name,
+        input,
+      );
+      assert.equal(calls, 0);
+      assert.equal(result.isError, true);
+      assert.equal(result.structuredContent.code, "unknown_abilities");
+      assert.deepEqual(result.structuredContent.suggestions, {});
+      assert.equal(result.content[0].text.startsWith("{"), false);
+      assert.match(result.content[0].text, /catalog is empty/i);
+      assert.match(result.content[0].text, /\[\]/);
+      assert.match(result.content[0].text, /mobile_/);
+    }
+  },
+);
 
 Deno.test(
   "MCP preserves exact update target/token and exposes structured business refusals",
@@ -104,13 +150,14 @@ Deno.test("MCP sanitizes backend errors, throws, and malformed output", async ()
 Deno.test("note tools return existing path and editability with user-facing guidance", async () => {
   for (const status of ["active", "in_process", "blocked", "done", "cancelled"]) {
     for (const tool of ["prepare_notes", "locate_notes"]) {
-      const notes_path = "/home/bot/.battuta/projects/Atlas/work/a3f91c2e/note.md";
+      const notes_path = "/old-host/.battuta/projects/Atlas/work/a3f91c2e/note.md";
+      const notes_ref = "projects/Atlas/work/a3f91c2e/note.md";
       const result = await call(
         () =>
           Promise.resolve({
             data: {
               ok: true,
-              notes_path,
+              notes_ref,
               editable: !["done", "cancelled"].includes(status),
               assignment: {
                 ...assignment,
@@ -141,16 +188,39 @@ Deno.test("note tools return existing path and editability with user-facing guid
         {
           project: "Atlas",
           assignment_id: "a3f91c2e",
-          ...(tool === "prepare_notes" ? { root: "/home/bot/.battuta" } : {}),
         },
       );
-      assert.equal(result.structuredContent.notes_path, notes_path);
+      assert.equal(result.structuredContent.notes_ref, notes_ref);
+      assert.equal(result.structuredContent.notes_path, undefined);
       assert.equal(result.structuredContent.editable, !["done", "cancelled"].includes(status));
       assert.equal(typeof result.structuredContent.guidance, "string");
       assert.ok(result.structuredContent.guidance.trim().length > 0);
     }
   }
 });
+
+Deno.test(
+  "note reference validation rejects remote paths, traversal and unrelated assignments",
+  async () => {
+    for (const notes_ref of [
+      "/other-host/note.md",
+      "projects/../work/a3f91c2e/note.md",
+      "projects/Other/work/a3f91c2e/note.md",
+    ]) {
+      const response = await call(
+        () =>
+          Promise.resolve({
+            data: { ok: true, assignment, notes_ref, editable: true },
+            error: null,
+          }),
+        "locate_notes",
+        { project: assignment.project, assignment_id: assignment.id },
+      );
+      assert.equal(response.isError, true);
+      assert.equal(response.structuredContent?.notes_ref, undefined);
+    }
+  },
+);
 
 Deno.test(
   "claim-bound writes preserve exact claim tokens and incomplete recovery data is rejected",

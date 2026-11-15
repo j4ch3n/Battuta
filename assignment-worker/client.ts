@@ -45,6 +45,7 @@ export async function blockAndInspect(
     row.project !== claim.project ||
     row.id !== claim.assignment_id ||
     row.claimed_at !== claim.claimed_at ||
+    row.claim_by !== claim.claim_by ||
     row.status !== "blocked" ||
     row.blocker !== blocker
   ) {
@@ -93,13 +94,29 @@ export class AssignmentService implements AssignmentClient {
   get({ project, assignment_id }: Target) {
     return this.call("get_assignment", { project, assignment_id }, DetailSchema, false);
   }
-  claim({ project, assignment_id }: Target) {
-    return this.call("claim_assignment", { project, assignment_id }, DetailSchema);
+  claim({
+    project,
+    assignment_id,
+    claim_by,
+    abilities,
+  }: Target & { claim_by: string; abilities: string[] }) {
+    return this.call(
+      "claim_assignment",
+      { project, assignment_id, claim_by, abilities },
+      DetailSchema,
+    );
   }
-  start({ project, assignment_id, claimed_at, position, expected_updated_at }: TodoTarget) {
+  start({
+    project,
+    assignment_id,
+    claimed_at,
+    claim_by,
+    position,
+    expected_updated_at,
+  }: TodoTarget) {
     return this.call(
       "start_todo",
-      { project, assignment_id, claimed_at, position, expected_updated_at },
+      { project, assignment_id, claimed_at, claim_by, position, expected_updated_at },
       ProgressSchema,
     );
   }
@@ -108,6 +125,7 @@ export class AssignmentService implements AssignmentClient {
       project,
       assignment_id,
       claimed_at,
+      claim_by,
       position,
       expected_updated_at,
       outcome,
@@ -120,6 +138,7 @@ export class AssignmentService implements AssignmentClient {
         project,
         assignment_id,
         claimed_at,
+        claim_by,
         position,
         expected_updated_at,
         outcome,
@@ -130,15 +149,19 @@ export class AssignmentService implements AssignmentClient {
       ProgressSchema,
     );
   }
-  block({ project, assignment_id, claimed_at, blocker }: Claim & { blocker: string }) {
+  block({ project, assignment_id, claimed_at, claim_by, blocker }: Claim & { blocker: string }) {
     return this.call(
       "block_assignment",
-      { project, assignment_id, claimed_at, blocker },
+      { project, assignment_id, claimed_at, claim_by, blocker },
       AssignedSchema,
     );
   }
-  finish({ project, assignment_id, claimed_at }: Claim) {
-    return this.call("finish_assignment", { project, assignment_id, claimed_at }, AssignedSchema);
+  finish({ project, assignment_id, claimed_at, claim_by }: Claim) {
+    return this.call(
+      "finish_assignment",
+      { project, assignment_id, claimed_at, claim_by },
+      AssignedSchema,
+    );
   }
   close() {
     return this.client.close();

@@ -12,7 +12,7 @@ import type {
 } from "../types.ts";
 import { detail } from "./fixtures.ts";
 
-function harness(count = 2) {
+function harness(count = 2, initialized = true) {
   const state = detail();
   state.todos = Array.from({ length: count }, (_, i) => ({
     ...state.todos[0],
@@ -53,6 +53,7 @@ function harness(count = 2) {
       state.assignment.status = "in_process";
       state.assignment.ready = false;
       state.assignment.claimed_at = stamp();
+      state.assignment.claim_by = "test-worker";
       state.assignment.lease_expired_at = "2026-11-04T12:45:00.000002Z";
       return Promise.resolve(clone(state));
     }),
@@ -105,6 +106,12 @@ function harness(count = 2) {
     close: vi.fn(() => Promise.resolve()),
   } satisfies AssignmentClient;
   const sessions = {
+    prepareWorkspace: vi.fn(() =>
+      Promise.resolve({
+        directory: "/private/assignment",
+        notePath: "/private/assignment/note.md",
+      }),
+    ),
     isIdle: () => idle,
     hasPendingMessages: () => pending,
     openAssignmentSession: vi.fn((d: Detail) => {
@@ -112,6 +119,7 @@ function harness(count = 2) {
         project: d.assignment.project,
         assignment_id: d.assignment.id,
         claimed_at: d.assignment.claimed_at!,
+        claim_by: d.assignment.claim_by,
         session_file: "/private/test-session.jsonl",
       };
       opened.push(binding);
@@ -132,7 +140,14 @@ function harness(count = 2) {
       reference: { conversation_id: "11111111-1111-4111-8111-111111111111", id: "123456abcdef" },
     });
   });
-  const coordinator = createCoordinator({ assignments, sessions, diagnostics, notify });
+  const coordinator = createCoordinator({
+    assignments,
+    sessions,
+    diagnostics,
+    notify,
+    workerId: "test-worker",
+  });
+  if (initialized) coordinator.registerAbilities([]);
   return {
     state,
     assignments,
@@ -165,6 +180,90 @@ function harness(count = 2) {
     },
   };
 }
+
+test("uninitialized sessions cannot claim, but explicit empty registration can", async () => {
+  const h = harness(1, false);
+  await h.coordinator.reconcile("startup");
+  expect(h.assignments.claim).not.toHaveBeenCalled();
+  h.coordinator.registerAbilities([]);
+  await h.coordinator.reconcile("idle");
+  expect(h.assignments.claim).toHaveBeenCalledWith({
+    project: "atlas",
+    assignment_id: "1234abcd",
+    claim_by: "test-worker",
+    abilities: [],
+  });
+});
+
+test("all required abilities must match locally before attempting a claim", async () => {
+  const h = harness();
+  h.state.assignment.require_abilities = ["mobile_use"];
+  await h.coordinator.reconcile("idle");
+  expect(h.assignments.claim).not.toHaveBeenCalled();
+});
+
+test("live claims refuse ability-set replacement and stale claimant rows never dispatch", async () => {
+  const h = harness();
+  await h.coordinator.reconcile("idle");
+  expect(() => h.coordinator.registerAbilities(["mobile_use"])).toThrow();
+  h.state.assignment.claim_by = "another-worker";
+  await h.coordinator.restoreBinding(h.opened[0]);
+  expect(h.turns).toEqual([]);
+});
+
+test("workspace preparation follows the winning claim and guards restoration before TODO start", async () => {
+  const h = harness();
+  h.sessions.prepareWorkspace.mockImplementation(() => {
+    expect(h.state.assignment.status).toBe("in_process");
+    expect(h.state.assignment.claim_by).toBe("test-worker");
+    expect(h.assignments.start).not.toHaveBeenCalled();
+    return Promise.resolve({
+      directory: "/private/assignment",
+      notePath: "/private/assignment/note.md",
+    });
+  });
+  await h.begin();
+  expect(h.sessions.prepareWorkspace).toHaveBeenCalledTimes(2);
+  expect(h.turns).toHaveLength(1);
+});
+test.each(["claim", "restore"])(
+  "workspace failure during %s blocks honestly without model execution",
+  async (stage) => {
+    const h = harness();
+    if (stage === "restore") await h.coordinator.reconcile("idle");
+    h.sessions.prepareWorkspace.mockRejectedValueOnce(new Error("permission denied"));
+    if (stage === "restore") await h.coordinator.restoreBinding(h.opened[0]);
+    else await h.coordinator.reconcile("idle");
+    expect(h.assignments.start).not.toHaveBeenCalled();
+    expect(h.turns).toEqual([]);
+    expect(h.state.assignment.status).toBe("blocked");
+    expect(h.state.assignment.claim_by).toBe("test-worker");
+    expect(h.notifications).toHaveLength(1);
+  },
+);
+test("uncertain workspace blocker retains claim and pauses without opening a session", async () => {
+  const h = harness();
+  h.sessions.prepareWorkspace.mockRejectedValueOnce(new Error("denied"));
+  h.assignments.block.mockRejectedValue(new UncertainAssignmentWriteError("block_assignment"));
+  await h.coordinator.reconcile("idle");
+  expect(h.state.assignment.status).toBe("in_process");
+  expect(h.sessions.openAssignmentSession).not.toHaveBeenCalled();
+  expect(h.notifications).toEqual([]);
+});
+test("cancellation during preparation prevents handoff and execution", async () => {
+  const h = harness();
+  h.sessions.prepareWorkspace.mockImplementation(() => {
+    h.state.assignment.status = "cancelled";
+    return Promise.resolve({
+      directory: "/private/assignment",
+      notePath: "/private/assignment/note.md",
+    });
+  });
+  await h.coordinator.reconcile("idle");
+  expect(h.sessions.openAssignmentSession).not.toHaveBeenCalled();
+  expect(h.assignments.start).not.toHaveBeenCalled();
+  expect(h.turns).toEqual([]);
+});
 
 test("claims before prompting and runs TODOs sequentially before persistence-owned completion", async () => {
   const h = harness();

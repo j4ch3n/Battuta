@@ -4,11 +4,15 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { createClient } from "@supabase/supabase-js";
+import { randomUUID } from "node:crypto";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { createAssignmentClient } from "./client.ts";
 import { createCoordinator } from "./coordinator.ts";
-import { ExecutionResultSchema } from "./contracts.ts";
+import { AbilityRegistrationSchema, ExecutionResultSchema, parseBinding } from "./contracts.ts";
 import { createNotifier } from "./notify.ts";
-import type { AssignmentClient, Binding, Coordinator, Detail } from "./types.ts";
+import { ensureAssignmentWorkspace } from "./workspace.ts";
+import type { AssignmentClient, Coordinator, Detail } from "./types.ts";
 
 export default function worker(pi: ExtensionAPI) {
   let coordinator: Coordinator | undefined, client: AssignmentClient | undefined;
@@ -16,12 +20,36 @@ export default function worker(pi: ExtensionAPI) {
     timer: ReturnType<typeof setInterval> | undefined;
   let context: ExtensionContext | undefined, command: ExtensionCommandContext | undefined;
   let stopped = false,
-    restored = false;
+    restored = false,
+    registrationPrompted = false;
+  const workerId = randomUUID();
   const diagnostic = (event: string) => console.error(`[assignment-worker] ${event}`);
   const wake = () => {
     if (!stopped && context?.isIdle() && !context.hasPendingMessages())
       pi.sendUserMessage("/worker-next", { expandPromptTemplates: true });
   };
+  pi.registerTool({
+    name: "register_worker_abilities",
+    label: "Register worker abilities",
+    description:
+      "Declare this session's specialist abilities before claiming or executing work. The catalog is currently empty: use []. General skills are not specialist tags.",
+    parameters: AbilityRegistrationSchema,
+    execute(_id, value) {
+      return Promise.resolve().then(() => {
+        if (!coordinator || stopped) throw new Error("Worker execution is not available");
+        coordinator.registerAbilities(value.abilities);
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Session abilities registered. Availability will be checked after this turn settles.",
+            },
+          ],
+          details: { registered: true },
+        };
+      });
+    },
+  });
   pi.registerTool({
     name: "report_execution_result",
     label: "Report execution result",
@@ -42,23 +70,29 @@ export default function worker(pi: ExtensionAPI) {
     async handler(_args, ctx) {
       if (stopped || !coordinator || !ctx.isIdle() || ctx.hasPendingMessages()) return;
       command = ctx;
+      if (!coordinator.abilitiesReady) {
+        if (!registrationPrompted) {
+          registrationPrompted = true;
+          pi.sendMessage(
+            {
+              customType: "worker-ability-registration",
+              content:
+                "Before taking or resuming any assignment, call register_worker_abilities with your specialist ability set. The catalog is currently empty; register [] for general work. Do not execute assignment work during this registration turn.",
+              display: true,
+            },
+            { triggerTurn: true },
+          );
+        }
+        return;
+      }
       if (!restored) {
         const entry = [...ctx.sessionManager.getEntries()]
           .reverse()
           .find((entry) => entry.type === "custom" && entry.customType === "assignment-binding");
         if (entry?.type === "custom") {
-          const data = entry.data as Omit<Binding, "session_file">;
-          if (
-            typeof data.project !== "string" ||
-            !/^\w{8}$/.test(data.assignment_id) ||
-            typeof data.claimed_at !== "string"
-          )
-            throw new Error("Invalid live assignment binding");
+          const binding = parseBinding(entry.data, ctx.sessionManager.getSessionFile() ?? "");
           restored = true;
-          await coordinator.restoreBinding({
-            ...data,
-            session_file: ctx.sessionManager.getSessionFile() ?? "",
-          });
+          await coordinator.restoreBinding(binding);
           return;
         }
         restored = true;
@@ -84,6 +118,7 @@ export default function worker(pi: ExtensionAPI) {
       "find",
       "ls",
       "report_execution_result",
+      "register_worker_abilities",
       "mcp__assignments__list_assignments",
       "mcp__assignments__get_assignment",
       "mcp__assignments__prepare_notes",
@@ -105,10 +140,13 @@ export default function worker(pi: ExtensionAPI) {
       appendEntry: (kind, data) => pi.appendEntry(kind, data),
     });
     coordinator = createCoordinator({
+      workerId,
       assignments: client,
       notify: notifier,
       diagnostics: diagnostic,
       sessions: {
+        prepareWorkspace: (target) =>
+          ensureAssignmentWorkspace(join(homedir(), ".battuta"), target),
         isIdle: () => context?.isIdle() ?? false,
         hasPendingMessages: () => context?.hasPendingMessages() ?? true,
         appendEntry: (kind, data) => pi.appendEntry(kind, data),
@@ -118,6 +156,7 @@ export default function worker(pi: ExtensionAPI) {
             project: detail.assignment.project,
             assignment_id: detail.assignment.id,
             claimed_at: detail.assignment.claimed_at!,
+            claim_by: detail.assignment.claim_by,
             session_file: "",
           };
           const originalCwd = command.cwd;
@@ -136,7 +175,7 @@ export default function worker(pi: ExtensionAPI) {
           if (result.cancelled) throw new Error("Assignment conversation replacement cancelled");
           return binding;
         },
-        runTodo(_binding, todo, detail) {
+        runTodo(_binding, todo, detail, workspace) {
           if (stopped) throw new Error("Worker session was disposed");
           pi.sendMessage(
             {
@@ -145,6 +184,7 @@ export default function worker(pi: ExtensionAPI) {
                 assignment: detail.assignment,
                 todos: detail.todos,
                 current_todo: todo,
+                workspace,
               }),
               display: true,
             },
