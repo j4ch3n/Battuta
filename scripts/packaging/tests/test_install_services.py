@@ -81,3 +81,28 @@ def test_excess_running_worker_is_not_stopped(deployment, monkeypatch):
     with pytest.raises(click.ClickException, match="worker"):
         services.install_services(root, env_file=env, node=node)
     assert not units.exists()
+
+
+def test_influencer_installs_only_worker_and_support_services(deployment, capsys):
+    root, env, node, units = deployment
+    profile = root / "bots/worker-influencer"
+    profile.mkdir()
+    source = Path(__file__).parents[3] / "bots/worker-influencer/bot.toml"
+    (profile / "bot.toml").write_text(source.read_text())
+    (profile / "abilities.json").write_text('{"mobile-control": {}}')
+    env.write_text("BATTUTA_WORKER_1_TYPE=influencer\n")
+    services.install_services(root, env_file=env, node=node, deployment="influencer")
+    assert {p.name for p in units.iterdir()} == {"battuta-worker@.service", "battuta-artifacts.service", "battuta-speech.service"}
+    assert "battuta-memory.service" not in (units / "battuta-worker@.service").read_text()
+    output = capsys.readouterr().out
+    assert "battuta-worker@1.service" in output
+    assert "battuta-cos.service" not in output and "battuta-manager.service" not in output
+
+
+@pytest.mark.parametrize("selection", ["", "BATTUTA_WORKER_1_TYPE=general\n", "BATTUTA_WORKER_1_TYPE=influencer\nBATTUTA_WORKER_2_TYPE=influencer\n"])
+def test_influencer_rejects_invalid_service_selection(deployment, selection):
+    root, env, node, units = deployment
+    env.write_text(selection)
+    with pytest.raises(click.ClickException):
+        services.install_services(root, env_file=env, node=node, deployment="influencer")
+    assert not units.exists()

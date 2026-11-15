@@ -77,8 +77,9 @@ and selected skills. Install-runtime installs dependencies in the installation.
 All configured workers share the installed worker working directory; their
 `PI_CODING_AGENT_DIR` values point at separate private `.pi/` directories.
 
-`battuta-bot-setup configure-release --root DIR --env-file FILE` configures
-CoS/Manager and workers selected by `BATTUTA_WORKER_<N>_TYPE`. It creates
+`battuta-bot-setup configure-release --root DIR --env-file FILE --deployment main`
+configures CoS/Manager and selected workers. `--deployment influencer` configures
+exactly one selected influencer worker without CoS or Manager. It creates
 missing configuration and reports existing files left untouched.
 Unexpected custom executable resources stop setup rather than trigger a merge.
 

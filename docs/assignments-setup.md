@@ -28,9 +28,10 @@ database to bypass them. Do not start another server if one is already serving.
 
 Source bot configuration generates the role's `assignments` entry; prepare the
 source worker profile separately with `configure --root . --role worker`.
-Release `battuta-bot-setup configure-release --root DIR --env-file FILE` generates
-CoS, Manager and every worker selected by `BATTUTA_WORKER_<N>_TYPE` into their flat private
-homes. Each role keeps its own tool restrictions. The assignment entry uses
+Release `battuta-bot-setup configure-release --root DIR --env-file FILE` defaults
+to the main deployment, configuring CoS, Manager and selected workers.
+With `--deployment influencer`, it configures the selected influencer worker only.
+Each role keeps its own tool restrictions. The assignment entry uses
 `<SUPABASE_URL>/functions/v1/assignments` and the literal environment placeholder
 `${SUPABASE_SECRET_KEY}` in the `apikey` header. Remote origins require HTTPS;
 loopback HTTP is allowed for development. Runtime processes need the secret in

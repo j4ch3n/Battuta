@@ -119,9 +119,10 @@ def refresh_telegram(root, env_file):
 @main.command("configure-release")
 @click.option("--root", type=DIRECTORY, required=True)
 @click.option("--env-file", type=FILE, required=True)
-def release(root, env_file):
+@click.option("--deployment", type=click.Choice(["main", "influencer"]), default="main", show_default=True)
+def release(root, env_file, deployment):
     """Configure a clean installed release."""
-    configure_release(root, env_file=env_file, home=Path.home())
+    configure_release(root, env_file=env_file, home=Path.home(), deployment=deployment)
 
 
 @main.command("configure-worker")

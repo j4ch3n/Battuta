@@ -9,7 +9,7 @@ import click
 
 from .browser import browser_directories, browser_settings
 from .env import read_env, required
-from .instances import instance_paths, worker_names, worker_environment
+from .instances import deployment_workers, instance_paths, worker_environment
 from .install import run
 from .json_config import read_config
 from .mcp import mcp_payload, validate_memory_url
@@ -42,17 +42,18 @@ def validate_private_home(bot_home: Path) -> None:
                 raise click.ClickException(f"Unexpected private instructions: {base / name}")
 
 
-def configure_release(root: Path, *, env_file: Path, home: Path) -> None:
+def configure_release(root: Path, *, env_file: Path, home: Path, deployment: str = "main") -> None:
     values = read_env(env_file)
-    workers = worker_names(values, env_file)
+    workers = deployment_workers(values, env_file, deployment)
     for bot in workers:
         worker_environment(root, values, env_file, bot)
-    names = ["cos-bot", "manager-bot", *workers]
-    for key in ("LINEAR_API_TOKEN", "SUPABASE_URL", "SUPABASE_SECRET_KEY"):
+    names = (["cos-bot", "manager-bot"] if deployment == "main" else []) + workers
+    for key in ("SUPABASE_URL", "SUPABASE_SECRET_KEY", *(["LINEAR_API_TOKEN"] if deployment == "main" else [])):
         required(values, key, env_file)
     url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
-    telegram = telegram_payload(env_file, "COS", values)
-    telegram["profiles"]["default"]["botToken"] = "${COS_TELEGRAM_TOKEN}"
+    if deployment == "main":
+        telegram = telegram_payload(env_file, "COS", values)
+        telegram["profiles"]["default"]["botToken"] = "${COS_TELEGRAM_TOKEN}"
     outputs = []
     browsers = {}
     instances = []
@@ -76,12 +77,13 @@ def configure_release(root: Path, *, env_file: Path, home: Path) -> None:
         read_config(profile / ".pi/web-search.json")
         if role == "cos":
             outputs.append((private / ".pi/telegram.json", telegram))
-    helper = root / "bots/_shared/memory-client/dist/configure-scheduler.js"
-    if not helper.is_file():
-        raise click.ClickException(f"Missing compiled scheduler helper: {helper}")
-    dream = helper.with_name("configure-dream.js")
-    if not dream.is_file():
-        raise click.ClickException(f"Missing compiled dream helper: {dream}")
+    if deployment == "main":
+        helper = root / "bots/_shared/memory-client/dist/configure-scheduler.js"
+        if not helper.is_file():
+            raise click.ClickException(f"Missing compiled scheduler helper: {helper}")
+        dream = helper.with_name("configure-dream.js")
+        if not dream.is_file():
+            raise click.ClickException(f"Missing compiled dream helper: {dream}")
     # Provision only after every instance has passed preflight; never start a bot.
     results = []
     skipped = []
@@ -100,16 +102,17 @@ def configure_release(root: Path, *, env_file: Path, home: Path) -> None:
         elif private in browsers:
             skipped.append(f"Browser setup skipped for {path}; review browser configuration before launch.")
         results.extend(prepare_files(root, profile, private, [rule.model_copy(update={"policy": "create-only"}) for rule in manifest.files if rule.destination == "private"], context="release"))
-    cos_private = instance_paths(root, home, "cos-bot")[2]
-    dream_env = {**os.environ, **values, "HOME": str(home), "PI_CODING_AGENT_DIR": str(cos_private / ".pi")}
-    dream_result = run("node", str(dream), str(root / "bots/cos-bot"), "--release", env=dream_env, stdout=subprocess.PIPE, text=True)
-    if dream_result is not None:
-        results.extend((Path(item["path"]), item["created"]) for item in json.loads(dream_result.stdout))
+    if deployment == "main":
+        cos_private = instance_paths(root, home, "cos-bot")[2]
+        dream_env = {**os.environ, **values, "HOME": str(home), "PI_CODING_AGENT_DIR": str(cos_private / ".pi")}
+        dream_result = run("node", str(dream), str(root / "bots/cos-bot"), "--release", env=dream_env, stdout=subprocess.PIPE, text=True)
+        if dream_result is not None:
+            results.extend((Path(item["path"]), item["created"]) for item in json.loads(dream_result.stdout))
     for path, payload in outputs:
         path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
         content = (json.dumps(payload, indent=2, allow_nan=False) + "\n").encode()
         results.append((path, write_file(path, content, policy="create-only")))
-    click.echo(f"Configured CoS, Manager and {len(names) - 2} worker(s); no bots started.")
+    click.echo(f"Configured {deployment} deployment with {len(workers)} worker(s); no bots started.")
     for path, created in results:
         click.echo(f"{'Created' if created else 'Untouched (setup skipped)'}: {path}")
     for message in skipped:

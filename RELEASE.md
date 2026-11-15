@@ -10,6 +10,22 @@ credentials, invent repairs, copy an old deployment, or start bots to validate
 setup. Authentication, model selection, bot messages, and actual work belong to
 human acceptance, not agent-run setup checks.
 
+## Choose the installation bundle
+
+Ask the owner which bundle to set up if not specified. Use the same verified release
+archive and six Python wheels for both; the bundle controls private configuration
+and generated services, not the files included in the downloaded archive.
+
+| Bundle             | `deployment` | Configured bots                        | Services to activate after approval                       | Setup validation                                                                           |
+| ------------------ | ------------ | -------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Main machine       | `main`       | CoS, Manager, selected general workers | memory, artifacts, speech, CoS, Manager, selected workers | Bundle validation, private configuration and named service status                          |
+| Influencer machine | `influencer` | Exactly one influencer worker          | artifacts, speech, selected worker                        | Bundle validation, worker private configuration, ADB availability and named service status |
+
+Set `deployment=main` or `deployment=influencer` in the trusted shell before
+continuing. Pass that same value to both configuration and service generation.
+Do not infer a selection or activate services from another bundle. Existing
+services are not removed, disabled or stopped by choosing a bundle.
+
 ## Layout and ownership
 
 ```text
@@ -18,7 +34,8 @@ human acceptance, not agent-run setup checks.
   _shared/<component>/dist/             # Compiled shared extensions/helpers
   cos-bot/                             # Generated AGENTS.md, .pi/skills and extensions
   manager-bot/
-  worker/                              # One installed role for all workers
+  worker/                              # General worker profile
+  worker-influencer/                   # Influencer worker profile
 
 ~/.battuta/
   .env.prod                            # Operator credentials/configuration
@@ -61,6 +78,7 @@ during agent-run checks.
 
 ```bash
 set -euo pipefail
+case "${deployment:-}" in main|influencer) ;; *) printf 'STOP: choose a bundle first.\n' >&2; exit 1 ;; esac
 source /etc/os-release
 test "$ID" = ol && test "${VERSION_ID%%.*}" = 9
 test "$(uname -m)" = aarch64
@@ -73,6 +91,10 @@ systemctl --user status >/dev/null
 Every check must succeed. The release requires managed Python 3.12 and the exact
 Node/pnpm versions declared in `bots/release.json`. GitHub, PyPI, npm, and Node
 download access are needed; there is no offline dependency bundle.
+For the influencer bundle, also run `command -v adb`; the owner must provide an
+authorized Android device with USB debugging, and configure `ANDROID_SERIAL` when
+needed. Unicode input requires ADBKeyboard. Device readiness is checked on launch,
+not by starting a bot during setup.
 
 Download these assets from the selected GitHub Release into a separate download
 directory, not the installation:
@@ -170,48 +192,65 @@ fi
 chmod 600 "$env_file"
 ```
 
-Have the owner fill credentials in a private editor, never chat: CoS Telegram token
-and allowed user ID, Linear token, Supabase URL and secret key. Confirm the intended
+Have the owner fill credentials in a private editor, never chat: both bundles need
+the Supabase URL and secret key. The main bundle also needs the CoS Telegram token
+and allowed user ID and Linear token. Confirm the intended
 remote backend. Use literal shell-compatible values, quoted when needed; do not
 use command substitution or variable expansion. Keep optional service overrides
 here too.
 
-Select instances with `BATTUTA_WORKER_1_TYPE=general` and additional numbered
-entries as needed. No entries selects no workers. Types are declared in the worker
+For `main`, select instances with `BATTUTA_WORKER_1_TYPE=general` and additional
+numbered entries as needed; no entries selects no workers. For `influencer`, set
+exactly one entry, for example `BATTUTA_WORKER_1_TYPE=influencer`. Types are declared in the worker
 manifest; invalid selections fail before launch. See [worker capabilities](docs/bot-setup.md#worker-capabilities).
 Changes require a restart, not live autoscaling.
 
-Before configuration, stop CoS and set the required `BATTUTA_DREAM_MODEL` to an
+For `main` only, before configuration, stop CoS and set the required `BATTUTA_DREAM_MODEL` to an
 exact `provider/model-id` in the selected environment file. It has no default and
 is independent of conversational model preferences. Configuration provisions the
 nightly dream task; a missed run may execute when CoS next starts.
 
 ```bash
-battuta-bot-setup configure-release --root "$install_path" --env-file "$env_file"
+battuta-bot-setup configure-release --root "$install_path" --env-file "$env_file" \
+  --deployment "${deployment:?Choose main or influencer}"
 ```
 
-Expected: separate flat private bot homes and role-appropriate generated files;
-no private model/authentication files copied or rewritten, no bots started. CoS
-alone receives Telegram configuration. Repeating configuration replaces owned
-configuration while leaving private state unchanged.
+Expected: separate flat private bot homes and role-appropriate generated files for
+the chosen bundle only. For an influencer selection of worker-1, verify the private
+files exist without displaying credentials:
+
+```bash
+if [[ "$deployment" == influencer ]]; then
+  worker=worker-1 # Use the selected instance number.
+  test -f "$HOME/.battuta/pi-bots/$worker/.pi/settings.json"
+  test -f "$HOME/.battuta/pi-bots/$worker/.pi/mcp.json"
+fi
+```
+
+Setup does not copy or rewrite private model/authentication files or start bots.
+CoS alone receives Telegram configuration. Repeating configuration preserves
+existing private files.
 
 ## 5. Provision application services
 
-In the same trusted private shell, load the same environment used by services:
+In the same trusted private shell, load the same environment used by services.
+For the main bundle provision memory; the influencer bundle does not use it:
 
 ```bash
 set -a
 source "$env_file"
 set +a
-battuta-memory model install
-battuta-memory model verify --json
-battuta-memory doctor --json
+if [[ "${deployment:?Choose main or influencer}" == main ]]; then
+  battuta-memory model install
+  battuta-memory model verify --json
+  battuta-memory doctor --json
+fi
 battuta-artifact setup
 battuta-packaging install-speech
 battuta-packaging verify-speech
 ```
 
-These provision the memory model/data, artifact schema, and speech assets without starting bots.
+These provision the selected memory model/data, artifact schema, and speech assets without starting bots.
 Every command must succeed. Optional offline model input and detailed native
 prerequisites belong to the component guides below. Do not invoke a model provider,
 authenticate Pi, or message bots as a setup check.
@@ -220,10 +259,14 @@ authenticate Pi, or message bots as a setup check.
 
 ```bash
 battuta-packaging install-services --root "$install_path" \
-  --env-file "$env_file" --node "$node"
+  --env-file "$env_file" --node "$node" \
+  --deployment "${deployment:?Choose main or influencer}"
 ```
 
-This writes CoS, Manager, memory, artifact, speech, and `battuta-worker@.service` definitions.
+The main bundle writes CoS, Manager, memory, artifact, speech, and
+`battuta-worker@.service` definitions. The influencer bundle writes only artifact,
+speech, and `battuta-worker@.service` definitions. Confirm the printed activation
+list matches the table above before proceeding.
 It prints the exact reload/activation commands for the configured count, but does
 not execute them. Conflicting units, symlinks, and excess running workers stop setup.
 `--replace` requires explicit approval and stopped affected services; review custom
@@ -288,8 +331,9 @@ Stop/launch/exit failures require an owner decision; no automatic restart or rep
 
 ## Human acceptance
 
-The human owns provider login/model selection, a Telegram reply from CoS, and an
-authorized worker assignment reaching Manager. Use each bot's exact private agent
+The human owns provider login/model selection and an authorized worker assignment
+reaching Manager. For the main bundle, acceptance also includes a Telegram reply
+from CoS. Use each bot's exact private agent
 directory and the maintenance procedure; never copy another bot's authentication.
 Service status proves startup only. Report setup as awaiting human acceptance until
 the owner confirms it.

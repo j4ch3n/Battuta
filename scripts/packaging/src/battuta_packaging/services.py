@@ -10,15 +10,15 @@ import tempfile
 
 import click
 from bot_setup.env import read_env
-from bot_setup.instances import worker_names, worker_environment
+from bot_setup.instances import deployment_workers, worker_environment
 
 from .runtime import check_node
 
 
-def install_services(root: Path, *, env_file: Path, node: Path, replace: bool = False) -> None:
+def install_services(root: Path, *, env_file: Path, node: Path, replace: bool = False, deployment: str = "main") -> None:
     root, env_file, node = root.resolve(), env_file.resolve(), node.resolve()
     values = read_env(env_file)
-    workers = worker_names(values, env_file)
+    workers = deployment_workers(values, env_file, deployment)
     for worker in workers:
         worker_environment(root, values, env_file, worker)
     check_node(root, node)
@@ -43,12 +43,16 @@ def install_services(root: Path, *, env_file: Path, node: Path, replace: bool = 
     path_value = os.pathsep.join(map(str, (node.parent, tools, Path(uv).parent, Path("/usr/local/bin"), Path("/usr/bin"), Path("/bin"))))
     executable = tools / "battuta-packaging"
     units = {}
-    for name, bot, profile in (("cos", "cos-bot", "cos-bot"), ("manager", "manager-bot", "manager-bot"), ("worker@", "worker-%i", "worker")):
+    bots = [("worker@", "worker-%i", "worker")]
+    if deployment == "main":
+        bots = [("cos", "cos-bot", "cos-bot"), ("manager", "manager-bot", "manager-bot"), *bots]
+    for name, bot, profile in bots:
         command = shlex.join([str(executable), "run-bot", "--root", str(root), "--bot", bot, "--env-file", str(env_file), "--node", str(node), "--mode", "service"])
+        dependencies = "network-online.target battuta-memory.service" if deployment == "main" else "network-online.target"
         units[f"battuta-{name}.service"] = f'''[Unit]
 Description=Battuta {name} bot
-After=network-online.target battuta-memory.service
-Wants=network-online.target battuta-memory.service
+After={dependencies}
+Wants={dependencies}
 
 [Service]
 Type=simple
@@ -62,7 +66,8 @@ RestartSec=5
 [Install]
 WantedBy=default.target
 '''
-    for component in ("memory", "artifacts", "speech"):
+    components = ("memory", "artifacts", "speech") if deployment == "main" else ("artifacts", "speech")
+    for component in components:
         extra = "Environment=MCP_MEMORY_ONNX_ALLOW_DOWNLOAD=false\n" if component == "memory" else "NoNewPrivileges=true\nProtectSystem=strict\nProtectHome=read-only\n"
         preflight = f"ExecStartPre={executable} verify-speech\n" if component == "speech" else ""
         units[f"battuta-{component}.service"] = f'''[Unit]
@@ -101,5 +106,8 @@ WantedBy=default.target
                 temporary.replace(directory / name)
             finally:
                 temporary.unlink(missing_ok=True)
-    selected = ["battuta-memory.service", "battuta-artifacts.service", "battuta-speech.service", "battuta-cos.service", "battuta-manager.service", *sorted(expected)]
+    selected = [*(f"battuta-{component}.service" for component in components)]
+    if deployment == "main":
+        selected.extend(["battuta-cos.service", "battuta-manager.service"])
+    selected.extend(sorted(expected))
     click.echo("Installed units without activation. After owner approval:\nsystemctl --user daemon-reload\nsystemctl --user enable --now " + " ".join(selected))
