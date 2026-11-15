@@ -4,6 +4,8 @@ Supabase owns assignments, immutable prerequisites, and ordered TODOs. The
 `assignments` Edge Function exposes strict MCP tools over stateless Streamable
 HTTP. CoS defines the problem/authority; Manager publishes complete plans and
 judges results; [persistent workers](workers.md) execute assignments.
+Workers may also share [assignment remote files](assignment-remote-files.md),
+including after closure, independently of local note editing.
 
 ## Storage and identity
 

@@ -44,8 +44,15 @@ def test_assignment_mcp_preserves_custom_auth_and_role_appropriate_access(tmp_pa
         assert "claim_assignment" not in server["toolExposure"]
         assert "get_assignment" in server["toolExposure"]
         assert data["mcpServers"]["memory"]["enabled"] is False
-        assert set(data["mcpServers"]) == {"other", "assignments", "memory", "speech"}
+        assert set(data["mcpServers"]) == {"other", "assignments", "assignment-files", "memory", "speech"}
+        remote = data["mcpServers"]["assignment-files"]
+        assert remote["url"] == url.rstrip("/") + "/functions/v1/assignment-files"
+        assert remote["headers"] == {"apikey": "${SUPABASE_SECRET_KEY}"}
+        assert remote["exposure"] == "hidden"
+        assert remote["toolExposure"] == {"list_assignment_files": "codemode", "download_assignment_file": "codemode"}
         assert not (pi / "settings.json").exists()
+    else:
+        assert "assignment-files" not in data["mcpServers"]
 
 
 @pytest.mark.parametrize("url", ["", "invalid", "http://example.com", "https://user:private-password@example.com", "https://example.com?secret=private-password", "https://example.com/#fragment", "https://example.com/path", "https://exa mple.com", "https://example.com\\path", "https://example.com/\n", "https://bad_host.example", "https://-bad.example"])

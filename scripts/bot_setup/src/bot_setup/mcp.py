@@ -73,6 +73,7 @@ def mcp_payload(*, role: Literal["cos", "manager", "worker"], supabase_url: str,
     if role == "worker":
         assignment["exposure"] = "hidden"
         assignment["toolExposure"] = {name: "codemode" for name in ("list_assignments", "get_assignment", "prepare_notes", "locate_notes")}
+        servers["assignment-files"] = {"url": supabase_url.rstrip("/") + "/functions/v1/assignment-files", "headers": {"apikey": "${SUPABASE_SECRET_KEY}"}, "exposure": "hidden", "toolExposure": {name: "codemode" for name in ("list_assignment_files", "download_assignment_file")}}
     if role == "cos":
         servers["luma"] = {"url": "https://mcp.luma.com", "oauth": {"clientRegistration": "cimd"}, "exposure": "hidden", "toolExposure": {f"{verb}_*": "codemode" for verb in ("search", "lookup", "get", "list", "find")}, "description": "Discover Luma events and look up event/account details; read-only use"}
     return {"mcpServers": servers}
