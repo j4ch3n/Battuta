@@ -13,6 +13,7 @@ TypeScript on Node.js and Deno, the Pi coding-agent runtime, Telegram, Linear, a
 - Store implementation plans under `docs/superpowers/plans/` and design/specification documents under `docs/superpowers/specs/`. Keep these local; do not commit plans or specs.
 - Name new ticket branches `agent/<ticket>-<short-description>`, using a lowercase ticket identifier and fewer than four hyphen-separated description words (for example, `agent/fis-46-constitution-tool`).
 - Follow surrounding code and runtime-specific formatting, linting, and typing rules.
+- Keep component-specific ignore rules in the owning component's `.gitignore`; reserve the root `.gitignore` for repository-wide rules.
 - Scan related code before adding logic; reuse existing helpers and refactor duplication within the affected scope. Avoid unrelated rewrites.
 - Put non-runtime tooling—setup, configuration, packaging, and test-environment/check orchestration—under responsibility-based subdirectories of `scripts/`, not the repository root or bot runtime directories. Python tooling projects own their `pyproject.toml`, `uv.lock`, local `.gitignore`, environment, and tests; reuse shared package logic rather than duplicate it. See [development commands](docs/commands.md) for entry points.
 - Cover changed behavior, edge cases, and regressions with meaningful tests. Use parameterized tests for equivalent cases.

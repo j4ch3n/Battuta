@@ -19,7 +19,7 @@ def deployment(tmp_path, monkeypatch):
         (bot / ".pi/skills").mkdir(parents=True)
         (bot / "bot.toml").write_text(manifest_text(role.removesuffix("-bot"), []))
         if role == "worker":
-            (bot / "abilities.json").write_text("{}")
+            (bot / "abilities.json").write_text('{"research": {}}')
         (bot / "AGENTS.md").write_text(role)
         (bot / ".pi/settings.json").write_text("{}")
         (bot / ".pi/web-search.json").write_text('{"fetchContent":{"userAgent":"fixture"}}')

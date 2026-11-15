@@ -14,7 +14,7 @@ from bot_setup.manifest import load_profile
 from bot_setup.subagents import render_worker_agents
 from bot_setup.extensions import profile_settings, source_extension_links
 
-PROFILES = ("cos-bot", "manager-bot", "worker")
+PROFILES = ("cos-bot", "manager-bot", "worker", "worker-influencer")
 SHARED = ("memory-client",)
 ENTRY_OUTPUTS = (
     "bots/_shared/memory-client/dist/configure-scheduler.js", "bots/_shared/memory-client/dist/configure-dream.js",
@@ -64,7 +64,7 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
     if destination.is_symlink() or (destination.exists() and (not destination.is_dir() or any(destination.iterdir()))):
         raise click.ClickException("Release destination must be an empty regular directory")
     selections = {profile: load_selection(source / "bots" / profile / "bot.toml", source / "skills-hub") for profile in PROFILES}
-    manifests = {profile: load_profile(source / "bots" / profile / "bot.toml", profile.removesuffix("-bot")) for profile in PROFILES}
+    manifests = {profile: load_profile(source / "bots" / profile / "bot.toml", "worker" if profile.startswith("worker") else profile.removesuffix("-bot")) for profile in PROFILES}
     for profile, manifest in manifests.items():
         source_extension_links(source, destination / "bots" / profile, manifest.extensions)
         for extension in manifest.extensions:
@@ -110,14 +110,14 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         bot = destination / "bots" / profile
         (bot / ".pi/extensions").mkdir(parents=True)
         original = source / "bots" / profile
-        runtime = source / "assignment-worker" if profile == "worker" else original
+        runtime = source / "assignment-worker" if profile.startswith("worker") else original
         for name in ("package.json", "pnpm-lock.yaml"):
             shutil.copy2(runtime / name, bot / name)
         manifest = release_manifest(json.loads((bot / "package.json").read_text()))
         manifest["type"] = "module"
         write_json(bot / "package.json", manifest)
         shutil.copy2(original / "bot.toml", bot / "bot.toml")
-        if profile == "worker":
+        if profile.startswith("worker"):
             shutil.copy2(source / "supabase/functions/assignments/abilities.json", bot / "abilities.json")
         prepare_files(source, bot, bot, [rule for rule in manifests[profile].files if rule.destination == "profile"], source_profile=original, context="release")
         for name in selections[profile]:
@@ -144,7 +144,7 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
             agents.mkdir()
             for name, content in worker_agents.items():
                 (agents / name).write_bytes(content)
-        settings = profile_settings(manifests[profile], browser=profile != "manager-bot")
+        settings = profile_settings(manifests[profile], browser=profile not in ("manager-bot", "worker-influencer"))
         write_json(bot / ".pi/settings.json", settings)
         shutil.copy2(original / ".pi/web-search.json", bot / ".pi/web-search.json")
     for relative in ENTRY_OUTPUTS:
@@ -169,7 +169,7 @@ def validate_bundle(root: Path) -> dict:
                 raise ValueError(relative)
         for profile in PROFILES:
             bot = root / "bots" / profile
-            manifest = load_profile(bot / "bot.toml", profile.removesuffix("-bot"))
+            manifest = load_profile(bot / "bot.toml", "worker" if profile.startswith("worker") else profile.removesuffix("-bot"))
             for extension in manifest.extensions:
                 package = bot / ".pi/extensions" / extension.name
                 for name in ("dist/index.js", "package.json", "pnpm-lock.yaml"):

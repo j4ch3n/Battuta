@@ -138,7 +138,7 @@ if "-P" in args:
         cli.touch()
         (self.root / "bots/worker").mkdir(parents=True)
         shutil.copy2(ROOT / "bots/worker/bot.toml", self.root / "bots/worker/bot.toml")
-        (self.root / "bots/worker/abilities.json").write_text("{}")
+        (self.root / "bots/worker/abilities.json").write_text('{"research": {}}')
         scripts = self.root / "scripts/bot_setup"
         scripts.mkdir(exist_ok=True)
         shutil.copy2(ROOT / "scripts/bot_setup/run-worker.sh", scripts / "run-worker.sh")

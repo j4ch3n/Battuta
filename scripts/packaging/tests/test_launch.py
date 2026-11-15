@@ -11,7 +11,7 @@ from urllib.parse import unquote
 
 import pytest
 
-from battuta_packaging.bundle import ENTRY_OUTPUTS
+from battuta_packaging.bundle import ENTRY_OUTPUTS, PROFILES
 from skill_fixtures import manifest_text
 
 
@@ -23,12 +23,16 @@ def installed(tmp_path):
         path = root / entry
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("export default function () {}")
-    for profile in ("cos-bot", "manager-bot", "worker"):
+    for profile in PROFILES:
         bot = root / "bots" / profile
         (bot / ".pi/skills").mkdir(parents=True, exist_ok=True)
-        (bot / "bot.toml").write_text(manifest_text(profile.removesuffix("-bot"), []))
-        if profile == "worker":
-            (bot / "abilities.json").write_text("{}")
+        if profile == "worker-influencer":
+            manifest = (Path(__file__).resolve().parents[3] / "bots/worker-influencer/bot.toml").read_text().split("[skills]")[0] + "[skills]\ninclude = []"
+        else:
+            manifest = manifest_text(profile.removesuffix("-bot"), [])
+        (bot / "bot.toml").write_text(manifest)
+        if profile.startswith("worker"):
+            (bot / "abilities.json").write_text('{"research": {}, "mobile-control": {}}')
         for extension in tomllib.loads((bot / "bot.toml").read_text())["extensions"]:
             package = bot / ".pi/extensions" / extension["name"]
             (package / "dist").mkdir(parents=True)
@@ -44,15 +48,15 @@ def installed(tmp_path):
         package.parent.mkdir(parents=True)
         package.write_text('{"name":"@example/extension","version":"1.2.3"}')
     version = subprocess.check_output([str(node), "--version"], text=True).strip().removeprefix("v")
-    (root / "bots/release.json").write_text(json.dumps({"node": version, "skills": {p: [] for p in ("cos-bot", "manager-bot", "worker")}, "packages": {p: ["npm:@example/extension@1.2.3"] for p in ("cos-bot", "manager-bot", "worker")}}))
+    (root / "bots/release.json").write_text(json.dumps({"node": version, "skills": {p: [] for p in PROFILES}, "packages": {p: ["npm:@example/extension@1.2.3"] for p in PROFILES}}))
     (root / "bots/runtime.json").write_text(json.dumps({"node": str(node)}))
     env = tmp_path / ".env.prod"
-    env.write_text("BATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=general\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=private-key\nLINEAR_API_TOKEN=private-linear\nCOS_TELEGRAM_TOKEN=private-telegram\n")
+    env.write_text("BATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=influencer\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=private-key\nLINEAR_API_TOKEN=private-linear\nCOS_TELEGRAM_TOKEN=private-telegram\n")
     for name in ("cos-bot", "manager-bot", "worker-1", "worker-2"):
         pi = home / ".battuta/pi-bots" / name / ".pi"
         pi.mkdir(parents=True)
         (pi / "mcp.json").write_text("{}")
-        if name != "manager-bot":
+        if name not in ("manager-bot", "worker-2"):
             (pi / "browser-research").mkdir(mode=0o700)
             (pi / "settings.json").write_text(json.dumps({"pi-browser-use": {
                 "userDataDir": str(pi / "browser-research"), "executablePath": "${CHROME_PATH}",
@@ -67,6 +71,9 @@ def installed(tmp_path):
     chromium = binary / "chromium-browser"
     chromium.write_text("#!/bin/sh\nexit 99\n")
     chromium.chmod(0o700)
+    adb = binary / "adb"
+    adb.write_text("#!/bin/sh\nprintf 'device\\n'\n")
+    adb.chmod(0o700)
     (home / ".battuta/browser-screenshot").mkdir(mode=0o700)
     return root, home, env, node
 
@@ -77,21 +84,21 @@ def test_launch_cwd_private_state_and_credentials(installed, bot):
     with env_file.open("a") as stream:
         stream.write("BATTUTA_PROJECTS_ROOT_HEADER=must-not-override-derived-root\n")
         stream.write('BATTUTA_WORKER_CAPABILITIES=["must-not-override"]\n')
-    if bot == "manager-bot":
+    if bot in ("manager-bot", "worker-2"):
         (home / "bin/chromium-browser").unlink()
     result = subprocess.run([sys.executable, "-m", "battuta_packaging.cli", "run-bot", "--root", str(root), "--bot", bot, "--env-file", str(env_file), "--node", str(node), "--mode", "service"], env={**os.environ, "HOME": str(home), "PATH": str(home / "bin") + os.pathsep + os.environ["PATH"]}, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     output = json.loads(result.stdout)
     assert unquote(output["env"]["BATTUTA_PROJECTS_ROOT_HEADER"]) == str(home / ".battuta/projects")
-    assert output["cwd"] == str(root / "bots" / ("worker" if bot.startswith("worker-") else bot))
+    assert output["cwd"] == str(root / "bots" / ("worker-influencer" if bot == "worker-2" else "worker" if bot.startswith("worker-") else bot))
     assert output["env"]["PI_CODING_AGENT_DIR"] == str(home / ".battuta/pi-bots" / bot / ".pi")
     assert any("TELEGRAM" in key for key in output["env"]) == (bot == "cos-bot")
     assert output["env"]["LINEAR_API_TOKEN"] == "private-linear"
     if bot.startswith("worker-"):
-        assert json.loads(output["env"]["BATTUTA_WORKER_CAPABILITIES"]) == []
+        assert json.loads(output["env"]["BATTUTA_WORKER_CAPABILITIES"]) == (["mobile-control"] if bot == "worker-2" else ["research"])
     assert "--session-dir" in output["args"]
     assert "--offline" in output["args"]
-    if bot != "manager-bot":
+    if bot not in ("manager-bot", "worker-2"):
         assert output["env"]["CHROME_PATH"] == str(home / "bin/chromium-browser")
 
 

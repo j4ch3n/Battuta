@@ -137,7 +137,9 @@ export const toolContracts = {
       constraints: z.string().optional(),
       initial_todos: z.array(text).min(1),
       depends_on_assignment_ids: z.array(id).optional(),
-      require_abilities: abilityProposal.default([]),
+      require_abilities: abilityProposal
+        .refine((abilities) => abilities.length > 0)
+        .default(["research"]),
     }),
     output: z.union([detail, failure]),
   },

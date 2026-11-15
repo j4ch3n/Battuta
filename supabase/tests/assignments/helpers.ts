@@ -89,7 +89,7 @@ export async function rpc(
   if (!/^assignment_[a-z_]+$/.test(name)) throw new Error("Invalid test RPC name");
   // Default identity for tests whose subject is the existing execution lifecycle.
   args = [...args];
-  if (name === "assignment_claim" && args.length === 2) args.push("test-worker", []);
+  if (name === "assignment_claim" && args.length === 2) args.push("test-worker", ["research"]);
   const ownerPosition: Record<string, number> = {
     assignment_start_todo: 5,
     assignment_record_todo_result: 9,

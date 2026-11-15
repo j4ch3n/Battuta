@@ -14,7 +14,7 @@ from battuta_packaging import runtime
 
 
 def test_install_is_frozen_and_install_local(tmp_path, monkeypatch):
-    monkeypatch.setattr(runtime, "validate_bundle", lambda root: {"node": "24.21.0", "packageManager": "pnpm@10.20.0", "packages": {"cos-bot": ["npm:example@1.2.3"], "manager-bot": [], "worker": []}})
+    monkeypatch.setattr(runtime, "validate_bundle", lambda root: {"node": "24.21.0", "packageManager": "pnpm@10.20.0", "packages": {"cos-bot": ["npm:example@1.2.3"], "manager-bot": [], "worker": [], "worker-influencer": []}})
     calls = []
     def command(args, **kwargs):
         calls.append((args, kwargs))
@@ -23,7 +23,7 @@ def test_install_is_frozen_and_install_local(tmp_path, monkeypatch):
         return SimpleNamespace(returncode=0)
     monkeypatch.setattr(runtime.subprocess, "run", command)
     monkeypatch.setattr(runtime.shutil, "which", lambda name, **kwargs: "/tools/" + name)
-    for profile in ("cos-bot", "manager-bot", "worker"):
+    for profile in ("cos-bot", "manager-bot", "worker", "worker-influencer"):
         pi = tmp_path / "bots" / profile / ".pi"
         pi.mkdir(parents=True)
         (pi / "settings.json").write_text("{}")

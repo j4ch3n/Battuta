@@ -45,7 +45,8 @@ def prepare_launch_worker(root: Path, profile: Path, private: Path, *, bot: str)
         for key in ("extensions", "skills", "packages"):
             if key in settings:
                 settings[key] = [rebase_resource(value, profile, require_exists=False) for value in settings[key]]
-        browser_settings(profile, private, home=Path.home(), bot=bot)
+        if profile.name != "worker-influencer":
+            browser_settings(profile, private, home=Path.home(), bot=bot)
     if not (private / ".pi/mcp.json").exists() and not (profile / ".pi/mcp.json").is_file():
         raise click.ClickException(
             "Missing generated worker MCP configuration. From the source root run:\n"
@@ -53,7 +54,7 @@ def prepare_launch_worker(root: Path, profile: Path, private: Path, *, bot: str)
         )
     prepare_files(root, profile, private, [rule for rule in manifest.files if rule.destination == "private"])
     initialize_settings_if_missing(private / ".pi", manifest.defaults, initial_settings=settings)
-    if fresh:
+    if fresh and profile.name != "worker-influencer":
         configure_browser(profile, private, home=Path.home(), bot=bot)
 
 
@@ -92,7 +93,8 @@ def copy_worker_profile(profile: Path, bot_dir: Path) -> None:
         settings[key] = entries
     settings["battutaWorkerResources"] = owned
     settings["battutaMemoryCapture"] = {"enabled": False}
-    settings["pi-browser-use"] = {**source["settings.json"].get("pi-browser-use", {}), **browser_settings(profile, bot_dir, home=Path.home(), bot=bot_dir.name)["pi-browser-use"]}
+    if profile.name != "worker-influencer":
+        settings["pi-browser-use"] = {**source["settings.json"].get("pi-browser-use", {}), **browser_settings(profile, bot_dir, home=Path.home(), bot=bot_dir.name)["pi-browser-use"]}
     mcp = deepcopy(source["mcp.json"])
     source_servers = mcp.get("mcpServers", {})
     destination_servers = destination["mcp.json"].get("mcpServers", {})
@@ -115,7 +117,8 @@ def copy_worker_profile(profile: Path, bot_dir: Path) -> None:
         initialize_settings_if_missing(bot_dir / ".pi", manifest.defaults)
         settings.update(read_config(bot_dir / ".pi/settings.json"))
     write_config(bot_dir / ".pi/settings.json", settings, ".settings-")
-    configure_browser(profile, bot_dir, home=Path.home(), bot=bot_dir.name)
+    if profile.name != "worker-influencer":
+        configure_browser(profile, bot_dir, home=Path.home(), bot=bot_dir.name)
     write_config(bot_dir / ".pi/mcp.json", mcp, ".mcp-")
     if "web-search.json" in names and not (bot_dir / ".pi/web-search.json").exists():
         write_config(bot_dir / ".pi/web-search.json", source["web-search.json"], ".web-")

@@ -10,7 +10,7 @@ const entries = {
   "memory-client/configure-dream.mjs": "bots/_shared/memory-client/dist/configure-dream.js",
 };
 const builds = Object.entries(entries).map(([entry, output]) => ({ entry, output }));
-for (const profile of ["cos-bot", "manager-bot", "worker"]) {
+for (const profile of ["cos-bot", "manager-bot", "worker", "worker-influencer"]) {
   const map = JSON.parse(
     await readFile(join(destination, "bots", profile, ".pi/extension-build.json"), "utf8"),
   );

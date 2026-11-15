@@ -39,11 +39,15 @@ def source(tmp_path, monkeypatch):
         (path / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n")
         (path / "index.ts").write_text("export default () => {}")
     (root / "memory-client/dream-extension.ts").write_text("export default () => {}")
-    for profile in ("cos-bot", "manager-bot", "worker"):
+    for profile in ("cos-bot", "manager-bot", "worker", "worker-influencer"):
         path = root / "bots" / profile
         path.mkdir(parents=True, exist_ok=True)
         (path / "AGENTS_dedicated.md").write_text(profile)
-        (path / "bot.toml").write_text(manifest_text(profile.removesuffix("-bot"), ["research"]))
+        if profile == "worker-influencer":
+            manifest = (Path(__file__).resolve().parents[3] / "bots/worker-influencer/bot.toml").read_text().split("[skills]")[0] + '[skills]\ninclude = ["research"]'
+        else:
+            manifest = manifest_text(profile.removesuffix("-bot"), ["research"])
+        (path / "bot.toml").write_text(manifest)
         (path / ".pi").mkdir()
         (path / ".pi/auth.json").write_text("private-sentinel")
         (path / ".pi/settings.json").write_text('{"defaultModel":"private-model"}')
@@ -83,7 +87,7 @@ def test_staged_archive_separates_documentation_and_bots(source, tmp_path):
     assert (target / "memory-service/DESIGN.md").is_file()
     assert (target / "bots/LICENSE").read_text() == "repository license"
     assert not list((target / "bots").rglob("skills-hub"))
-    for profile in ("cos-bot", "manager-bot", "worker"):
+    for profile in ("cos-bot", "manager-bot", "worker", "worker-influencer"):
         bot = target / "bots" / profile
         assert (bot / "AGENTS.md").is_file()
         assert (bot / ".pi/skills/research/LICENSE").read_text() == "LICENSE"
@@ -114,10 +118,12 @@ def test_staged_archive_separates_documentation_and_bots(source, tmp_path):
             assert "skills: false" in reviewer
             assert "extensions: false" in reviewer
             assert not (bot / ".pi/agents/unselected.md").exists()
-        assert any("pi-browser-use" in package for package in settings["packages"]) == (profile != "manager-bot")
-        if profile != "manager-bot":
+        assert any("pi-browser-use" in package for package in settings["packages"]) == (profile not in ("manager-bot", "worker-influencer"))
+        if profile not in ("manager-bot", "worker-influencer"):
             assert settings["pi-browser-use"]["headless"] is True
             assert "userDataDir" not in settings["pi-browser-use"]
+        else:
+            assert "pi-browser-use" not in settings
     assert not list(target.rglob("*.ts"))
     assert not list(target.rglob("node_modules"))
     assert not list(target.rglob("extension-build.json"))

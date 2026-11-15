@@ -5,6 +5,8 @@ import fcntl
 import os
 import re
 import json
+import shutil
+import subprocess
 
 import click
 from .manifest import load_manifest
@@ -26,12 +28,12 @@ def worker_names(values: dict[str, str], env_file: Path) -> list[str]:
 def worker_environment(root: Path, values: dict[str, str], env_file: Path, bot: str) -> dict[str, str]:
     if bot not in worker_names(values, env_file):
         raise click.ClickException("Worker is not selected by BATTUTA_WORKER_<N>_TYPE")
-    profile = root / "bots/worker"
+    kind = values[f"BATTUTA_WORKER_{bot.removeprefix('worker-')}_TYPE"]
+    profile = root / "bots" / ("worker-influencer" if kind == "influencer" else "worker")
     manifest = load_manifest(profile / "bot.toml")
     worker = manifest.worker
     if worker is None:
         raise click.ClickException("Worker manifest requires capability types")
-    kind = values[f"BATTUTA_WORKER_{bot.removeprefix('worker-')}_TYPE"]
     if kind not in worker.types:
         raise click.ClickException(f"Unknown configured worker type for {bot}")
     source = root / "supabase/functions/assignments/abilities.json"
@@ -50,6 +52,18 @@ def worker_environment(root: Path, values: dict[str, str], env_file: Path, bot: 
     return {"BATTUTA_WORKER_CAPABILITIES": json.dumps(capabilities)}
 
 
+def validate_mobile_device(env: dict[str, str]) -> None:
+    adb = shutil.which("adb", path=env.get("PATH"))
+    if not adb:
+        raise click.ClickException("Influencer worker requires ADB and an authorized Android device")
+    try:
+        result = subprocess.run([adb, "get-state"], env=env, capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise click.ClickException("Cannot check Android device readiness") from error
+    if result.returncode != 0 or result.stdout.strip() != "device":
+        raise click.ClickException("Select one authorized Android device before starting the influencer worker")
+
+
 def profile_identity(bot: str) -> tuple[str, str]:
     if bot in {"cos-bot", "manager-bot"}:
         role = bot.removesuffix("-bot")
@@ -61,8 +75,10 @@ def profile_identity(bot: str) -> tuple[str, str]:
     return role, profile
 
 
-def instance_paths(root: Path, home: Path, bot: str) -> tuple[str, Path, Path]:
+def instance_paths(root: Path, home: Path, bot: str, values: dict[str, str] | None = None) -> tuple[str, Path, Path]:
     role, name = profile_identity(bot)
+    if role == "worker" and values and values.get(f"BATTUTA_WORKER_{bot.removeprefix('worker-')}_TYPE") == "influencer":
+        name = "worker-influencer"
     profile = root / "bots" / name
     manifest = load_manifest(profile / "bot.toml")
     return role, profile, resolve_agent_dir(manifest, bot, home).parent

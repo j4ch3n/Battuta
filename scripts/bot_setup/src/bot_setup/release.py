@@ -58,7 +58,7 @@ def configure_release(root: Path, *, env_file: Path, home: Path) -> None:
     instances = []
     private_paths = set()
     for bot in names:
-        role, profile, private = instance_paths(root, home, bot)
+        role, profile, private = instance_paths(root, home, bot, values)
         manifest = load_profile(profile / "bot.toml", role)
         if manifest.defaults is None or private in private_paths:
             raise click.ClickException("Missing defaults or overlapping private instance paths")
@@ -67,7 +67,7 @@ def configure_release(root: Path, *, env_file: Path, home: Path) -> None:
             raise click.ClickException(f"Missing installed role profile: {profile}")
         validate_private_home(private)
         instances.append((profile, private, manifest))
-        if role != "manager":
+        if role != "manager" and profile.name != "worker-influencer":
             if not (private / ".pi/settings.json").exists():
                 browser_settings(profile, private, home=home, bot=bot)
             browsers[private] = (bot, profile)

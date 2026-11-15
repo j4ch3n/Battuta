@@ -43,7 +43,7 @@ class WorkerLauncherTests(unittest.TestCase):
             cli.write_text("fixture")
             (root / "bots/worker").mkdir(parents=True)
             (root / "bots/worker/bot.toml").write_text(manifest_text("worker", []))
-            (root / "bots/worker/abilities.json").write_text("{}")
+            (root / "bots/worker/abilities.json").write_text('{"research": {}}')
             configure_browser(root / "bots/worker", bot, home=self.home, bot="worker-1")
             binary = root / "bin"
             binary.mkdir()
@@ -61,7 +61,7 @@ class WorkerLauncherTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             output = json.loads(result.stdout)
             self.assertEqual(output["role"], "worker")
-            self.assertEqual(output["capabilities"], [])
+            self.assertEqual(output["capabilities"], ["research"])
             self.assertEqual(output["agentDir"], str(bot / ".pi"))
             self.assertEqual(output["private"], [])
             self.assertNotIn("--print", output["args"])
@@ -83,7 +83,7 @@ class WorkerLauncherTests(unittest.TestCase):
                 'pi_coding_agent_dir = "{instance}/.pi"',
                 'pi_coding_agent_dir = "{instance}/runtime/.pi"',
             ))
-            (profile / "abilities.json").write_text("{}")
+            (profile / "abilities.json").write_text('{"research": {}}')
             (profile / "AGENTS.md").write_text("profile instructions")
             manifest = load_profile(profile / "bot.toml", "worker")
             (profile / ".pi/settings.json").write_text(json.dumps(profile_settings(manifest, browser=True)))
@@ -154,7 +154,7 @@ class WorkerLauncherTests(unittest.TestCase):
             cli.write_text("fixture")
             (root / "bots/worker").mkdir(parents=True)
             (root / "bots/worker/bot.toml").write_text(manifest_text("worker", []))
-            (root / "bots/worker/abilities.json").write_text("{}")
+            (root / "bots/worker/abilities.json").write_text('{"research": {}}')
             bot = self.home / ".battuta/pi-bots/worker-1"
             (bot / ".pi").mkdir(parents=True)
             (bot / ".pi/settings.json").write_text("{}")

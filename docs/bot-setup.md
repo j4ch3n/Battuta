@@ -70,7 +70,7 @@ The worker manifest owns base capabilities and named type additions:
 capabilities = []
 
 [worker.types.general]
-capabilities = []
+capabilities = ["research"]
 ```
 
 `BATTUTA_WORKER_1_TYPE=general` selects worker-1 and its type in the environment
@@ -79,9 +79,10 @@ integers without leading zeroes; gaps are allowed, and no entries means no worke
 There is no count or separate instance map.
 
 The effective set is the deduplicated union of base and selected type capabilities.
-Types do not inherit other types or change installed tools/resources. All names
-must exist in the canonical assignment ability catalog, currently empty, so only
-empty capability lists are valid. Unknown types, unknown names and malformed
+Types do not inherit other types. The `influencer` type selects the separate
+`worker-influencer` profile with `mobile-control` and Pi-Droid instead of the
+general worker's `research` capability and subagents. All names must exist in
+the canonical assignment ability catalog. Unknown types, unknown names and malformed
 configuration stop launch. Source and release launchers supply the resolved set as
 code-owned JSON; changing it requires restarting the worker. Models do not choose,
 register or discover worker capabilities.

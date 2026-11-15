@@ -6,7 +6,7 @@ env_prefix = "WORKER"
 capabilities = []
 
 [worker.types.general]
-capabilities = []
+capabilities = ["research"]
 
 [runtime]
 pi_coding_agent_dir = "{instance}/.pi"

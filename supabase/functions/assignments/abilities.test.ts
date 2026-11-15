@@ -4,6 +4,7 @@ import { abilityProposal, unknownAbilities } from "./abilities.ts";
 Deno.test("specialist proposals are sets and empty sets need no capability", () => {
   assert.deepEqual(abilityProposal.parse(["mobile_use", "mobile_use"]), ["mobile_use"]);
   assert.equal(unknownAbilities([]), undefined);
+  assert.equal(unknownAbilities(["research", "mobile-control"]), undefined);
 });
 
 Deno.test("empty catalog rejects every proposed name without guessing or substituting", () => {

@@ -90,8 +90,7 @@ Deno.test(
       assert.equal(result.structuredContent.code, "unknown_abilities");
       assert.deepEqual(result.structuredContent.suggestions, {});
       assert.equal(result.content[0].text.startsWith("{"), false);
-      assert.match(result.content[0].text, /catalog is empty/i);
-      assert.match(result.content[0].text, /\[\]/);
+      assert.match(result.content[0].text, /specialist catalog/i);
       assert.match(result.content[0].text, /mobile_/);
     }
   },
