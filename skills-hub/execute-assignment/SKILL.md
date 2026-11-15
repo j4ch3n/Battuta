@@ -31,11 +31,9 @@ bound executor retains responsibility for evidence, integration and reporting.
 
 ## Orient to the commission
 
-Before taking or resuming work, use `register_worker_abilities` to declare this
-session's specialist set. The catalog is currently empty: register `[]`; do not
-invent tags for general skills. A successful registration means the declaration
-was accepted, not that work was claimed. Wait for the bound TODO and supplied
-output paths before executing work; report missing essential inputs.
+Wait for the bound TODO and supplied output paths before executing work;
+report missing essential inputs. Assignment selection and claiming are automatic,
+not model actions.
 
 1. Read the bound project, goal, current TODO, prerequisite results, constraints,
    exclusions, acceptance, authority, and Manager's input paths. Use assignment

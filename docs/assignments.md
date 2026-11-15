@@ -49,8 +49,8 @@ remain null and may finish with their original exact token. Terminal/blocked row
 retain the owner; explicit reactivation clears it with the old claim.
 
 `require_abilities` is a deduplicated specialist set, defaulting to `[]` for old
-and new assignments. Empty requirements allow any otherwise eligible registered
-worker. Requirements must be a subset of the claiming session's declared abilities,
+and new assignments. Empty requirements allow any otherwise eligible configured
+worker. Requirements must be a subset of the worker's configured capabilities,
 checked both locally and atomically by the database. They are not authorization.
 The canonical catalog is currently empty: only `[]` is accepted. General writing,
 searching, and coding do not need specialist tags. Unknown names reject the entire
@@ -71,7 +71,7 @@ unchanged: JavaScript Date conversion loses PostgreSQL microseconds.
 | `append_todos` / `update_todo`        | Manager appends or edits/cancels unfinished active/blocked work; exact expected_updated_at required for updates                                |
 | `close_assignment`                    | Cancel nonterminal work without rewriting TODO results                                                                                         |
 | `reactivate_assignment`               | Explicitly return blocked work to active after resolving/cancelling blocked/in-progress TODOs and leaving executable TODOs; clear former claim |
-| `claim_assignment`                    | Worker-code-owned whole-assignment claim with claimed_by and initialized session abilities                                                     |
+| `claim_assignment`                    | Worker-code-owned whole-assignment claim with claimed_by and configured capabilities                                                           |
 | `start_todo`                          | Code-owned current-claim operation; exact item token, first unfinished position, no parallel TODO                                              |
 | `record_todo_result`                  | Code-owned completed/blocked report, summary/evidence and required blocker for blocked; block assignment and TODO atomically                   |
 | `block_assignment`                    | Code-owned claim-bound runtime blocker, also blocking a running TODO                                                                           |

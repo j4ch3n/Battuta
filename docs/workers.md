@@ -53,7 +53,7 @@ exposure; worker assignment mutations remain hidden from model/codemode tools.
 Installed releases instead use the compiled `bots/worker` role as cwd and
 `~/.battuta/pi-bots/worker-N/.pi` as agentDir. Build-generated instructions/skills
 and installed dependencies stay in the installation; private configuration is
-generated separately without resource merges. `WORKER_BOT_COUNT` selects the
+generated separately without resource merges. `BATTUTA_WORKER_<N>_TYPE` selects the
 numbered systemd instances. Source and release launchers hold an instance lock
 across exec. Foreground maintenance requires the selected service to be stopped;
 tmux detach never authorizes starting another process for that identity.
@@ -67,20 +67,21 @@ claimed crash session. Availability wakes `/worker-next`, a registered control
 command that does not require a model call. Busy/pending contexts do not claim.
 One serialized coordinator owns at most one binding and one running TODO.
 
-Before claiming, a registration-only model turn calls `register_worker_abilities`.
+Before subscribing, the extension validates launcher-provided
+`BATTUTA_WORKER_CAPABILITIES` JSON and initializes an immutable capability set.
 The launcher supplies the configured bot ID in `BATTUTA_BOT_NAME`; claims record
 that name as `claimed_by` for traceability. A missing or invalid name stops startup
 rather than inventing an ID. Bot names must be distinct wherever operators need
 to distinguish workers across hosts.
-If that turn finishes without valid registration, the worker displays a paused
-notice and keeps any existing claim. Run `/worker-next retry-registration` for a
-deliberate retry; availability wakes do not start an automatic model retry loop.
-The catalog is currently empty: register `[]`. The validated set lives only in
-extension memory, is fixed while a claim is live, and is never restored from
-conversation entries. Uninitialized workers cannot claim, even general work.
-Each fresh Pi runtime registers again before executing TODOs. Registration turns
-receive no commissioned execution work. Names must come from the canonical catalog;
-unknown proposals are refused in readable text, never silently renamed.
+The launcher resolves base plus selected type capabilities from `bot.toml`;
+see [manifest configuration](bot-setup.md#worker-capabilities).
+Each fresh Pi runtime reloads the same configuration without a model turn.
+Missing, malformed or unknown capabilities stop startup before network access.
+Availability signals, reconnects and fallback checks drive matching and claiming
+in code. No registration tool or model declaration exists. The first execution
+turn follows a confirmed claim, prepared workspace and persisted TODO start.
+Configuration changes require a restart; restored claims still require the full
+configured subset.
 
 After claiming and safely preparing the local scratch workspace, `newSession`
 starts a fresh conversation at the same cwd/agentDir.

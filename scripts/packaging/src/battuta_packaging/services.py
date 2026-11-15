@@ -36,7 +36,7 @@ def install_services(root: Path, *, env_file: Path, node: Path, replace: bool = 
     for line in active.stdout.splitlines():
         fields = line.split()
         if len(fields) >= 3 and fields[2] in {"active", "activating", "deactivating"} and fields[0] not in expected:
-            raise click.ClickException("A running worker is outside WORKER_BOT_COUNT; ask the owner before changing services")
+            raise click.ClickException("A running worker is not selected by BATTUTA_WORKER_<N>_TYPE; ask the owner before changing services")
     path_value = os.pathsep.join(map(str, (node.parent, tools, Path(uv).parent, Path("/usr/local/bin"), Path("/usr/bin"), Path("/bin"))))
     executable = tools / "battuta-packaging"
     units = {}

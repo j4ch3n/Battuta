@@ -34,8 +34,8 @@ make setup-bot
 make dev
 ```
 
-Set `WORKER_BOT_COUNT` explicitly in both selected source environment files: `1`
-is normal locally, `0` disables workers, and `N` selects worker-1 through worker-N.
+Select workers in each source environment file with numbered entries such as
+`BATTUTA_WORKER_1_TYPE=general`. No entries selects no workers.
 `make dev` opens a `bots` window with one pane per bot and a `services` window for
 memory and Edge Functions. It expects local Supabase to be running and loads `.env`.
 Bots use flat private paths at `~/.battuta/pi-bots/<bot>/.pi`; the source launcher

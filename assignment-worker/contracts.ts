@@ -160,7 +160,7 @@ export const ExecutionResultSchema = Type.Union([
   ),
 ]);
 export type ExecutionResult = Static<typeof ExecutionResultSchema>;
-export const AbilityRegistrationSchema = Type.Object(
+const CapabilityConfigurationSchema = Type.Object(
   {
     abilities: Type.Array(Type.String(), {
       description: `Specialist names: ${Object.keys(abilityCatalog).join(", ") || "none; use [] for general work"}. Exact matches only.`,
@@ -169,11 +169,11 @@ export const AbilityRegistrationSchema = Type.Object(
   { additionalProperties: false },
 );
 export function parseAbilities(values: unknown): Set<string> {
-  const { abilities } = parseValue(AbilityRegistrationSchema, { abilities: values });
+  const { abilities } = parseValue(CapabilityConfigurationSchema, { abilities: values });
   const unknown = abilities.filter((name) => !Object.hasOwn(abilityCatalog, name));
   if (unknown.length)
     throw new Error(
-      `Unknown specialist abilities: ${unknown.join(", ")}. The specialist catalog is empty; only [] is currently valid. Nothing was registered.`,
+      `Unknown configured specialist abilities: ${unknown.join(", ")}. Use exact names from the specialist catalog.`,
     );
   return new Set(abilities);
 }

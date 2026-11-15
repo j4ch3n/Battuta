@@ -11,6 +11,7 @@ const backend = vi.hoisted(() => ({
   subscribe: vi.fn<(callback: (state: string) => void) => void>(),
   get: vi.fn(),
   start: vi.fn(),
+  on: vi.fn(),
 }));
 vi.mock("../client.ts", () => ({
   createAssignmentClient: vi.fn(() =>
@@ -26,7 +27,8 @@ vi.mock("../client.ts", () => ({
 vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({
     channel: () => ({
-      on() {
+      on(...args: unknown[]) {
+        backend.on(...args);
         return this;
       },
       subscribe: backend.subscribe,
@@ -44,6 +46,7 @@ vi.mock("../workspace.ts", () => ({
 }));
 beforeEach(() => {
   vi.stubEnv("BATTUTA_BOT_NAME", "worker-1");
+  vi.stubEnv("BATTUTA_WORKER_CAPABILITIES", "[]");
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -58,6 +61,7 @@ test.each(["worker-1", "worker-2"])(
     backend.list.mockResolvedValue({ ok: true, assignments: [] });
     const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
     const sendUserMessage = vi.fn();
+    const sendMessage = vi.fn();
     const tools = new Map<
       string,
       { execute: (id: string, args: { abilities: string[] }) => Promise<unknown> }
@@ -66,7 +70,7 @@ test.each(["worker-1", "worker-2"])(
     worker({
       on: (name: string, fn: unknown) => handlers.set(name, fn as never),
       registerTool: (tool: { name: string; execute: never }) => tools.set(tool.name, tool),
-      sendMessage: vi.fn(),
+      sendMessage,
       appendEntry: vi.fn(),
       registerCommand: (_name: string, options: { handler: typeof next }) => {
         next = options.handler;
@@ -90,10 +94,9 @@ test.each(["worker-1", "worker-2"])(
     expect(vi.getTimerCount()).toBe(1);
     expect(sendUserMessage).toHaveBeenCalledWith("/worker-next", { expandPromptTemplates: true });
     await next!("", ctx);
-    expect(backend.list).not.toHaveBeenCalled();
-    await tools.get("register_worker_abilities")!.execute("registration", { abilities: [] });
-    await next!("", ctx);
     expect(backend.list).toHaveBeenCalledTimes(1);
+    expect(tools.has("register_worker_abilities")).toBe(false);
+    expect(sendMessage).not.toHaveBeenCalled();
     const row = detail();
     backend.list.mockResolvedValue({ ok: true, assignments: [row.assignment] });
     backend.claim.mockResolvedValue({
@@ -105,6 +108,17 @@ test.each(["worker-1", "worker-2"])(
         claimed_by: workerId,
       },
     });
+    backend.get.mockResolvedValue({
+      ...row,
+      assignment: {
+        ...row.assignment,
+        status: "in_process",
+        claimed_at: "2026-11-05T12:00:00Z",
+        claimed_by: workerId,
+      },
+    });
+    const signal = backend.on.mock.calls[0][2] as () => void;
+    signal();
     await next!("", ctx);
     expect(backend.claim).toHaveBeenCalledWith({
       project: row.assignment.project,
@@ -113,15 +127,16 @@ test.each(["worker-1", "worker-2"])(
       abilities: [],
     });
     await vi.advanceTimersByTimeAsync(30000);
-    expect(sendUserMessage).toHaveBeenCalledTimes(2);
-    backend.subscribe.mock.calls[0][0]("SUBSCRIBED");
     expect(sendUserMessage).toHaveBeenCalledTimes(3);
+    backend.subscribe.mock.calls[0][0]("SUBSCRIBED");
+    expect(sendUserMessage).toHaveBeenCalledTimes(4);
     await handlers.get("session_shutdown")!({}, ctx);
     await handlers.get("session_shutdown")!({}, ctx);
     expect(vi.getTimerCount()).toBe(0);
     expect(backend.close).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(60000);
-    expect(sendUserMessage).toHaveBeenCalledTimes(3);
+    expect(sendUserMessage).toHaveBeenCalledTimes(4);
+    expect(sendMessage).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
   },
 );
@@ -203,12 +218,7 @@ test("a bound native extension dispatches its TODO through Pi without a host sen
   } as unknown as ExtensionContext;
   await handlers.get("session_start")!({ reason: "new" }, ctx);
   await next!("", ctx);
-  expect(backend.start).not.toHaveBeenCalled();
-  await expect(
-    tools.get("register_worker_abilities")!.execute("invalid", { abilities: ["mobile_use"] }),
-  ).rejects.toThrow(/catalog is empty/);
-  await tools.get("register_worker_abilities")!.execute("registration", { abilities: [] });
-  await next!("", ctx);
+  expect(tools.has("register_worker_abilities")).toBe(false);
   expect(sendMessage).toHaveBeenCalledWith(
     {
       customType: "assignment-todo",
@@ -231,44 +241,36 @@ test("a bound native extension dispatches its TODO through Pi without a host sen
   await handlers.get("session_shutdown")!({}, ctx);
 });
 
-test("failed registration pauses visibly and only an explicit retry starts another turn", async () => {
-  vi.useFakeTimers();
-  const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
-  const sendMessage = vi.fn();
-  let next: (args: string, ctx: ExtensionContext) => Promise<void>;
-  worker({
-    on: (name: string, fn: unknown) => handlers.set(name, fn as never),
-    registerTool: vi.fn(),
-    registerCommand: (_name: string, options: { handler: typeof next }) => {
-      next = options.handler;
-    },
-    sendMessage,
-    sendUserMessage: vi.fn(),
-    setActiveTools: vi.fn(),
-  } as unknown as ExtensionAPI);
-  const ctx = {
-    isIdle: () => true,
-    hasPendingMessages: () => false,
-    sessionManager: { getEntries: () => [], getSessionId: () => crypto.randomUUID() },
-  } as unknown as ExtensionContext;
-  vi.stubEnv("SUPABASE_URL", "http://127.0.0.1:54321");
-  vi.stubEnv("SUPABASE_SECRET_KEY", "local-test-key");
-  try {
-    await handlers.get("session_start")!({ reason: "startup" }, ctx);
-    await next!("", ctx);
-    expect(sendMessage).toHaveBeenCalledTimes(1);
-    await handlers.get("agent_settled")!({ outcome: "aborted" }, ctx);
-    expect(sendMessage).toHaveBeenCalledTimes(2);
-    expect(sendMessage.mock.calls[1][1]).toEqual({ triggerTurn: false });
-    await next!("", ctx);
-    await next!("", ctx);
-    expect(sendMessage).toHaveBeenCalledTimes(2);
-    expect(backend.list).not.toHaveBeenCalled();
-    await next!("retry-registration", ctx);
-    expect(sendMessage).toHaveBeenCalledTimes(3);
-    expect(sendMessage.mock.calls[2][1]).toEqual({ triggerTurn: true });
-  } finally {
-    await handlers.get("session_shutdown")!({}, ctx);
-    vi.unstubAllEnvs();
-  }
-});
+test.each([undefined, "", "{", "null", "{}", '["mobile_browse"]', "[1]"])(
+  "invalid configured capabilities %j refuse before networking or a model turn",
+  async (value) => {
+    vi.useFakeTimers();
+    vi.stubEnv("BATTUTA_WORKER_CAPABILITIES", value);
+    const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
+    const sendMessage = vi.fn();
+    worker({
+      on: (name: string, fn: unknown) => handlers.set(name, fn as never),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+      sendMessage,
+      sendUserMessage: vi.fn(),
+      setActiveTools: vi.fn(),
+    } as unknown as ExtensionAPI);
+    const ctx = {
+      isIdle: () => true,
+      hasPendingMessages: () => false,
+      sessionManager: { getEntries: () => [], getSessionId: () => crypto.randomUUID() },
+    } as unknown as ExtensionContext;
+    vi.stubEnv("SUPABASE_URL", "http://127.0.0.1:54321");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "local-test-key");
+    try {
+      await expect(handlers.get("session_start")!({ reason: "startup" }, ctx)).rejects.toThrow();
+      expect(backend.subscribe).not.toHaveBeenCalled();
+      expect(backend.list).not.toHaveBeenCalled();
+      expect(sendMessage).not.toHaveBeenCalled();
+    } finally {
+      await handlers.get("session_shutdown")!({}, ctx);
+      vi.unstubAllEnvs();
+    }
+  },
+);

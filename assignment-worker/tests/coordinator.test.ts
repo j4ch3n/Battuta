@@ -12,7 +12,7 @@ import type {
 } from "../types.ts";
 import { detail } from "./fixtures.ts";
 
-function harness(count = 2, initialized = true) {
+function harness(count = 2) {
   const state = detail();
   state.todos = Array.from({ length: count }, (_, i) => ({
     ...state.todos[0],
@@ -146,8 +146,8 @@ function harness(count = 2, initialized = true) {
     diagnostics,
     notify,
     workerId: "test-worker",
+    capabilities: [],
   });
-  if (initialized) coordinator.registerAbilities([]);
   return {
     state,
     assignments,
@@ -181,12 +181,9 @@ function harness(count = 2, initialized = true) {
   };
 }
 
-test("uninitialized sessions cannot claim, but explicit empty registration can", async () => {
-  const h = harness(1, false);
+test("configured general workers claim without a model bootstrap", async () => {
+  const h = harness(1);
   await h.coordinator.reconcile("startup");
-  expect(h.assignments.claim).not.toHaveBeenCalled();
-  h.coordinator.registerAbilities([]);
-  await h.coordinator.reconcile("idle");
   expect(h.assignments.claim).toHaveBeenCalledWith({
     project: "atlas",
     assignment_id: "1234abcd",
@@ -202,13 +199,22 @@ test("all required abilities must match locally before attempting a claim", asyn
   expect(h.assignments.claim).not.toHaveBeenCalled();
 });
 
-test("live claims refuse ability-set replacement and stale claimant rows never dispatch", async () => {
+test("stale claimant rows never dispatch", async () => {
   const h = harness();
   await h.coordinator.reconcile("idle");
-  expect(() => h.coordinator.registerAbilities(["mobile_use"])).toThrow();
   h.state.assignment.claimed_by = "another-worker";
   await h.coordinator.restoreBinding(h.opened[0]);
   expect(h.turns).toEqual([]);
+});
+
+test("restored claims lacking configured specialists block before execution", async () => {
+  const h = harness();
+  await h.coordinator.reconcile("idle");
+  h.state.assignment.require_abilities = ["mobile_use"];
+  await h.coordinator.restoreBinding(h.opened[0]);
+  expect(h.state.assignment.status).toBe("blocked");
+  expect(h.turns).toEqual([]);
+  expect(h.notifications).toHaveLength(1);
 });
 
 test("workspace is prepared once after claiming, before any TODO starts", async () => {
@@ -242,8 +248,8 @@ test.each(["claim", "restore"])(
         notify: h.notify,
         diagnostics: h.diagnostics,
         workerId: "restored-worker",
+        capabilities: [],
       });
-      restored.registerAbilities([]);
       await restored.restoreBinding(h.opened[0]);
     } else await h.coordinator.reconcile("idle");
     expect(h.assignments.start).not.toHaveBeenCalled();

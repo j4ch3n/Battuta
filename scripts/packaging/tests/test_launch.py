@@ -27,6 +27,8 @@ def installed(tmp_path):
         bot = root / "bots" / profile
         (bot / ".pi/skills").mkdir(parents=True, exist_ok=True)
         (bot / "bot.toml").write_text(manifest_text(profile.removesuffix("-bot"), []))
+        if profile == "worker":
+            (bot / "abilities.json").write_text("{}")
         for extension in tomllib.loads((bot / "bot.toml").read_text())["extensions"]:
             package = bot / ".pi/extensions" / extension["name"]
             (package / "dist").mkdir(parents=True)
@@ -45,7 +47,7 @@ def installed(tmp_path):
     (root / "bots/release.json").write_text(json.dumps({"node": version, "skills": {p: [] for p in ("cos-bot", "manager-bot", "worker")}, "packages": {p: ["npm:@example/extension@1.2.3"] for p in ("cos-bot", "manager-bot", "worker")}}))
     (root / "bots/runtime.json").write_text(json.dumps({"node": str(node)}))
     env = tmp_path / ".env.prod"
-    env.write_text("WORKER_BOT_COUNT=2\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=private-key\nLINEAR_API_TOKEN=private-linear\nCOS_TELEGRAM_TOKEN=private-telegram\n")
+    env.write_text("BATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=general\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=private-key\nLINEAR_API_TOKEN=private-linear\nCOS_TELEGRAM_TOKEN=private-telegram\n")
     for name in ("cos-bot", "manager-bot", "worker-1", "worker-2"):
         pi = home / ".battuta/pi-bots" / name / ".pi"
         pi.mkdir(parents=True)
@@ -74,6 +76,7 @@ def test_launch_cwd_private_state_and_credentials(installed, bot):
     root, home, env_file, node = installed
     with env_file.open("a") as stream:
         stream.write("BATTUTA_PROJECTS_ROOT_HEADER=must-not-override-derived-root\n")
+        stream.write('BATTUTA_WORKER_CAPABILITIES=["must-not-override"]\n')
     if bot == "manager-bot":
         (home / "bin/chromium-browser").unlink()
     result = subprocess.run([sys.executable, "-m", "battuta_packaging.cli", "run-bot", "--root", str(root), "--bot", bot, "--env-file", str(env_file), "--node", str(node), "--mode", "service"], env={**os.environ, "HOME": str(home), "PATH": str(home / "bin") + os.pathsep + os.environ["PATH"]}, capture_output=True, text=True)
@@ -84,6 +87,8 @@ def test_launch_cwd_private_state_and_credentials(installed, bot):
     assert output["env"]["PI_CODING_AGENT_DIR"] == str(home / ".battuta/pi-bots" / bot / ".pi")
     assert any("TELEGRAM" in key for key in output["env"]) == (bot == "cos-bot")
     assert output["env"]["LINEAR_API_TOKEN"] == "private-linear"
+    if bot.startswith("worker-"):
+        assert json.loads(output["env"]["BATTUTA_WORKER_CAPABILITIES"]) == []
     assert "--session-dir" in output["args"]
     assert "--offline" in output["args"]
     if bot != "manager-bot":

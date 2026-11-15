@@ -42,12 +42,13 @@ This explicit source configuration preserves private preferences/custom resource
 it is not the release configuration mechanism. Extension code, dependencies and
 skills remain shared with the checkout, not installed per private worker.
 
-## Local count and tmux
+## Local selection and tmux
 
-Set `WORKER_BOT_COUNT=1` in `.env` for the normal local case. Both `.env` and source
-`.env.prod` require a non-negative integer; `0` disables workers. `make dev` and
+Set `BATTUTA_WORKER_1_TYPE=general` in the selected `.env` or `.env.prod`.
+Each `BATTUTA_WORKER_<N>_TYPE` entry selects that instance and its manifest type;
+no entries selects no workers. Positive indices may have gaps. `make dev` and
 `make prod` give each selected worker its own labelled tmux pane, alongside the
-other bots. Worker paths are `~/.battuta/pi-bots/worker-1` through worker-N.
+other bots. Worker paths are `~/.battuta/pi-bots/worker-N`.
 Reattaching does not duplicate processes or resize an existing session.
 
 Only when the operator has approved execution:
@@ -71,7 +72,7 @@ All configured workers share the installed worker working directory; their
 `PI_CODING_AGENT_DIR` values point at separate private `.pi/` directories.
 
 `battuta-bot-setup configure-release --root DIR --env-file FILE` configures
-CoS/Manager and worker-1 through worker-N from `WORKER_BOT_COUNT`. It creates
+CoS/Manager and workers selected by `BATTUTA_WORKER_<N>_TYPE`. It creates
 missing configuration and reports existing files left untouched.
 Unexpected custom executable resources stop setup rather than trigger a merge.
 

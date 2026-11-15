@@ -8,7 +8,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { createAssignmentClient } from "./client.ts";
 import { createCoordinator } from "./coordinator.ts";
-import { AbilityRegistrationSchema, ExecutionResultSchema, parseBinding } from "./contracts.ts";
+import { ExecutionResultSchema, parseAbilities, parseBinding } from "./contracts.ts";
 import { createNotifier } from "./notify.ts";
 import { ensureAssignmentWorkspace } from "./workspace.ts";
 import type { AssignmentClient, Coordinator, Detail } from "./types.ts";
@@ -20,34 +20,11 @@ export default function worker(pi: ExtensionAPI) {
   let context: ExtensionContext | undefined, command: ExtensionCommandContext | undefined;
   let stopped = false,
     restored = false;
-  let registrationState: "unprompted" | "prompted" | "paused" = "unprompted";
   const diagnostic = (event: string) => console.error(`[assignment-worker] ${event}`);
   const wake = () => {
     if (!stopped && context?.isIdle() && !context.hasPendingMessages())
       pi.sendUserMessage("/worker-next", { expandPromptTemplates: true });
   };
-  pi.registerTool({
-    name: "register_worker_abilities",
-    label: "Register worker abilities",
-    description:
-      "Declare this session's specialist abilities before claiming or executing work. The catalog is currently empty: use []. General skills are not specialist tags.",
-    parameters: AbilityRegistrationSchema,
-    execute(_id, value) {
-      return Promise.resolve().then(() => {
-        if (!coordinator || stopped) throw new Error("Worker execution is not available");
-        coordinator.registerAbilities(value.abilities);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Session abilities registered. Availability will be checked after this turn settles.",
-            },
-          ],
-          details: { registered: true },
-        };
-      });
-    },
-  });
   pi.registerTool({
     name: "report_execution_result",
     label: "Report execution result",
@@ -65,26 +42,9 @@ export default function worker(pi: ExtensionAPI) {
   });
   pi.registerCommand("worker-next", {
     description: "Reconcile worker availability without invoking a model",
-    async handler(args, ctx) {
+    async handler(_args, ctx) {
       if (stopped || !coordinator || !ctx.isIdle() || ctx.hasPendingMessages()) return;
       command = ctx;
-      if (!coordinator.abilitiesReady) {
-        if (args === "retry-registration" && registrationState === "paused")
-          registrationState = "unprompted";
-        if (registrationState === "unprompted") {
-          registrationState = "prompted";
-          pi.sendMessage(
-            {
-              customType: "worker-ability-registration",
-              content:
-                "Before taking or resuming any assignment, call register_worker_abilities with your specialist ability set. The catalog is currently empty; register [] for general work. Do not execute assignment work during this registration turn.",
-              display: true,
-            },
-            { triggerTurn: true },
-          );
-        }
-        return;
-      }
       if (!restored) {
         const entry = [...ctx.sessionManager.getEntries()]
           .reverse()
@@ -104,6 +64,9 @@ export default function worker(pi: ExtensionAPI) {
     if (client || stopped) return;
     const workerId = process.env.BATTUTA_BOT_NAME?.trim();
     if (!workerId) throw new Error("BATTUTA_BOT_NAME must identify the worker bot");
+    const configured = process.env.BATTUTA_WORKER_CAPABILITIES;
+    if (!configured) throw new Error("BATTUTA_WORKER_CAPABILITIES must contain configured JSON");
+    const capabilities = [...parseAbilities(JSON.parse(configured))];
     context = ctx;
     pi.setActiveTools([
       "codemode",
@@ -120,7 +83,6 @@ export default function worker(pi: ExtensionAPI) {
       "find",
       "ls",
       "report_execution_result",
-      "register_worker_abilities",
       "mcp__assignments__list_assignments",
       "mcp__assignments__get_assignment",
       "mcp__assignments__prepare_notes",
@@ -143,6 +105,7 @@ export default function worker(pi: ExtensionAPI) {
     });
     coordinator = createCoordinator({
       workerId,
+      capabilities,
       assignments: client,
       notify: notifier,
       diagnostics: diagnostic,
@@ -215,24 +178,6 @@ export default function worker(pi: ExtensionAPI) {
   });
   pi.on("agent_settled", async (event, ctx) => {
     context = ctx;
-    if (
-      !stopped &&
-      coordinator &&
-      !coordinator.abilitiesReady &&
-      registrationState === "prompted"
-    ) {
-      registrationState = "paused";
-      diagnostic("Ability registration did not complete; explicit retry required");
-      pi.sendMessage(
-        {
-          customType: "worker-registration-paused",
-          content:
-            "Worker paused because this turn did not register valid abilities. No assignment work was dispatched. Run /worker-next retry-registration to try again; any existing claim remains held.",
-          display: true,
-        },
-        { triggerTurn: false },
-      );
-    }
     await coordinator?.settle(event);
     wake();
   });

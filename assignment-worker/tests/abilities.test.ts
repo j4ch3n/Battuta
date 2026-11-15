@@ -11,7 +11,10 @@ vi.mock("../../supabase/functions/assignments/abilities.json", () => ({
   },
 }));
 
-test("claims require all specialists and a live session set cannot be replaced", async () => {
+test.each([
+  { capabilities: ["test_one"], claims: false },
+  { capabilities: ["test_one", "test_two", "test_one"], claims: true },
+])("configured specialist subset: $capabilities", async ({ capabilities, claims }) => {
   const row = detail();
   row.assignment.require_abilities = ["test_one", "test_two"];
   const claim = vi.fn(() => {
@@ -22,6 +25,7 @@ test("claims require all specialists and a live session set cannot be replaced",
   });
   const coordinator = createCoordinator({
     workerId: "worker-test",
+    capabilities,
     assignments: {
       list: () => Promise.resolve({ ok: true, assignments: [row.assignment] }),
       claim,
@@ -50,21 +54,16 @@ test("claims require all specialists and a live session set cannot be replaced",
     notify: vi.fn(),
     diagnostics: vi.fn(),
   });
-  coordinator.registerAbilities(["test_one"]);
+  capabilities.length = 0;
   await coordinator.reconcile("idle");
-  expect(claim).not.toHaveBeenCalled();
-  coordinator.registerAbilities(["test_one", "test_two", "test_one"]);
-  await coordinator.reconcile("idle");
-  expect(claim).toHaveBeenCalledWith(
-    expect.objectContaining({
-      claimed_by: "worker-test",
-      abilities: ["test_one", "test_two"],
-    }),
-  );
-  expect(() => coordinator.registerAbilities(["test_one"])).toThrow(
-    "while an assignment is claimed",
-  );
-  expect(() => coordinator.registerAbilities(["test_two", "test_one"])).not.toThrow();
+  if (claims)
+    expect(claim).toHaveBeenCalledWith(
+      expect.objectContaining({
+        claimed_by: "worker-test",
+        abilities: ["test_one", "test_two"],
+      }),
+    );
+  else expect(claim).not.toHaveBeenCalled();
   expect([...parseAbilities(["test_two", "test_two"])]).toEqual(["test_two"]);
   await coordinator.stop();
 });

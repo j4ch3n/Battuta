@@ -27,6 +27,9 @@ def source(tmp_path, monkeypatch):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("guide")
     (root / "package.json").write_text('{"packageManager":"pnpm@10.20.0"}')
+    catalog = root / "supabase/functions/assignments/abilities.json"
+    catalog.parent.mkdir(parents=True)
+    catalog.write_text("{}")
     (root / "bots").mkdir()
     (root / "bots/AGENTS_shared.md").write_text("shared")
     for name in ("agent-mail", "project-spec", "memory-client", "bots/cos-bot", "bots/manager-bot", "assignment-worker"):
@@ -100,6 +103,9 @@ def test_staged_archive_separates_documentation_and_bots(source, tmp_path):
         if profile == "manager-bot":
             assert not any("pi-subagents" in package for package in settings["packages"])
         if profile == "worker":
+            assert json.loads((bot / "abilities.json").read_text()) == json.loads(
+                (source / "supabase/functions/assignments/abilities.json").read_text()
+            )
             assert "npm:@tintinweb/pi-subagents@0.24.0" in settings["packages"]
             researcher = (bot / ".pi/agents/researcher.md").read_text()
             reviewer = (bot / ".pi/agents/reviewer.md").read_text()

@@ -29,7 +29,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
   let boundary: "completed" | "aborted" | "error" | undefined;
   let tail: Promise<unknown> = Promise.resolve();
   let reconciling: Promise<void> | undefined;
-  let abilities: ReadonlySet<string> | undefined;
+  const abilities: ReadonlySet<string> = parseAbilities(options.capabilities);
   let workspace: Workspace | undefined;
   function serial<T>(work: () => Promise<T>): Promise<T> {
     const next = tail.then(work);
@@ -127,8 +127,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     if (stopped || !binding) return;
     const latest = detail ?? (await assignments.get(binding));
     if (stopped || !checkLive(latest)) return;
-    if (!abilities) return;
-    if (!latest.assignment.require_abilities.every((ability) => abilities?.has(ability))) {
+    if (!latest.assignment.require_abilities.every((ability) => abilities.has(ability))) {
       await blockRun("This session lacks required specialist abilities; no TODO was dispatched");
       return;
     }
@@ -179,29 +178,10 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     );
   }
   const coordinator: Coordinator = {
-    get abilitiesReady() {
-      return abilities !== undefined;
-    },
-    registerAbilities(values) {
-      const next = parseAbilities(values);
-      if (
-        binding &&
-        abilities &&
-        (next.size !== abilities.size || [...next].some((name) => !abilities?.has(name)))
-      )
-        throw new Error("Cannot replace specialist abilities while an assignment is claimed");
-      abilities = next;
-    },
     reconcile() {
       if (reconciling) return reconciling;
       reconciling = serial(async () => {
-        if (
-          stopped ||
-          !abilities ||
-          phase !== "idle" ||
-          !sessions.isIdle() ||
-          sessions.hasPendingMessages()
-        )
+        if (stopped || phase !== "idle" || !sessions.isIdle() || sessions.hasPendingMessages())
           return;
         phase = "claiming";
         try {
@@ -210,7 +190,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
           for (const candidate of board.assignments
             .filter(
               (row) =>
-                row.ready && row.require_abilities.every((ability) => abilities?.has(ability)),
+                row.ready && row.require_abilities.every((ability) => abilities.has(ability)),
             )
             .reverse()) {
             let detail: Detail;

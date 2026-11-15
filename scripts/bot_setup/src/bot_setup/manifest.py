@@ -85,6 +85,14 @@ class Extension(Section):
         return source
 
 
+class WorkerType(Section):
+    capabilities: list[str]
+
+
+class Worker(WorkerType):
+    types: dict[Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")], WorkerType]
+
+
 class BotManifest(Section):
     skills: Skills
     bot: Identity | None = None
@@ -95,6 +103,7 @@ class BotManifest(Section):
     defaults: Defaults | None = None
     subagents: Subagents | None = None
     extensions: list[Extension] = Field(default_factory=list)
+    worker: Worker | None = None
 
     @field_validator("extensions")
     @classmethod

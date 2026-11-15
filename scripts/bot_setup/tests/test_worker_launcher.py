@@ -43,23 +43,25 @@ class WorkerLauncherTests(unittest.TestCase):
             cli.write_text("fixture")
             (root / "bots/worker").mkdir(parents=True)
             (root / "bots/worker/bot.toml").write_text(manifest_text("worker", []))
+            (root / "bots/worker/abilities.json").write_text("{}")
             configure_browser(root / "bots/worker", bot, home=self.home, bot="worker-1")
             binary = root / "bin"
             binary.mkdir()
             node = binary / "node"
-            node.write_text("#!/usr/bin/env python3\nimport json,os,sys\nprint(json.dumps({'args':sys.argv[1:],'role':os.environ.get('AGENT_ROLE'),'agentDir':os.environ.get('PI_CODING_AGENT_DIR'),'private':[key for key in os.environ if 'TELEGRAM' in key or key.startswith('PI_SCHEDULER')]}))\n")
+            node.write_text("#!/usr/bin/env python3\nimport json,os,sys\nprint(json.dumps({'args':sys.argv[1:],'role':os.environ.get('AGENT_ROLE'),'capabilities':json.loads(os.environ['BATTUTA_WORKER_CAPABILITIES']),'agentDir':os.environ.get('PI_CODING_AGENT_DIR'),'private':[key for key in os.environ if 'TELEGRAM' in key or key.startswith('PI_SCHEDULER')]}))\n")
             node.chmod(0o755)
             chromium = binary / "chromium-browser"
             chromium.write_text("#!/bin/sh\nexit 99\n")
             chromium.chmod(0o700)
             env_file = root / ".env"
-            env_file.write_text("WORKER_BOT_COUNT=1\nSUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n")
+            env_file.write_text('BATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_CAPABILITIES=["must-not-override"]\nSUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n')
             env = {**os.environ, "PATH":f"{binary}:{os.environ['PATH']}", "COS_TELEGRAM_TOKEN":"private-sentinel", "PI_SCHEDULER_STATE_FILE":"private-sentinel"}
             args = ["bash", str(scripts / "run-worker.sh"), "--bot-dir", str(bot), "--env-file", str(env_file)]
             result = subprocess.run(args, env=env, text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             output = json.loads(result.stdout)
             self.assertEqual(output["role"], "worker")
+            self.assertEqual(output["capabilities"], [])
             self.assertEqual(output["agentDir"], str(bot / ".pi"))
             self.assertEqual(output["private"], [])
             self.assertNotIn("--print", output["args"])
@@ -81,6 +83,7 @@ class WorkerLauncherTests(unittest.TestCase):
                 'pi_coding_agent_dir = "{instance}/.pi"',
                 'pi_coding_agent_dir = "{instance}/runtime/.pi"',
             ))
+            (profile / "abilities.json").write_text("{}")
             (profile / "AGENTS.md").write_text("profile instructions")
             manifest = load_profile(profile / "bot.toml", "worker")
             (profile / ".pi/settings.json").write_text(json.dumps(profile_settings(manifest, browser=True)))
@@ -102,7 +105,7 @@ class WorkerLauncherTests(unittest.TestCase):
             chromium = binary / "chromium-browser"
             chromium.write_text("#!/bin/sh\nexit 99\n")
             chromium.chmod(0o700)
-            (root / ".env").write_text("WORKER_BOT_COUNT=1\nSUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n")
+            (root / ".env").write_text("BATTUTA_WORKER_1_TYPE=general\nSUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n")
             bot = self.home / ".battuta/pi-bots/worker-1/runtime"
             env = {**os.environ, "PATH": f"{binary}:{os.environ['PATH']}"}
             args = ["bash", str(scripts / "run-worker.sh"), "--bot-dir", str(bot)]
@@ -151,11 +154,12 @@ class WorkerLauncherTests(unittest.TestCase):
             cli.write_text("fixture")
             (root / "bots/worker").mkdir(parents=True)
             (root / "bots/worker/bot.toml").write_text(manifest_text("worker", []))
+            (root / "bots/worker/abilities.json").write_text("{}")
             bot = self.home / ".battuta/pi-bots/worker-1"
             (bot / ".pi").mkdir(parents=True)
             (bot / ".pi/settings.json").write_text("{}")
             env_file = root / ".env"
-            env_file.write_text("WORKER_BOT_COUNT=1\nSUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n")
+            env_file.write_text("BATTUTA_WORKER_1_TYPE=general\nSUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SECRET_KEY=private-sentinel\n")
             binary = root / "bin"
             binary.mkdir()
             node = binary / "node"

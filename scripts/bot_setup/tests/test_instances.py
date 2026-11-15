@@ -10,16 +10,24 @@ from bot_setup.cli import main
 from skill_fixtures import manifest_text
 
 
-@pytest.mark.parametrize("count,expected", [("0", []), ("1", ["worker-1"]), ("3", ["worker-1", "worker-2", "worker-3"])])
-def test_worker_names(tmp_path, count, expected):
-    assert instances.worker_names({"WORKER_BOT_COUNT": count}, tmp_path / ".env") == expected
+@pytest.mark.parametrize("values,expected", [
+    ({}, []),
+    ({"BATTUTA_WORKER_1_TYPE": "general"}, ["worker-1"]),
+    ({"BATTUTA_WORKER_10_TYPE": "general", "BATTUTA_WORKER_2_TYPE": "general"}, ["worker-2", "worker-10"]),
+])
+def test_worker_names(tmp_path, values, expected):
+    assert instances.worker_names(values, tmp_path / ".env") == expected
 
 
-@pytest.mark.parametrize("value", [None, "", "-1", "1.5", "true", "١", "secret-sentinel"])
-def test_invalid_counts_do_not_expose_values(tmp_path, value):
+@pytest.mark.parametrize("key,value", [
+    ("BATTUTA_WORKER_0_TYPE", "general"), ("BATTUTA_WORKER_01_TYPE", "general"),
+    ("BATTUTA_WORKER_١_TYPE", "general"), ("BATTUTA_WORKER_X_TYPE", "secret-sentinel"),
+    ("BATTUTA_WORKER_1_TYPE", ""), ("BATTUTA_WORKER_1_TYPE", " "),
+])
+def test_invalid_selections_do_not_expose_values(tmp_path, key, value):
     with pytest.raises(click.ClickException) as error:
-        instances.worker_names({} if value is None else {"WORKER_BOT_COUNT": value}, tmp_path / ".env")
-    assert "WORKER_BOT_COUNT" in str(error.value)
+        instances.worker_names({key: value}, tmp_path / ".env")
+    assert "BATTUTA_WORKER" in str(error.value)
     assert "secret-sentinel" not in str(error.value)
 
 
@@ -40,7 +48,7 @@ def test_invalid_instance(tmp_path, bot):
 
 def test_workers_cli(tmp_path):
     env_file = tmp_path / ".env"
-    env_file.write_text("WORKER_BOT_COUNT=2\n")
+    env_file.write_text("BATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=general\n")
     result = CliRunner().invoke(main, ["workers", "--env-file", str(env_file)])
     assert result.exit_code == 0, result.output
     assert result.output.splitlines() == ["worker-1", "worker-2"]

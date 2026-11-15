@@ -13,11 +13,13 @@ from skill_fixtures import manifest_text
 def deployment(tmp_path, monkeypatch):
     root, home = tmp_path / "install", tmp_path / "home"
     env_file = tmp_path / ".env.prod"
-    env_file.write_text("WORKER_BOT_COUNT=2\nSUPABASE_URL=https://backend.example\nSUPABASE_SECRET_KEY=private-key\nLINEAR_API_TOKEN=private-linear\nCOS_TELEGRAM_TOKEN=101:private-token\nTELEGRAM_ALLOWED_USER_ID=123\n")
+    env_file.write_text("BATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=general\nSUPABASE_URL=https://backend.example\nSUPABASE_SECRET_KEY=private-key\nLINEAR_API_TOKEN=private-linear\nCOS_TELEGRAM_TOKEN=101:private-token\nTELEGRAM_ALLOWED_USER_ID=123\n")
     for role in ("cos-bot", "manager-bot", "worker"):
         bot = root / "bots" / role
         (bot / ".pi/skills").mkdir(parents=True)
         (bot / "bot.toml").write_text(manifest_text(role.removesuffix("-bot"), []))
+        if role == "worker":
+            (bot / "abilities.json").write_text("{}")
         (bot / "AGENTS.md").write_text(role)
         (bot / ".pi/settings.json").write_text("{}")
         (bot / ".pi/web-search.json").write_text('{"fetchContent":{"userAgent":"fixture"}}')
@@ -126,6 +128,6 @@ def test_preflight_all_instances_before_any_write(deployment, conflict):
 
 def test_zero_workers(deployment):
     root, home, env_file = deployment
-    env_file.write_text(env_file.read_text().replace("WORKER_BOT_COUNT=2", "WORKER_BOT_COUNT=0"))
+    env_file.write_text(env_file.read_text().replace("BATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=general\n", ""))
     release.configure_release(root, env_file=env_file, home=home)
     assert {p.name for p in (home / ".battuta/pi-bots").iterdir()} == {"cos-bot", "manager-bot"}

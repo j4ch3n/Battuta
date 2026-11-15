@@ -41,14 +41,13 @@ export interface ExecutionSessions {
 export type ReconcileReason = "startup" | "reconnect" | "idle" | "event" | "fallback";
 export interface CoordinatorOptions {
   workerId: string;
+  capabilities: string[];
   assignments: AssignmentClient;
   sessions: ExecutionSessions;
   notify: (detail: Detail) => Promise<MailDelivery>;
   diagnostics: (event: string, error?: unknown) => void;
 }
 export interface Coordinator {
-  readonly abilitiesReady: boolean;
-  registerAbilities(abilities: string[]): void;
   reconcile(reason: ReconcileReason): Promise<void>;
   restoreBinding(binding: Binding): Promise<void>;
   acceptReport(value: unknown): Promise<{ accepted: true }>;
