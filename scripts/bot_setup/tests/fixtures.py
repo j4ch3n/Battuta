@@ -82,7 +82,7 @@ os.execv(sys.executable, [sys.executable, "-m", "bot_setup.cli", *args[args.inde
             "LINEAR_API_TOKEN=linear-test\n"
             "SUPABASE_URL=http://localhost:54321\n"
             "SUPABASE_SECRET_KEY=supabase-test\n"
-            "WORKER_BOT_COUNT=1\n"
+            "BATTUTA_WORKER_1_TYPE=general\n"
         )
 
     def refresh(self, filename=".env"):
@@ -138,6 +138,7 @@ if "-P" in args:
         cli.touch()
         (self.root / "bots/worker").mkdir(parents=True)
         shutil.copy2(ROOT / "bots/worker/bot.toml", self.root / "bots/worker/bot.toml")
+        (self.root / "bots/worker/abilities.json").write_text("{}")
         scripts = self.root / "scripts/bot_setup"
         scripts.mkdir(exist_ok=True)
         shutil.copy2(ROOT / "scripts/bot_setup/run-worker.sh", scripts / "run-worker.sh")

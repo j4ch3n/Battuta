@@ -29,12 +29,17 @@ database to bypass them. Do not start another server if one is already serving.
 Source bot configuration generates the role's `assignments` entry; prepare the
 source worker profile separately with `configure --root . --role worker`.
 Release `battuta-bot-setup configure-release --root DIR --env-file FILE` generates
-CoS, Manager and every worker selected by `WORKER_BOT_COUNT` into their flat private
+CoS, Manager and every worker selected by `BATTUTA_WORKER_<N>_TYPE` into their flat private
 homes. Each role keeps its own tool restrictions. The assignment entry uses
 `<SUPABASE_URL>/functions/v1/assignments` and the literal environment placeholder
 `${SUPABASE_SECRET_KEY}` in the `apikey` header. Remote origins require HTTPS;
 loopback HTTP is allowed for development. Runtime processes need the secret in
 their environment; configuration does not embed its value.
+
+The entry also sends `X-Battuta-Projects-Root: ${BATTUTA_PROJECTS_ROOT_HEADER}`.
+Source/release launchers derive and encode this value from the bot user's home;
+do not set it manually or ask the model to supply a root. Note operations fail
+before writing metadata when the header is missing or invalid.
 
 For source configuration, check files without invoking a model or
 mutating remote task state:
@@ -47,7 +52,10 @@ for profile in ('cos-bot', 'manager-bot', 'worker'):
     path = Path('bots') / profile / '.pi/mcp.json'
     entry = json.loads(path.read_text())['mcpServers']['assignments']
     assert entry['url'].endswith('/functions/v1/assignments')
-    assert entry['headers'] == {'apikey': '${SUPABASE_SECRET_KEY}'}
+    assert entry['headers'] == {
+        'apikey': '${SUPABASE_SECRET_KEY}',
+        'X-Battuta-Projects-Root': '${BATTUTA_PROJECTS_ROOT_HEADER}',
+    }
     if profile == 'worker':
         assert entry['exposure'] == 'hidden'
         assert set(entry['toolExposure']) == {'list_assignments', 'get_assignment', 'prepare_notes', 'locate_notes'}
@@ -63,6 +71,12 @@ setup creates missing private MCP files and leaves existing files untouched. Rev
 skipped configuration before starting bots. Restart bots separately only when authorized. Neither source nor release
 configuration starts worker sessions or changes bounded-subagent isolation defaults.
 
-Notes need no editor package or service: bots use Pi's file tools at returned
-paths. Verify project registration using `battuta-project list`; missing project
-context requires owner confirmation, not a general-scope fallback.
+Deploy the matching migration and clients together: note tools now accept only
+project/assignment ID and return guidance containing the caller's full note path. Refresh generated
+MCP entries to include the new header and use the matching launchers; existing
+private files are preserved, so inspect skipped configuration before proceeding.
+No new credentials are required. Workers need write permission
+under their own expanded `~/.battuta` root; runtime code prepares only assignment
+scratch directories and preserves existing files. Notes need no editor service
+and are not synchronized. Project registration is not required for note-only
+work; missing essential commission inputs still require an honest blocker.

@@ -13,6 +13,8 @@ export function detail(): Detail {
       updated_at: "2026-11-04T12:00:00.000001Z",
       closed_at: null,
       claimed_at: null,
+      claimed_by: null,
+      require_abilities: [],
       lease_expired_at: null,
       blocker: null,
       dependencies: [],

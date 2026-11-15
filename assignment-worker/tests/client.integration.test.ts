@@ -13,7 +13,7 @@ test("real MCP client authenticates, reads the board, and retains scoped claim r
   try {
     expect(await client.list({ project, status: "active" })).toEqual({ ok: true, assignments: [] });
     const error = await client
-      .claim({ project, assignment_id: "12345678" })
+      .claim({ project, assignment_id: "12345678", claimed_by: "worker-1", abilities: [] })
       .catch((error: unknown) => error);
     expect(error).toBeInstanceOf(AssignmentRefusalError);
     expect((error as AssignmentRefusalError).refusal.code).toBe("not_found");

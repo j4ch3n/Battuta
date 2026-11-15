@@ -3,11 +3,18 @@ import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/cli
 import { localEnv, type Result, withDatabaseTest } from "./helpers.ts";
 
 const endpoint = () => new URL(`${localEnv("SUPABASE_URL")}/functions/v1/assignments`);
-async function connect() {
+async function connect(projectsRoot: string | null = "/client/projects") {
   const client = new Client({ name: "assignment-test", version: "1" });
   await client.connect(
     new StreamableHTTPClientTransport(endpoint(), {
-      requestInit: { headers: { apikey: localEnv("SUPABASE_SECRET_KEY") } },
+      requestInit: {
+        headers: {
+          apikey: localEnv("SUPABASE_SECRET_KEY"),
+          ...(projectsRoot === null
+            ? {}
+            : { "X-Battuta-Projects-Root": encodeURIComponent(projectsRoot) }),
+        },
+      },
     }),
   );
   return client;
@@ -28,8 +35,8 @@ Deno.test("remote MCP authenticates before discovery and exposes shared lifecycl
       await response.arrayBuffer();
       assert.equal(response.status, 401);
     }
-    const cos = await connect();
-    const manager = await connect();
+    const cos = await connect("/caller/cos/projects");
+    const manager = await connect("/caller/测试 space%2F/projects");
     try {
       const tools = (await cos.listTools()).tools;
       assert.deepEqual(tools.map((t) => t.name).sort(), [
@@ -57,6 +64,19 @@ Deno.test("remote MCP authenticates before discovery and exposes shared lifecycl
       });
       assert.equal(created.result.ok, true);
       const target = { project, assignment_id: created.result.assignment.id };
+      const unconfigured = await connect(null);
+      try {
+        const refusedNotes = await call(unconfigured, "prepare_notes", target);
+        assert.equal(refusedNotes.isError, true);
+        assert.equal(refusedNotes.result.ok, false);
+        assert.ok(refusedNotes.result.reason);
+        assert.equal((await call(unconfigured, "get_assignment", target)).result.ok, true);
+        const unprepared = await call(manager, "locate_notes", target);
+        assert.equal(unprepared.result.ok, false);
+        assert.match(unprepared.result.nextStep ?? "", /prepare_notes/);
+      } finally {
+        await unconfigured.close();
+      }
       const wrong = await call(manager, "get_assignment", {
         ...target,
         project: project + "-wrong",
@@ -89,18 +109,29 @@ Deno.test("remote MCP authenticates before discovery and exposes shared lifecycl
         ).result.code,
         "stale_update",
       );
-      const claimed = await call(manager, "claim_assignment", target);
-      const execution = { ...target, claimed_at: claimed.result.assignment.claimed_at };
+      const claimed_by = "mcp-test-worker";
+      const claimed = await call(manager, "claim_assignment", {
+        ...target,
+        claimed_by,
+        abilities: [],
+      });
+      const execution = { ...target, claimed_by, claimed_at: claimed.result.assignment.claimed_at };
       const refused = await call(manager, "finish_assignment", execution);
       assert.equal(refused.isError, true);
       assert.deepEqual(
         refused.result.unfinished.map((t) => t.position),
         [1, 2],
       );
-      const notes = await call(cos, "prepare_notes", { ...target, root: "/home/bot/.battuta" });
-      assert.equal(
-        notes.result.notes_path,
-        `/home/bot/.battuta/projects/${project}/work/${target.assignment_id}/note.md`,
+      const notes = await call(cos, "prepare_notes", target);
+      assert.ok(
+        notes.result.nextStep?.includes(
+          `/caller/cos/projects/${project}/work/${target.assignment_id}/note.md`,
+        ),
+      );
+      assert.ok(
+        (await call(manager, "locate_notes", target)).result.nextStep?.includes(
+          `/caller/测试 space%2F/projects/${project}/work/${target.assignment_id}/note.md`,
+        ),
       );
       for (const todo of claimed.result.todos) {
         const started = await call(manager, "start_todo", {
@@ -131,7 +162,7 @@ Deno.test("remote MCP authenticates before discovery and exposes shared lifecycl
         (await call(manager, "finish_assignment", execution)).result.assignment.status,
         "done",
       );
-      assert.equal((await call(cos, "locate_notes", target)).result.editable, false);
+      assert.match((await call(cos, "locate_notes", target)).result.nextStep ?? "", /read.only/i);
       const next = (
         await call(cos, "create_assignment", {
           project,

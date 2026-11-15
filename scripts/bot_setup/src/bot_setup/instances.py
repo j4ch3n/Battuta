@@ -4,6 +4,7 @@ from pathlib import Path
 import fcntl
 import os
 import re
+import json
 
 import click
 from .manifest import load_manifest
@@ -11,14 +12,42 @@ from .runtime import resolve_agent_dir
 
 
 def worker_names(values: dict[str, str], env_file: Path) -> list[str]:
-    value = values.get("WORKER_BOT_COUNT", "")
-    if not re.fullmatch(r"[0-9]+", value):
-        raise click.ClickException(f"WORKER_BOT_COUNT must be a non-negative integer in {env_file}")
+    numbers = []
+    for key, value in values.items():
+        if not key.startswith("BATTUTA_WORKER_") or key == "BATTUTA_WORKER_CAPABILITIES":
+            continue
+        match = re.fullmatch(r"BATTUTA_WORKER_([1-9][0-9]*)_TYPE", key)
+        if not match or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", value):
+            raise click.ClickException(f"Invalid BATTUTA_WORKER_<N>_TYPE selection in {env_file}")
+        numbers.append(int(match[1]))
+    return [f"worker-{number}" for number in sorted(numbers)]
+
+
+def worker_environment(root: Path, values: dict[str, str], env_file: Path, bot: str) -> dict[str, str]:
+    if bot not in worker_names(values, env_file):
+        raise click.ClickException("Worker is not selected by BATTUTA_WORKER_<N>_TYPE")
+    profile = root / "bots/worker"
+    manifest = load_manifest(profile / "bot.toml")
+    worker = manifest.worker
+    if worker is None:
+        raise click.ClickException("Worker manifest requires capability types")
+    kind = values[f"BATTUTA_WORKER_{bot.removeprefix('worker-')}_TYPE"]
+    if kind not in worker.types:
+        raise click.ClickException(f"Unknown configured worker type for {bot}")
+    source = root / "supabase/functions/assignments/abilities.json"
+    catalog_path = source if source.exists() else profile / "abilities.json"
     try:
-        count = int(value)
-    except ValueError as error:
-        raise click.ClickException(f"Invalid WORKER_BOT_COUNT in {env_file}") from error
-    return [f"worker-{number}" for number in range(1, count + 1)]
+        catalog = json.loads(catalog_path.read_text())
+        if not isinstance(catalog, dict):
+            raise ValueError("Expected capability catalog")
+    except (OSError, ValueError) as error:
+        raise click.ClickException("Cannot read the worker capability catalog") from error
+    for capabilities in [worker.capabilities, *(entry.capabilities for entry in worker.types.values())]:
+        unknown = set(capabilities) - catalog.keys()
+        if unknown:
+            raise click.ClickException("Unknown worker capabilities in bot.toml; use canonical catalog names")
+    capabilities = sorted(set(worker.capabilities) | set(worker.types[kind].capabilities))
+    return {"BATTUTA_WORKER_CAPABILITIES": json.dumps(capabilities)}
 
 
 def profile_identity(bot: str) -> tuple[str, str]:

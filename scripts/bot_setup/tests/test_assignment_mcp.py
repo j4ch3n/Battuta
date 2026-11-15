@@ -1,11 +1,22 @@
 """Assignment MCP endpoint validation and shared profile configuration."""
 
 import json
+from urllib.parse import unquote
 
 import click
 import pytest
 
 from bot_setup.mcp import configure_mcp
+from bot_setup import mcp
+
+
+@pytest.mark.parametrize("name", ["normal", "测试 home%2F#"])
+def test_assignment_root_header_encodes_caller_home_without_creating_storage(tmp_path, name):
+    home = tmp_path / name
+    header = mcp.assignment_environment(home)["BATTUTA_PROJECTS_ROOT_HEADER"]
+    assert header.isascii()
+    assert unquote(header) == str(home / ".battuta/projects")
+    assert not home.exists()
 
 
 @pytest.mark.parametrize("role", ["cos", "manager", "worker"])
@@ -20,7 +31,10 @@ def test_assignment_mcp_preserves_custom_auth_and_role_appropriate_access(tmp_pa
     data = json.loads((pi / "mcp.json").read_text())
     server = data["mcpServers"]["assignments"]
     assert server["url"] == url.rstrip("/") + "/functions/v1/assignments"
-    assert server["headers"] == {"apikey": "${SUPABASE_SECRET_KEY}"}
+    assert server["headers"] == {
+        "apikey": "${SUPABASE_SECRET_KEY}",
+        "X-Battuta-Projects-Root": "${BATTUTA_PROJECTS_ROOT_HEADER}",
+    }
     assert server["exposure"] == ("hidden" if role == "worker" else "codemode")
     assert data["custom"] is True
     assert data["mcpServers"]["other"] == {"command": "custom"}

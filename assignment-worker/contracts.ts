@@ -1,11 +1,26 @@
 import { Type, type Static, type TSchema } from "typebox";
 import { Format } from "typebox/format";
 import { Value } from "typebox/value";
+import abilityCatalog from "../supabase/functions/assignments/abilities.json" with { type: "json" };
 
 Format.Set("date-time", Format.IsDateTime);
 const text = Type.String({ minLength: 1, pattern: "\\S" });
 const id = Type.String({ pattern: "^[0-9a-f]{8}$" });
 const time = Type.String({ format: "date-time" });
+const SavedBindingSchema = Type.Object(
+  {
+    project: text,
+    assignment_id: id,
+    claimed_at: time,
+    claimed_by: Type.Optional(Type.Union([text, Type.Null()])),
+    session_file: Type.Optional(Type.String()),
+  },
+  { additionalProperties: false },
+);
+export function parseBinding(value: unknown, sessionFile: string) {
+  const saved = parseValue(SavedBindingSchema, value);
+  return { ...saved, claimed_by: saved.claimed_by ?? null, session_file: sessionFile };
+}
 const assignmentStatus = Type.Union([
   Type.Literal("active"),
   Type.Literal("in_process"),
@@ -32,6 +47,8 @@ export const AssignmentSchema = Type.Object(
     updated_at: time,
     closed_at: Type.Union([time, Type.Null()]),
     claimed_at: Type.Union([time, Type.Null()]),
+    claimed_by: Type.Union([text, Type.Null()]),
+    require_abilities: Type.Array(text),
     lease_expired_at: Type.Union([time, Type.Null()]),
     blocker: Type.Union([text, Type.Null()]),
     dependencies: Type.Array(
@@ -76,6 +93,18 @@ export const ListSchema = Type.Object(
 );
 const refused = { ok: Type.Literal(false), message: text };
 export const FailureSchema = Type.Union([
+  Type.Object({
+    ...refused,
+    code: Type.Literal("unknown_abilities"),
+    unknown: Type.Array(Type.String()),
+    suggestions: Type.Record(Type.String(), Type.Array(Type.String())),
+  }),
+  Type.Object({
+    ...refused,
+    code: Type.Literal("ability_mismatch"),
+    assignment: AssignmentSchema,
+    missing: Type.Array(text),
+  }),
   Type.Object({
     ...refused,
     code: Type.Literal("missing_dependencies"),
@@ -131,6 +160,23 @@ export const ExecutionResultSchema = Type.Union([
   ),
 ]);
 export type ExecutionResult = Static<typeof ExecutionResultSchema>;
+const CapabilityConfigurationSchema = Type.Object(
+  {
+    abilities: Type.Array(Type.String(), {
+      description: `Specialist names: ${Object.keys(abilityCatalog).join(", ") || "none; use [] for general work"}. Exact matches only.`,
+    }),
+  },
+  { additionalProperties: false },
+);
+export function parseAbilities(values: unknown): Set<string> {
+  const { abilities } = parseValue(CapabilityConfigurationSchema, { abilities: values });
+  const unknown = abilities.filter((name) => !Object.hasOwn(abilityCatalog, name));
+  if (unknown.length)
+    throw new Error(
+      "Unknown configured specialist abilities in BATTUTA_WORKER_CAPABILITIES. Use exact names from the specialist catalog.",
+    );
+  return new Set(abilities);
+}
 export function parseValue<T extends TSchema>(schema: T, value: unknown): Static<T> {
   if (!Value.Check(schema, value)) throw new Error("Invalid assignment value");
   return value;

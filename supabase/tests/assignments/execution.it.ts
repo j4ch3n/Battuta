@@ -1,6 +1,69 @@
 import assert from "node:assert/strict";
 import { rpc, withDatabaseTest } from "./helpers.ts";
 
+Deno.test("specialist claims reject unknown names and fence every write by owner", () =>
+  withDatabaseTest(async (sql, project) => {
+    const created = await rpc(sql, "assignment_create", [
+      project,
+      "General work",
+      ["Step"],
+      "",
+      [],
+      [],
+    ]);
+    const id = created.assignment.id;
+    assert.deepEqual(created.assignment.require_abilities, []);
+    assert.equal(created.assignment.claimed_by, null);
+    const bad = await rpc(sql, "assignment_claim", [project, id, "worker-a", ["mobile_use"]]);
+    assert.equal(bad.code, "unknown_abilities");
+    assert.equal((await rpc(sql, "assignment_get", [project, id])).assignment.claimed_at, null);
+    const claimed = await rpc(sql, "assignment_claim", [project, id, "worker-a", []]);
+    assert.equal(claimed.assignment.claimed_by, "worker-a");
+    const token = claimed.assignment.claimed_at;
+    const version = claimed.todos[0].updated_at;
+    assert.equal(
+      (await rpc(sql, "assignment_start_todo", [project, id, token, 1, version, "worker-b"])).code,
+      "stale_claim",
+    );
+    assert.equal(
+      (await rpc(sql, "assignment_start_todo", [project, id, token, 1, version, null])).code,
+      "stale_claim",
+    );
+    const started = await rpc(sql, "assignment_start_todo", [
+      project,
+      id,
+      token,
+      1,
+      version,
+      "worker-a",
+    ]);
+    assert.equal(started.todo.status, "in_progress");
+    assert.equal(
+      (await rpc(sql, "assignment_block", [project, id, token, "Need input", "worker-b"])).code,
+      "stale_claim",
+    );
+    const blocked = await rpc(sql, "assignment_block", [
+      project,
+      id,
+      token,
+      "Need input",
+      "worker-a",
+    ]);
+    assert.equal(blocked.assignment.claimed_by, "worker-a");
+    await rpc(sql, "assignment_update_todo", [
+      project,
+      id,
+      1,
+      (await rpc(sql, "assignment_get", [project, id])).todos[0].updated_at,
+      null,
+      "cancelled",
+    ]);
+    await rpc(sql, "assignment_append_todos", [project, id, ["Replacement"]]);
+    const active = await rpc(sql, "assignment_reactivate", [project, id]);
+    assert.equal(active.assignment.claimed_by, null);
+  }),
+);
+
 Deno.test("complete plans publish atomically and dependency claims have one winner", () =>
   withDatabaseTest(async (sql, project) => {
     const a = await rpc(sql, "assignment_create", [project, "First", ["A"], "", []]);
@@ -96,10 +159,7 @@ Deno.test("ordered reports preserve exact claims, block atomically and reactivat
     ]);
     assert.equal(blocked.assignment.status, "blocked");
     assert.equal(blocked.todo.status, "blocked");
-    assert.equal(
-      (await rpc(sql, "assignment_prepare_notes", [project, id, "/home/bot/.battuta"])).editable,
-      true,
-    );
+    assert.equal((await rpc(sql, "assignment_prepare_notes", [project, id])).editable, true);
     assert.equal(
       (await rpc(sql, "assignment_reactivate", [project, id])).code,
       "invalid_transition",
@@ -202,5 +262,43 @@ Deno.test("current claim completes late and cancelled prerequisites never unlock
       (await rpc(sql, "assignment_reactivate", [project, id])).code,
       "assignment_closed",
     );
+  }),
+);
+Deno.test("atomic specialist matching requires the entire normalized set", () =>
+  withDatabaseTest(async (sql, project) => {
+    const rollback = new Error("Rollback synthetic specialist catalog");
+    try {
+      await sql.begin(async (tx) => {
+        // Transaction-local fixture; no specialist is added to the deployed catalog.
+        await tx.unsafe(`create or replace function public.assignment_ability_catalog()
+          returns text[] language sql immutable set search_path='' as $$
+          select array['test_one','test_two']::text[] $$`);
+        const created = await rpc(tx, "assignment_create", [
+          project,
+          "Specialist plan",
+          ["Step"],
+          "",
+          [],
+          ["test_one", "test_two", "test_one"],
+        ]);
+        assert.deepEqual(created.assignment.require_abilities, ["test_one", "test_two"]);
+        const id = created.assignment.id;
+        const rejected = await rpc(tx, "assignment_claim", [project, id, "worker-a", ["test_one"]]);
+        assert.equal(rejected.code, "ability_mismatch");
+        assert.equal(rejected.assignment.status, "active");
+        assert.equal(rejected.assignment.claimed_by, null);
+        const claimed = await rpc(tx, "assignment_claim", [
+          project,
+          id,
+          "worker-b",
+          ["test_two", "test_one", "test_two"],
+        ]);
+        assert.equal(claimed.ok, true);
+        assert.equal(claimed.assignment.claimed_by, "worker-b");
+        throw rollback;
+      });
+    } catch (error) {
+      if (error !== rollback) throw error;
+    }
   }),
 );

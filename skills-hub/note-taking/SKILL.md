@@ -14,8 +14,7 @@ locate and trust.
 
 Keep findings and provenance that would be costly to reconstruct. Notes are
 provisional working material, not canonical specifications, commitments,
-publication approval, or automatic durable memory. All bots use the same file
-for a project assignment, not separate role notebooks. Use todo for assignment
+publication approval, or automatic durable memory. Use todo for assignment
 discovery and progress; use draft-writing for complete long-form documents.
 
 ## Prepare or locate notes
@@ -24,28 +23,11 @@ Use the `assignments` MCP service. Both tools require exact `project` and
 eight-character `assignment_id` from the commission or bound assignment.
 Every note requires an assignment; do not create general/unbound notebooks.
 
-| Tool            | Additional input                                                  | Result                                                                     |
-| --------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `prepare_notes` | `root`: absolute local Battuta root, with home directory expanded | Establish/reuse the shared path and return initialization/editing guidance |
-| `locate_notes`  | None                                                              | Return the existing path and current editable/frozen guidance              |
-
-The root is normally the expanded `~/.battuta`, not its projects subdirectory.
-Use the returned `notes_path`; do not invent another location or role suffix.
-Preparation returns a plan, not proof that a file exists locally. A conflicting
-root fails rather than relocating existing material. If notes are unprepared,
-prepare them for the nonterminal assignment first, including blocked work.
-
-Inspect local path safety, create directories/file only if absent, and preserve
-existing contents. Use Pi's built-in read/edit/write/search tools at that path;
-no note-update CLI or custom editing tool is needed. Freely revise Markdown and
-keep sources distinct from inference. Coordinate shared edits to avoid clobbering
-another bot's changes; there is no note revision history or automatic undo.
-
-Call `locate_notes` before later edits. When `editable` is false, the assignment
-is done/cancelled: read existing material only. Do not create or edit its notes
-or adjacent drafts. The freeze is a prompt rule, not a filesystem security lock.
-On missing files or storage errors, retain existing content and report the
-problem; do not silently replace or repair another file.
+Call `prepare_notes` to prepare notes or `locate_notes` to find them. Follow the
+tool's response before accessing or editing files, and call `locate_notes` before
+later edits. Preserve existing material, distinguish sources from inference, and
+report inaccessible required inputs. Put complete handoff findings in the
+execution result and evidence.
 
 ## Worth keeping
 

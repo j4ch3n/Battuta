@@ -25,13 +25,13 @@ Run source-checkout commands from the repository root. See [development](../.age
 
 Before configuring CoS, stop it and set the required `BATTUTA_DREAM_MODEL=provider/model-id` in the selected environment file. Bot `bot.toml` files provide initial private model/thinking defaults only when settings are missing; see [bot setup manifests](bot-setup.md). CoS setup provisions the nightly dream independently; see [memory setup](memory-service-setup.md#nightly-cos-dream-setup).
 
-`WORKER_BOT_COUNT` is required in both source environment files: `0` selects no
-workers, `1` is the normal local setting, and `N` selects worker-1 through worker-N.
+`BATTUTA_WORKER_<N>_TYPE` entries select workers in each environment file;
+for example, `BATTUTA_WORKER_1_TYPE=general` selects worker-1. No entries selects none.
 Each bot gets its own tmux pane. Worker state uses
 `$HOME/.battuta/pi-bots/worker-N/.pi`. `make dev` retains the `services` window for
 memory and Edge Functions; Supabase must already be running. Worker launch waits
 for assignment-route readiness. Existing sessions reattach without resizing or
-duplicating processes; invalid counts fail even before reattach. Human runtime
+duplicating processes; invalid selections fail even before reattach. Human runtime
 acceptance is separate from setup checks.
 
 ## Script entry points

@@ -25,8 +25,6 @@ calls. For bound execution, use Manager's supplied identity and inputs; report
 missing context through execute-assignment. For planning outside a bound task,
 use project-management to inspect registered context and ask the responsible requester
 when the commission lacks its project. Do not silently substitute global selection.
-Workers currently stay on the same project; this workflow does not change global
-project configuration.
 
 Inspect related work before creating duplicates. Multiple assignments may be open
 per project. Create the entire initial TODO list atomically, with goal, authority,
@@ -34,13 +32,19 @@ constraints, acceptance/input references, and existing prerequisite IDs. Depende
 may cross projects but remain immutable; only prerequisites done unlock execution.
 Duplicate prerequisite IDs mean one dependency. Cancelled prerequisites do not
 satisfy dependents. Choose non-conflicting workspace boundaries or dependencies.
+Use canonical specialist requirements only when the work genuinely needs them.
+The catalog is currently empty: omit `require_abilities` or use `[]`. Unknown names
+reject the whole write; read the correction message rather than guessing aliases.
+Workers claim matching work automatically; do not set or change ownership yourself.
+Keep appended TODOs compatible with the assignment's requirements;
+replace the assignment when requirements must change.
 
 ## Manager and inspection tools
 
 | Tool | Inputs beyond project/assignment ID | Use |
 | --- | --- | --- |
-| create_assignment | goal, nonempty initial_todos, optional constraints and depends_on_assignment_ids | Publish one complete initial plan; requires project, not an existing assignment ID |
-| list_assignments | optional project and status | Inspect global or project work, readiness, and claim timestamps; no assignment ID |
+| create_assignment | goal, nonempty initial_todos, optional constraints, depends_on_assignment_ids and require_abilities | Publish one complete initial plan; requires project, not an existing assignment ID |
+| list_assignments | optional project and status | Inspect all or project work, readiness, and claiming bot; no assignment ID |
 | get_assignment | None | Read authoritative detail, evidence, dependencies, and ordered TODOs |
 | append_todos | nonempty descriptions array | Append consecutive positions to active/blocked work |
 | update_todo | position, exact expected_updated_at, description and/or status: cancelled | Edit/cancel unfinished active/blocked work, not execution outcomes |
@@ -51,6 +55,24 @@ Assignment states: active, in_process, blocked, done, cancelled. TODO states:
 todo, in_progress, blocked, done, cancelled. Positions never shift; no reorder,
 deletion, TODO dependency graph, or per-TODO claims. Execution APIs are code-owned;
 workers use execute-assignment rather than directly maintaining status.
+
+## Read returned results
+
+On `ok: true`, use the returned assignment and TODOs rather than assuming your
+requested change is the current state. Keep its project and assignment ID for
+later calls.
+
+| Field | How to use it |
+| --- | --- |
+| `status` | Distinguish waiting (`active`), claimed (`in_process`), blocked, and terminal work |
+| `ready` | See whether prerequisites and TODO state currently permit a claim; it does not reserve work |
+| `claimed_by` | Identify the claiming bot, such as `worker-1`; a retained name is not proof it is still running, and a blank name alone does not prove work is available |
+| `require_abilities` | Read the exact specialist names a worker must all satisfy; `[]` adds no specialist restriction |
+| TODO `summary` / `evidence` / `blocker` | Evaluate actual outcomes, verification, and missing inputs before accepting results or replanning |
+
+On `ok: false` or a tool error, read the explanation and use the returned error
+code and recovery state. A readable message explains the problem; structured
+fields identify what to refresh or correct. Do not treat a rejected call as saved.
 
 ## Recovery and uncertainty
 

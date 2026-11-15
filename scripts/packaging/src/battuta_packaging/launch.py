@@ -7,9 +7,10 @@ import subprocess
 import click
 from bot_setup.browser import validate_browser, configure_browser
 from bot_setup.env import read_env, required
-from bot_setup.instances import acquire_instance_lock, instance_paths, worker_names
+from bot_setup.instances import acquire_instance_lock, instance_paths, worker_names, worker_environment
 from bot_setup.release import validate_private_home
 from bot_setup.manifest import load_profile
+from bot_setup.mcp import assignment_environment
 from bot_setup.runtime import initialize_settings_if_missing
 
 from .runtime import check_node, check_packages
@@ -28,7 +29,8 @@ def run_bot(root: Path, *, bot: str, env_file: Path, node: Path, mode: str) -> N
     values = read_env(env_file)
     workers = worker_names(values, env_file)
     if role == "worker" and bot not in workers:
-        raise click.ClickException("Worker is outside the configured WORKER_BOT_COUNT")
+        raise click.ClickException("Worker is not selected by BATTUTA_WORKER_<N>_TYPE")
+    capabilities = worker_environment(root, values, env_file, bot) if role == "worker" else {}
     if mode == "foreground-maintenance":
         result = subprocess.run(["systemctl", "--user", "show", service_name(bot), "--property=ActiveState", "--value"], capture_output=True, text=True)
         if result.returncode != 0 or result.stdout.strip() not in {"inactive", "failed"}:
@@ -57,6 +59,8 @@ def run_bot(root: Path, *, bot: str, env_file: Path, node: Path, mode: str) -> N
     if fresh and role != "manager":
         configure_browser(profile, private, home=Path.home(), bot=bot)
     env = {**os.environ, **values, "AGENT_ROLE": role, "BATTUTA_BOT_NAME": bot, "PI_CODING_AGENT_DIR": str(private / ".pi")}
+    env.update(assignment_environment(Path.home()))
+    env.update(capabilities)
     env["PATH"] = str(node.parent) + os.pathsep + env.get("PATH", "")
     if role != "manager":
         env.update(validate_browser(profile, private, home=Path.home(), bot=bot, path=env["PATH"]))

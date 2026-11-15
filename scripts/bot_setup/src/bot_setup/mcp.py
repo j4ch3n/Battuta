@@ -4,11 +4,15 @@ from pathlib import Path
 from ipaddress import ip_address
 import re
 from typing import Literal
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import click
 
 from .json_config import read_config, write_config
+
+
+def assignment_environment(home: Path) -> dict[str, str]:
+    return {"BATTUTA_PROJECTS_ROOT_HEADER": quote(str(home / ".battuta/projects"), safe="")}
 
 
 def validate_memory_url(value: str | None = None) -> str:
@@ -41,7 +45,7 @@ def assignment_server(supabase_url: str) -> dict:
         valid = False
     if not valid:
         raise click.ClickException("SUPABASE_URL must be an HTTPS origin or loopback HTTP origin without credentials, query, or fragment")
-    return {"url": supabase_url.rstrip("/") + "/functions/v1/assignments", "headers": {"apikey": "${SUPABASE_SECRET_KEY}"}, "exposure": "codemode", "description": "Shared project assignments, ordered TODOs, and local note paths"}
+    return {"url": supabase_url.rstrip("/") + "/functions/v1/assignments", "headers": {"apikey": "${SUPABASE_SECRET_KEY}", "X-Battuta-Projects-Root": "${BATTUTA_PROJECTS_ROOT_HEADER}"}, "exposure": "codemode", "description": "Shared project assignments, ordered TODOs, and local note paths"}
 
 
 def mcp_payload(*, role: Literal["cos", "manager", "worker"], supabase_url: str, memory_url: str | None = None) -> dict:

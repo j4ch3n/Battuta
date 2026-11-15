@@ -4,11 +4,14 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { createClient } from "@supabase/supabase-js";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { createAssignmentClient } from "./client.ts";
 import { createCoordinator } from "./coordinator.ts";
-import { ExecutionResultSchema } from "./contracts.ts";
+import { ExecutionResultSchema, parseAbilities, parseBinding } from "./contracts.ts";
 import { createNotifier } from "./notify.ts";
-import type { AssignmentClient, Binding, Coordinator, Detail } from "./types.ts";
+import { ensureAssignmentWorkspace } from "./workspace.ts";
+import type { AssignmentClient, Coordinator, Detail } from "./types.ts";
 
 export default function worker(pi: ExtensionAPI) {
   let coordinator: Coordinator | undefined, client: AssignmentClient | undefined;
@@ -47,18 +50,9 @@ export default function worker(pi: ExtensionAPI) {
           .reverse()
           .find((entry) => entry.type === "custom" && entry.customType === "assignment-binding");
         if (entry?.type === "custom") {
-          const data = entry.data as Omit<Binding, "session_file">;
-          if (
-            typeof data.project !== "string" ||
-            !/^\w{8}$/.test(data.assignment_id) ||
-            typeof data.claimed_at !== "string"
-          )
-            throw new Error("Invalid live assignment binding");
+          const binding = parseBinding(entry.data, ctx.sessionManager.getSessionFile() ?? "");
           restored = true;
-          await coordinator.restoreBinding({
-            ...data,
-            session_file: ctx.sessionManager.getSessionFile() ?? "",
-          });
+          await coordinator.restoreBinding(binding);
           return;
         }
         restored = true;
@@ -68,6 +62,17 @@ export default function worker(pi: ExtensionAPI) {
   });
   pi.on("session_start", async (event, ctx) => {
     if (client || stopped) return;
+    const workerId = process.env.BATTUTA_BOT_NAME?.trim();
+    if (!workerId) throw new Error("BATTUTA_BOT_NAME must identify the worker bot");
+    const configured = process.env.BATTUTA_WORKER_CAPABILITIES;
+    if (!configured) throw new Error("BATTUTA_WORKER_CAPABILITIES must contain configured JSON");
+    let values: unknown;
+    try {
+      values = JSON.parse(configured);
+    } catch {
+      throw new Error("BATTUTA_WORKER_CAPABILITIES must contain valid JSON");
+    }
+    const capabilities = [...parseAbilities(values)];
     context = ctx;
     pi.setActiveTools([
       "codemode",
@@ -105,10 +110,14 @@ export default function worker(pi: ExtensionAPI) {
       appendEntry: (kind, data) => pi.appendEntry(kind, data),
     });
     coordinator = createCoordinator({
+      workerId,
+      capabilities,
       assignments: client,
       notify: notifier,
       diagnostics: diagnostic,
       sessions: {
+        prepareWorkspace: (target) =>
+          ensureAssignmentWorkspace(join(homedir(), ".battuta"), target),
         isIdle: () => context?.isIdle() ?? false,
         hasPendingMessages: () => context?.hasPendingMessages() ?? true,
         appendEntry: (kind, data) => pi.appendEntry(kind, data),
@@ -118,6 +127,7 @@ export default function worker(pi: ExtensionAPI) {
             project: detail.assignment.project,
             assignment_id: detail.assignment.id,
             claimed_at: detail.assignment.claimed_at!,
+            claimed_by: detail.assignment.claimed_by,
             session_file: "",
           };
           const originalCwd = command.cwd;
@@ -136,7 +146,7 @@ export default function worker(pi: ExtensionAPI) {
           if (result.cancelled) throw new Error("Assignment conversation replacement cancelled");
           return binding;
         },
-        runTodo(_binding, todo, detail) {
+        runTodo(_binding, todo, detail, workspace) {
           if (stopped) throw new Error("Worker session was disposed");
           pi.sendMessage(
             {
@@ -145,6 +155,7 @@ export default function worker(pi: ExtensionAPI) {
                 assignment: detail.assignment,
                 todos: detail.todos,
                 current_todo: todo,
+                workspace,
               }),
               display: true,
             },

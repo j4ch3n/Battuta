@@ -4,7 +4,7 @@ import {
   UncertainAssignmentWriteError,
   blockAndInspect,
 } from "./client.ts";
-import { parseExecutionResult } from "./contracts.ts";
+import { parseAbilities, parseExecutionResult } from "./contracts.ts";
 import type {
   Coordinator,
   CoordinatorOptions,
@@ -13,6 +13,7 @@ import type {
   ExecutionResult,
   TodoRow,
   AssignmentView,
+  Workspace,
 } from "./types.ts";
 
 type Phase =
@@ -28,6 +29,8 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
   let boundary: "completed" | "aborted" | "error" | undefined;
   let tail: Promise<unknown> = Promise.resolve();
   let reconciling: Promise<void> | undefined;
+  const abilities: ReadonlySet<string> = parseAbilities(options.capabilities);
+  let workspace: Workspace | undefined;
   function serial<T>(work: () => Promise<T>): Promise<T> {
     const next = tail.then(work);
     tail = next.catch(() => {});
@@ -42,7 +45,8 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     binding !== undefined &&
     row.id === binding.assignment_id &&
     row.project === binding.project &&
-    row.claimed_at === binding.claimed_at;
+    row.claimed_at === binding.claimed_at &&
+    row.claimed_by === binding.claimed_by;
   function checkLive(detail: Detail) {
     if (!matches(detail.assignment) || detail.assignment.status !== "in_process") {
       pause("Execution claim was superseded; progression stopped");
@@ -67,6 +71,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     }
     if (stopped) return;
     binding = undefined;
+    workspace = undefined;
     current = undefined;
     accepted = undefined;
     boundary = undefined;
@@ -105,10 +110,29 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     }
     await deliver(detail);
   }
+  async function prepareWorkspace() {
+    if (stopped || !binding) return;
+    if (workspace) return workspace;
+    try {
+      workspace = await sessions.prepareWorkspace(binding);
+      return stopped ? undefined : workspace;
+    } catch (error) {
+      diagnostics("Local assignment workspace preparation failed", error);
+      await blockRun(
+        "Local assignment workspace could not be prepared safely; no work was dispatched",
+      );
+    }
+  }
   async function advance(detail?: Detail) {
     if (stopped || !binding) return;
     const latest = detail ?? (await assignments.get(binding));
     if (stopped || !checkLive(latest)) return;
+    if (!latest.assignment.require_abilities.every((ability) => abilities.has(ability))) {
+      await blockRun("This session lacks required specialist abilities; no TODO was dispatched");
+      return;
+    }
+    const workspace = await prepareWorkspace();
+    if (!workspace) return;
     const next = latest.todos.find((todo) => !["done", "cancelled"].includes(todo.status));
     if (!next) {
       if (!latest.todos.length) {
@@ -139,7 +163,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     accepted = undefined;
     boundary = undefined;
     phase = "executing";
-    sessions.runTodo({ ...binding }, structuredClone(current), latest);
+    sessions.runTodo({ ...binding }, structuredClone(current), latest, workspace);
   }
   function matchesReport(todo: TodoRow, row: AssignmentView, report: ExecutionResult) {
     return (
@@ -163,25 +187,35 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
         try {
           const board = await assignments.list({ status: "active" });
           if (stopped) return;
-          for (const candidate of board.assignments.filter((row) => row.ready).reverse()) {
+          for (const candidate of board.assignments
+            .filter(
+              (row) =>
+                row.ready && row.require_abilities.every((ability) => abilities.has(ability)),
+            )
+            .reverse()) {
             let detail: Detail;
             try {
               detail = await assignments.claim({
                 project: candidate.project,
                 assignment_id: candidate.id,
+                claimed_by: options.workerId,
+                abilities: [...abilities],
               });
             } catch (error) {
               if (stopped) return;
               if (
                 error instanceof AssignmentRefusalError &&
-                ["not_claimable", "not_found"].includes(error.refusal.code)
+                ["not_claimable", "not_found", "ability_mismatch"].includes(error.refusal.code)
               )
                 continue;
               pause("Claim could not be confirmed; do not infer ownership or retry", error);
               return;
             }
             if (stopped) return;
-            if (!detail.assignment.claimed_at) {
+            if (
+              !detail.assignment.claimed_at ||
+              detail.assignment.claimed_by !== options.workerId
+            ) {
               pause("Claim response omitted its version; inspect ownership");
               return;
             }
@@ -189,9 +223,20 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
               project: detail.assignment.project,
               assignment_id: detail.assignment.id,
               claimed_at: detail.assignment.claimed_at,
+              claimed_by: detail.assignment.claimed_by,
               session_file: "",
             };
             phase = "switching";
+            if (!(await prepareWorkspace())) return;
+            try {
+              if (!checkLive(await assignments.get(binding))) return;
+            } catch (error) {
+              pause(
+                "Claim could not be verified after workspace preparation; retained for inspection",
+                error,
+              );
+              return;
+            }
             try {
               const opened = await sessions.openAssignmentSession(detail);
               if (!stopped) binding = opened;
@@ -222,6 +267,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
         if (
           binding &&
           (binding.claimed_at !== next.claimed_at ||
+            binding.claimed_by !== next.claimed_by ||
             binding.assignment_id !== next.assignment_id ||
             binding.project !== next.project)
         )

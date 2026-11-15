@@ -31,6 +31,10 @@ bound executor retains responsibility for evidence, integration and reporting.
 
 ## Orient to the commission
 
+Wait for the bound TODO and supplied output paths before executing work;
+report missing essential inputs. Assignment selection and claiming are automatic,
+not model actions.
+
 1. Read the bound project, goal, current TODO, prerequisite results, constraints,
    exclusions, acceptance, authority, and Manager's input paths. Use assignment
    MCP to inspect the bound context as needed. Retain context across ordered TODOs;
@@ -63,7 +67,8 @@ bound executor retains responsibility for evidence, integration and reporting.
 5. Compare those inputs with the commission and current evidence. Return
    consequential conflicts, missing authority, project mismatches, or essential
    inaccessible inputs to Manager through a blocked execution result. Do not
-   silently adopt a newer ticket comment as changed scope. Skip repository and
+    silently adopt a newer ticket comment as changed scope. Skip project
+    registration/orientation when note-only work has sufficient supplied inputs. Skip repository and
    ticket steps when they are irrelevant to research, writing, or another
    non-repository deliverable; do not fabricate requirements to complete a ritual.
 
@@ -78,10 +83,13 @@ bound executor retains responsibility for evidence, integration and reporting.
    relevant regression checks. Verify against the commissioned acceptance;
    distinguish observed results, inference, missing evidence, and unavailable
    checks. A blocked check is not a pass.
-3. Use assignment MCP to prepare/locate notes, and built-in file tools for safe
-   local work. Preserve existing material and record concise findings, actual
+3. Use the `note-taking` skill to prepare or locate notes and follow the tool's
+   guidance. Preserve existing material and record concise findings, actual
    verification, and real evidence references, not a tool-call diary. Do not
    persist credentials, private owner-profile data, or unrelated personal context.
+   Local scratch files are not synchronized. Include sufficient
+   findings/deliverable content in the persisted result for Manager to review;
+   inaccessible required content is a blocker, not a successful remote delivery.
 4. Submit `report_execution_result` for the bound TODO using the contract below.
    Correct malformed input if rejected. Acceptance awaits final turn settlement
    and persistence; a successful call alone proves neither assignment completion
@@ -100,7 +108,7 @@ bound executor retains responsibility for evidence, integration and reporting.
 Use actual evidence, not the illustrative paths above. `evidence: []` means none
 exists; do not embellish. For `outcome: "blocked"`, also provide a nonblank
 `blocker` explanation and describe actual progress in `summary`. Identity and
-claim tokens are bound by code, not tool arguments.
+claim tokens are supplied automatically; do not include them in this report.
 
 ## Boundaries and recovery
 

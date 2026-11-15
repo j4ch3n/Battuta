@@ -10,14 +10,17 @@ import tempfile
 
 import click
 from bot_setup.env import read_env
-from bot_setup.instances import worker_names
+from bot_setup.instances import worker_names, worker_environment
 
 from .runtime import check_node
 
 
 def install_services(root: Path, *, env_file: Path, node: Path, replace: bool = False) -> None:
     root, env_file, node = root.resolve(), env_file.resolve(), node.resolve()
-    workers = worker_names(read_env(env_file), env_file)
+    values = read_env(env_file)
+    workers = worker_names(values, env_file)
+    for worker in workers:
+        worker_environment(root, values, env_file, worker)
     check_node(root, node)
     try:
         tools = Path(subprocess.check_output(["uv", "tool", "dir", "--bin"], text=True).strip())
@@ -36,7 +39,7 @@ def install_services(root: Path, *, env_file: Path, node: Path, replace: bool = 
     for line in active.stdout.splitlines():
         fields = line.split()
         if len(fields) >= 3 and fields[2] in {"active", "activating", "deactivating"} and fields[0] not in expected:
-            raise click.ClickException("A running worker is outside WORKER_BOT_COUNT; ask the owner before changing services")
+            raise click.ClickException("A running worker is not selected by BATTUTA_WORKER_<N>_TYPE; ask the owner before changing services")
     path_value = os.pathsep.join(map(str, (node.parent, tools, Path(uv).parent, Path("/usr/local/bin"), Path("/usr/bin"), Path("/bin"))))
     executable = tools / "battuta-packaging"
     units = {}

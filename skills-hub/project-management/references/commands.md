@@ -1,8 +1,11 @@
 # Command usage
 
-Run `battuta-project` from any directory. The CLI owns project discovery and workspace management; [project-spec tools](spec-tools.md) own spec discovery and lifecycle. Use `list` to discover projects and pass the exact project name to each project-scoped command. Conversations have no execution-project binding. CoS supplies prepared relevant memory context; obtain locations from command/tool results rather than assuming storage layout.
+Run `battuta-project` from any directory. Use `list` to discover projects and pass the exact project name to each project-scoped command. Use returned locations rather than assuming storage layout. Use [project-spec tools](spec-tools.md) for spec discovery and lifecycle.
 
 A bare `battuta-project` invocation displays command help.
+Check the exit status before using output: a nonzero exit means failure. Read
+the diagnostic and stop the dependent operation rather than treating incomplete
+output as usable context.
 
 ## Initialize a project
 
@@ -16,7 +19,7 @@ Use `init` once to register a named project, create its managed workspace, and r
 battuta-project init linth
 ```
 
-The project name must be a nonblank, nonhidden direct folder name without slashes, backslashes, or NUL. Shell-quote names containing spaces or special characters. For names beginning with `-`, place command options first, then `--` before positional arguments, for example `battuta-project explain -- '-atlas'`. Memory uses explicit project labels in its shared store; no project-local memory store is created. Spec tools operate on managed project storage without requiring GitHub.
+The project name must be nonblank and must not start with a dot or contain slashes, backslashes, or NUL. Shell-quote names containing spaces or special characters. For names beginning with `-`, place command options first, then `--` before positional arguments, for example `battuta-project explain -- '-atlas'`. GitHub is not required for project documents.
 
 The summary has Purpose, Users and use cases, Scope, Current capabilities, and Specifications sections with explicit unknowns. Initialization does not establish spec storage or a constitution. Managed documents are created by spec tools only when requested.
 
@@ -57,7 +60,22 @@ battuta-project list --json
 
 The command returns a numbered Markdown list sorted by project name. Each entry has a bold name followed by indented `Project Root` and `Code` lines: the managed project directory and repository checkout, respectively. Paths under the home directory are abbreviated with `~`; other paths remain absolute.
 
-Listing discovers projects from `project.yaml` markers, validates configurations and checkouts, and does not read spec inventories or contact Linear. Hidden directories, symlinked project directories, non-directory entries, and directories without markers are excluded. An absent store reports that no Battuta project store has been initialized; an existing empty registry reports `No registered projects.` Both suggest `battuta-project init <project-name>` and succeed without creating state. A malformed configuration, unsafe marker, or invalid checkout reports an error rather than a partial successful catalog.
+For automation, use `list --json` and parse the `projects` array:
+
+```json
+{"projects":["atlas","beacon"]}
+```
+
+Preserve returned project names exactly. A missing or empty registry returns
+`{"projects":[]}` successfully; initialize a project only when authorized.
+Invalid project configuration or an inaccessible checkout fails instead of
+returning a partial successful catalog. Listing does not contact Linear or
+include spec inventories.
+
+The labels differ between commands: `list` uses `Project Root` for the managed
+workspace and `Code` for the checkout. In `explain`, `Project Root` is the
+checkout; use `Managed Project Directory` for project documents and `Summary`
+for the overview.
 
 ## Remove a project
 
@@ -66,8 +84,6 @@ battuta-project remove atlas
 ```
 
 Ensure no worker is using the project before removing it; the command does not check or stop workers. It requires the installed `battuta-artifact` command and its configured registry. It withdraws the project's artifacts, then moves the complete project folder to Trash. Published artifact links stop working. Shared memory, assignment history, and remote projects remain unchanged. If the move fails after withdrawal, the error identifies the deregistered artifacts and retained project; their registrations are not restored.
-
-For automation, `--json` writes only `{"projects":["atlas","beacon"]}` to stdout, preserving directory spelling and sorting names. A missing or empty registry returns `{"projects":[]}` without creating files. Invalid registrations fail with a nonzero exit and a diagnostic on stderr. Project discovery always uses `~/.battuta/projects`; there is no root override or shared current selection.
 
 ## Linear projects
 
@@ -101,11 +117,11 @@ Run `explain` with the exact project name before working in its checkout or writ
 
 The output distinguishes the Managed Project Directory from Project Root (the repository checkout) and reports the Summary path. Unlike `list`, `explain` labels the checkout as `Project Root`. Spec and constitution discovery belong to spec tools and are not included as overview fields.
 
-The Project Summary section displays the managed `SUMMARY.md` as Markdown. Missing or blank summaries show `Project summary: not written yet`; unreadable, invalid UTF-8, symlink, or non-file summaries produce a file error. `explain` never edits the summary or creates artifact directories. Older registrations without a summary remain valid.
+The Project Summary section displays the overview as Markdown. `Project summary: not written yet` means the summary is missing or blank, not that the project is unknown. A file error means it could not be read; report the failure rather than inventing context. `explain` does not edit or create project material.
 
 The output includes the repository URL and the linked Linear project's URL. Repository information comes from the local configuration; `no GitHub repository linked yet` means it is absent. For a linked project, the command fetches its actual URL from Linear and requires network access and a token with access to that project. An unlinked project shows `not linked` without contacting Linear. Lookup failures are reported as errors; the command does not change the project.
 
-Use the documentation index to find and read applicable `README.md` and `AGENTS.md` files, then work from the displayed Project Root. Documentation paths are relative to that checkout. Discovery is recursive, while the directory tree is limited to two levels. Symlinks, dependencies, and generated directories are excluded.
+Use the documentation index to find and read applicable `README.md` and `AGENTS.md` files, then work from the displayed Project Root. Documentation paths are relative to that checkout. The displayed tree is an overview, not a complete inventory; inspect further when the task requires it.
 
 ## Write project documents
 

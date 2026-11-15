@@ -40,13 +40,13 @@ class RunDevTests(LauncherFixture):
         self.assertEqual(again.returncode, 0, again.stderr)
         self.assertEqual(settings.read_text(), "{}")
 
-    def test_configured_worker_count_controls_distinct_panes(self):
+    def test_selected_workers_control_distinct_panes(self):
         for count in (0, 1, 3):
             with self.subTest(count=count):
                 path = self.root / ".env"
                 text = path.read_text()
                 import re
-                path.write_text(re.sub(r"WORKER_BOT_COUNT=\d+", f"WORKER_BOT_COUNT={count}", text))
+                path.write_text(re.sub(r"BATTUTA_WORKER_[0-9]+_TYPE=.*\n", "", text) + "".join(f"BATTUTA_WORKER_{n}_TYPE=general\n" for n in range(1, count + 1)))
                 self.log.unlink(missing_ok=True)
                 result = self.run_launcher("dev", existing=False)
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -55,9 +55,9 @@ class RunDevTests(LauncherFixture):
                 for number, call in enumerate(workers, 1):
                     self.assertIn(f".battuta/pi-bots/worker-{number}", call[-1])
 
-    def test_invalid_count_fails_before_reattach(self):
+    def test_invalid_selection_fails_before_reattach(self):
         path = self.root / ".env"
-        path.write_text(path.read_text().replace("WORKER_BOT_COUNT=1", "WORKER_BOT_COUNT=invalid"))
+        path.write_text(path.read_text().replace("BATTUTA_WORKER_1_TYPE=general", "BATTUTA_WORKER_0_TYPE=general"))
         result = self.run_launcher("dev", existing=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(self.log.exists())

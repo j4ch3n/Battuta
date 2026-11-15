@@ -9,7 +9,7 @@ import click
 
 from .browser import browser_directories, browser_settings
 from .env import read_env, required
-from .instances import instance_paths, worker_names
+from .instances import instance_paths, worker_names, worker_environment
 from .install import run
 from .json_config import read_config
 from .mcp import mcp_payload, validate_memory_url
@@ -44,7 +44,10 @@ def validate_private_home(bot_home: Path) -> None:
 
 def configure_release(root: Path, *, env_file: Path, home: Path) -> None:
     values = read_env(env_file)
-    names = ["cos-bot", "manager-bot", *worker_names(values, env_file)]
+    workers = worker_names(values, env_file)
+    for bot in workers:
+        worker_environment(root, values, env_file, bot)
+    names = ["cos-bot", "manager-bot", *workers]
     for key in ("LINEAR_API_TOKEN", "SUPABASE_URL", "SUPABASE_SECRET_KEY"):
         required(values, key, env_file)
     url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))

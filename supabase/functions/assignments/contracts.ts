@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { abilityProposal } from "./abilities.ts";
 
 const text = z
   .string()
@@ -25,6 +26,8 @@ const assignment = z.object({
   updated_at: timestamp,
   closed_at: timestamp.nullable(),
   claimed_at: timestamp.nullable(),
+  claimed_by: text.nullable(),
+  require_abilities: z.array(z.string()),
   lease_expired_at: timestamp.nullable(),
   blocker: text.nullable(),
   dependencies: z.array(z.object({ assignment_id: id, project, status: assignmentStatus })),
@@ -43,6 +46,12 @@ const todo = z.object({
 });
 const refused = z.object({ ok: z.literal(false), message: text });
 const failure = z.discriminatedUnion("code", [
+  refused.extend({
+    code: z.literal("unknown_abilities"),
+    unknown: z.array(z.string()),
+    suggestions: z.record(z.string(), z.array(z.string())),
+  }),
+  refused.extend({ code: z.literal("ability_mismatch"), missing: z.array(z.string()), assignment }),
   refused.extend({
     code: z.literal("missing_dependencies"),
     missing_assignment_ids: z.array(id).min(1),
@@ -76,16 +85,43 @@ const failure = z.discriminatedUnion("code", [
 const assigned = z.object({ ok: z.literal(true), assignment });
 const detail = assigned.extend({ todos: z.array(todo) });
 const progressed = assigned.extend({ todo });
-const notes = z.object({
-  ok: z.literal(true),
-  assignment,
-  notes_path: z.string().nullable(),
-  editable: z.boolean(),
-  guidance: z.string().optional(),
-});
-export type NotesResult = z.infer<typeof notes>;
+export const absolutePath = z
+  .string()
+  .min(1)
+  .refine(
+    (value) =>
+      value.startsWith("/") &&
+      !/[\\\p{Cc}]/u.test(value) &&
+      !value.split("/").some((part) => part === "." || part === ".."),
+    "Expected an absolute local path without traversal or control characters",
+  );
+const noteReference = z
+  .object({
+    ok: z.literal(true),
+    assignment,
+    notes_ref: z
+      .string()
+      .refine((value) => {
+        const match = /^(.+)\/work\/[0-9a-f]{8}\/note[.]md$/.exec(value);
+        return match !== null && project.safeParse(match[1]).success;
+      }, "Expected a host-neutral assignment note reference")
+      .nullable(),
+    editable: z.boolean(),
+    guidance: z.string().optional(),
+  })
+  .refine(
+    (value) =>
+      value.notes_ref === null ||
+      value.notes_ref === `${value.assignment.project}/work/${value.assignment.id}/note.md`,
+    "Note reference must identify this assignment",
+  );
+export const noteReferenceResult = z.union([noteReference, failure]);
+const notes = z.union([
+  z.strictObject({ ok: z.literal(true), nextStep: text.optional() }),
+  z.strictObject({ ok: z.literal(false), reason: text, nextStep: text.optional() }),
+]);
 const target = { project, assignment_id: id };
-const claim = { ...target, claimed_at: timestamp };
+const claim = { ...target, claimed_at: timestamp, claimed_by: text.nullable().default(null) };
 const item = {
   ...claim,
   position: z.number().int().positive().max(2147483647),
@@ -101,6 +137,7 @@ export const toolContracts = {
       constraints: z.string().optional(),
       initial_todos: z.array(text).min(1),
       depends_on_assignment_ids: z.array(id).optional(),
+      require_abilities: abilityProposal.default([]),
     }),
     output: z.union([detail, failure]),
   },
@@ -136,11 +173,14 @@ export const toolContracts = {
     output: z.union([assigned, failure]),
   },
   prepare_notes: {
-    input: z.strictObject({ ...target, root: text }),
-    output: z.union([notes, failure]),
+    input: z.strictObject(target),
+    output: notes,
   },
-  locate_notes: { input: z.strictObject(target), output: z.union([notes, failure]) },
-  claim_assignment: { input: z.strictObject(target), output: z.union([detail, failure]) },
+  locate_notes: { input: z.strictObject(target), output: notes },
+  claim_assignment: {
+    input: z.strictObject({ ...target, claimed_by: text, abilities: abilityProposal }),
+    output: z.union([detail, failure]),
+  },
   start_todo: { input: z.strictObject(item), output: z.union([progressed, failure]) },
   record_todo_result: {
     input: z.discriminatedUnion("outcome", [

@@ -61,6 +61,31 @@ preferences in private runtime settings instead. Setup tracks its own extension
 links, removes deselected links only while unchanged, and refuses to overwrite
 custom extension files or links.
 
+## Worker capabilities
+
+The worker manifest owns base capabilities and named type additions:
+
+```toml
+[worker]
+capabilities = []
+
+[worker.types.general]
+capabilities = []
+```
+
+`BATTUTA_WORKER_1_TYPE=general` selects worker-1 and its type in the environment
+file; add numbered entries for other instances. Indices are positive ASCII
+integers without leading zeroes; gaps are allowed, and no entries means no workers.
+There is no count or separate instance map.
+
+The effective set is the deduplicated union of base and selected type capabilities.
+Types do not inherit other types or change installed tools/resources. All names
+must exist in the canonical assignment ability catalog, currently empty, so only
+empty capability lists are valid. Unknown types, unknown names and malformed
+configuration stop launch. Source and release launchers supply the resolved set as
+code-owned JSON; changing it requires restarting the worker. Models do not choose,
+register or discover worker capabilities.
+
 ## Worker subagents
 
 The worker manifest declares each native subagent:

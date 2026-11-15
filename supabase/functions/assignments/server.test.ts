@@ -12,20 +12,28 @@ const assignment = {
   updated_at: "2026-11-04T12:00:00+00:00",
   closed_at: null,
   claimed_at: null,
+  claimed_by: null,
+  require_abilities: [],
   lease_expired_at: null,
   blocker: null,
   dependencies: [],
   ready: true,
 };
 
-async function call(rpc: Rpc, name: string, args: Record<string, unknown>) {
-  const handler = createAssignmentHandler(rpc);
+async function call(
+  rpc: Rpc,
+  name: string,
+  args: Record<string, unknown>,
+  rootHeader: string | null = encodeURIComponent("/local/.battuta/projects"),
+  handler = createAssignmentHandler(rpc),
+) {
   const response = await handler(
     new Request("http://localhost/mcp", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json, text/event-stream",
+        ...(rootHeader === null ? {} : { "X-Battuta-Projects-Root": rootHeader }),
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
@@ -44,6 +52,50 @@ async function call(rpc: Rpc, name: string, args: Record<string, unknown>) {
     : text;
   return JSON.parse(payload).result;
 }
+
+Deno.test(
+  "unknown specialists refuse before RPC with readable text and typed recovery data",
+  async () => {
+    for (const [name, input] of [
+      [
+        "create_assignment",
+        {
+          project: "Atlas",
+          goal: "Goal",
+          initial_todos: ["Step"],
+          require_abilities: ["mobile_browse"],
+        },
+      ],
+      [
+        "claim_assignment",
+        {
+          project: "Atlas",
+          assignment_id: "a3f91c2e",
+          claimed_by: "worker-1",
+          abilities: ["mobile_use"],
+        },
+      ],
+    ] as const) {
+      let calls = 0;
+      const result = await call(
+        () => {
+          calls++;
+          return Promise.resolve({ data: null, error: null });
+        },
+        name,
+        input,
+      );
+      assert.equal(calls, 0);
+      assert.equal(result.isError, true);
+      assert.equal(result.structuredContent.code, "unknown_abilities");
+      assert.deepEqual(result.structuredContent.suggestions, {});
+      assert.equal(result.content[0].text.startsWith("{"), false);
+      assert.match(result.content[0].text, /catalog is empty/i);
+      assert.match(result.content[0].text, /\[\]/);
+      assert.match(result.content[0].text, /mobile_/);
+    }
+  },
+);
 
 Deno.test(
   "MCP preserves exact update target/token and exposes structured business refusals",
@@ -94,23 +146,39 @@ Deno.test("MCP sanitizes backend errors, throws, and malformed output", async ()
     () => Promise.reject(new Error("private-sentinel")),
     () => Promise.resolve({ data: { ok: true, assignments: "private-sentinel" }, error: null }),
   ]) {
-    const result = await call(rpc, "list_assignments", { project: "Atlas" });
-    assert.equal(result.isError, true);
-    assert.equal(result.structuredContent.code, "backend_error");
-    assert.equal(JSON.stringify(result).includes("private-sentinel"), false);
+    for (const tool of ["list_assignments", "prepare_notes"]) {
+      const result = await call(rpc, tool, {
+        project: assignment.project,
+        ...(tool === "prepare_notes" ? { assignment_id: assignment.id } : {}),
+      });
+      assert.equal(result.isError, true);
+      if (tool === "prepare_notes") {
+        assert.deepEqual(Object.keys(result.structuredContent).sort(), [
+          "nextStep",
+          "ok",
+          "reason",
+        ]);
+        assert.equal(result.structuredContent.ok, false);
+        assert.ok(result.structuredContent.reason);
+        assert.ok(result.structuredContent.nextStep);
+        assert.deepEqual(JSON.parse(result.content[0].text), result.structuredContent);
+      } else assert.equal(result.structuredContent.code, "backend_error");
+      assert.equal(JSON.stringify(result).includes("private-sentinel"), false);
+    }
   }
 });
 
-Deno.test("note tools return existing path and editability with user-facing guidance", async () => {
+Deno.test("note tools return caller-local guidance respecting assignment status", async () => {
   for (const status of ["active", "in_process", "blocked", "done", "cancelled"]) {
-    for (const tool of ["prepare_notes", "locate_notes"]) {
-      const notes_path = "/home/bot/.battuta/projects/Atlas/work/a3f91c2e/note.md";
+    for (const tool of status === "active" ? ["prepare_notes", "locate_notes"] : ["locate_notes"]) {
+      const notes_path = "/old-host/.battuta/projects/Atlas/work/a3f91c2e/note.md";
+      const notes_ref = "Atlas/work/a3f91c2e/note.md";
       const result = await call(
         () =>
           Promise.resolve({
             data: {
               ok: true,
-              notes_path,
+              notes_ref,
               editable: !["done", "cancelled"].includes(status),
               assignment: {
                 ...assignment,
@@ -141,15 +209,164 @@ Deno.test("note tools return existing path and editability with user-facing guid
         {
           project: "Atlas",
           assignment_id: "a3f91c2e",
-          ...(tool === "prepare_notes" ? { root: "/home/bot/.battuta" } : {}),
         },
       );
-      assert.equal(result.structuredContent.notes_path, notes_path);
-      assert.equal(result.structuredContent.editable, !["done", "cancelled"].includes(status));
-      assert.equal(typeof result.structuredContent.guidance, "string");
-      assert.ok(result.structuredContent.guidance.trim().length > 0);
+      assert.deepEqual(Object.keys(result.structuredContent).sort(), ["nextStep", "ok"]);
+      assert.equal(result.structuredContent.ok, true);
+      assert.ok(
+        result.structuredContent.nextStep.includes(`/local/.battuta/projects/${notes_ref}`),
+      );
+      assert.match(
+        result.structuredContent.nextStep,
+        ["done", "cancelled"].includes(status) ? /read.only/i : /edit/i,
+      );
+      assert.deepEqual(JSON.parse(result.content[0].text), result.structuredContent);
     }
   }
+});
+
+Deno.test(
+  "note reference validation rejects remote paths, traversal and unrelated assignments",
+  async () => {
+    for (const notes_ref of [
+      "/other-host/note.md",
+      "../work/a3f91c2e/note.md",
+      "Other/work/a3f91c2e/note.md",
+      "projects/Atlas/work/a3f91c2e/note.md",
+    ]) {
+      const response = await call(
+        () =>
+          Promise.resolve({
+            data: { ok: true, assignment, notes_ref, editable: true },
+            error: null,
+          }),
+        "locate_notes",
+        { project: assignment.project, assignment_id: assignment.id },
+      );
+      assert.equal(response.isError, true);
+      assert.equal(response.structuredContent?.notes_ref, undefined);
+    }
+  },
+);
+
+Deno.test("note roots are caller metadata and invalid roots refuse before RPC", async () => {
+  for (const root of [
+    null,
+    "",
+    "relative",
+    "~/.battuta/projects",
+    "/local/../escape",
+    "/local/./projects",
+    "/local\\projects",
+    "/local/\u0000projects",
+    "/local/\nprojects",
+    "${PROJECTS_ROOT}",
+  ]) {
+    for (const name of ["prepare_notes", "locate_notes"]) {
+      let calls = 0;
+      const result = await call(
+        () => {
+          calls++;
+          return Promise.resolve({ data: null, error: null });
+        },
+        name,
+        { project: assignment.project, assignment_id: assignment.id },
+        root === null ? null : encodeURIComponent(root),
+      );
+      assert.equal(calls, 0);
+      assert.equal(result.isError, true);
+      assert.equal(result.structuredContent.ok, false);
+      assert.ok(result.structuredContent.reason);
+      assert.ok(result.structuredContent.nextStep);
+      assert.deepEqual(JSON.parse(result.content[0].text), result.structuredContent);
+    }
+  }
+  const malformed = await call(
+    () => {
+      throw new Error("must not reach RPC");
+    },
+    "prepare_notes",
+    { project: assignment.project, assignment_id: assignment.id },
+    "%ZZ",
+  );
+  assert.equal(malformed.structuredContent.ok, false);
+  const listed = await call(
+    () => Promise.resolve({ data: { ok: true, assignments: [] }, error: null }),
+    "list_assignments",
+    {},
+    null,
+  );
+  assert.equal(listed.isError, false);
+});
+
+Deno.test("note paths are resolved per request, decoding caller roots exactly once", async () => {
+  const rpc: Rpc = (_name, args) => {
+    assert.deepEqual(args, { p_project: assignment.project, p_assignment_id: assignment.id });
+    return Promise.resolve({
+      data: { ok: true, assignment, notes_ref: "Atlas/work/a3f91c2e/note.md", editable: true },
+      error: null,
+    });
+  };
+  const handler = createAssignmentHandler(rpc);
+  const roots = ["/home/worker-a/.battuta/projects/", "/Users/测试 space%2F#/.battuta/projects"];
+  const results = await Promise.all(
+    roots.map((root) =>
+      call(
+        rpc,
+        "prepare_notes",
+        { project: assignment.project, assignment_id: assignment.id },
+        encodeURIComponent(root),
+        handler,
+      ),
+    ),
+  );
+  for (const [index, result] of results.entries()) {
+    assert.equal(result.isError, false);
+    assert.ok(
+      result.structuredContent.nextStep.includes(
+        `${roots[index].replace(/\/$/, "")}/Atlas/work/a3f91c2e/note.md`,
+      ),
+    );
+    assert.equal(result.structuredContent.notes_ref, undefined);
+  }
+});
+
+Deno.test("closed unprepared notes have no invented local path", async () => {
+  const result = await call(
+    () =>
+      Promise.resolve({
+        data: {
+          ok: true,
+          assignment: { ...assignment, status: "done" },
+          notes_ref: null,
+          editable: false,
+        },
+        error: null,
+      }),
+    "locate_notes",
+    { project: assignment.project, assignment_id: assignment.id },
+  );
+  assert.equal(result.isError, false);
+  assert.match(result.structuredContent.nextStep, /no .*note/i);
+  assert.match(result.structuredContent.nextStep, /read.only/i);
+});
+
+Deno.test("unprepared note failures provide recovery without exposing backend fields", async () => {
+  const result = await call(
+    () =>
+      Promise.resolve({
+        data: { ok: false, code: "notes_unprepared", message: "Not prepared", assignment },
+        error: null,
+      }),
+    "locate_notes",
+    { project: assignment.project, assignment_id: assignment.id },
+  );
+  assert.equal(result.isError, true);
+  assert.equal(result.structuredContent.ok, false);
+  assert.ok(result.structuredContent.reason);
+  assert.match(result.structuredContent.nextStep, /prepare_notes/);
+  assert.deepEqual(Object.keys(result.structuredContent).sort(), ["nextStep", "ok", "reason"]);
+  assert.deepEqual(JSON.parse(result.content[0].text), result.structuredContent);
 });
 
 Deno.test(

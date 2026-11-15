@@ -2,6 +2,12 @@
 role = "worker"
 env_prefix = "WORKER"
 
+[worker]
+capabilities = []
+
+[worker.types.general]
+capabilities = []
+
 [runtime]
 pi_coding_agent_dir = "{instance}/.pi"
 

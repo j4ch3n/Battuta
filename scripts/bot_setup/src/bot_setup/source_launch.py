@@ -8,8 +8,9 @@ import click
 
 from .browser import validate_browser, configure_browser
 from .env import read_env, required
-from .instances import acquire_instance_lock, worker_names, instance_paths
+from .instances import acquire_instance_lock, worker_names, instance_paths, worker_environment
 from .manifest import load_profile
+from .mcp import assignment_environment
 from .runtime import initialize_settings_if_missing
 from .workers import prepare_launch_worker
 
@@ -18,7 +19,7 @@ def run_source_worker(root: Path, *, bot_dir: Path, env_file: Path, node: Path) 
     values = read_env(env_file)
     selected = worker_names(values, env_file)
     if not selected:
-        raise click.ClickException("Worker is outside the configured WORKER_BOT_COUNT")
+        raise click.ClickException("Worker is not selected by BATTUTA_WORKER_<N>_TYPE")
     for key in ("SUPABASE_URL", "SUPABASE_SECRET_KEY"):
         required(values, key, env_file)
     cli = root / "assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
@@ -26,13 +27,16 @@ def run_source_worker(root: Path, *, bot_dir: Path, env_file: Path, node: Path) 
         raise click.ClickException("Prepare the source worker runtime first")
     matches = [name for name in selected if instance_paths(root, Path.home(), name)[2].absolute() == bot_dir.absolute()]
     if len(matches) != 1:
-        raise click.ClickException("Worker directory must match bot.toml and configured WORKER_BOT_COUNT")
+        raise click.ClickException("Worker directory must match BATTUTA_WORKER_<N>_TYPE selection")
     bot = matches[0]
     profile = root / "bots/worker"
+    capabilities = worker_environment(root, values, env_file, bot)
     acquire_instance_lock(bot_dir)
     prepare_launch_worker(root, profile, bot_dir, bot=bot)
     env = {key: value for key, value in {**os.environ, **values}.items() if "TELEGRAM" not in key and not key.startswith("PI_SCHEDULER")}
     env.update(AGENT_ROLE="worker", BATTUTA_BOT_NAME=bot, PI_CODING_AGENT_DIR=str(bot_dir / ".pi"))
+    env.update(assignment_environment(Path.home()))
+    env.update(capabilities)
     env.setdefault("BATTUTA_MEMORY_URL", "http://127.0.0.1:8901/mcp")
     env.update(validate_browser(profile, bot_dir, home=Path.home(), bot=bot, path=env.get("PATH")))
     # Project settings must not shadow interpolated private browser settings.
@@ -55,6 +59,7 @@ def run_source_bot(root: Path, *, bot: str, env_file: Path) -> None:
     if fresh and "browser" in manifest.setup.steps:
         configure_browser(profile, private, home=Path.home(), bot=bot)
     env = {**os.environ, **values, "AGENT_ROLE": role, "BATTUTA_BOT_NAME": bot, "PI_CODING_AGENT_DIR": str(private / ".pi")}
+    env.update(assignment_environment(Path.home()))
     env.setdefault("BATTUTA_MEMORY_URL", "http://127.0.0.1:8901/mcp")
     if role == "cos":
         env.update(validate_browser(profile, private, home=Path.home(), bot=bot, path=env.get("PATH")))

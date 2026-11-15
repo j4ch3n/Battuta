@@ -117,6 +117,8 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         manifest["type"] = "module"
         write_json(bot / "package.json", manifest)
         shutil.copy2(original / "bot.toml", bot / "bot.toml")
+        if profile == "worker":
+            shutil.copy2(source / "supabase/functions/assignments/abilities.json", bot / "abilities.json")
         prepare_files(source, bot, bot, [rule for rule in manifests[profile].files if rule.destination == "profile"], source_profile=original, context="release")
         for name in selections[profile]:
             shutil.copytree(source / "skills-hub" / name, bot / ".pi/skills" / name)

@@ -1,21 +1,21 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(67);
+select plan(76);
 select ok((select relrowsecurity from pg_class where oid = 'public.assignments'::regclass), 'assignments RLS enabled');
 select ok((select relrowsecurity from pg_class where oid = 'public.todos'::regclass), 'todos RLS enabled');
 select ok(not has_table_privilege('anon','public.assignments','SELECT'), 'no anonymous reads');
 select ok(not has_table_privilege('authenticated','public.todos','INSERT'), 'no user writes');
 select ok(not has_table_privilege('service_role','public.todos','UPDATE'), 'backend uses RPC for updates');
 select ok(not has_table_privilege('service_role','public.assignments','INSERT'), 'backend uses RPC for creation');
-select ok(not has_function_privilege('anon','public.assignment_create(text,text,text[],text,text[])','EXECUTE'), 'anonymous RPC refused');
+select ok(not has_function_privilege('anon','public.assignment_create(text,text,text[],text,text[],text[])','EXECUTE'), 'anonymous RPC refused');
 select ok(not has_function_privilege('authenticated','public.assignment_get(text,text)','EXECUTE'), 'user RPC refused');
 select ok(has_function_privilege('service_role','public.assignment_get(text,text)','EXECUTE'), 'backend RPC allowed');
 select ok(not has_function_privilege('service_role','public.assignment_valid_project(text)','EXECUTE'), 'helper private');
 select is((select pg_get_constraintdef(oid) from pg_constraint where conrelid='public.todos'::regclass and contype='p'), 'PRIMARY KEY (assignment_id, "position")', 'composite item key');
 select is((select count(*)::integer from pg_indexes where schemaname='public' and tablename='todos'), 1, 'no redundant item index');
 select is((select data_type from information_schema.columns where table_schema='public' and table_name='todos' and column_name='assignment_id'), 'text', 'short assignment foreign key');
-select ok(not has_function_privilege('service_role','public.assignment_notes(text,text,text)','EXECUTE'), 'notes helper private');
+select ok(not has_function_privilege('service_role','public.assignment_notes_ref(text,text,boolean)','EXECUTE'), 'notes helper private');
 select ok(not has_function_privilege('service_role','public.assignment_nonblank(text)','EXECUTE'), 'nonblank helper private');
 select ok((select relrowsecurity from pg_class where oid='public.assignment_dependencies'::regclass), 'dependency RLS enabled');
 select ok((select relrowsecurity from pg_class where oid='public.assignment_availability'::regclass), 'availability RLS enabled');
@@ -34,16 +34,27 @@ cross join unnest(array[
  'public.assignment_append_todos(text,text,text[])',
  'public.assignment_update_todo(text,text,integer,timestamptz,text,text)',
  'public.assignment_close(text,text,text)',
- 'public.assignment_prepare_notes(text,text,text)',
+ 'public.assignment_prepare_notes(text,text)',
  'public.assignment_locate_notes(text,text)',
- 'public.assignment_create(text,text,text[],text,text[])',
- 'public.assignment_claim(text,text)',
- 'public.assignment_start_todo(text,text,timestamptz,integer,timestamptz)',
- 'public.assignment_record_todo_result(text,text,timestamptz,integer,timestamptz,text,text,text[],text)',
- 'public.assignment_block(text,text,timestamptz,text)',
- 'public.assignment_finish(text,text,timestamptz)',
+ 'public.assignment_create(text,text,text[],text,text[],text[])',
+ 'public.assignment_claim(text,text,text,text[])',
+ 'public.assignment_start_todo(text,text,timestamptz,integer,timestamptz,text)',
+ 'public.assignment_record_todo_result(text,text,timestamptz,integer,timestamptz,text,text,text[],text,text)',
+ 'public.assignment_block(text,text,timestamptz,text,text)',
+ 'public.assignment_finish(text,text,timestamptz,text)',
  'public.assignment_reactivate(text,text)',
  'public.assignment_list(text,text)',
- 'public.assignment_get(text,text)']) signature;
+  'public.assignment_get(text,text)']) signature;
+select ok(not has_function_privilege('service_role',signature,'EXECUTE'), 'no helper bypass: ' || signature)
+from unnest(array[
+ 'public.assignment_create_plan(text,text,text[],text,text[])',
+ 'public.assignment_claim_ready(text,text)',
+ 'public.assignment_start_todo_owned(text,text,timestamptz,integer,timestamptz)',
+ 'public.assignment_record_todo_result_owned(text,text,timestamptz,integer,timestamptz,text,text,text[],text)',
+ 'public.assignment_block_owned(text,text,timestamptz,text)',
+ 'public.assignment_finish_owned(text,text,timestamptz)',
+ 'public.assignment_ability_catalog()',
+ 'public.assignment_ability_error(text[])',
+ 'public.assignment_claimant_error(text,text,timestamptz,text)']) signature;
 select * from finish();
 rollback;

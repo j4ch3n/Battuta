@@ -11,6 +11,8 @@ export interface Assignment {
   updated_at: string;
   closed_at: string | null;
   claimed_at: string | null;
+  claimed_by: string | null;
+  require_abilities: string[];
   lease_expired_at: string | null;
   blocker: string | null;
   dependencies: { assignment_id: string; project: string; status: string }[];
@@ -35,9 +37,11 @@ export interface Result {
   todos: Todo[];
   todo: Todo;
   unfinished: Todo[];
+  notes_ref: string | null;
   notes_path: string | null;
   editable: boolean;
   reason?: string;
+  nextStep?: string;
   missing_assignment_ids?: string[];
   message?: string;
 }
@@ -83,6 +87,20 @@ export async function rpc(
   args: unknown[],
 ): Promise<Result> {
   if (!/^assignment_[a-z_]+$/.test(name)) throw new Error("Invalid test RPC name");
+  // Default identity for tests whose subject is the existing execution lifecycle.
+  args = [...args];
+  if (name === "assignment_claim" && args.length === 2) args.push("test-worker", []);
+  const ownerPosition: Record<string, number> = {
+    assignment_start_todo: 5,
+    assignment_record_todo_result: 9,
+    assignment_block: 4,
+    assignment_finish: 3,
+  };
+  const owner = ownerPosition[name];
+  if (owner !== undefined && args.length <= owner) {
+    while (args.length < owner) args.push(null);
+    args.push("test-worker");
+  }
   // postgres.js serializes inferred timestamptz parameters through Date (milliseconds).
   const tokens: Record<string, number[]> = {
     assignment_update_todo: [3],

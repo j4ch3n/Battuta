@@ -53,7 +53,7 @@ exposure; worker assignment mutations remain hidden from model/codemode tools.
 Installed releases instead use the compiled `bots/worker` role as cwd and
 `~/.battuta/pi-bots/worker-N/.pi` as agentDir. Build-generated instructions/skills
 and installed dependencies stay in the installation; private configuration is
-generated separately without resource merges. `WORKER_BOT_COUNT` selects the
+generated separately without resource merges. `BATTUTA_WORKER_<N>_TYPE` selects the
 numbered systemd instances. Source and release launchers hold an instance lock
 across exec. Foreground maintenance requires the selected service to be stopped;
 tmux detach never authorizes starting another process for that identity.
@@ -67,7 +67,24 @@ claimed crash session. Availability wakes `/worker-next`, a registered control
 command that does not require a model call. Busy/pending contexts do not claim.
 One serialized coordinator owns at most one binding and one running TODO.
 
-After claiming, `newSession` starts a fresh conversation at the same cwd/agentDir.
+Before subscribing, the extension validates launcher-provided
+`BATTUTA_WORKER_CAPABILITIES` JSON and initializes an immutable capability set.
+The launcher supplies the configured bot ID in `BATTUTA_BOT_NAME`; claims record
+that name as `claimed_by` for traceability. A missing or invalid name stops startup
+rather than inventing an ID. Bot names must be distinct wherever operators need
+to distinguish workers across hosts.
+The launcher resolves base plus selected type capabilities from `bot.toml`;
+see [manifest configuration](bot-setup.md#worker-capabilities).
+Each fresh Pi runtime reloads the same configuration without a model turn.
+Missing, malformed or unknown capabilities stop startup before network access.
+Availability signals, reconnects and fallback checks drive matching and claiming
+in code. No registration tool or model declaration exists. The first execution
+turn follows a confirmed claim, prepared workspace and persisted TODO start.
+Configuration changes require a restart; restored claims still require the full
+configured subset.
+
+After claiming and safely preparing the local scratch workspace, `newSession`
+starts a fresh conversation at the same cwd/agentDir.
 Setup records the binding before the new extension restores it. Disposal stops
 the old coordinator and its availability connections. A failed/cancelled handoff
 retains the claim for operator inspection rather than invoking a recovery host.
@@ -101,13 +118,27 @@ not sandbox guarantees.
 Workers discover ready assignments across projects and claim each using its
 explicit project and assignment ID. Project-context commands also require an
 explicit project target; there is no global current-project configuration.
-The runtime does not resolve workspaces or switch cwd to the project's checkout.
+The runtime does not switch cwd or provision a project checkout. It creates only
+missing `~/.battuta/projects/<project>/work/<assignment-id>/note.md` scratch paths,
+without changing existing note bytes. It verifies the live claim before preparation,
+and prepares once per session binding, including a fresh restoration, not before
+each TODO or note edit. Workspace paths have a trusted single writer. Unsafe paths or creation
+failures become claim-bound blockers; an unconfirmed blocker retains the claim
+and pauses. Preparation does not register a project, create `project.yaml` or a
+summary, clone code, restore essential inputs, or synchronize files.
 Commission only approved work with accessible project inputs; a discovered
 mismatch or missing context is a blocker, not an automatic unclaim.
+The executing worker checks essential inputs in the commission; directory
+readiness alone is not evidence those inputs exist. Note-only work needs no
+registered project when its supplied inputs are sufficient.
 
 Concurrent workers may share project files. Manager must choose non-conflicting
 boundaries or dependencies. No locking or file synchronization is added; missing
 local input must be reported honestly rather than assumed to exist elsewhere.
+The bound execution message includes the resolved local workspace paths.
+Shared note tools return full local paths resolved for the calling bot;
+old absolute metadata must never be used as a local write target. Persist complete
+handoff content in TODO results; local notes alone are not cross-host evidence.
 
 ## Notification and manual operations
 

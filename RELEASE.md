@@ -176,9 +176,10 @@ remote backend. Use literal shell-compatible values, quoted when needed; do not
 use command substitution or variable expansion. Keep optional service overrides
 here too.
 
-Set `WORKER_BOT_COUNT` explicitly: `1` is the normal local example, `0` disables
-workers, and `N` selects `worker-1` through `worker-N`. Missing/invalid values fail
-before configuration or launch. This setting is not live autoscaling.
+Select instances with `BATTUTA_WORKER_1_TYPE=general` and additional numbered
+entries as needed. No entries selects no workers. Types are declared in the worker
+manifest; invalid selections fail before launch. See [worker capabilities](docs/bot-setup.md#worker-capabilities).
+Changes require a restart, not live autoscaling.
 
 Before configuration, stop CoS and set the required `BATTUTA_DREAM_MODEL` to an
 exact `provider/model-id` in the selected environment file. It has no default and
