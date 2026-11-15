@@ -63,6 +63,10 @@ setup creates missing private MCP files and leaves existing files untouched. Rev
 skipped configuration before starting bots. Restart bots separately only when authorized. Neither source nor release
 configuration starts worker sessions or changes bounded-subagent isolation defaults.
 
-Notes need no editor package or service: bots use Pi's file tools at returned
-paths. Verify project registration using `battuta-project list`; missing project
-context requires owner confirmation, not a general-scope fallback.
+Deploy the matching migration and clients together: note tools now accept only
+project/assignment ID and return a relative `notes_ref`, not an absolute
+`notes_path`. No new credentials are required. Workers need write permission
+under their own expanded `~/.battuta` root; runtime code prepares only assignment
+scratch directories and preserves existing files. Notes need no editor service
+and are not synchronized. Project registration is not required for note-only
+work; missing essential commission inputs still require an honest blocker.

@@ -25,8 +25,7 @@ calls. For bound execution, use Manager's supplied identity and inputs; report
 missing context through execute-assignment. For planning outside a bound task,
 use project-management to inspect registered context and ask the responsible requester
 when the commission lacks its project. Do not silently substitute global selection.
-Workers currently stay on the same project; this workflow does not change global
-project configuration.
+This workflow does not change global project configuration.
 
 Inspect related work before creating duplicates. Multiple assignments may be open
 per project. Create the entire initial TODO list atomically, with goal, authority,
@@ -34,12 +33,18 @@ constraints, acceptance/input references, and existing prerequisite IDs. Depende
 may cross projects but remain immutable; only prerequisites done unlock execution.
 Duplicate prerequisite IDs mean one dependency. Cancelled prerequisites do not
 satisfy dependents. Choose non-conflicting workspace boundaries or dependencies.
+Use canonical specialist requirements only when the work genuinely needs them.
+The catalog is currently empty: omit `require_abilities` or use `[]`. Unknown names
+reject the whole write; read the correction message rather than guessing aliases.
+Worker code claims only when its registered session set includes every required
+ability. Keep appended TODOs compatible with the assignment's requirements;
+replace the assignment when requirements must change.
 
 ## Manager and inspection tools
 
 | Tool | Inputs beyond project/assignment ID | Use |
 | --- | --- | --- |
-| create_assignment | goal, nonempty initial_todos, optional constraints and depends_on_assignment_ids | Publish one complete initial plan; requires project, not an existing assignment ID |
+| create_assignment | goal, nonempty initial_todos, optional constraints, depends_on_assignment_ids and require_abilities | Publish one complete initial plan; requires project, not an existing assignment ID |
 | list_assignments | optional project and status | Inspect global or project work, readiness, and claim timestamps; no assignment ID |
 | get_assignment | None | Read authoritative detail, evidence, dependencies, and ordered TODOs |
 | append_todos | nonempty descriptions array | Append consecutive positions to active/blocked work |

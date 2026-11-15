@@ -67,7 +67,16 @@ claimed crash session. Availability wakes `/worker-next`, a registered control
 command that does not require a model call. Busy/pending contexts do not claim.
 One serialized coordinator owns at most one binding and one running TODO.
 
-After claiming, `newSession` starts a fresh conversation at the same cwd/agentDir.
+Before claiming, a registration-only model turn calls `register_worker_abilities`.
+The catalog is currently empty: register `[]`. The validated set lives only in
+extension memory, is fixed while a claim is live, and is never restored from
+conversation entries. Uninitialized workers cannot claim, even general work.
+Each fresh Pi runtime registers again before executing TODOs. Registration turns
+receive no commissioned execution work. Names must come from the canonical catalog;
+unknown proposals are refused in readable text, never silently renamed.
+
+After claiming and safely preparing the local scratch workspace, `newSession`
+starts a fresh conversation at the same cwd/agentDir.
 Setup records the binding before the new extension restores it. Disposal stops
 the old coordinator and its availability connections. A failed/cancelled handoff
 retains the claim for operator inspection rather than invoking a recovery host.
@@ -101,13 +110,26 @@ not sandbox guarantees.
 Workers discover ready assignments across projects and claim each using its
 explicit project and assignment ID. Project-context commands also require an
 explicit project target; there is no global current-project configuration.
-The runtime does not resolve workspaces or switch cwd to the project's checkout.
+The runtime does not switch cwd or provision a project checkout. It creates only
+missing `~/.battuta/projects/<project>/work/<assignment-id>/note.md` scratch paths,
+without changing existing note bytes. It verifies the live claim before preparation,
+and prepares again before dispatch after restoration. Unsafe paths or creation
+failures become claim-bound blockers; an unconfirmed blocker retains the claim
+and pauses. Preparation does not register a project, create `project.yaml` or a
+summary, clone code, restore essential inputs, or synchronize files.
 Commission only approved work with accessible project inputs; a discovered
 mismatch or missing context is a blocker, not an automatic unclaim.
+The executing worker checks essential inputs in the commission; directory
+readiness alone is not evidence those inputs exist. Note-only work needs no
+registered project when its supplied inputs are sufficient.
 
 Concurrent workers may share project files. Manager must choose non-conflicting
 boundaries or dependencies. No locking or file synchronization is added; missing
 local input must be reported honestly rather than assumed to exist elsewhere.
+The bound execution message includes the resolved local workspace paths.
+Shared note tools return relative references, resolved under each host's root;
+old absolute metadata must never be used as a local write target. Persist complete
+handoff content in TODO results; local notes alone are not cross-host evidence.
 
 ## Notification and manual operations
 

@@ -31,6 +31,12 @@ bound executor retains responsibility for evidence, integration and reporting.
 
 ## Orient to the commission
 
+Before taking or resuming work, use `register_worker_abilities` to declare this
+session's specialist set. The catalog is currently empty: register `[]`; do not
+invent tags for general skills. Registration alone does not claim work. Code
+prepares the local assignment output workspace before executing a TODO and
+supplies its paths. This does not register a project or recover missing inputs.
+
 1. Read the bound project, goal, current TODO, prerequisite results, constraints,
    exclusions, acceptance, authority, and Manager's input paths. Use assignment
    MCP to inspect the bound context as needed. Retain context across ordered TODOs;
@@ -63,7 +69,8 @@ bound executor retains responsibility for evidence, integration and reporting.
 5. Compare those inputs with the commission and current evidence. Return
    consequential conflicts, missing authority, project mismatches, or essential
    inaccessible inputs to Manager through a blocked execution result. Do not
-   silently adopt a newer ticket comment as changed scope. Skip repository and
+    silently adopt a newer ticket comment as changed scope. Skip project
+    registration/orientation when note-only work has sufficient supplied inputs. Skip repository and
    ticket steps when they are irrelevant to research, writing, or another
    non-repository deliverable; do not fabricate requirements to complete a ritual.
 
@@ -82,6 +89,10 @@ bound executor retains responsibility for evidence, integration and reporting.
    local work. Preserve existing material and record concise findings, actual
    verification, and real evidence references, not a tool-call diary. Do not
    persist credentials, private owner-profile data, or unrelated personal context.
+   Resolve note references locally; never write to another host's historical
+   absolute path. Local scratch files are not synchronized. Include sufficient
+   findings/deliverable content in the persisted result for Manager to review;
+   inaccessible required content is a blocker, not a successful remote delivery.
 4. Submit `report_execution_result` for the bound TODO using the contract below.
    Correct malformed input if rejected. Acceptance awaits final turn settlement
    and persistence; a successful call alone proves neither assignment completion

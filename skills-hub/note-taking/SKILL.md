@@ -14,8 +14,9 @@ locate and trust.
 
 Keep findings and provenance that would be costly to reconstruct. Notes are
 provisional working material, not canonical specifications, commitments,
-publication approval, or automatic durable memory. All bots use the same file
-for a project assignment, not separate role notebooks. Use todo for assignment
+publication approval, or automatic durable memory. Bots on the same host use the
+same assignment file, not separate role notebooks; other hosts have independent
+local copies, not synchronized content. Use todo for assignment
 discovery and progress; use draft-writing for complete long-form documents.
 
 ## Prepare or locate notes
@@ -26,14 +27,16 @@ Every note requires an assignment; do not create general/unbound notebooks.
 
 | Tool            | Additional input                                                  | Result                                                                     |
 | --------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `prepare_notes` | `root`: absolute local Battuta root, with home directory expanded | Establish/reuse the shared path and return initialization/editing guidance |
-| `locate_notes`  | None                                                              | Return the existing path and current editable/frozen guidance              |
+| `prepare_notes` | None | Establish/reuse the relative note reference and return initialization/editing guidance |
+| `locate_notes`  | None | Return the relative reference and current editable/frozen guidance |
 
-The root is normally the expanded `~/.battuta`, not its projects subdirectory.
-Use the returned `notes_path`; do not invent another location or role suffix.
-Preparation returns a plan, not proof that a file exists locally. A conflicting
-root fails rather than relocating existing material. If notes are unprepared,
-prepare them for the nonterminal assignment first, including blocked work.
+Resolve returned `notes_ref` under your own expanded `~/.battuta` root, not
+under its projects subdirectory. Never use historical `assignment.notes_path`
+as a write target: it may belong to another host. Do not invent another location
+or role suffix. Preparation returns guidance, not proof a local file exists.
+If notes are unprepared, prepare them for the nonterminal assignment first,
+including blocked work. A worker's local output workspace is prepared by code;
+an empty file does not recover missing commission inputs.
 
 Inspect local path safety, create directories/file only if absent, and preserve
 existing contents. Use Pi's built-in read/edit/write/search tools at that path;
@@ -46,6 +49,9 @@ is done/cancelled: read existing material only. Do not create or edit its notes
 or adjacent drafts. The freeze is a prompt rule, not a filesystem security lock.
 On missing files or storage errors, retain existing content and report the
 problem; do not silently replace or repair another file.
+Local notes and drafts are not remotely readable merely because their reference
+is shared. Put complete handoff findings in the execution result and evidence;
+report missing required remote content rather than inventing it.
 
 ## Worth keeping
 
