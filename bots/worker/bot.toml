@@ -69,6 +69,7 @@ policy = "create-only"
 
 [skills]
 include = [
+  "access-remote-files",
   "todo",
   "note-taking",
   "draft-writing",

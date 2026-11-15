@@ -7,6 +7,9 @@ project_id = "Battuta"
 [functions.assignments]
 verify_jwt = false
 
+[functions.assignment-files]
+verify_jwt = false
+
 [api]
 enabled = true
 # Port to use for the API URL.
