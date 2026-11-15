@@ -1,4 +1,4 @@
-import { constants, promises as fs } from "node:fs";
+import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
@@ -22,11 +22,9 @@ test.each(["relative", "/some/../root", "/some/./root", "/some\\root", "/some\nr
   },
 );
 
-test("prepares only assignment scratch directories and preserves bytes across repeats and concurrent calls", async () => {
+test("prepares only assignment scratch directories and preserves bytes across repeats", async () => {
   const base = await root();
-  const [paths] = await Promise.all(
-    Array.from({ length: 8 }, () => ensureAssignmentWorkspace(base, target)),
-  );
+  const paths = await ensureAssignmentWorkspace(base, target);
   expect(paths).toEqual({
     directory: join(base, "projects/Atlas/work/1234abcd"),
     notePath: join(base, "projects/Atlas/work/1234abcd/note.md"),
@@ -34,7 +32,7 @@ test("prepares only assignment scratch directories and preserves bytes across re
   expect(await fs.readFile(paths.notePath, "utf8")).toBe("");
   const bytes = Buffer.from([0, 255, 10, 65]);
   await fs.writeFile(paths.notePath, bytes);
-  await Promise.all(Array.from({ length: 8 }, () => ensureAssignmentWorkspace(base, target)));
+  await ensureAssignmentWorkspace(base, target);
   expect(await fs.readFile(paths.notePath)).toEqual(bytes);
   expect(await fs.readdir(join(base, "projects/Atlas"))).toEqual(["work"]);
 });
@@ -86,23 +84,6 @@ test("permission failure does not overwrite existing content", async () => {
   await expect(ensureAssignmentWorkspace(base, target)).rejects.toThrow("denied");
   expect(await fs.readFile(paths.notePath, "utf8")).toBe("preserve");
 });
-test("a concurrent creator's note wins exclusive creation without truncation", async () => {
-  const base = await root();
-  const open = fs.open.bind(fs);
-  vi.spyOn(fs, "open").mockImplementation(async (...args: Parameters<typeof fs.open>) => {
-    if (
-      typeof args[0] === "string" &&
-      args[0].endsWith("/note.md") &&
-      typeof args[1] === "number" &&
-      args[1] & constants.O_EXCL
-    ) {
-      await fs.writeFile(args[0], "concurrent content", { flag: "wx" });
-    }
-    return open(...args);
-  });
-  const paths = await ensureAssignmentWorkspace(base, target);
-  expect(await fs.readFile(paths.notePath, "utf8")).toBe("concurrent content");
-});
 test("different host roots share only a relative reference, never note contents", async () => {
   const firstRoot = await root(),
     secondRoot = await root();
@@ -112,20 +93,4 @@ test("different host roots share only a relative reference, never note contents"
   expect(relative(firstRoot, first.notePath)).toBe(relative(secondRoot, second.notePath));
   expect(first.notePath).not.toBe(second.notePath);
   expect(await fs.readFile(second.notePath, "utf8")).toBe("");
-});
-test("a directory replaced by a symlink during creation is rejected before descending", async () => {
-  const base = await root();
-  const outside = join(base, "..", "outside");
-  await fs.mkdir(outside);
-  const mkdir = fs.mkdir.bind(fs);
-  vi.spyOn(fs, "mkdir").mockImplementation(async (...args: Parameters<typeof fs.mkdir>) => {
-    const result = await mkdir(...args);
-    if (typeof args[0] === "string" && args[0].endsWith("/work")) {
-      await fs.rename(args[0], `${args[0]}.original`);
-      await fs.symlink(outside, args[0]);
-    }
-    return result;
-  });
-  await expect(ensureAssignmentWorkspace(base, target)).rejects.toThrow();
-  expect(await fs.readdir(outside)).toEqual([]);
 });

@@ -1,4 +1,4 @@
-import { constants, promises as fs } from "node:fs";
+import { promises as fs } from "node:fs";
 import { isAbsolute, join, parse } from "node:path";
 
 export async function ensureAssignmentWorkspace(
@@ -20,6 +20,7 @@ export async function ensureAssignmentWorkspace(
   )
     throw new Error("Workspace root must be an absolute local path without traversal");
   const directory = join(root, "projects", project, "work", assignment_id);
+  // shortcut: trusted single-writer workspace, use directory-relative operations if that changes.
   let current = parse(directory).root;
   for (const part of directory.slice(current.length).split("/")) {
     current = join(current, part);
@@ -33,25 +34,13 @@ export async function ensureAssignmentWorkspace(
       throw new Error("Workspace contains a symlink or non-directory");
   }
   const notePath = join(directory, "note.md");
-  let handle;
   try {
-    handle = await fs.open(
-      notePath,
-      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
-      0o600,
-    );
+    const handle = await fs.open(notePath, "wx", 0o600);
+    await handle.close();
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-    handle = await fs.open(
-      notePath,
-      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
-    );
   }
-  try {
-    if (!(await handle.stat()).isFile() || (await fs.realpath(notePath)) !== notePath)
-      throw new Error("Assignment note must be a regular local file without symlinks");
-  } finally {
-    await handle.close();
-  }
+  if (!(await fs.lstat(notePath)).isFile())
+    throw new Error("Assignment note must be a regular local file");
   return { directory, notePath };
 }

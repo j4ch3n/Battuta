@@ -20,8 +20,8 @@ export default function worker(pi: ExtensionAPI) {
     timer: ReturnType<typeof setInterval> | undefined;
   let context: ExtensionContext | undefined, command: ExtensionCommandContext | undefined;
   let stopped = false,
-    restored = false,
-    registrationPrompted = false;
+    restored = false;
+  let registrationState: "unprompted" | "prompted" | "paused" = "unprompted";
   const workerId = randomUUID();
   const diagnostic = (event: string) => console.error(`[assignment-worker] ${event}`);
   const wake = () => {
@@ -67,12 +67,14 @@ export default function worker(pi: ExtensionAPI) {
   });
   pi.registerCommand("worker-next", {
     description: "Reconcile worker availability without invoking a model",
-    async handler(_args, ctx) {
+    async handler(args, ctx) {
       if (stopped || !coordinator || !ctx.isIdle() || ctx.hasPendingMessages()) return;
       command = ctx;
       if (!coordinator.abilitiesReady) {
-        if (!registrationPrompted) {
-          registrationPrompted = true;
+        if (args === "retry-registration" && registrationState === "paused")
+          registrationState = "unprompted";
+        if (registrationState === "unprompted") {
+          registrationState = "prompted";
           pi.sendMessage(
             {
               customType: "worker-ability-registration",
@@ -213,6 +215,24 @@ export default function worker(pi: ExtensionAPI) {
   });
   pi.on("agent_settled", async (event, ctx) => {
     context = ctx;
+    if (
+      !stopped &&
+      coordinator &&
+      !coordinator.abilitiesReady &&
+      registrationState === "prompted"
+    ) {
+      registrationState = "paused";
+      diagnostic("Ability registration did not complete; explicit retry required");
+      pi.sendMessage(
+        {
+          customType: "worker-registration-paused",
+          content:
+            "Worker paused because this turn did not register valid abilities. No assignment work was dispatched. Run /worker-next retry-registration to try again; any existing claim remains held.",
+          display: true,
+        },
+        { triggerTurn: false },
+      );
+    }
     await coordinator?.settle(event);
     wake();
   });

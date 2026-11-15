@@ -173,3 +173,45 @@ test("a bound native extension dispatches its TODO through Pi without a host sen
   expect(setActiveTools.mock.calls[0][0]).not.toContain("mcp__assignments__claim_assignment");
   await handlers.get("session_shutdown")!({}, ctx);
 });
+
+test("failed registration pauses visibly and only an explicit retry starts another turn", async () => {
+  vi.useFakeTimers();
+  const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
+  const sendMessage = vi.fn();
+  let next: (args: string, ctx: ExtensionContext) => Promise<void>;
+  worker({
+    on: (name: string, fn: unknown) => handlers.set(name, fn as never),
+    registerTool: vi.fn(),
+    registerCommand: (_name: string, options: { handler: typeof next }) => {
+      next = options.handler;
+    },
+    sendMessage,
+    sendUserMessage: vi.fn(),
+    setActiveTools: vi.fn(),
+  } as unknown as ExtensionAPI);
+  const ctx = {
+    isIdle: () => true,
+    hasPendingMessages: () => false,
+    sessionManager: { getEntries: () => [], getSessionId: () => crypto.randomUUID() },
+  } as unknown as ExtensionContext;
+  vi.stubEnv("SUPABASE_URL", "http://127.0.0.1:54321");
+  vi.stubEnv("SUPABASE_SECRET_KEY", "local-test-key");
+  try {
+    await handlers.get("session_start")!({ reason: "startup" }, ctx);
+    await next!("", ctx);
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    await handlers.get("agent_settled")!({ outcome: "aborted" }, ctx);
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    expect(sendMessage.mock.calls[1][1]).toEqual({ triggerTurn: false });
+    await next!("", ctx);
+    await next!("", ctx);
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    expect(backend.list).not.toHaveBeenCalled();
+    await next!("retry-registration", ctx);
+    expect(sendMessage).toHaveBeenCalledTimes(3);
+    expect(sendMessage.mock.calls[2][1]).toEqual({ triggerTurn: true });
+  } finally {
+    await handlers.get("session_shutdown")!({}, ctx);
+    vi.unstubAllEnvs();
+  }
+});

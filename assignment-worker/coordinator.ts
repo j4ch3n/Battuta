@@ -13,6 +13,7 @@ import type {
   ExecutionResult,
   TodoRow,
   AssignmentView,
+  Workspace,
 } from "./types.ts";
 
 type Phase =
@@ -29,6 +30,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
   let tail: Promise<unknown> = Promise.resolve();
   let reconciling: Promise<void> | undefined;
   let abilities: ReadonlySet<string> | undefined;
+  let workspace: Workspace | undefined;
   function serial<T>(work: () => Promise<T>): Promise<T> {
     const next = tail.then(work);
     tail = next.catch(() => {});
@@ -69,6 +71,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     }
     if (stopped) return;
     binding = undefined;
+    workspace = undefined;
     current = undefined;
     accepted = undefined;
     boundary = undefined;
@@ -109,8 +112,9 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
   }
   async function prepareWorkspace() {
     if (stopped || !binding) return;
+    if (workspace) return workspace;
     try {
-      const workspace = await sessions.prepareWorkspace(binding);
+      workspace = await sessions.prepareWorkspace(binding);
       return stopped ? undefined : workspace;
     } catch (error) {
       diagnostics("Local assignment workspace preparation failed", error);

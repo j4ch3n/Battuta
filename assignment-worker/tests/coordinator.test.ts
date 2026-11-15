@@ -211,7 +211,7 @@ test("live claims refuse ability-set replacement and stale claimant rows never d
   expect(h.turns).toEqual([]);
 });
 
-test("workspace preparation follows the winning claim and guards restoration before TODO start", async () => {
+test("workspace is prepared once after claiming, before any TODO starts", async () => {
   const h = harness();
   h.sessions.prepareWorkspace.mockImplementation(() => {
     expect(h.state.assignment.status).toBe("in_process");
@@ -223,8 +223,11 @@ test("workspace preparation follows the winning claim and guards restoration bef
     });
   });
   await h.begin();
-  expect(h.sessions.prepareWorkspace).toHaveBeenCalledTimes(2);
+  expect(h.sessions.prepareWorkspace).toHaveBeenCalledTimes(1);
   expect(h.turns).toHaveLength(1);
+  await h.complete();
+  expect(h.turns).toHaveLength(2);
+  expect(h.sessions.prepareWorkspace).toHaveBeenCalledTimes(1);
 });
 test.each(["claim", "restore"])(
   "workspace failure during %s blocks honestly without model execution",
@@ -232,8 +235,17 @@ test.each(["claim", "restore"])(
     const h = harness();
     if (stage === "restore") await h.coordinator.reconcile("idle");
     h.sessions.prepareWorkspace.mockRejectedValueOnce(new Error("permission denied"));
-    if (stage === "restore") await h.coordinator.restoreBinding(h.opened[0]);
-    else await h.coordinator.reconcile("idle");
+    if (stage === "restore") {
+      const restored = createCoordinator({
+        assignments: h.assignments,
+        sessions: h.sessions,
+        notify: h.notify,
+        diagnostics: h.diagnostics,
+        workerId: "restored-worker",
+      });
+      restored.registerAbilities([]);
+      await restored.restoreBinding(h.opened[0]);
+    } else await h.coordinator.reconcile("idle");
     expect(h.assignments.start).not.toHaveBeenCalled();
     expect(h.turns).toEqual([]);
     expect(h.state.assignment.status).toBe("blocked");

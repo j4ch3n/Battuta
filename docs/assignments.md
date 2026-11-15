@@ -117,12 +117,13 @@ and files are preserved; that field is not a local write destination. New metada
 uses the relative reference. Deploy the migration and matching clients together.
 
 After a confirmed claim, worker code ensures the local directories and `note.md`
-exist before handoff and before restored TODO dispatch. Existing bytes are preserved;
+exist once before handoff, or once when restoring a fresh session. It does not repeat
+preparation for each TODO or note edit. Existing bytes are preserved;
 symlinks, traversal, wrong object types, and permission failures stop execution.
 Preparation does not create project registration, summaries, repositories or missing
 inputs. Failure retains the claim and follows the blocker/Manager notification
-flow; an uncertain blocker pauses for inspection. These checks are not a sandbox
-against hostile concurrent filesystem mutation. The server itself does no file I/O.
+flow; an uncertain blocker pauses for inspection. The workspace assumes a trusted
+single writer, not concurrent directory replacement. The server itself does no file I/O.
 
 Long drafts may live beside the note. No synchronization or remote file delivery
 is provided: local scratch paths alone are not portable evidence. Put the complete

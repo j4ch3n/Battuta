@@ -68,6 +68,9 @@ command that does not require a model call. Busy/pending contexts do not claim.
 One serialized coordinator owns at most one binding and one running TODO.
 
 Before claiming, a registration-only model turn calls `register_worker_abilities`.
+If that turn finishes without valid registration, the worker displays a paused
+notice and keeps any existing claim. Run `/worker-next retry-registration` for a
+deliberate retry; availability wakes do not start an automatic model retry loop.
 The catalog is currently empty: register `[]`. The validated set lives only in
 extension memory, is fixed while a claim is live, and is never restored from
 conversation entries. Uninitialized workers cannot claim, even general work.
@@ -113,7 +116,8 @@ explicit project target; there is no global current-project configuration.
 The runtime does not switch cwd or provision a project checkout. It creates only
 missing `~/.battuta/projects/<project>/work/<assignment-id>/note.md` scratch paths,
 without changing existing note bytes. It verifies the live claim before preparation,
-and prepares again before dispatch after restoration. Unsafe paths or creation
+and prepares once per session binding, including a fresh restoration, not before
+each TODO or note edit. Workspace paths have a trusted single writer. Unsafe paths or creation
 failures become claim-bound blockers; an unconfirmed blocker retains the claim
 and pauses. Preparation does not register a project, create `project.yaml` or a
 summary, clone code, restore essential inputs, or synchronize files.
