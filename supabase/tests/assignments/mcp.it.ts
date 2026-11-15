@@ -89,13 +89,13 @@ Deno.test("remote MCP authenticates before discovery and exposes shared lifecycl
         ).result.code,
         "stale_update",
       );
-      const claim_by = "mcp-test-worker";
+      const claimed_by = "mcp-test-worker";
       const claimed = await call(manager, "claim_assignment", {
         ...target,
-        claim_by,
+        claimed_by,
         abilities: [],
       });
-      const execution = { ...target, claim_by, claimed_at: claimed.result.assignment.claimed_at };
+      const execution = { ...target, claimed_by, claimed_at: claimed.result.assignment.claimed_at };
       const refused = await call(manager, "finish_assignment", execution);
       assert.equal(refused.isError, true);
       assert.deepEqual(

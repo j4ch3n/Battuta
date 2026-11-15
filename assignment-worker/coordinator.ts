@@ -46,7 +46,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     row.id === binding.assignment_id &&
     row.project === binding.project &&
     row.claimed_at === binding.claimed_at &&
-    row.claim_by === binding.claim_by;
+    row.claimed_by === binding.claimed_by;
   function checkLive(detail: Detail) {
     if (!matches(detail.assignment) || detail.assignment.status !== "in_process") {
       pause("Execution claim was superseded; progression stopped");
@@ -218,7 +218,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
               detail = await assignments.claim({
                 project: candidate.project,
                 assignment_id: candidate.id,
-                claim_by: options.workerId,
+                claimed_by: options.workerId,
                 abilities: [...abilities],
               });
             } catch (error) {
@@ -232,7 +232,10 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
               return;
             }
             if (stopped) return;
-            if (!detail.assignment.claimed_at || detail.assignment.claim_by !== options.workerId) {
+            if (
+              !detail.assignment.claimed_at ||
+              detail.assignment.claimed_by !== options.workerId
+            ) {
               pause("Claim response omitted its version; inspect ownership");
               return;
             }
@@ -240,7 +243,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
               project: detail.assignment.project,
               assignment_id: detail.assignment.id,
               claimed_at: detail.assignment.claimed_at,
-              claim_by: detail.assignment.claim_by,
+              claimed_by: detail.assignment.claimed_by,
               session_file: "",
             };
             phase = "switching";
@@ -284,7 +287,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
         if (
           binding &&
           (binding.claimed_at !== next.claimed_at ||
-            binding.claim_by !== next.claim_by ||
+            binding.claimed_by !== next.claimed_by ||
             binding.assignment_id !== next.assignment_id ||
             binding.project !== next.project)
         )

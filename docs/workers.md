@@ -68,6 +68,10 @@ command that does not require a model call. Busy/pending contexts do not claim.
 One serialized coordinator owns at most one binding and one running TODO.
 
 Before claiming, a registration-only model turn calls `register_worker_abilities`.
+The launcher supplies the configured bot ID in `BATTUTA_BOT_NAME`; claims record
+that name as `claimed_by` for traceability. A missing or invalid name stops startup
+rather than inventing an ID. Bot names must be distinct wherever operators need
+to distinguish workers across hosts.
 If that turn finishes without valid registration, the worker displays a paused
 notice and keeps any existing claim. Run `/worker-next retry-registration` for a
 deliberate retry; availability wakes do not start an automatic model retry loop.

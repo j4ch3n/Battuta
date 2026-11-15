@@ -17,7 +17,7 @@ test("claims require all specialists and a live session set cannot be replaced",
   const claim = vi.fn(() => {
     row.assignment.status = "in_process";
     row.assignment.claimed_at = row.assignment.created_at;
-    row.assignment.claim_by = "worker-test";
+    row.assignment.claimed_by = "worker-test";
     return Promise.resolve(row);
   });
   const coordinator = createCoordinator({
@@ -41,7 +41,7 @@ test("claims require all specialists and a live session set cannot be replaced",
           project: row.assignment.project,
           assignment_id: row.assignment.id,
           claimed_at: row.assignment.claimed_at!,
-          claim_by: "worker-test",
+          claimed_by: "worker-test",
           session_file: "/session",
         }),
       runTodo: vi.fn(),
@@ -57,7 +57,7 @@ test("claims require all specialists and a live session set cannot be replaced",
   await coordinator.reconcile("idle");
   expect(claim).toHaveBeenCalledWith(
     expect.objectContaining({
-      claim_by: "worker-test",
+      claimed_by: "worker-test",
       abilities: ["test_one", "test_two"],
     }),
   );

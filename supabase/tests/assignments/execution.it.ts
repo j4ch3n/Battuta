@@ -13,12 +13,12 @@ Deno.test("specialist claims reject unknown names and fence every write by owner
     ]);
     const id = created.assignment.id;
     assert.deepEqual(created.assignment.require_abilities, []);
-    assert.equal(created.assignment.claim_by, null);
+    assert.equal(created.assignment.claimed_by, null);
     const bad = await rpc(sql, "assignment_claim", [project, id, "worker-a", ["mobile_use"]]);
     assert.equal(bad.code, "unknown_abilities");
     assert.equal((await rpc(sql, "assignment_get", [project, id])).assignment.claimed_at, null);
     const claimed = await rpc(sql, "assignment_claim", [project, id, "worker-a", []]);
-    assert.equal(claimed.assignment.claim_by, "worker-a");
+    assert.equal(claimed.assignment.claimed_by, "worker-a");
     const token = claimed.assignment.claimed_at;
     const version = claimed.todos[0].updated_at;
     assert.equal(
@@ -49,7 +49,7 @@ Deno.test("specialist claims reject unknown names and fence every write by owner
       "Need input",
       "worker-a",
     ]);
-    assert.equal(blocked.assignment.claim_by, "worker-a");
+    assert.equal(blocked.assignment.claimed_by, "worker-a");
     await rpc(sql, "assignment_update_todo", [
       project,
       id,
@@ -60,7 +60,7 @@ Deno.test("specialist claims reject unknown names and fence every write by owner
     ]);
     await rpc(sql, "assignment_append_todos", [project, id, ["Replacement"]]);
     const active = await rpc(sql, "assignment_reactivate", [project, id]);
-    assert.equal(active.assignment.claim_by, null);
+    assert.equal(active.assignment.claimed_by, null);
   }),
 );
 
@@ -286,7 +286,7 @@ Deno.test("atomic specialist matching requires the entire normalized set", () =>
         const rejected = await rpc(tx, "assignment_claim", [project, id, "worker-a", ["test_one"]]);
         assert.equal(rejected.code, "ability_mismatch");
         assert.equal(rejected.assignment.status, "active");
-        assert.equal(rejected.assignment.claim_by, null);
+        assert.equal(rejected.assignment.claimed_by, null);
         const claimed = await rpc(tx, "assignment_claim", [
           project,
           id,
@@ -294,7 +294,7 @@ Deno.test("atomic specialist matching requires the entire normalized set", () =>
           ["test_two", "test_one", "test_two"],
         ]);
         assert.equal(claimed.ok, true);
-        assert.equal(claimed.assignment.claim_by, "worker-b");
+        assert.equal(claimed.assignment.claimed_by, "worker-b");
         throw rollback;
       });
     } catch (error) {

@@ -12,14 +12,14 @@ const SavedBindingSchema = Type.Object(
     project: text,
     assignment_id: id,
     claimed_at: time,
-    claim_by: Type.Optional(Type.Union([text, Type.Null()])),
+    claimed_by: Type.Optional(Type.Union([text, Type.Null()])),
     session_file: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );
 export function parseBinding(value: unknown, sessionFile: string) {
   const saved = parseValue(SavedBindingSchema, value);
-  return { ...saved, claim_by: saved.claim_by ?? null, session_file: sessionFile };
+  return { ...saved, claimed_by: saved.claimed_by ?? null, session_file: sessionFile };
 }
 const assignmentStatus = Type.Union([
   Type.Literal("active"),
@@ -47,7 +47,7 @@ export const AssignmentSchema = Type.Object(
     updated_at: time,
     closed_at: Type.Union([time, Type.Null()]),
     claimed_at: Type.Union([time, Type.Null()]),
-    claim_by: Type.Union([text, Type.Null()]),
+    claimed_by: Type.Union([text, Type.Null()]),
     require_abilities: Type.Array(text),
     lease_expired_at: Type.Union([time, Type.Null()]),
     blocker: Type.Union([text, Type.Null()]),

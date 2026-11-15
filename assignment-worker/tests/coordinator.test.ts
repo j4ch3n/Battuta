@@ -53,7 +53,7 @@ function harness(count = 2, initialized = true) {
       state.assignment.status = "in_process";
       state.assignment.ready = false;
       state.assignment.claimed_at = stamp();
-      state.assignment.claim_by = "test-worker";
+      state.assignment.claimed_by = "test-worker";
       state.assignment.lease_expired_at = "2026-11-04T12:45:00.000002Z";
       return Promise.resolve(clone(state));
     }),
@@ -119,7 +119,7 @@ function harness(count = 2, initialized = true) {
         project: d.assignment.project,
         assignment_id: d.assignment.id,
         claimed_at: d.assignment.claimed_at!,
-        claim_by: d.assignment.claim_by,
+        claimed_by: d.assignment.claimed_by,
         session_file: "/private/test-session.jsonl",
       };
       opened.push(binding);
@@ -190,7 +190,7 @@ test("uninitialized sessions cannot claim, but explicit empty registration can",
   expect(h.assignments.claim).toHaveBeenCalledWith({
     project: "atlas",
     assignment_id: "1234abcd",
-    claim_by: "test-worker",
+    claimed_by: "test-worker",
     abilities: [],
   });
 });
@@ -206,7 +206,7 @@ test("live claims refuse ability-set replacement and stale claimant rows never d
   const h = harness();
   await h.coordinator.reconcile("idle");
   expect(() => h.coordinator.registerAbilities(["mobile_use"])).toThrow();
-  h.state.assignment.claim_by = "another-worker";
+  h.state.assignment.claimed_by = "another-worker";
   await h.coordinator.restoreBinding(h.opened[0]);
   expect(h.turns).toEqual([]);
 });
@@ -215,7 +215,7 @@ test("workspace is prepared once after claiming, before any TODO starts", async 
   const h = harness();
   h.sessions.prepareWorkspace.mockImplementation(() => {
     expect(h.state.assignment.status).toBe("in_process");
-    expect(h.state.assignment.claim_by).toBe("test-worker");
+    expect(h.state.assignment.claimed_by).toBe("test-worker");
     expect(h.assignments.start).not.toHaveBeenCalled();
     return Promise.resolve({
       directory: "/private/assignment",
@@ -249,7 +249,7 @@ test.each(["claim", "restore"])(
     expect(h.assignments.start).not.toHaveBeenCalled();
     expect(h.turns).toEqual([]);
     expect(h.state.assignment.status).toBe("blocked");
-    expect(h.state.assignment.claim_by).toBe("test-worker");
+    expect(h.state.assignment.claimed_by).toBe("test-worker");
     expect(h.notifications).toHaveLength(1);
   },
 );

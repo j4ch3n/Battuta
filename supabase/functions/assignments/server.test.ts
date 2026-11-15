@@ -12,7 +12,7 @@ const assignment = {
   updated_at: "2026-11-04T12:00:00+00:00",
   closed_at: null,
   claimed_at: null,
-  claim_by: null,
+  claimed_by: null,
   require_abilities: [],
   lease_expired_at: null,
   blocker: null,
@@ -65,7 +65,7 @@ Deno.test(
         {
           project: "Atlas",
           assignment_id: "a3f91c2e",
-          claim_by: "worker-uuid",
+          claimed_by: "worker-1",
           abilities: ["mobile_use"],
         },
       ],

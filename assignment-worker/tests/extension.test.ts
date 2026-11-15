@@ -1,10 +1,11 @@
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import worker from "../index.ts";
 import { detail } from "./fixtures.ts";
 
 const backend = vi.hoisted(() => ({
   list: vi.fn(),
+  claim: vi.fn(),
   close: vi.fn(),
   remove: vi.fn(),
   subscribe: vi.fn<(callback: (state: string) => void) => void>(),
@@ -15,6 +16,7 @@ vi.mock("../client.ts", () => ({
   createAssignmentClient: vi.fn(() =>
     Promise.resolve({
       list: backend.list,
+      claim: backend.claim,
       close: backend.close,
       get: backend.get,
       start: backend.start,
@@ -40,60 +42,115 @@ vi.mock("../workspace.ts", () => ({
     }),
   ),
 }));
+beforeEach(() => {
+  vi.stubEnv("BATTUTA_BOT_NAME", "worker-1");
+});
 afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
-});
-test("factory is inert; session lifecycle owns one timer/socket and shutdown fences stale callbacks", async () => {
-  vi.useFakeTimers();
-  backend.list.mockResolvedValue({ ok: true, assignments: [] });
-  const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
-  const sendUserMessage = vi.fn();
-  const tools = new Map<
-    string,
-    { execute: (id: string, args: { abilities: string[] }) => Promise<unknown> }
-  >();
-  let next: (_args: string, ctx: ExtensionContext) => Promise<void>;
-  worker({
-    on: (name: string, fn: unknown) => handlers.set(name, fn as never),
-    registerTool: (tool: { name: string; execute: never }) => tools.set(tool.name, tool),
-    sendMessage: vi.fn(),
-    registerCommand: (_name: string, options: { handler: typeof next }) => {
-      next = options.handler;
-    },
-    sendUserMessage,
-    setActiveTools: vi.fn(),
-  } as unknown as ExtensionAPI);
-  expect(backend.subscribe).not.toHaveBeenCalled();
-  expect(vi.getTimerCount()).toBe(0);
-  const ctx = {
-    isIdle: () => true,
-    hasPendingMessages: () => false,
-    sessionManager: { getEntries: () => [], getSessionId: () => crypto.randomUUID() },
-  } as unknown as ExtensionContext;
-  vi.stubEnv("SUPABASE_URL", "http://127.0.0.1:54321");
-  vi.stubEnv("SUPABASE_SECRET_KEY", "local-test-key");
-  await handlers.get("session_start")!({ reason: "startup" }, ctx);
-  expect(backend.subscribe).toHaveBeenCalledTimes(1);
-  expect(vi.getTimerCount()).toBe(1);
-  expect(sendUserMessage).toHaveBeenCalledWith("/worker-next", { expandPromptTemplates: true });
-  await next!("", ctx);
-  expect(backend.list).not.toHaveBeenCalled();
-  await tools.get("register_worker_abilities")!.execute("registration", { abilities: [] });
-  await next!("", ctx);
-  expect(backend.list).toHaveBeenCalledTimes(1);
-  await vi.advanceTimersByTimeAsync(30000);
-  expect(sendUserMessage).toHaveBeenCalledTimes(2);
-  backend.subscribe.mock.calls[0][0]("SUBSCRIBED");
-  expect(sendUserMessage).toHaveBeenCalledTimes(3);
-  await handlers.get("session_shutdown")!({}, ctx);
-  await handlers.get("session_shutdown")!({}, ctx);
-  expect(vi.getTimerCount()).toBe(0);
-  expect(backend.close).toHaveBeenCalledTimes(1);
-  await vi.advanceTimersByTimeAsync(60000);
-  expect(sendUserMessage).toHaveBeenCalledTimes(3);
   vi.unstubAllEnvs();
 });
+test.each(["worker-1", "worker-2"])(
+  "configured bot %s claims work and owns its lifecycle",
+  async (workerId) => {
+    vi.useFakeTimers();
+    vi.stubEnv("BATTUTA_BOT_NAME", workerId);
+    backend.list.mockResolvedValue({ ok: true, assignments: [] });
+    const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
+    const sendUserMessage = vi.fn();
+    const tools = new Map<
+      string,
+      { execute: (id: string, args: { abilities: string[] }) => Promise<unknown> }
+    >();
+    let next: (_args: string, ctx: ExtensionContext) => Promise<void>;
+    worker({
+      on: (name: string, fn: unknown) => handlers.set(name, fn as never),
+      registerTool: (tool: { name: string; execute: never }) => tools.set(tool.name, tool),
+      sendMessage: vi.fn(),
+      appendEntry: vi.fn(),
+      registerCommand: (_name: string, options: { handler: typeof next }) => {
+        next = options.handler;
+      },
+      sendUserMessage,
+      setActiveTools: vi.fn(),
+    } as unknown as ExtensionAPI);
+    expect(backend.subscribe).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+    const ctx = {
+      isIdle: () => true,
+      hasPendingMessages: () => false,
+      cwd: "/private/worker",
+      newSession: vi.fn(() => Promise.resolve({ cancelled: false })),
+      sessionManager: { getEntries: () => [], getSessionId: () => crypto.randomUUID() },
+    } as unknown as ExtensionContext;
+    vi.stubEnv("SUPABASE_URL", "http://127.0.0.1:54321");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "local-test-key");
+    await handlers.get("session_start")!({ reason: "startup" }, ctx);
+    expect(backend.subscribe).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(1);
+    expect(sendUserMessage).toHaveBeenCalledWith("/worker-next", { expandPromptTemplates: true });
+    await next!("", ctx);
+    expect(backend.list).not.toHaveBeenCalled();
+    await tools.get("register_worker_abilities")!.execute("registration", { abilities: [] });
+    await next!("", ctx);
+    expect(backend.list).toHaveBeenCalledTimes(1);
+    const row = detail();
+    backend.list.mockResolvedValue({ ok: true, assignments: [row.assignment] });
+    backend.claim.mockResolvedValue({
+      ...row,
+      assignment: {
+        ...row.assignment,
+        status: "in_process",
+        claimed_at: "2026-11-05T12:00:00Z",
+        claimed_by: workerId,
+      },
+    });
+    await next!("", ctx);
+    expect(backend.claim).toHaveBeenCalledWith({
+      project: row.assignment.project,
+      assignment_id: row.assignment.id,
+      claimed_by: workerId,
+      abilities: [],
+    });
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(sendUserMessage).toHaveBeenCalledTimes(2);
+    backend.subscribe.mock.calls[0][0]("SUBSCRIBED");
+    expect(sendUserMessage).toHaveBeenCalledTimes(3);
+    await handlers.get("session_shutdown")!({}, ctx);
+    await handlers.get("session_shutdown")!({}, ctx);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(backend.close).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(sendUserMessage).toHaveBeenCalledTimes(3);
+    vi.unstubAllEnvs();
+  },
+);
+
+test.each([undefined, "", " "])(
+  "refuses startup without a valid configured bot ID: %j",
+  async (name) => {
+    vi.useFakeTimers();
+    vi.stubEnv("BATTUTA_BOT_NAME", name);
+    const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
+    worker({
+      on: (event: string, handler: never) => handlers.set(event, handler),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+      setActiveTools: vi.fn(),
+      sendUserMessage: vi.fn(),
+    } as unknown as ExtensionAPI);
+    const ctx = {
+      isIdle: () => true,
+      hasPendingMessages: () => false,
+      sessionManager: { getSessionId: () => "11111111-1111-4111-8111-111111111111" },
+    } as unknown as ExtensionContext;
+    const result = await handlers.get("session_start")!({}, ctx).catch((error: unknown) => error);
+    await handlers.get("session_shutdown")!({}, ctx);
+    expect(result).toBeInstanceOf(Error);
+    expect((result as Error).message).toContain("BATTUTA_BOT_NAME");
+    expect(backend.subscribe).not.toHaveBeenCalled();
+  },
+);
 
 test("a bound native extension dispatches its TODO through Pi without a host sender", async () => {
   vi.useFakeTimers();

@@ -4,10 +4,10 @@ create function public.assignment_ability_catalog()
 returns text[] language sql immutable set search_path='' as $$ select '{}'::text[] $$;
 
 alter table public.assignments
-  add column claim_by text,
+  add column claimed_by text,
   add column require_abilities text[] not null default '{}',
   add constraint assignments_claimant_valid check (
-    claim_by is null or (public.assignment_nonblank(claim_by) and claimed_at is not null)),
+    claimed_by is null or (public.assignment_nonblank(claimed_by) and claimed_at is not null)),
   add constraint assignments_abilities_valid check (
     require_abilities <@ public.assignment_ability_catalog()
     and array_position(require_abilities,null) is null);
@@ -53,12 +53,12 @@ begin
   return public.assignment_detail(v_row);
 end $$;
 
-create function public.assignment_claim(p_project text,p_assignment_id text,p_claim_by text,p_abilities text[])
+create function public.assignment_claim(p_project text,p_assignment_id text,p_claimed_by text,p_abilities text[])
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare v_row public.assignments; v_error jsonb; v_result jsonb; v_missing text[];
 begin
   if not public.assignment_valid_target(p_project,p_assignment_id)
-    or not public.assignment_nonblank(p_claim_by) then return public.assignment_error('invalid_input'); end if;
+    or not public.assignment_nonblank(p_claimed_by) then return public.assignment_error('invalid_input'); end if;
   v_error:=public.assignment_ability_error(p_abilities);
   if v_error is not null then return v_error; end if;
   select * into v_row from public.assignments where project=p_project and id=p_assignment_id for update;
@@ -69,13 +69,13 @@ begin
     'assignment',public.assignment_view(v_row),'missing',to_jsonb(v_missing)); end if;
   v_result:=public.assignment_claim_ready(p_project,p_assignment_id);
   if not (v_result->>'ok')::boolean then return v_result; end if;
-  update public.assignments set claim_by=p_claim_by where id=p_assignment_id returning * into v_row;
+  update public.assignments set claimed_by=p_claimed_by where id=p_assignment_id returning * into v_row;
   return public.assignment_detail(v_row);
 end $$;
 
 -- Lock before checking both fences; old unidentified claims remain token-only.
 create function public.assignment_claimant_error(p_project text,p_assignment_id text,
-  p_claimed_at timestamptz,p_claim_by text)
+  p_claimed_at timestamptz,p_claimed_by text)
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare v_row public.assignments;
 begin
@@ -83,50 +83,50 @@ begin
     or p_claimed_at is null or not isfinite(p_claimed_at) then return public.assignment_error('invalid_input'); end if;
   select * into v_row from public.assignments where project=p_project and id=p_assignment_id for update;
   if not found then return public.assignment_error('not_found'); end if;
-  if v_row.claimed_at is distinct from p_claimed_at or v_row.claim_by is distinct from p_claim_by then
+  if v_row.claimed_at is distinct from p_claimed_at or v_row.claimed_by is distinct from p_claimed_by then
     return public.assignment_error('stale_claim',jsonb_build_object('assignment',public.assignment_view(v_row)));
   end if;
   return null;
 end $$;
 
 create function public.assignment_start_todo(p_project text,p_assignment_id text,p_claimed_at timestamptz,
-  p_position integer,p_expected_updated_at timestamptz,p_claim_by text default null)
+  p_position integer,p_expected_updated_at timestamptz,p_claimed_by text default null)
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare v_error jsonb;
 begin
-  v_error:=public.assignment_claimant_error(p_project,p_assignment_id,p_claimed_at,p_claim_by);
+  v_error:=public.assignment_claimant_error(p_project,p_assignment_id,p_claimed_at,p_claimed_by);
   if v_error is not null then return v_error; end if;
   return public.assignment_start_todo_owned(p_project,p_assignment_id,p_claimed_at,p_position,p_expected_updated_at);
 end $$;
 
 create function public.assignment_record_todo_result(p_project text,p_assignment_id text,p_claimed_at timestamptz,
   p_position integer,p_expected_updated_at timestamptz,p_outcome text,p_summary text,p_evidence text[],
-  p_blocker text default null,p_claim_by text default null)
+  p_blocker text default null,p_claimed_by text default null)
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare v_error jsonb;
 begin
-  v_error:=public.assignment_claimant_error(p_project,p_assignment_id,p_claimed_at,p_claim_by);
+  v_error:=public.assignment_claimant_error(p_project,p_assignment_id,p_claimed_at,p_claimed_by);
   if v_error is not null then return v_error; end if;
   return public.assignment_record_todo_result_owned(p_project,p_assignment_id,p_claimed_at,
     p_position,p_expected_updated_at,p_outcome,p_summary,p_evidence,p_blocker);
 end $$;
 
 create function public.assignment_block(p_project text,p_assignment_id text,p_claimed_at timestamptz,
-  p_blocker text,p_claim_by text default null)
+  p_blocker text,p_claimed_by text default null)
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare v_error jsonb;
 begin
-  v_error:=public.assignment_claimant_error(p_project,p_assignment_id,p_claimed_at,p_claim_by);
+  v_error:=public.assignment_claimant_error(p_project,p_assignment_id,p_claimed_at,p_claimed_by);
   if v_error is not null then return v_error; end if;
   return public.assignment_block_owned(p_project,p_assignment_id,p_claimed_at,p_blocker);
 end $$;
 
 create function public.assignment_finish(p_project text,p_assignment_id text,p_claimed_at timestamptz,
-  p_claim_by text default null)
+  p_claimed_by text default null)
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare v_error jsonb;
 begin
-  v_error:=public.assignment_claimant_error(p_project,p_assignment_id,p_claimed_at,p_claim_by);
+  v_error:=public.assignment_claimant_error(p_project,p_assignment_id,p_claimed_at,p_claimed_by);
   if v_error is not null then return v_error; end if;
   return public.assignment_finish_owned(p_project,p_assignment_id,p_claimed_at);
 end $$;
@@ -141,7 +141,7 @@ begin
   if v_row.status in ('done','cancelled') then return public.assignment_error('assignment_closed',jsonb_build_object('assignment',public.assignment_view(v_row))); end if;
   if v_row.status<>'blocked' or exists(select 1 from public.todos where assignment_id=p_assignment_id and status in ('blocked','in_progress'))
     or not exists(select 1 from public.todos where assignment_id=p_assignment_id and status='todo') then return public.assignment_error('invalid_transition',jsonb_build_object('assignment',public.assignment_view(v_row))); end if;
-  update public.assignments set status='active',claim_by=null,claimed_at=null,lease_expired_at=null,blocker=null,
+  update public.assignments set status='active',claimed_by=null,claimed_at=null,lease_expired_at=null,blocker=null,
     updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') where id=p_assignment_id returning * into v_row;
   perform public.assignment_signal();
   return public.assignment_detail(v_row);

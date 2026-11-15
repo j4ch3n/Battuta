@@ -26,7 +26,7 @@ const assignment = z.object({
   updated_at: timestamp,
   closed_at: timestamp.nullable(),
   claimed_at: timestamp.nullable(),
-  claim_by: text.nullable(),
+  claimed_by: text.nullable(),
   require_abilities: z.array(z.string()),
   lease_expired_at: timestamp.nullable(),
   blocker: text.nullable(),
@@ -108,7 +108,7 @@ const notes = z
   );
 export type NotesResult = z.infer<typeof notes>;
 const target = { project, assignment_id: id };
-const claim = { ...target, claimed_at: timestamp, claim_by: text.nullable().default(null) };
+const claim = { ...target, claimed_at: timestamp, claimed_by: text.nullable().default(null) };
 const item = {
   ...claim,
   position: z.number().int().positive().max(2147483647),
@@ -165,7 +165,7 @@ export const toolContracts = {
   },
   locate_notes: { input: z.strictObject(target), output: z.union([notes, failure]) },
   claim_assignment: {
-    input: z.strictObject({ ...target, claim_by: text, abilities: abilityProposal }),
+    input: z.strictObject({ ...target, claimed_by: text, abilities: abilityProposal }),
     output: z.union([detail, failure]),
   },
   start_todo: { input: z.strictObject(item), output: z.union([progressed, failure]) },

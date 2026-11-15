@@ -21,14 +21,14 @@ Deno.test("claim requires code-owned identity and an explicit ability set", () =
   assert.deepEqual(
     toolContracts.claim_assignment.input.parse({
       ...target,
-      claim_by: "worker-uuid",
+      claimed_by: "worker-1",
       abilities: [],
     }),
-    { ...target, claim_by: "worker-uuid", abilities: [] },
+    { ...target, claimed_by: "worker-1", abilities: [] },
   );
-  for (const claim_by of ["", " ", null, "bad\0id"]) {
+  for (const claimed_by of ["", " ", null, "bad\0id"]) {
     assert.equal(
-      toolContracts.claim_assignment.input.safeParse({ ...target, claim_by, abilities: [] })
+      toolContracts.claim_assignment.input.safeParse({ ...target, claimed_by, abilities: [] })
         .success,
       false,
     );
@@ -131,7 +131,7 @@ Deno.test("creation publishes complete plans and listing may omit project", () =
 Deno.test("execution requires exact bound tokens and actionable refusal metadata", () => {
   const input = {
     ...target,
-    claim_by: "worker-uuid",
+    claimed_by: "worker-1",
     claimed_at: "2026-11-04T12:00:00.123456+00:00",
     position: 1,
     expected_updated_at: "2026-11-04T12:00:01.654321+00:00",

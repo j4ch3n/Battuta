@@ -11,7 +11,7 @@ export interface Assignment {
   updated_at: string;
   closed_at: string | null;
   claimed_at: string | null;
-  claim_by: string | null;
+  claimed_by: string | null;
   require_abilities: string[];
   lease_expired_at: string | null;
   blocker: string | null;

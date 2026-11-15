@@ -4,7 +4,6 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { createClient } from "@supabase/supabase-js";
-import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createAssignmentClient } from "./client.ts";
@@ -22,7 +21,6 @@ export default function worker(pi: ExtensionAPI) {
   let stopped = false,
     restored = false;
   let registrationState: "unprompted" | "prompted" | "paused" = "unprompted";
-  const workerId = randomUUID();
   const diagnostic = (event: string) => console.error(`[assignment-worker] ${event}`);
   const wake = () => {
     if (!stopped && context?.isIdle() && !context.hasPendingMessages())
@@ -104,6 +102,8 @@ export default function worker(pi: ExtensionAPI) {
   });
   pi.on("session_start", async (event, ctx) => {
     if (client || stopped) return;
+    const workerId = process.env.BATTUTA_BOT_NAME?.trim();
+    if (!workerId) throw new Error("BATTUTA_BOT_NAME must identify the worker bot");
     context = ctx;
     pi.setActiveTools([
       "codemode",
@@ -158,7 +158,7 @@ export default function worker(pi: ExtensionAPI) {
             project: detail.assignment.project,
             assignment_id: detail.assignment.id,
             claimed_at: detail.assignment.claimed_at!,
-            claim_by: detail.assignment.claim_by,
+            claimed_by: detail.assignment.claimed_by,
             session_file: "",
           };
           const originalCwd = command.cwd;

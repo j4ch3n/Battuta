@@ -12,12 +12,12 @@ IDs are real short primary keys, with collision retries, not truncated aliases.
 The server validates name/key shape and matching ownership, not local project
 registration. Unknown or mismatched project/ID returns `not_found`.
 
-| Table                     | Fields and constraints                                                                                                                                                          |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `assignments`             | ID, explicit project, nonblank goal, constraints, status, optional notes_path/blocker, created_at/updated_at/closed_at, claim_by/claimed_at/lease_expired_at, require_abilities |
-| `todos`                   | Composite key assignment_id + positive immutable position, nonblank description, status, outcome summary, evidence text array, optional blocker, created_at/updated_at          |
-| `assignment_dependencies` | Unique assignment_id + prerequisite_assignment_id; existing assignments only, no self-edge, immutable after creation                                                            |
-| `assignment_availability` | One singleton row containing a monotonically increasing revision; no assignment payload or delivery ledger                                                                      |
+| Table                     | Fields and constraints                                                                                                                                                            |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `assignments`             | ID, explicit project, nonblank goal, constraints, status, optional notes_path/blocker, created_at/updated_at/closed_at, claimed_by/claimed_at/lease_expired_at, require_abilities |
+| `todos`                   | Composite key assignment_id + positive immutable position, nonblank description, status, outcome summary, evidence text array, optional blocker, created_at/updated_at            |
+| `assignment_dependencies` | Unique assignment_id + prerequisite_assignment_id; existing assignments only, no self-edge, immutable after creation                                                              |
+| `assignment_availability` | One singleton row containing a monotonically increasing revision; no assignment payload or delivery ledger                                                                        |
 
 Multiple assignments may be open in one project. Creation atomically saves a
 nonempty initial TODO batch and deduplicated prerequisite IDs, then signals
@@ -41,8 +41,9 @@ an exact `claimed_at` version and server-computed `lease_expired_at` 45 minutes
 later. Exactly one contender wins. Readiness requires satisfied prerequisites,
 no blocked/in-progress TODO, and at least one `todo` item.
 
-`claim_by` is a code-generated globally unique worker runtime ID, not a Pi session
-ID or host-local worker label. The existing exact `claimed_at` token remains the
+`claimed_by` records the configured bot ID, such as `worker-1` or `worker-2`, from
+the launcher's `BATTUTA_BOT_NAME`, so the claiming bot can be traced. It is not a
+generated UUID, Pi session ID, or credential. The existing exact `claimed_at` token remains the
 execution fence; writes verify both identity and token. Historical null owners
 remain null and may finish with their original exact token. Terminal/blocked rows
 retain the owner; explicit reactivation clears it with the old claim.
@@ -70,7 +71,7 @@ unchanged: JavaScript Date conversion loses PostgreSQL microseconds.
 | `append_todos` / `update_todo`        | Manager appends or edits/cancels unfinished active/blocked work; exact expected_updated_at required for updates                                |
 | `close_assignment`                    | Cancel nonterminal work without rewriting TODO results                                                                                         |
 | `reactivate_assignment`               | Explicitly return blocked work to active after resolving/cancelling blocked/in-progress TODOs and leaving executable TODOs; clear former claim |
-| `claim_assignment`                    | Worker-code-owned whole-assignment claim with claim_by and initialized session abilities                                                       |
+| `claim_assignment`                    | Worker-code-owned whole-assignment claim with claimed_by and initialized session abilities                                                     |
 | `start_todo`                          | Code-owned current-claim operation; exact item token, first unfinished position, no parallel TODO                                              |
 | `record_todo_result`                  | Code-owned completed/blocked report, summary/evidence and required blocker for blocked; block assignment and TODO atomically                   |
 | `block_assignment`                    | Code-owned claim-bound runtime blocker, also blocking a running TODO                                                                           |
