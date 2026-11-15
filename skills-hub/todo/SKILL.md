@@ -32,9 +32,10 @@ constraints, acceptance/input references, and existing prerequisite IDs. Depende
 may cross projects but remain immutable; only prerequisites done unlock execution.
 Duplicate prerequisite IDs mean one dependency. Cancelled prerequisites do not
 satisfy dependents. Choose non-conflicting workspace boundaries or dependencies.
-Use canonical specialist requirements only when the work genuinely needs them.
-The catalog is currently empty: omit `require_abilities` or use `[]`. Unknown names
-reject the whole write; read the correction message rather than guessing aliases.
+Omit `require_abilities` for ordinary work; it defaults to `["research"]`.
+For influencer work, explicitly require `["mobile-control"]`. Empty requirements
+are invalid. Unknown names reject the whole write; read the correction message
+rather than guessing aliases.
 Workers claim matching work automatically; do not set or change ownership yourself.
 Keep appended TODOs compatible with the assignment's requirements;
 replace the assignment when requirements must change.
@@ -67,7 +68,7 @@ later calls.
 | `status` | Distinguish waiting (`active`), claimed (`in_process`), blocked, and terminal work |
 | `ready` | See whether prerequisites and TODO state currently permit a claim; it does not reserve work |
 | `claimed_by` | Identify the claiming bot, such as `worker-1`; a retained name is not proof it is still running, and a blank name alone does not prove work is available |
-| `require_abilities` | Read the exact specialist names a worker must all satisfy; `[]` adds no specialist restriction |
+| `require_abilities` | Read the exact abilities a worker must all satisfy |
 | TODO `summary` / `evidence` / `blocker` | Evaluate actual outcomes, verification, and missing inputs before accepting results or replanning |
 
 On `ok: false` or a tool error, read the explanation and use the returned error

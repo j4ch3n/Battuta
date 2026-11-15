@@ -1,1 +1,10 @@
-{}
+{
+  "research": {
+    "description": "General research and other non-mobile work.",
+    "tools": []
+  },
+  "mobile-control": {
+    "description": "Control an authorized Android device.",
+    "tools": []
+  }
+}

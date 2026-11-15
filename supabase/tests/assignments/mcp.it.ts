@@ -113,7 +113,7 @@ Deno.test("remote MCP authenticates before discovery and exposes shared lifecycl
       const claimed = await call(manager, "claim_assignment", {
         ...target,
         claimed_by,
-        abilities: [],
+        abilities: ["research"],
       });
       const execution = { ...target, claimed_by, claimed_at: claimed.result.assignment.claimed_at };
       const refused = await call(manager, "finish_assignment", execution);

@@ -6,9 +6,14 @@ Deno.test("creation defaults specialist requirements and rejects malformed sets"
   const input = { project: "Atlas", goal: "Goal", initial_todos: ["Step"] };
   assert.deepEqual(toolContracts.create_assignment.input.parse(input), {
     ...input,
-    require_abilities: [],
+    require_abilities: ["research"],
   });
-  for (const require_abilities of [null, "mobile_use", [null], [1]]) {
+  assert.deepEqual(
+    toolContracts.create_assignment.input.parse({ ...input, require_abilities: ["mobile-control"] })
+      .require_abilities,
+    ["mobile-control"],
+  );
+  for (const require_abilities of [[], null, "mobile_use", [null], [1]]) {
     assert.equal(
       toolContracts.create_assignment.input.safeParse({ ...input, require_abilities }).success,
       false,

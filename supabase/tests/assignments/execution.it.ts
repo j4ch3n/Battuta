@@ -9,15 +9,19 @@ Deno.test("specialist claims reject unknown names and fence every write by owner
       ["Step"],
       "",
       [],
-      [],
+      ["research"],
     ]);
     const id = created.assignment.id;
-    assert.deepEqual(created.assignment.require_abilities, []);
+    assert.deepEqual(created.assignment.require_abilities, ["research"]);
     assert.equal(created.assignment.claimed_by, null);
+    assert.equal(
+      (await rpc(sql, "assignment_claim", [project, id, "mobile", ["mobile-control"]])).code,
+      "ability_mismatch",
+    );
     const bad = await rpc(sql, "assignment_claim", [project, id, "worker-a", ["mobile_use"]]);
     assert.equal(bad.code, "unknown_abilities");
     assert.equal((await rpc(sql, "assignment_get", [project, id])).assignment.claimed_at, null);
-    const claimed = await rpc(sql, "assignment_claim", [project, id, "worker-a", []]);
+    const claimed = await rpc(sql, "assignment_claim", [project, id, "worker-a", ["research"]]);
     assert.equal(claimed.assignment.claimed_by, "worker-a");
     const token = claimed.assignment.claimed_at;
     const version = claimed.todos[0].updated_at;
@@ -272,7 +276,7 @@ Deno.test("atomic specialist matching requires the entire normalized set", () =>
         // Transaction-local fixture; no specialist is added to the deployed catalog.
         await tx.unsafe(`create or replace function public.assignment_ability_catalog()
           returns text[] language sql immutable set search_path='' as $$
-          select array['test_one','test_two']::text[] $$`);
+          select array['research','test_one','test_two']::text[] $$`);
         const created = await rpc(tx, "assignment_create", [
           project,
           "Specialist plan",

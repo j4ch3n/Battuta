@@ -21,11 +21,18 @@ from .skills import load_selection, link_selected_skills
 from .workers import copy_worker_profile
 from .runtime import initialize_settings_if_missing, resolve_agent_dir
 from .extensions import prepare_source_extensions, profile_settings, source_extension_links
+from .instances import worker_names
 
 
 def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_file: Path | None = None, env_prefix: str | None = None, telegram_package: str | None = None) -> None:
     if role == "worker":
         configure_worker(root, bot_dir=bot_dir, env_file=env_file)
+        if bot_dir is None:
+            selected_env = env_file or root / ".env"
+            values = read_env(selected_env)
+            if any(values[f"BATTUTA_WORKER_{name.removeprefix('worker-')}_TYPE"] == "influencer"
+                   for name in worker_names(values, selected_env)):
+                configure_worker(root, profile=root / "bots/worker-influencer", env_file=env_file)
         return
     if role not in {"cos", "manager"}:
         raise click.ClickException("Bot role must be cos or manager")
@@ -96,10 +103,10 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
     warn_running_session(bot_dir)
 
 
-def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path | None = None, shared_catalog: bool = False) -> None:
+def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path | None = None, shared_catalog: bool = False, profile: Path | None = None) -> None:
     root = root.resolve()
-    bot_dir = (bot_dir or root / "bots/worker").resolve()
-    profile = root / "bots/worker"
+    profile = (profile or root / "bots/worker").resolve()
+    bot_dir = (bot_dir or profile).resolve()
     if bot_dir != profile:
         copy_worker_profile(profile, bot_dir)
         return
@@ -112,11 +119,11 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
     required(values, "SUPABASE_SECRET_KEY", env_file)
     assignment_server(supabase_url)
     memory_url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
-    names = load_selection(root / "bots/worker/bot.toml", root / "skills-hub")
+    names = load_selection(profile / "bot.toml", root / "skills-hub")
     agents = render_worker_agents(profile, manifest)
     source_extension_links(root, bot_dir, manifest.extensions)
     path = bot_dir / ".pi/settings.json"
-    settings = profile_settings(manifest, browser=True)
+    settings = profile_settings(manifest, browser=profile.name != "worker-influencer")
     runtime = root / "assignment-worker"
     if not shared_catalog:
         for project in manifest.packages.node_projects:

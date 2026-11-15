@@ -50,14 +50,12 @@ execution fence; writes verify both identity and token. Historical null owners
 remain null and may finish with their original exact token. Terminal/blocked rows
 retain the owner; explicit reactivation clears it with the old claim.
 
-`require_abilities` is a deduplicated specialist set, defaulting to `[]` for old
-and new assignments. Empty requirements allow any otherwise eligible configured
-worker. Requirements must be a subset of the worker's configured capabilities,
-checked both locally and atomically by the database. They are not authorization.
-The canonical catalog is currently empty: only `[]` is accepted. General writing,
-searching, and coding do not need specialist tags. Unknown names reject the entire
-write with readable feedback and typed `unknown_abilities` recovery data; there
-are no accepted aliases, silent substitutions, or current suggestions.
+`require_abilities` is a nonempty, deduplicated set. Existing assignments are
+migrated to `["research"]`, which is also the default for new assignments.
+Influencer work must explicitly require `["mobile-control"]`. Requirements must
+be a subset of the worker's configured capabilities, checked both locally and
+atomically by the database. They are not authorization. Unknown names reject the
+entire write with typed `unknown_abilities` recovery data.
 Add actual specialists through coordinated catalog, prerequisite-validation, and
 database updates, not prompts alone. Manager must keep appended work compatible
 with the assignment's immutable requirements or publish a replacement assignment.

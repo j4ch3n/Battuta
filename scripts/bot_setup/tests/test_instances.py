@@ -3,11 +3,29 @@
 import pytest
 import click
 import os
+from pathlib import Path
+import shutil
+import subprocess
 from click.testing import CliRunner
 
 from bot_setup import instances
 from bot_setup.cli import main
+from bot_setup.manifest import load_profile
 from skill_fixtures import manifest_text
+
+
+def test_actual_worker_profiles_route_without_subagents():
+    root = Path(__file__).resolve().parents[3]
+    general = load_profile(root / "bots/worker/bot.toml", "worker")
+    influencer = load_profile(root / "bots/worker-influencer/bot.toml", "worker")
+    assert general.worker.types["general"].capabilities == ["research"]
+    assert influencer.worker.types["influencer"].capabilities == ["mobile-control"]
+    assert any("pi-subagents" in package for package in general.packages.pi)
+    assert not any("pi-subagents" in package for package in influencer.packages.pi)
+    assert any("pi-droid" in package for package in influencer.packages.pi)
+    assert not any("pi-browser-use" in package for package in influencer.packages.pi)
+    assert "browser-evidence" not in influencer.skills.include
+    assert influencer.subagents.agents == []
 
 
 @pytest.mark.parametrize("values,expected", [
@@ -38,6 +56,48 @@ def test_instance_paths(tmp_path, bot, role, profile):
     directory.mkdir(parents=True)
     (directory / "bot.toml").write_text(manifest_text(role, []))
     assert instances.instance_paths(root, home, bot) == (role, root / "bots" / profile, home / ".battuta/pi-bots" / bot)
+
+def test_influencer_uses_separate_profile_and_private_instance(tmp_path):
+    for name in ("worker", "worker-influencer"):
+        profile = tmp_path / "bots" / name
+        profile.mkdir(parents=True)
+        (profile / "bot.toml").write_text(manifest_text("worker", []))
+    values = {"BATTUTA_WORKER_2_TYPE": "influencer"}
+    assert instances.instance_paths(tmp_path, tmp_path / "home", "worker-2", values) == (
+        "worker", tmp_path / "bots/worker-influencer", tmp_path / "home/.battuta/pi-bots/worker-2"
+    )
+
+def test_worker_capabilities_follow_selected_profile(tmp_path):
+    for name, capability in (("worker", "research"), ("worker-influencer", "mobile-control")):
+        profile = tmp_path / "bots" / name
+        profile.mkdir(parents=True)
+        (profile / "bot.toml").write_text(
+            f'[worker]\ncapabilities=["{capability}"]\n[worker.types.influencer]\ncapabilities=[]\n[skills]\ninclude=[]'
+        )
+        (profile / "abilities.json").write_text('{"research": {}, "mobile-control": {}}')
+    values = {"BATTUTA_WORKER_2_TYPE": "influencer"}
+    assert instances.worker_environment(tmp_path, values, tmp_path / ".env", "worker-2") == {
+        "BATTUTA_WORKER_CAPABILITIES": '["mobile-control"]'
+    }
+
+
+@pytest.mark.parametrize("state,returncode", [("device\n", 0), ("offline\n", 0), ("", 1)])
+def test_mobile_device_preflight_requires_ready_device(monkeypatch, state, returncode):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(shutil, "which", lambda *args, **kwargs: "/bin/adb")
+    seen = []
+    def run(args, **kwargs):
+        seen.append((args, kwargs["env"]))
+        return SimpleNamespace(stdout=state, returncode=returncode)
+    monkeypatch.setattr(subprocess, "run", run)
+    env = {"ANDROID_SERIAL": "selected"}
+    if state == "device\n" and returncode == 0:
+        instances.validate_mobile_device(env)
+    else:
+        with pytest.raises(click.ClickException):
+            instances.validate_mobile_device(env)
+    assert seen == [(["/bin/adb", "get-state"], env)]
 
 
 @pytest.mark.parametrize("bot", ["worker-0", "worker-01", "../cos-bot", "worker/1", "unknown"])

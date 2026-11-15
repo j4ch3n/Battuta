@@ -45,6 +45,12 @@ skills remain shared with the checkout, not installed per private worker.
 ## Local selection and tmux
 
 Set `BATTUTA_WORKER_1_TYPE=general` in the selected `.env` or `.env.prod`.
+Use `BATTUTA_WORKER_2_TYPE=influencer` for a separate Android-capable worker.
+Run the worker source configuration after selecting it, and provide an authorized
+Android device with USB debugging and ADB on `PATH`. Pi-Droid uses
+`ANDROID_SERIAL` to select a device when needed; Unicode input requires
+ADBKeyboard. Launch stops before claiming work if ADB cannot select one
+authorized, online device. Posting and replies require explicit assignment authority.
 Each `BATTUTA_WORKER_<N>_TYPE` entry selects that instance and its manifest type;
 no entries selects no workers. Positive indices may have gaps. `make dev` and
 `make prod` give each selected worker its own labelled tmux pane, alongside the
@@ -58,7 +64,7 @@ bash scripts/bot_setup/run-worker.sh --bot-dir "$worker" --env-file .env
 ```
 
 The launcher uses the shared instance lock and normal Pi UI, not a custom host.
-It runs from the shared checkout worker role while `PI_CODING_AGENT_DIR` selects
+It runs from the selected checkout worker profile while `PI_CODING_AGENT_DIR` selects
 the intended private instance. Runtime state is not the project working directory.
 The operator handles `/login` and `/model` within the intended private instance.
 Never launch an additional authentication process beside a running instance or

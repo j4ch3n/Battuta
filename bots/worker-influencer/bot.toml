@@ -1,0 +1,72 @@
+[bot]
+role = "worker"
+env_prefix = "WORKER"
+
+[worker]
+capabilities = []
+
+[worker.types.influencer]
+capabilities = ["mobile-control"]
+
+[runtime]
+pi_coding_agent_dir = "{instance}/.pi"
+
+[defaults]
+provider = "openai"
+model = "gpt-6.1-terra"
+thinking = "high"
+
+[packages]
+pi = [
+  "npm:pi-web-access@0.43.0",
+  "npm:pi-droid@0.2.0",
+]
+node_projects = ["assignment-worker", "agent-mail"]
+
+[[extensions]]
+name = "assignment-worker"
+source = "assignment-worker/index.ts"
+
+[[files]]
+operation = "concatenate"
+sources = [
+  { root = "repository", path = "bots/AGENTS_shared.md" },
+  { root = "profile", path = "AGENTS_dedicated.md" },
+]
+target = "AGENTS.md"
+destination = "profile"
+policy = "replace"
+
+[[files]]
+operation = "copy"
+sources = [{ root = "profile", path = ".pi/web-search.json" }]
+target = ".pi/web-search.json"
+destination = "private"
+policy = "create-only"
+optional = true
+
+[[files]]
+operation = "copy"
+sources = [{ root = "profile", path = ".pi/mcp.json" }]
+context = "source"
+target = ".pi/mcp.json"
+destination = "private"
+policy = "create-only"
+
+[setup]
+steps = ["worker-profile"]
+
+[subagents]
+agents = []
+
+[skills]
+include = [
+  "access-remote-files",
+  "todo",
+  "note-taking",
+  "draft-writing",
+  "execute-assignment",
+  "research",
+  "artifacts",
+  "prd",
+]

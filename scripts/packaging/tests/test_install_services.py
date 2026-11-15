@@ -15,7 +15,7 @@ def deployment(tmp_path, monkeypatch):
     profile = tmp_path / "release/bots/worker"
     profile.mkdir(parents=True)
     (profile / "bot.toml").write_text(manifest_text("worker", []))
-    (profile / "abilities.json").write_text("{}")
+    (profile / "abilities.json").write_text('{"research": {}}')
     env_file = tmp_path / ".env.prod"
     env_file.write_text("BATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=general\nBATTUTA_WORKER_3_TYPE=general\nCOS_TELEGRAM_TOKEN=private-sentinel\n")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))

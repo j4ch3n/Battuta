@@ -50,7 +50,8 @@ installation's paths, preserving unrelated custom resources. Pi does not interpr
 that metadata at runtime. CoS/Manager configuration never rewrites worker MCP
 exposure; worker assignment mutations remain hidden from model/codemode tools.
 
-Installed releases instead use the compiled `bots/worker` role as cwd and
+Installed releases instead use the selected compiled `bots/worker` or
+`bots/worker-influencer` profile as cwd and
 `~/.battuta/pi-bots/worker-N/.pi` as agentDir. Build-generated instructions/skills
 and installed dependencies stay in the installation; private configuration is
 generated separately without resource merges. `BATTUTA_WORKER_<N>_TYPE` selects the
