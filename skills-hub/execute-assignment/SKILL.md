@@ -33,9 +33,9 @@ bound executor retains responsibility for evidence, integration and reporting.
 
 Before taking or resuming work, use `register_worker_abilities` to declare this
 session's specialist set. The catalog is currently empty: register `[]`; do not
-invent tags for general skills. Registration alone does not claim work. Code
-prepares the local assignment output workspace before executing a TODO and
-supplies its paths. This does not register a project or recover missing inputs.
+invent tags for general skills. A successful registration means the declaration
+was accepted, not that work was claimed. Wait for the bound TODO and supplied
+output paths before executing work; report missing essential inputs.
 
 1. Read the bound project, goal, current TODO, prerequisite results, constraints,
    exclusions, acceptance, authority, and Manager's input paths. Use assignment
@@ -85,12 +85,13 @@ supplies its paths. This does not register a project or recover missing inputs.
    relevant regression checks. Verify against the commissioned acceptance;
    distinguish observed results, inference, missing evidence, and unavailable
    checks. A blocked check is not a pass.
-3. Use assignment MCP to prepare/locate notes, and built-in file tools for safe
-   local work. Preserve existing material and record concise findings, actual
+3. Use assignment MCP to prepare/locate notes, then read or edit the returned
+   top-level `notes_path` with built-in file tools. Check `editable` before writing;
+   false means read only. Preserve existing material and record concise findings, actual
    verification, and real evidence references, not a tool-call diary. Do not
    persist credentials, private owner-profile data, or unrelated personal context.
-   Resolve note references locally; never write to another host's historical
-   absolute path. Local scratch files are not synchronized. Include sufficient
+   Use the returned path directly; do not reconstruct a storage location.
+   Local scratch files are not synchronized. Include sufficient
    findings/deliverable content in the persisted result for Manager to review;
    inaccessible required content is a blocker, not a successful remote delivery.
 4. Submit `report_execution_result` for the bound TODO using the contract below.
@@ -111,7 +112,7 @@ supplies its paths. This does not register a project or recover missing inputs.
 Use actual evidence, not the illustrative paths above. `evidence: []` means none
 exists; do not embellish. For `outcome: "blocked"`, also provide a nonblank
 `blocker` explanation and describe actual progress in `summary`. Identity and
-claim tokens are bound by code, not tool arguments.
+claim tokens are supplied automatically; do not include them in this report.
 
 ## Boundaries and recovery
 
