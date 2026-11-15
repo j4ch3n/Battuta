@@ -18,9 +18,9 @@ claim whole assignments. These roles do not prescribe the invoker. This skill
 defines assignment content, not a new scheduler, per-TODO ownership graph, or
 execution authority.
 
-## Flight manual: choose a worker capability
+## Choose a worker capability
 
-**Preflight:** Identify the outcome, the tools it actually needs, and the
+Identify the outcome, the tools it actually needs, and the
 authority for any external action. Capabilities route work; they do not grant
 permission to publish, interact, or access an account or device.
 
@@ -29,12 +29,12 @@ permission to publish, interact, or access an account or device.
 | General research or other non-mobile work | `research` | The general worker can research with web access, use a browser, and delegate to researcher and reviewer subagents. Use it for investigation, analysis, and other work that does not require a phone. |
 | Work on an authorized Android device | `mobile-control` | The influencer worker can control the phone and access the web. Use it to browse apps, prepare content, or, only when explicitly authorized, post or reply. |
 
-**Set course:** With todo, omit `require_abilities` for the default
+With todo, omit `require_abilities` for the default
 `["research"]`; explicitly set `["mobile-control"]` for phone work. The
 influencer worker has a research skill, but does not advertise the `research`
 routing ability. `mobile` is not an ability name.
 
-**Before dispatch:** A worker must satisfy every required ability. The current
+Before creating the assignment, check that a worker can satisfy every required ability. The current
 profiles do not advertise both, so split mixed research and phone work into
 separate assignments with prerequisites and handoff evidence rather than
 requiring both on one assignment. Specify the authorized device, accounts,
