@@ -116,14 +116,10 @@ const noteReference = z
     "Note reference must identify this assignment",
   );
 export const noteReferenceResult = z.union([noteReference, failure]);
-const notes = z.object({
-  ok: z.literal(true),
-  assignment,
-  notes_path: absolutePath.nullable(),
-  editable: z.boolean(),
-  guidance: z.string().optional(),
-});
-export type NotesResult = z.infer<typeof notes>;
+const notes = z.union([
+  z.strictObject({ ok: z.literal(true), nextStep: text.optional() }),
+  z.strictObject({ ok: z.literal(false), reason: text, nextStep: text.optional() }),
+]);
 const target = { project, assignment_id: id };
 const claim = { ...target, claimed_at: timestamp, claimed_by: text.nullable().default(null) };
 const item = {
@@ -178,9 +174,9 @@ export const toolContracts = {
   },
   prepare_notes: {
     input: z.strictObject(target),
-    output: z.union([notes, failure]),
+    output: notes,
   },
-  locate_notes: { input: z.strictObject(target), output: z.union([notes, failure]) },
+  locate_notes: { input: z.strictObject(target), output: notes },
   claim_assignment: {
     input: z.strictObject({ ...target, claimed_by: text, abilities: abilityProposal }),
     output: z.union([detail, failure]),

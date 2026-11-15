@@ -68,9 +68,12 @@ Deno.test("remote MCP authenticates before discovery and exposes shared lifecycl
       try {
         const refusedNotes = await call(unconfigured, "prepare_notes", target);
         assert.equal(refusedNotes.isError, true);
-        assert.equal(refusedNotes.result.code, "invalid_input");
+        assert.equal(refusedNotes.result.ok, false);
+        assert.ok(refusedNotes.result.reason);
         assert.equal((await call(unconfigured, "get_assignment", target)).result.ok, true);
-        assert.equal((await call(manager, "locate_notes", target)).result.code, "notes_unprepared");
+        const unprepared = await call(manager, "locate_notes", target);
+        assert.equal(unprepared.result.ok, false);
+        assert.match(unprepared.result.nextStep ?? "", /prepare_notes/);
       } finally {
         await unconfigured.close();
       }
@@ -120,17 +123,15 @@ Deno.test("remote MCP authenticates before discovery and exposes shared lifecycl
         [1, 2],
       );
       const notes = await call(cos, "prepare_notes", target);
-      assert.equal(
-        notes.result.notes_path,
-        `/caller/cos/projects/${project}/work/${target.assignment_id}/note.md`,
+      assert.ok(
+        notes.result.nextStep?.includes(
+          `/caller/cos/projects/${project}/work/${target.assignment_id}/note.md`,
+        ),
       );
-      assert.equal(
-        (await call(manager, "locate_notes", target)).result.notes_path,
-        `/caller/测试 space%2F/projects/${project}/work/${target.assignment_id}/note.md`,
-      );
-      assert.equal(
-        notes.result.assignment.notes_path,
-        `${project}/work/${target.assignment_id}/note.md`,
+      assert.ok(
+        (await call(manager, "locate_notes", target)).result.nextStep?.includes(
+          `/caller/测试 space%2F/projects/${project}/work/${target.assignment_id}/note.md`,
+        ),
       );
       for (const todo of claimed.result.todos) {
         const started = await call(manager, "start_todo", {
@@ -161,7 +162,7 @@ Deno.test("remote MCP authenticates before discovery and exposes shared lifecycl
         (await call(manager, "finish_assignment", execution)).result.assignment.status,
         "done",
       );
-      assert.equal((await call(cos, "locate_notes", target)).result.editable, false);
+      assert.match((await call(cos, "locate_notes", target)).result.nextStep ?? "", /read.only/i);
       const next = (
         await call(cos, "create_assignment", {
           project,

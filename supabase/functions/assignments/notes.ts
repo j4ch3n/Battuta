@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { join, relative } from "node:path/posix";
-import { absolutePath, noteReferenceResult, type NotesResult } from "./contracts.ts";
+import { absolutePath, noteReferenceResult } from "./contracts.ts";
 
 export const projectsRootHeader = z
   .string()
@@ -25,8 +25,11 @@ export function resolveNotePath(data: unknown, projectsRoot: string) {
   return { ...rest, notes_path };
 }
 
-export function noteGuidance(result: NotesResult): string {
-  if (!result.editable)
-    return "Assignment closed: notes and drafts are frozen. Read existing files only; do not create or edit them.";
-  return `Read or edit the returned notes_path ${JSON.stringify(result.notes_path)} directly. A returned path does not prove the file exists; inspect path safety, create only missing directories/files, and preserve existing content. Record findings, sources, decisions, and limits. Drafts may live beside the note. Call locate_notes before later edits and write only while editable is true. Local files are not synchronized; include complete handoff findings in the execution result and report inaccessible required inputs.`;
+export function noteGuidance(result: { editable: boolean; notes_path: string | null }): string {
+  if (!result.editable) {
+    return result.notes_path === null
+      ? "No note location is available. The assignment is closed; notes and drafts are read-only and must not be created or edited."
+      : `The assignment is closed. Read existing notes at ${result.notes_path} only; notes and drafts are read-only and must not be created or edited.`;
+  }
+  return `Read or edit notes at ${result.notes_path}. The path does not prove the file exists; inspect path safety, create only missing directories/files, and preserve existing content. Call locate_notes before later edits. Include complete handoff findings in the execution result and report inaccessible required inputs.`;
 }

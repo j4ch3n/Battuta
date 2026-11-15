@@ -1,5 +1,5 @@
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
-import { toolContracts, type ToolName, type NotesResult } from "./contracts.ts";
+import { toolContracts, type ToolName } from "./contracts.ts";
 import { noteGuidance, projectsRootHeader, resolveNotePath } from "./notes.ts";
 import { unknownAbilities } from "./abilities.ts";
 
@@ -102,8 +102,23 @@ export function createAssignmentHandler(rpc: Rpc): (request: Request) => Promise
           },
           async (args: Record<string, unknown>) => {
             let result: Record<string, unknown>;
+            const isNotes = name === "prepare_notes" || name === "locate_notes";
+            const noteReply = (value: unknown) => {
+              const output = toolContracts.prepare_notes.output.parse(value);
+              return {
+                structuredContent: output,
+                content: [{ type: "text" as const, text: JSON.stringify(output) }],
+                isError: !output.ok,
+              };
+            };
             const input = contract.input.safeParse(args);
             if (!input.success) {
+              if (isNotes)
+                return noteReply({
+                  ok: false,
+                  reason: "Invalid note request.",
+                  nextStep: "Check the project and assignment ID and try again.",
+                });
               const result = {
                 ok: false,
                 code: "invalid_input",
@@ -117,11 +132,17 @@ export function createAssignmentHandler(rpc: Rpc): (request: Request) => Promise
                 isError: true,
               };
             }
-            const isNotes = name === "prepare_notes" || name === "locate_notes";
             const root = isNotes
               ? projectsRootHeader.safeParse(request.headers.get("X-Battuta-Projects-Root"))
               : undefined;
             if (root && !root.success) {
+              if (isNotes)
+                return noteReply({
+                  ok: false,
+                  reason: "Local note storage is not configured correctly.",
+                  nextStep:
+                    "Ask the operator to refresh the assignment MCP configuration and restart. Do not guess a storage path.",
+                });
               const result = {
                 ok: false,
                 code: "invalid_input",
@@ -155,13 +176,29 @@ export function createAssignmentHandler(rpc: Rpc): (request: Request) => Promise
               );
               const { data, error } = await rpc(operations[name].rpc, params);
               if (error) throw new Error("RPC failed");
+              if (isNotes && root?.success) {
+                const note = resolveNotePath(data, root.data);
+                if (!note.ok) {
+                  return noteReply({
+                    ok: false,
+                    reason: note.message,
+                    ...(note.code === "notes_unprepared"
+                      ? { nextStep: "Call prepare_notes before accessing these notes." }
+                      : {}),
+                  });
+                }
+                return noteReply({ ok: true, nextStep: noteGuidance(note) });
+              }
               result = contract.output.parse(
                 root?.success ? resolveNotePath(data, root.data) : data,
               );
-              if (result.ok && isNotes) {
-                result = { ...result, guidance: noteGuidance(result as NotesResult) };
-              }
             } catch {
+              if (isNotes)
+                return noteReply({
+                  ok: false,
+                  reason: "The note operation could not be confirmed.",
+                  nextStep: "Inspect the assignment before retrying.",
+                });
               result = {
                 ok: false,
                 code: "backend_error",

@@ -72,7 +72,7 @@ skipped configuration before starting bots. Restart bots separately only when au
 configuration starts worker sessions or changes bounded-subagent isolation defaults.
 
 Deploy the matching migration and clients together: note tools now accept only
-project/assignment ID and return the caller's full `notes_path`. Refresh generated
+project/assignment ID and return guidance containing the caller's full note path. Refresh generated
 MCP entries to include the new header and use the matching launchers; existing
 private files are preserved, so inspect skipped configuration before proceeding.
 No new credentials are required. Workers need write permission

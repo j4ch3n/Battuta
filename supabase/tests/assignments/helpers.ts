@@ -41,6 +41,7 @@ export interface Result {
   notes_path: string | null;
   editable: boolean;
   reason?: string;
+  nextStep?: string;
   missing_assignment_ids?: string[];
   message?: string;
 }

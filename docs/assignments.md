@@ -76,7 +76,7 @@ unchanged: JavaScript Date conversion loses PostgreSQL microseconds.
 | `record_todo_result`                  | Code-owned completed/blocked report, summary/evidence and required blocker for blocked; block assignment and TODO atomically                   |
 | `block_assignment`                    | Code-owned claim-bound runtime blocker, also blocking a running TODO                                                                           |
 | `finish_assignment`                   | Code-owned current-claim completion only for a nonempty all-done/cancelled TODO set                                                            |
-| `prepare_notes` / `locate_notes`      | Return the caller-local absolute notes_path and current editability; project/assignment ID only                                                |
+| `prepare_notes` / `locate_notes`      | Return actionable caller-local note guidance; project/assignment ID only                                                                       |
 
 Mutations serialize on the parent assignment row. Claims fence execution; TODO
 writes also compare exact `expected_updated_at`. Terminal work cannot reopen.
@@ -106,7 +106,8 @@ attempts mandatory Manager mail once. A mail failure never rolls back execution.
 
 ## Local working material
 
-Note tools return a top-level absolute `notes_path` resolved for the caller.
+Note tools return `ok`, a failure `reason` when applicable, and actionable
+`nextStep` guidance including the caller-local absolute path when available.
 The database reference remains relative to the projects root:
 
 ```text

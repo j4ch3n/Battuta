@@ -83,12 +83,10 @@ not model actions.
    relevant regression checks. Verify against the commissioned acceptance;
    distinguish observed results, inference, missing evidence, and unavailable
    checks. A blocked check is not a pass.
-3. Use assignment MCP to prepare/locate notes, then read or edit the returned
-   top-level `notes_path` with built-in file tools. Check `editable` before writing;
-   false means read only. Preserve existing material and record concise findings, actual
+3. Use the `note-taking` skill to prepare or locate notes and follow the tool's
+   guidance. Preserve existing material and record concise findings, actual
    verification, and real evidence references, not a tool-call diary. Do not
    persist credentials, private owner-profile data, or unrelated personal context.
-   Use the returned path directly; do not reconstruct a storage location.
    Local scratch files are not synchronized. Include sufficient
    findings/deliverable content in the persisted result for Manager to review;
    inaccessible required content is a blocker, not a successful remote delivery.

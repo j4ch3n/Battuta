@@ -146,16 +146,31 @@ Deno.test("MCP sanitizes backend errors, throws, and malformed output", async ()
     () => Promise.reject(new Error("private-sentinel")),
     () => Promise.resolve({ data: { ok: true, assignments: "private-sentinel" }, error: null }),
   ]) {
-    const result = await call(rpc, "list_assignments", { project: "Atlas" });
-    assert.equal(result.isError, true);
-    assert.equal(result.structuredContent.code, "backend_error");
-    assert.equal(JSON.stringify(result).includes("private-sentinel"), false);
+    for (const tool of ["list_assignments", "prepare_notes"]) {
+      const result = await call(rpc, tool, {
+        project: assignment.project,
+        ...(tool === "prepare_notes" ? { assignment_id: assignment.id } : {}),
+      });
+      assert.equal(result.isError, true);
+      if (tool === "prepare_notes") {
+        assert.deepEqual(Object.keys(result.structuredContent).sort(), [
+          "nextStep",
+          "ok",
+          "reason",
+        ]);
+        assert.equal(result.structuredContent.ok, false);
+        assert.ok(result.structuredContent.reason);
+        assert.ok(result.structuredContent.nextStep);
+        assert.deepEqual(JSON.parse(result.content[0].text), result.structuredContent);
+      } else assert.equal(result.structuredContent.code, "backend_error");
+      assert.equal(JSON.stringify(result).includes("private-sentinel"), false);
+    }
   }
 });
 
-Deno.test("note tools return existing path and editability with user-facing guidance", async () => {
+Deno.test("note tools return caller-local guidance respecting assignment status", async () => {
   for (const status of ["active", "in_process", "blocked", "done", "cancelled"]) {
-    for (const tool of ["prepare_notes", "locate_notes"]) {
+    for (const tool of status === "active" ? ["prepare_notes", "locate_notes"] : ["locate_notes"]) {
       const notes_path = "/old-host/.battuta/projects/Atlas/work/a3f91c2e/note.md";
       const notes_ref = "Atlas/work/a3f91c2e/note.md";
       const result = await call(
@@ -196,11 +211,16 @@ Deno.test("note tools return existing path and editability with user-facing guid
           assignment_id: "a3f91c2e",
         },
       );
-      assert.equal(result.structuredContent.notes_ref, undefined);
-      assert.equal(result.structuredContent.notes_path, `/local/.battuta/projects/${notes_ref}`);
-      assert.equal(result.structuredContent.editable, !["done", "cancelled"].includes(status));
-      assert.equal(typeof result.structuredContent.guidance, "string");
-      assert.ok(result.structuredContent.guidance.trim().length > 0);
+      assert.deepEqual(Object.keys(result.structuredContent).sort(), ["nextStep", "ok"]);
+      assert.equal(result.structuredContent.ok, true);
+      assert.ok(
+        result.structuredContent.nextStep.includes(`/local/.battuta/projects/${notes_ref}`),
+      );
+      assert.match(
+        result.structuredContent.nextStep,
+        ["done", "cancelled"].includes(status) ? /read.only/i : /edit/i,
+      );
+      assert.deepEqual(JSON.parse(result.content[0].text), result.structuredContent);
     }
   }
 });
@@ -255,8 +275,10 @@ Deno.test("note roots are caller metadata and invalid roots refuse before RPC", 
       );
       assert.equal(calls, 0);
       assert.equal(result.isError, true);
-      assert.equal(result.structuredContent.code, "invalid_input");
-      assert.equal(result.content[0].text.startsWith("{"), false);
+      assert.equal(result.structuredContent.ok, false);
+      assert.ok(result.structuredContent.reason);
+      assert.ok(result.structuredContent.nextStep);
+      assert.deepEqual(JSON.parse(result.content[0].text), result.structuredContent);
     }
   }
   const malformed = await call(
@@ -267,7 +289,7 @@ Deno.test("note roots are caller metadata and invalid roots refuse before RPC", 
     { project: assignment.project, assignment_id: assignment.id },
     "%ZZ",
   );
-  assert.equal(malformed.structuredContent.code, "invalid_input");
+  assert.equal(malformed.structuredContent.ok, false);
   const listed = await call(
     () => Promise.resolve({ data: { ok: true, assignments: [] }, error: null }),
     "list_assignments",
@@ -300,9 +322,10 @@ Deno.test("note paths are resolved per request, decoding caller roots exactly on
   );
   for (const [index, result] of results.entries()) {
     assert.equal(result.isError, false);
-    assert.equal(
-      result.structuredContent.notes_path,
-      `${roots[index].replace(/\/$/, "")}/Atlas/work/a3f91c2e/note.md`,
+    assert.ok(
+      result.structuredContent.nextStep.includes(
+        `${roots[index].replace(/\/$/, "")}/Atlas/work/a3f91c2e/note.md`,
+      ),
     );
     assert.equal(result.structuredContent.notes_ref, undefined);
   }
@@ -324,7 +347,26 @@ Deno.test("closed unprepared notes have no invented local path", async () => {
     { project: assignment.project, assignment_id: assignment.id },
   );
   assert.equal(result.isError, false);
-  assert.equal(result.structuredContent.notes_path, null);
+  assert.match(result.structuredContent.nextStep, /no .*note/i);
+  assert.match(result.structuredContent.nextStep, /read.only/i);
+});
+
+Deno.test("unprepared note failures provide recovery without exposing backend fields", async () => {
+  const result = await call(
+    () =>
+      Promise.resolve({
+        data: { ok: false, code: "notes_unprepared", message: "Not prepared", assignment },
+        error: null,
+      }),
+    "locate_notes",
+    { project: assignment.project, assignment_id: assignment.id },
+  );
+  assert.equal(result.isError, true);
+  assert.equal(result.structuredContent.ok, false);
+  assert.ok(result.structuredContent.reason);
+  assert.match(result.structuredContent.nextStep, /prepare_notes/);
+  assert.deepEqual(Object.keys(result.structuredContent).sort(), ["nextStep", "ok", "reason"]);
+  assert.deepEqual(JSON.parse(result.content[0].text), result.structuredContent);
 });
 
 Deno.test(
