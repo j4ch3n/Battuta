@@ -102,9 +102,10 @@ def launch(root, bot, env_file, node, mode):
 @click.option("--env-file", required=True, type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--node", required=True, type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--replace", is_flag=True, help="Replace existing regular unit files with this release's definitions. Stop services first.")
-def services(root, env_file, node, replace):
+@click.option("--deployment", type=click.Choice(["main", "influencer"]), default="main", show_default=True)
+def services(root, env_file, node, replace, deployment):
     """Install user service units, never start or restart them."""
-    install_services(root, env_file=env_file, node=node, replace=replace)
+    install_services(root, env_file=env_file, node=node, replace=replace, deployment=deployment)
 
 
 @main.command("run-component")

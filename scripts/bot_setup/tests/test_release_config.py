@@ -1,6 +1,7 @@
 """Release configuration regenerates owned files, never private preferences."""
 
 import json
+from pathlib import Path
 
 import click
 import pytest
@@ -131,3 +132,33 @@ def test_zero_workers(deployment):
     env_file.write_text(env_file.read_text().replace("BATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=general\n", ""))
     release.configure_release(root, env_file=env_file, home=home)
     assert {p.name for p in (home / ".battuta/pi-bots").iterdir()} == {"cos-bot", "manager-bot"}
+
+
+def test_influencer_release_configures_only_worker(deployment):
+    root, home, env_file = deployment
+    profile = root / "bots/worker-influencer"
+    profile.mkdir()
+    (profile / ".pi").mkdir()
+    source = Path(__file__).parents[3] / "bots/worker-influencer/bot.toml"
+    (profile / "bot.toml").write_text(source.read_text())
+    (profile / "abilities.json").write_text('{"mobile-control": {}}')
+    (profile / "AGENTS.md").write_text("worker")
+    (profile / ".pi/settings.json").write_text("{}")
+    cos = home / ".battuta/pi-bots/cos-bot/.pi"
+    cos.mkdir(parents=True)
+    (cos / "auth.json").write_text("existing")
+    env_file.write_text("BATTUTA_WORKER_1_TYPE=influencer\nSUPABASE_URL=https://backend.example\nSUPABASE_SECRET_KEY=private\n")
+    release.configure_release(root, env_file=env_file, home=home, deployment="influencer")
+    assert {p.name for p in (home / ".battuta/pi-bots").iterdir()} == {"cos-bot", "worker-1"}
+    assert (cos / "auth.json").read_text() == "existing"
+    assert not (cos / "mcp.json").exists()
+    assert (home / ".battuta/pi-bots/worker-1/.pi/mcp.json").is_file()
+
+
+@pytest.mark.parametrize("selection", ["", "BATTUTA_WORKER_1_TYPE=general\n", "BATTUTA_WORKER_1_TYPE=influencer\nBATTUTA_WORKER_2_TYPE=influencer\n"])
+def test_influencer_release_rejects_invalid_selection_before_writes(deployment, selection):
+    root, home, env_file = deployment
+    env_file.write_text(selection)
+    with pytest.raises(click.ClickException):
+        release.configure_release(root, env_file=env_file, home=home, deployment="influencer")
+    assert not home.exists()

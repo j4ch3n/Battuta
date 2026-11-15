@@ -25,6 +25,17 @@ def worker_names(values: dict[str, str], env_file: Path) -> list[str]:
     return [f"worker-{number}" for number in sorted(numbers)]
 
 
+def deployment_workers(values: dict[str, str], env_file: Path, deployment: str) -> list[str]:
+    workers = worker_names(values, env_file)
+    if deployment not in {"main", "influencer"}:
+        raise click.ClickException("Choose main or influencer deployment")
+    if deployment == "influencer" and (
+        len(workers) != 1 or values[f"BATTUTA_WORKER_{workers[0].removeprefix('worker-')}_TYPE"] != "influencer"
+    ):
+        raise click.ClickException("Influencer deployment requires exactly one influencer worker")
+    return workers
+
+
 def worker_environment(root: Path, values: dict[str, str], env_file: Path, bot: str) -> dict[str, str]:
     if bot not in worker_names(values, env_file):
         raise click.ClickException("Worker is not selected by BATTUTA_WORKER_<N>_TYPE")
