@@ -40,7 +40,8 @@ TODO states are `todo`, `in_progress`, `blocked`, `done`, `cancelled`.
 
 An atomic claim locks a ready active assignment and returns the full plan with
 an exact `claimed_at` version and server-computed `lease_expired_at` 45 minutes
-later. Exactly one contender wins. Readiness requires satisfied prerequisites,
+later. `lease_expired` is true only for an `in_process` assignment past that time (UTC);
+blocked, done, and other states always report false. Exactly one contender wins. Readiness requires satisfied prerequisites,
 no blocked/in-progress TODO, and at least one `todo` item.
 
 `claimed_by` records the configured bot ID, such as `worker-1` or `worker-2`, from

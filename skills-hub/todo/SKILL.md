@@ -68,6 +68,7 @@ later calls.
 | `status` | Distinguish waiting (`active`), claimed (`in_process`), blocked, and terminal work |
 | `ready` | See whether prerequisites and TODO state currently permit a claim; it does not reserve work |
 | `claimed_by` | The claiming bot's Agent Mail mailbox, such as `worker-1`; mail it to chase or steer that bot. A retained name is not proof it is still running, and a blank name alone does not prove work is available |
+| `lease_expired` | True when an `in_process` assignment has run past its 45-minute lease (UTC); the worker is likely gone or stuck. Replan: mail `claimed_by` once, then create a new assignment one difficulty level up if there is no reply. Always false for blocked, done, and other states |
 | `require_abilities` | Read the exact abilities a worker must all satisfy |
 | `difficulty` | Read the level that selects the worker's model |
 | TODO `summary` / `evidence` / `blocker` | Evaluate actual outcomes, verification, and missing inputs before accepting results or replanning |

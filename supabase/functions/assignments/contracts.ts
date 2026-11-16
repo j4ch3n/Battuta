@@ -31,6 +31,7 @@ const assignment = z.object({
   require_abilities: z.array(z.string()),
   difficulty,
   lease_expired_at: timestamp.nullable(),
+  lease_expired: z.boolean(),
   blocker: text.nullable(),
   dependencies: z.array(z.object({ assignment_id: id, project, status: assignmentStatus })),
   ready: z.boolean(),

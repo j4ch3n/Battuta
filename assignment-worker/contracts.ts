@@ -56,6 +56,7 @@ export const AssignmentSchema = Type.Object(
       Type.Literal("hail_mary"),
     ]),
     lease_expired_at: Type.Union([time, Type.Null()]),
+    lease_expired: Type.Boolean(),
     blocker: Type.Union([text, Type.Null()]),
     dependencies: Type.Array(
       Type.Object(

@@ -194,6 +194,7 @@ Deno.test("current claim completes late and cancelled prerequisites never unlock
     await rpc(sql, "assignment_claim", [project, id]);
     await sql`update public.assignments set claimed_at = now() - interval '2 hours', lease_expired_at = now() - interval '75 minutes' where id = ${id}`;
     const detail = await rpc(sql, "assignment_get", [project, id]);
+    assert.equal(detail.assignment.lease_expired, true);
     const token = detail.assignment.claimed_at;
     for (const bad of [null, "infinity", "-infinity"]) {
       assert.equal(

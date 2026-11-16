@@ -17,6 +17,7 @@ export function detail(): Detail {
       require_abilities: [],
       difficulty: "easy",
       lease_expired_at: null,
+      lease_expired: false,
       blocker: null,
       dependencies: [],
       ready: true,
