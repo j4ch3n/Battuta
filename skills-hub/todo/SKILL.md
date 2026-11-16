@@ -67,7 +67,7 @@ later calls.
 | --- | --- |
 | `status` | Distinguish waiting (`active`), claimed (`in_process`), blocked, and terminal work |
 | `ready` | See whether prerequisites and TODO state currently permit a claim; it does not reserve work |
-| `claimed_by` | Identify the claiming bot, such as `worker-1`; a retained name is not proof it is still running, and a blank name alone does not prove work is available |
+| `claimed_by` | The claiming bot's Agent Mail mailbox, such as `worker-1`; mail it to chase or steer that bot. A retained name is not proof it is still running, and a blank name alone does not prove work is available |
 | `require_abilities` | Read the exact abilities a worker must all satisfy |
 | `difficulty` | Read the level that selects the worker's model |
 | TODO `summary` / `evidence` / `blocker` | Evaluate actual outcomes, verification, and missing inputs before accepting results or replanning |
