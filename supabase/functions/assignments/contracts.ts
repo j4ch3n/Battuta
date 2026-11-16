@@ -14,6 +14,7 @@ const project = text.refine(
 const id = z.string().regex(/^[0-9a-f]{8}$/);
 const timestamp = z.iso.datetime({ offset: true });
 const assignmentStatus = z.enum(["active", "in_process", "blocked", "done", "cancelled"]);
+const difficulty = z.enum(["easy", "medium", "hard", "hail_mary"]);
 const todoStatus = z.enum(["todo", "in_progress", "blocked", "done", "cancelled"]);
 const assignment = z.object({
   id,
@@ -28,6 +29,7 @@ const assignment = z.object({
   claimed_at: timestamp.nullable(),
   claimed_by: text.nullable(),
   require_abilities: z.array(z.string()),
+  difficulty,
   lease_expired_at: timestamp.nullable(),
   blocker: text.nullable(),
   dependencies: z.array(z.object({ assignment_id: id, project, status: assignmentStatus })),
@@ -137,6 +139,7 @@ export const toolContracts = {
       constraints: z.string().optional(),
       initial_todos: z.array(text).min(1),
       depends_on_assignment_ids: z.array(id).optional(),
+      difficulty: difficulty.optional(),
       require_abilities: abilityProposal
         .refine((abilities) => abilities.length > 0)
         .default(["research"]),

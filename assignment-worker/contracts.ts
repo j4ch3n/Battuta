@@ -49,6 +49,12 @@ export const AssignmentSchema = Type.Object(
     claimed_at: Type.Union([time, Type.Null()]),
     claimed_by: Type.Union([text, Type.Null()]),
     require_abilities: Type.Array(text),
+    difficulty: Type.Union([
+      Type.Literal("easy"),
+      Type.Literal("medium"),
+      Type.Literal("hard"),
+      Type.Literal("hail_mary"),
+    ]),
     lease_expired_at: Type.Union([time, Type.Null()]),
     blocker: Type.Union([text, Type.Null()]),
     dependencies: Type.Array(

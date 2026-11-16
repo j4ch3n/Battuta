@@ -14,6 +14,7 @@ const assignment = {
   claimed_at: null,
   claimed_by: null,
   require_abilities: [],
+  difficulty: "easy",
   lease_expired_at: null,
   blocker: null,
   dependencies: [],
