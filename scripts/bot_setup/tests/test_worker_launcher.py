@@ -90,6 +90,8 @@ class WorkerLauncherTests(unittest.TestCase):
             source = root / "assignment-worker/index.ts"
             source.parent.mkdir(parents=True)
             source.write_text("export default () => {}")
+            (root / "agent-mail").mkdir()
+            (root / "agent-mail/index.ts").write_text("export default () => {}")
             prepare_source_extensions(root, profile, manifest.extensions)
             configure_mcp(profile, role="worker", supabase_url="http://127.0.0.1:54321")
             (profile / ".pi/web-search.json").write_text('{"fetchContent":{"userAgent":"fixture mobile browser"}}')

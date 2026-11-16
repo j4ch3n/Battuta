@@ -34,6 +34,8 @@ class WorkerSetupTests(unittest.TestCase):
         self.runtime = self.root / "assignment-worker"
         self.runtime.mkdir(parents=True)
         (self.runtime / "index.ts").write_text("export default () => {};")
+        (self.root / "agent-mail").mkdir()
+        (self.root / "agent-mail/index.ts").write_text("export default () => {};")
         for name in ("mcp", "codemode"):
             path = self.runtime / f"node_modules/@earendil-works/pi-coding-agent/dist/extensions/{name}/index.js"
             path.parent.mkdir(parents=True, exist_ok=True)
