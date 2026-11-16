@@ -40,11 +40,15 @@ def initialize_settings_if_missing(agent_dir: Path, defaults: Defaults, *, initi
         return False
     content = json.dumps({
         **(initial_settings or {}),
-        "defaultProvider": defaults.provider,
-        "defaultModel": defaults.model,
         "defaultThinkingLevel": defaults.thinking,
     }, indent=2) + "\n"
     if not write_file(path, content.encode(), policy="create-only"):
         read_config(path)
         return False
     return True
+
+
+def model_args(defaults: Defaults, env: dict[str, str]) -> list[str]:
+    """The model comes from env on every launch; settings.json is never the source."""
+    value = env.get(f"MODEL_FOR_{defaults.difficulty.upper()}_TASKS", "").strip()
+    return ["--model", value] if value else []

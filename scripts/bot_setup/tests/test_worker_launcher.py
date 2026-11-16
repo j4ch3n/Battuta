@@ -118,7 +118,6 @@ class WorkerLauncherTests(unittest.TestCase):
             self.assertEqual(unquote(lines[3]), str(self.home / ".battuta/projects"))
             settings = json.loads((bot / ".pi/settings.json").read_text())
             self.assertEqual(settings["defaultThinkingLevel"], "high")
-            self.assertTrue(settings["defaultModel"])
             self.assertNotIn("extensions", settings)
             self.assertEqual(settings["packages"], manifest.packages.pi)
             self.assertEqual((profile / ".pi/extensions/assignment-worker.ts").resolve(), source)

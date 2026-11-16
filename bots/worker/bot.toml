@@ -12,8 +12,7 @@ capabilities = ["research"]
 pi_coding_agent_dir = "{instance}/.pi"
 
 [defaults]
-provider = "openai"
-model = "gpt-6.1-terra"
+difficulty = "easy"
 thinking = "high"
 
 [packages]

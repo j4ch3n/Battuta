@@ -6,8 +6,7 @@ env_prefix = "MANAGER"
 pi_coding_agent_dir = "manager-bot/.pi"
 
 [defaults]
-provider = "openai"
-model = "gpt-6.1.sol"
+difficulty = "hard"
 thinking = "medium"
 
 [packages]

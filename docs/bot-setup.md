@@ -15,7 +15,7 @@ Pi consumes the prepared settings/resources, not the manifest itself.
 | `[[files]]`            | File preparation operations with explicit ownership policy                 |
 | `[setup]`              | Ordered, known Python setup steps, restricted by role                      |
 | `[runtime]`            | Private `pi_coding_agent_dir`, relative to the fixed private base          |
-| `[defaults]`           | Initial provider, model and thinking preferences                           |
+| `[defaults]`           | Model difficulty tier and initial thinking preference                      |
 | `[[subagents.agents]]` | Profile-relative prompt, selected parent skills, and child extensions      |
 
 Node dependency versions remain in `package.json` and lockfiles. Secrets stay in
@@ -120,8 +120,7 @@ home. For example:
 pi_coding_agent_dir = "cos-bot/.pi"
 
 [defaults]
-provider = "openai"
-model = "gpt-6.1-sol"
+difficulty = "medium"
 thinking = "low"
 ```
 
@@ -133,8 +132,7 @@ Other template substitutions are rejected. Source worker `--bot-dir` must match
 that resolved private home.
 
 Setup and launch create private `settings.json` **only when absent**, before
-browser or worker preparation. The file receives `defaultProvider`,
-`defaultModel` and `defaultThinkingLevel`, is published atomically without
+browser or worker preparation. The file receives `defaultThinkingLevel`, is published atomically without
 replacement, and has mode `0600`.
 
 An existing file, including `{}`, is not reformatted or backfilled by the
@@ -142,19 +140,21 @@ defaults helper. Invalid JSON, non-regular files and symlinks fail rather than
 being repaired. Changing TOML does not update existing preferences; change them
 in Pi or edit the private settings explicitly. Other owned setup operations,
 such as maintaining private browser settings, still preserve preferences while
-updating their own fields. No launch flags force the configured model/thinking.
+updating their own fields. The model is not stored in settings: every launch passes `--model` from the
+`MODEL_FOR_<DIFFICULTY>_TASKS` variable (`provider/model-id`) of the manifest's
+`difficulty`, so the environment is the single source of truth. When that variable
+is unset or empty, no flag is passed and Pi uses its own default. Thinking is not forced.
 
 Current initial defaults:
 
-| Role    | Provider | Model         | Thinking |
-| ------- | -------- | ------------- | -------- |
-| CoS     | openai   | gpt-6.1-sol   | low      |
-| Manager | openai   | gpt-6.1.sol   | medium   |
-| Worker  | openai   | gpt-6.1-terra | high     |
+| Role    | Difficulty | Thinking |
+| ------- | ---------- | -------- |
+| CoS     | medium     | low      |
+| Manager | hard       | medium   |
+| Worker  | easy       | high     |
 
-Manager's dot spelling is the requested literal value. Setup does not authenticate,
-check provider model availability or invoke a model; confirm the model identifier
-and provider match the operator's account before first setup.
+Setup does not authenticate, check provider model availability or invoke a model;
+confirm the `MODEL_FOR_*_TASKS` identifiers match the operator's account.
 
 ## File rules
 
