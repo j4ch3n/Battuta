@@ -51,7 +51,7 @@ export interface Coordinator {
   reconcile(reason: ReconcileReason): Promise<void>;
   restoreBinding(binding: Binding): Promise<void>;
   acceptReport(value: unknown): Promise<{ accepted: true }>;
-  observeBoundary(outcome: "completed" | "aborted" | "error"): void;
+  observeBoundary(outcome: "completed" | "aborted" | "error", errorMessage?: string): void;
   settle(event: { aborted: boolean }): Promise<void>;
   stop(): Promise<void>;
 }

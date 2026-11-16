@@ -578,3 +578,11 @@ test.each(["failed", "uncertain"] as const)(
     expect(h.diagnostics).toHaveBeenCalled();
   },
 );
+
+test("error boundary blocker states the provider failure", async () => {
+  const h = harness(1);
+  await h.begin();
+  h.coordinator.observeBoundary("error", "insufficient_quota");
+  await h.coordinator.settle({ aborted: false });
+  expect(h.state.assignment.blocker).toContain("out of credit");
+});

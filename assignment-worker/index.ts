@@ -180,7 +180,13 @@ export default function worker(pi: ExtensionAPI) {
     if (event.reason !== "new") wake();
   });
   pi.on("agent_before_settle", (event) => {
-    coordinator?.observeBoundary(event.outcome);
+    const last = [...event.context.contextMessages]
+      .reverse()
+      .find((message) => message.role === "assistant");
+    coordinator?.observeBoundary(
+      event.outcome,
+      last && "errorMessage" in last ? last.errorMessage : undefined,
+    );
   });
   pi.on("agent_settled", async (event, ctx) => {
     context = ctx;
