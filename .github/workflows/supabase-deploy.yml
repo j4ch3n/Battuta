@@ -2,23 +2,27 @@ name: Deploy Supabase
 
 on:
   workflow_call:
+    inputs:
+      dry-run:
+        description: Check pending database migrations without modifying production
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: supabase-production
-  cancel-in-progress: false
+  group: ${{ inputs.dry-run && format('supabase-dry-run-{0}', github.ref) || 'supabase-production' }}
+  cancel-in-progress: ${{ inputs.dry-run }}
 
 jobs:
   deploy:
+    name: ${{ inputs.dry-run && 'Dry-run database migrations' || 'Deploy Supabase' }}
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-      LINEAR_WEBHOOK_SECRET: ${{ secrets.LINEAR_WEBHOOK_SECRET }}
-      LINEAR_API_TOKEN: ${{ secrets.LINEAR_API_TOKEN }}
 
     steps:
       - uses: actions/checkout@v7
@@ -32,11 +36,21 @@ jobs:
       - name: Link Supabase project
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
 
+      - name: Dry-run database migrations
+        if: ${{ inputs.dry-run }}
+        run: supabase db push --dry-run
+
       - name: Apply database migrations
+        if: ${{ !inputs.dry-run }}
         run: supabase db push --yes
 
       - name: Set Edge Function secrets
+        if: ${{ !inputs.dry-run }}
+        env:
+          LINEAR_WEBHOOK_SECRET: ${{ secrets.LINEAR_WEBHOOK_SECRET }}
+          LINEAR_API_TOKEN: ${{ secrets.LINEAR_API_TOKEN }}
         run: supabase secrets set LINEAR_WEBHOOK_SECRET="$LINEAR_WEBHOOK_SECRET" LINEAR_API_TOKEN="$LINEAR_API_TOKEN" --project-ref "$SUPABASE_PROJECT_REF"
 
       - name: Deploy Edge Functions
+        if: ${{ !inputs.dry-run }}
         run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF"
