@@ -29,6 +29,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     accepted: ExecutionResult | undefined;
   let boundary: "completed" | "aborted" | "error" | undefined;
   let boundaryError: string | undefined;
+  let modelSelected = false;
   let tail: Promise<unknown> = Promise.resolve();
   let reconciling: Promise<void> | undefined;
   const abilities: ReadonlySet<string> = parseAbilities(options.capabilities);
@@ -78,6 +79,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     accepted = undefined;
     boundary = undefined;
     boundaryError = undefined;
+    modelSelected = false;
     phase = "idle";
     queueMicrotask(() => {
       void coordinator.reconcile("idle");
@@ -146,6 +148,15 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
       return;
     }
     phase = "persisting";
+    if (!modelSelected) {
+      try {
+        await sessions.useModel(latest);
+        modelSelected = true;
+      } catch (error) {
+        await blockRun(error instanceof Error ? error.message : "Model could not be selected");
+        return;
+      }
+    }
     let started;
     try {
       started = await assignments.start({

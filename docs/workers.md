@@ -26,6 +26,14 @@ dispatch queue, result queue, or scheduler daemon is introduced.
 See [assignment runtime](assignments.md) for schema, RPC/tool, dependency, state,
 and privilege contracts. Assignment completion is not product acceptance.
 
+## Model by difficulty
+
+Each assignment has a difficulty: `easy` (the default), `medium`, `hard`, or `hail_mary`. Before the
+first TODO the worker selects the model named by `MODEL_FOR_EASY_TASKS`, `MODEL_FOR_MEDIUM_TASKS`,
+`MODEL_FOR_HARD_TASKS`, or `MODEL_FOR_HAIL_MARY_TASKS`, written as `provider/model-id` in the
+worker's environment. An unset variable keeps the bot's configured default model. A malformed or
+unknown value blocks the assignment with a reason naming the variable.
+
 ## Native Pi lifecycle
 
 The source launcher uses `bots/worker` as cwd and the manifest-derived private

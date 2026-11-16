@@ -125,6 +125,7 @@ function harness(count = 2) {
       opened.push(binding);
       return Promise.resolve(binding);
     }),
+    useModel: vi.fn(() => Promise.resolve()),
     runTodo: vi.fn((binding: Binding, todo: { position: number }) => {
       turns.push({ binding, position: todo.position });
       return Promise.resolve();
@@ -585,4 +586,13 @@ test("error boundary blocker states the provider failure", async () => {
   h.coordinator.observeBoundary("error", "insufficient_quota");
   await h.coordinator.settle({ aborted: false });
   expect(h.state.assignment.blocker).toContain("out of credit");
+});
+
+test("model selection failure blocks the assignment before any TODO starts", async () => {
+  const h = harness(1);
+  h.sessions.useModel.mockRejectedValue(new Error("MODEL_FOR_EASY_TASKS names an unknown model"));
+  await h.begin();
+  expect(h.state.assignment.status).toBe("blocked");
+  expect(h.state.assignment.blocker).toContain("MODEL_FOR_EASY_TASKS");
+  expect(h.turns).toEqual([]);
 });

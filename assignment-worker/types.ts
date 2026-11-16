@@ -35,6 +35,7 @@ export interface ExecutionSessions {
   isIdle(): boolean;
   hasPendingMessages(): boolean;
   openAssignmentSession(detail: Detail): Promise<Binding>;
+  useModel(detail: Detail): Promise<void>;
   runTodo(binding: Binding, todo: TodoRow, detail: Detail, workspace: Workspace): void;
   appendEntry(kind: string, data: unknown): void;
 }
