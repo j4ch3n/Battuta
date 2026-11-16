@@ -12,8 +12,7 @@ dispatch queue, result queue, or scheduler daemon is introduced.
   assignment plans and prerequisites. Assignment delegation is mandatory for
   worker-level research, implementation, artifacts and execution verification,
   through complete assignments for the next useful milestone, adapting later
-  assignments to reviewed findings. Manager may run bounded read-only review
-  spot-checks without taking over implementation or formal verification.
+  assignments to reviewed findings. Manager commissions reviews as assignments.
   It remains available for asynchronous results,
   reviews evidence and unblocks/replans/escalates to CoS. Managerial records and
   ticket/PR administration remain Manager-owned. Unavailable delegation is a

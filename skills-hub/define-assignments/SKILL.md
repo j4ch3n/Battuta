@@ -42,6 +42,22 @@ permitted actions, inputs, and expected evidence for phone work. If the required
 worker, device, access, or authority is unavailable, surface the blocker rather
 than routing to an incompatible worker or expanding permission.
 
+## Choose a difficulty
+
+Set `difficulty` on every assignment; it selects the worker's model. Omitting it
+means `easy`.
+
+| Difficulty | Use for |
+| --- | --- |
+| `easy` | Bulk data curation, a simple single-module feature, a bug with a known cause, a reproducing test and a single-module fix. |
+| `medium` | A bug whose cause must be identified, multi-step research. |
+| `hard` | Cross-module or schema changes, non-obvious failures. |
+| `hail_mary` | Last resort after a `hard` attempt failed. |
+
+When a worker is blocked or unable, replan one level up with the blocker as
+context; never skip levels. Reviews of diffs, tests and results are assignments
+too, with the same difficulty levels.
+
 ## How and why
 
 Plan the next useful milestone from current evidence. When discovery is needed,

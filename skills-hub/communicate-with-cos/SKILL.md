@@ -12,7 +12,7 @@ to resolve the next product or authority question.
 
 ## Roles and boundaries
 
-`cos` is the Agent Mail recipient for product commitments, owner clarification,
+`cos-bot` is the Agent Mail recipient for product commitments, owner clarification,
 and final owner communication. Manager commissions and reviews substantive work;
 Workers execute its investigation, implementation, artifact production and
 execution verification. These roles do not restrict invocation or transfer their
@@ -34,7 +34,7 @@ owner contact or product commitments.
    with the observed blocker and a bounded recovery recommendation.
 3. Choose an outbound example from the [template index](references/templates/index.md).
    Report findings, progress, evidence-backed conclusions, blockers,
-   recommendations, or a specific decision needed through Agent Mail to `cos`.
+   recommendations, or a specific decision needed through Agent Mail to `cos-bot`.
    Preserve message references and the reply-expectation contract.
    Report every delivery with project/assignment ID, actual TODO progress,
    evidence, and remaining work. Inspect worker summaries and authoritative
