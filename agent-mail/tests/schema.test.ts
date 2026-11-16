@@ -175,7 +175,7 @@ test("one role-independent schema requires explicit requests and evidence-backed
 
 test("recipients are bot names and delivery is limited to queue or steer", () => {
   const base = { message_type: "chat", content: content("Hello"), reply_expectation: null };
-  for (const recipient of ["worker-1", "manager-bot", "cos"])
+  for (const recipient of ["worker-1", "manager", "cos"])
     assert.doesNotThrow(() => validate(SendArguments, { ...base, recipient }));
   for (const delivery of ["queue", "steer"])
     assert.equal(

@@ -27,7 +27,7 @@ test("records one notification for repeated callbacks", async () => {
     client: {} as SupabaseClient,
     conversationId: "conversation",
     senderName: "worker-1",
-    managerName: "manager-bot",
+    managerName: "manager",
     appendEntry,
   });
 

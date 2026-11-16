@@ -161,7 +161,7 @@ needed action, not a required decision announcement.
 
 For bounded issue authoring, use ticket-writing when doing the commissioned work,
 or commission Manager to prepare it. Route technical assessment requests to
-`manager-bot` and results/product questions to `cos-bot` using the corresponding
+`manager` and results/product questions to `cos` using the corresponding
 communication skill. TODO completion is not acceptance of a delivery milestone.
 Bound execution uses execute-assignment; note-taking and artifact production use
 their respective skills. Return outcomes through the originating conversation;

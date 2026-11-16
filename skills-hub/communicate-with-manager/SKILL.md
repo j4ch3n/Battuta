@@ -12,7 +12,7 @@ with explicit authority, expected result, and reply expectation.
 
 ## Roles and boundaries
 
-`manager-bot` is the Agent Mail recipient for substantive investigation, breakdown,
+`manager` is the Agent Mail recipient for substantive investigation, breakdown,
 planning, assignment-based execution coordination, progress evaluation, and result
 judgment. This route does not change the invoking agent's execution or delegation
 authority.
@@ -40,7 +40,7 @@ permissions.
    than borrowing a project from another conversation; ordinary conversation needs
    no project binding.
 3. Choose an outbound example from the [template index](references/templates/index.md).
-   Send or reply through Agent Mail to `manager-bot`, preserving the existing
+   Send or reply through Agent Mail to `manager`, preserving the existing
    message-reference and reply-expectation contract.
 4. Let `manager` own the hard work. Handle consequential clarification and
    product decisions without repeating its investigation. Evaluate the returned

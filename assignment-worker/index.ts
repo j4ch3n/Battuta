@@ -109,7 +109,7 @@ export default function worker(pi: ExtensionAPI) {
       client: db,
       conversationId: ctx.sessionManager.getSessionId(),
       senderName: workerId,
-      managerName: process.env.BATTUTA_MANAGER_BOT_NAME?.trim() || "manager-bot",
+      managerName: "manager",
       appendEntry: (kind, data) => pi.appendEntry(kind, data),
     });
     coordinator = createCoordinator({

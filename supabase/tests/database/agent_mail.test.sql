@@ -24,11 +24,11 @@ select ok(not has_function_privilege('service_role',
   'public.agent_mail_store(text,text,uuid,public.agent_message_type,jsonb,integer,text,text)', 'EXECUTE'),
   'service role cannot bypass public RPCs through the internal store');
 
-select is((public.agent_mail_send('manager-bot','worker-1',gen_random_uuid(),'chat','{}'::jsonb,null)).delivery,
+select is((public.agent_mail_send('manager','worker-1',gen_random_uuid(),'chat','{}'::jsonb,null)).delivery,
   'queue', 'delivery defaults to queue');
-select is((public.agent_mail_send('manager-bot','worker-1',gen_random_uuid(),'chat','{}'::jsonb,null,'steer')).delivery,
+select is((public.agent_mail_send('manager','worker-1',gen_random_uuid(),'chat','{}'::jsonb,null,'steer')).delivery,
   'steer', 'steer delivery is stored');
-select throws_ok($$select public.agent_mail_send('manager-bot','worker-1',gen_random_uuid(),'chat','{}'::jsonb,null,'now')$$,
+select throws_ok($$select public.agent_mail_send('manager','worker-1',gen_random_uuid(),'chat','{}'::jsonb,null,'now')$$,
   '22023', 'invalid agent mail arguments', 'unknown delivery refused');
 select is((select count(*) from public.agent_messages where recipient = 'worker-1'), 2::bigint,
   'bot-name mailboxes are accepted');

@@ -56,7 +56,7 @@ function sender(mode: "sent" | "failed" | "uncertain" = "sent") {
           conversation_id: conversationId,
           id: "123456abcdef",
           sender: "worker-1",
-          recipient: "manager-bot",
+          recipient: "manager",
           delivery: "queue",
           message_type: "chat",
           content: body.content,
@@ -75,7 +75,7 @@ function sender(mode: "sent" | "failed" | "uncertain" = "sent") {
     client: { functions: { invoke } } as unknown as SupabaseClient,
     conversationId,
     senderName: "worker-1",
-    managerName: "manager-bot",
+    managerName: "manager",
     appendEntry: (_kind, data) => {
       entries.push(data);
       sequence.push("entry");
@@ -174,7 +174,7 @@ test("unsaved intent prevents sending, while an unsaved receipt never triggers r
       client: { functions: { invoke: h.invoke } } as unknown as SupabaseClient,
       conversationId,
       senderName: "worker-1",
-      managerName: "manager-bot",
+      managerName: "manager",
       appendEntry: () => {
         if (++entries === failAt) throw new Error("Disk full");
       },

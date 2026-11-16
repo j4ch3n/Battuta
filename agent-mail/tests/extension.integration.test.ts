@@ -45,7 +45,7 @@ function session(
   entries: Entry[] = [],
   autoAccept = true,
 ) {
-  process.env.BATTUTA_BOT_NAME = role;
+  process.env.AGENT_ROLE = role;
   const handlers = new Map<string, Handler>(),
     tools = new Map<string, Tool>(),
     messages: Delivery[] = [];
@@ -478,7 +478,7 @@ test.each([
   async (delivery, deliverAs) => {
     process.env.SUPABASE_URL = url;
     process.env.SUPABASE_SECRET_KEY = secret;
-    const lead = session("manager-bot"),
+    const lead = session("manager"),
       worker = session("worker-1", randomUUID(), [], false);
     try {
       await lead.start();
