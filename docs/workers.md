@@ -152,7 +152,7 @@ handoff content in TODO results; local notes alone are not cross-host evidence.
 ## Notification and manual operations
 
 After confirmed done/blocked persistence, the extension sends one chat from
-`worker` to `manager`, using the assignment conversation UUID. Mail contains
+the worker's bot name to the Manager mailbox (`BATTUTA_MANAGER_BOT_NAME`, default `manager-bot`), using the assignment conversation UUID. Mail contains
 bounded outcomes/evidence and points to the full authoritative ledger. Its sole
 automatic completion check verifies done plus a nonempty terminal TODO set;
 it does not claim independent implementation or product verification.

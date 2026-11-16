@@ -13,7 +13,7 @@ import {
   reference,
   referenceKey,
   replyRequest,
-  Role,
+  BotName,
   sendRequest,
   StoredMessage,
   validate,
@@ -36,7 +36,7 @@ const unwrap = <T>(result: { data: T | null; error: { message: string } | null }
 };
 
 export default function (pi: ExtensionAPI) {
-  const role = validate(Role, required("AGENT_ROLE"));
+  const role = validate(BotName, required("BATTUTA_BOT_NAME"));
   const log = (event: string, error?: unknown) =>
     console.error(
       `[agent-mail:${role}] ${event}${error ? `: ${error instanceof Error ? error.message : JSON.stringify(error)}` : ""}`,
@@ -149,7 +149,7 @@ export default function (pi: ExtensionAPI) {
               display: true,
               details: { message_ref: ref },
             },
-            { triggerTurn: true, deliverAs: "followUp" },
+            { triggerTurn: true, deliverAs: row.delivery === "steer" ? "steer" : "followUp" },
           );
         } catch (error) {
           delivering.delete(key);

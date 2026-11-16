@@ -28,6 +28,10 @@ node_projects = ["assignment-worker", "agent-mail"]
 name = "assignment-worker"
 source = "assignment-worker/index.ts"
 
+[[extensions]]
+name = "agent-mail"
+source = "agent-mail/index.ts"
+
 [[files]]
 operation = "concatenate"
 sources = [

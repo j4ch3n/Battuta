@@ -1,8 +1,8 @@
 # Agent mail protocol and architecture
 
-Agent mail connects the Chief of Staff (`cos`) and Manager (`manager`) through their running Pi agents. It supports focused questions, technical assessments, work handoffs, progress updates, and verified results without forwarding every exchange to the human owner.
+Agent mail connects the Chief of Staff (`cos-bot`), Manager (`manager-bot`) and workers (`worker-N`) through their running Pi agents. It supports focused questions, technical assessments, work handoffs, progress updates, and verified results without forwarding every exchange to the human owner.
 
-Messages are addressed to a role rather than a particular Pi session. Both agents use the same structured content contract, exposed directly through two tools: **`send_agent_message`** and **`reply_agent_message`**. Ordinary assistant text does not send mail.
+Messages are addressed to a bot name (`BATTUTA_BOT_NAME`) rather than a particular Pi session. A message's `delivery` is `queue` (default, handled after the recipient's current work) or `steer` (injected between the recipient's tool calls); the `delivery` column defaults to `queue`. Workers load agent-mail receive-only, so Manager reaches a worker through the bot name in the assignment's `claimed_by`. All agents use the same structured content contract, exposed directly through two tools: **`send_agent_message`** and **`reply_agent_message`**. Ordinary assistant text does not send mail.
 
 ## How it works
 

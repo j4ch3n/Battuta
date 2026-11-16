@@ -57,3 +57,14 @@ Deno.test("send, reply and read map composite references to the appropriate RPC"
     },
   );
 });
+
+Deno.test(
+  "delivery mode is optional on send, limited to queue or steer, and mapped to the RPC",
+  () => {
+    const args = (input: unknown): Record<string, unknown> => rpcRequest(parseRequest(input)).args;
+    assert.equal("p_delivery" in args(send), false);
+    for (const delivery of ["queue", "steer"])
+      assert.equal(args({ ...send, delivery }).p_delivery, delivery);
+    assert.throws(() => parseRequest({ ...send, delivery: "now" }));
+  },
+);

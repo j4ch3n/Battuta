@@ -55,8 +55,9 @@ function sender(mode: "sent" | "failed" | "uncertain" = "sent") {
         data: {
           conversation_id: conversationId,
           id: "123456abcdef",
-          sender: "worker",
-          recipient: "manager",
+          sender: "worker-1",
+          recipient: "manager-bot",
+          delivery: "queue",
           message_type: "chat",
           content: body.content,
           status: "created",
@@ -73,6 +74,8 @@ function sender(mode: "sent" | "failed" | "uncertain" = "sent") {
   const notify = createNotifier({
     client: { functions: { invoke } } as unknown as SupabaseClient,
     conversationId,
+    senderName: "worker-1",
+    managerName: "manager-bot",
     appendEntry: (_kind, data) => {
       entries.push(data);
       sequence.push("entry");
@@ -170,6 +173,8 @@ test("unsaved intent prevents sending, while an unsaved receipt never triggers r
     const notify = createNotifier({
       client: { functions: { invoke: h.invoke } } as unknown as SupabaseClient,
       conversationId,
+      senderName: "worker-1",
+      managerName: "manager-bot",
       appendEntry: () => {
         if (++entries === failAt) throw new Error("Disk full");
       },

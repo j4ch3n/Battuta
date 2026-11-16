@@ -13,8 +13,9 @@ export { validateCoverage, type MessageContent } from "./content.ts";
 Format.Set("uuid", Format.IsUuid);
 Format.Set("date-time", Format.IsDateTime);
 
-export const Role = Type.Union([Type.Literal("cos"), Type.Literal("manager")]);
-export const SenderRole = Type.Union([Role, Type.Literal("worker")]);
+// Mailboxes are addressed by bot name (BATTUTA_BOT_NAME), e.g. cos-bot, manager-bot, worker-1.
+export const BotName = Type.String({ pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$" });
+const Delivery = Type.Union([Type.Literal("queue"), Type.Literal("steer")]);
 export const MessageRef = MessageReferenceSchema;
 export type MessageReference = Static<typeof MessageRef>;
 
@@ -30,7 +31,7 @@ const ReplyExpectation = Type.Union([
 const intent = { message_type: MessageType, content: Content, reply_expectation: ReplyExpectation };
 
 export const SendArguments = Type.Object(
-  { recipient: Role, ...intent },
+  { recipient: BotName, delivery: Type.Optional(Delivery), ...intent },
   { additionalProperties: false },
 );
 export const ReplyArguments = Type.Object(
@@ -42,7 +43,7 @@ export const mailTools = [
   {
     name: "send_agent_message",
     description:
-      "Send a structured JSON message to the other role. Both roles use the same content schema: include every field, [] for unused lists and null for unused sections. A request requires a reply expectation. Link later results to the original request with related_messages. Use chat for ordinary mail; chase for an intentional follow-up. Choose short for acknowledgement, medium for bounded investigation, long for deeper review.",
+      "Send a structured JSON message to another bot by bot name. All bots use the same content schema: include every field, [] for unused lists and null for unused sections. A request requires a reply expectation. Link later results to the original request with related_messages. Use chat for ordinary mail; chase for an intentional follow-up. delivery queue (default) is handled after the recipient's current work; steer interrupts it between tool calls, so reserve it for urgent corrections. Choose short for acknowledgement, medium for bounded investigation, long for deeper review.",
     parameters: SendArguments,
   },
   {
@@ -64,7 +65,7 @@ export function validate<T extends TSchema>(schema: T, input: unknown): Static<T
   return parsed;
 }
 
-type AgentContext = { role: Static<typeof SenderRole>; sessionId: string };
+type AgentContext = { role: Static<typeof BotName>; sessionId: string };
 export function sendRequest(agent: AgentContext, input: unknown) {
   const args = validate(SendArguments, input);
   validateExpectation(args.content, args.reply_expectation !== null);
@@ -77,6 +78,7 @@ export function sendRequest(agent: AgentContext, input: unknown) {
     message_type: args.message_type,
     content: args.content,
     response_due_minutes: offset(args.reply_expectation),
+    ...(args.delivery ? { delivery: args.delivery } : {}),
   };
 }
 export function replyRequest(agent: AgentContext, input: unknown) {
@@ -102,6 +104,7 @@ export const StoredMessage = Type.Object(
     recipient: Type.String(),
     message_type: MessageType,
     content: Content,
+    delivery: Delivery,
     status: Type.Union([Type.Literal("created"), Type.Literal("read"), Type.Literal("replied")]),
     in_reply_to: Type.Union([Type.Null(), MessageRef.properties.id]),
     response_due: Type.Union([Type.Null(), Type.String({ format: "date-time" })]),

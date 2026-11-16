@@ -28,6 +28,7 @@ export const RequestSchema = Type.Union([
       ...fields,
       recipient_role: role,
       conversation_id: uuid,
+      delivery: Type.Optional(Type.Union([Type.Literal("queue"), Type.Literal("steer")])),
     },
     { additionalProperties: false },
   ),
@@ -79,6 +80,7 @@ export function rpcRequest(input: Static<typeof RequestSchema>) {
           ...args,
           p_recipient_role: input.recipient_role,
           p_conversation_id: input.conversation_id,
+          ...(input.delivery ? { p_delivery: input.delivery } : {}),
         },
       }
     : {
