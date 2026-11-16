@@ -35,4 +35,4 @@ PRs run checks for affected component directories, including configuration, lock
 
 Pushes to `main`, merge queues, manual runs, and release validation run the full suite. The stable `Quality gate` requires successful selected checks and permits skipped Node/Deno jobs only when their selection is empty. Local aggregate commands still run everything.
 
-On `main`, Supabase-related changes call the deployment workflow after the Quality gate succeeds, reusing those checks instead of running a second validation suite. Version tags still trigger release validation and packaging independently. Database/transport integration checks remain separate from the default CI suite.
+On `main`, Supabase-related changes run a migration dry-run after the Quality gate succeeds, reusing those checks instead of running a second validation suite. Version tags (`v*`) trigger release validation, candidate verification, production Supabase deployment, and release promotion. Database/transport integration checks remain separate from the default CI suite.

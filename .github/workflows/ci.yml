@@ -163,12 +163,14 @@ jobs:
           print("All required checks passed")
           PY
 
-  deploy:
-    name: Deploy Supabase
+  supabase-dry-run:
+    name: Dry-run Supabase migrations
     needs: [format, quality]
     if: >-
       ${{ !cancelled() && needs.quality.result == 'success' &&
           github.event_name == 'push' && github.ref == 'refs/heads/main' &&
           fromJSON(needs.format.outputs.checks).supabase }}
     uses: ./.github/workflows/supabase-deploy.yml
+    with:
+      dry-run: true
     secrets: inherit

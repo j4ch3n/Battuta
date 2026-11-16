@@ -105,8 +105,16 @@ jobs:
             battuta-verify uv run --no-project --python 3.12 \
             python /source/scripts/packaging/tests/release_install.it.py
 
-  promote:
+  deploy-supabase:
+    name: Deploy Supabase
     needs: [verify-install]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/supabase-deploy.yml
+    secrets: inherit
+
+  promote:
+    needs: [verify-install, deploy-supabase]
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: write
