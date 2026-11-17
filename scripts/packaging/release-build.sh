@@ -7,7 +7,7 @@ tool_version="${3:?Python tool version required}"
 source /etc/os-release
 case "$platform" in
   oracle-ampere) [[ "$ID" == ol && "${VERSION_ID%%.*}" == 9 ]] ;;
-  raspberry-pi) [[ "$ID" == debian && "${VERSION_ID%%.*}" == 12 ]] ;;
+  raspberry-pi) [[ "$ID" == debian && "${VERSION_ID%%.*}" == 13 ]] ;;
   *) printf 'Unknown platform: %s\n' "$platform" >&2; exit 1 ;;
 esac
 [[ "$(uname -m)" == aarch64 ]]

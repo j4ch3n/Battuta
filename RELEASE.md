@@ -1,7 +1,7 @@
 # Battuta release setup
 
 Fresh Battuta installation on **AArch64** as the ordinary bot user: **Oracle Linux 9**
-(platform `oracle-ampere`, main bundle) or **Raspberry Pi OS 12 / Debian bookworm**
+(platform `oracle-ampere`, main bundle) or **Raspberry Pi OS 13 / Debian trixie**
 (platform `raspberry-pi`, influencer bundle). nvm and uv must already be configured. Do not install them, replace system
 Python, or run Battuta with sudo. Remote Supabase migrations and Edge Functions
 must already be provisioned separately.
@@ -86,7 +86,7 @@ case "${platform:-}" in oracle-ampere|raspberry-pi) ;; *) printf 'STOP: set plat
 source /etc/os-release
 case "$platform" in
   oracle-ampere) test "$ID" = ol && test "${VERSION_ID%%.*}" = 9 ;;
-  raspberry-pi) test "$ID" = debian && test "${VERSION_ID%%.*}" = 12 ;;
+  raspberry-pi) test "$ID" = debian && test "${VERSION_ID%%.*}" = 13 ;;
 esac
 test "$(uname -m)" = aarch64
 test "$(getconf LONG_BIT)" = 64

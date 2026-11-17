@@ -1,12 +1,12 @@
 FROM ghcr.io/astral-sh/uv:0.11.19@sha256:b46b03ddfcfbf8f547af7e9eaefdf8a39c8cebcba7c98858d3162bd28cf536f6 AS uv
-FROM debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
+FROM debian:trixie-slim@sha256:24a01011d10eba3a023bc8585b9650b8b29021240d4217c05b905e09ef4a5232
 
 ARG NODE_VERSION
 ARG PNPM_VERSION
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates tar gzip xz-utils git libstdc++6 libgomp1 util-linux findutils && rm -rf /var/lib/apt/lists/*
 COPY --from=uv /uv /uvx /usr/local/bin/
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
-RUN source /etc/os-release && test "$ID" = debian && test "${VERSION_ID%%.*}" = 12 && test "$(uname -m)" = aarch64
+RUN source /etc/os-release && test "$ID" = debian && test "${VERSION_ID%%.*}" = 13 && test "$(uname -m)" = aarch64
 RUN cd /tmp && \
     curl --fail --location --output node.tar.xz "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-arm64.tar.xz" && \
     curl --fail --location --output SHASUMS256.txt "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt" && \
