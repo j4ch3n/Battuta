@@ -184,33 +184,17 @@ policy = "replace"
 - Paths are relative, cannot traverse upward, and cannot follow symlinks.
   File operations preflight their selected rules before writing.
 
-### CoS Telegram voice handler
+### CoS voice replies
 
-`bots/cos-bot/.pi/telegram.json` is a committed template that holds only the
-top-level `outboundHandlers` entry; it contains no credentials. CoS setup and
-release merge it into the private `.pi/telegram.json` with the `merge` policy,
-then the Telegram step writes `profiles.default` from the environment. A
-`make refresh-telegram` run updates only `profiles.default`. Existing top-level
-keys are preserved, so hosts that already define `outboundHandlers` keep their
-own handler; later template changes are not merged into them.
+Setup gives CoS a Telegram voice reply handler backed by the local speech service
+([speech service](speech-service.md)). Explicit voice requests and
+`voice.replyMode` produce spoken replies; the default reply mode stays `manual`.
+The service accepts English text only. If synthesis fails, the reply falls back to
+text. Hosts that already define their own Telegram voice handler keep it, so later
+setup changes do not replace it.
 
-The handler runs `curl` against the local `POST /tts` route
-([speech service](speech-service.md)) and reads the OGG artifact from `{ogg}`.
-`curl -f` turns HTTP errors into a command failure, so the bridge falls back to
-a text reply. `curl` must be on the Pi process's `PATH`. The default reply mode
-stays `manual`; explicit voice requests and `voice.replyMode` use this handler.
-The service accepts English text only.
-
-Check the route from the command line before a Telegram test. Expect a non-empty
-OGG file and no Telegram or model call:
-
-```sh
-printf 'Voice check.' | curl -sf --data-binary @- -H 'Content-Type: text/plain' http://127.0.0.1:8902/tts -o "${TMPDIR:-/tmp}/voice-check.ogg"
-test -s "${TMPDIR:-/tmp}/voice-check.ogg" && file "${TMPDIR:-/tmp}/voice-check.ogg"
-```
-
-A Telegram receipt is separate evidence. Do not treat a generated or queued file
-as confirmed delivery.
+A generated audio file is not proof of delivery; confirm the voice message in
+Telegram separately.
 
 ## Setup and validation
 
