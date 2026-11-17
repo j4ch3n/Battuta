@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .config import DIMENSION, MODEL, MemoryConfig
 
-EMBEDDING_TOKEN_LIMIT = 256
+EMBEDDING_TOKEN_LIMIT = 512
 
 
 class TerminalMutationError(ValueError):

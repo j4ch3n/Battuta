@@ -51,7 +51,7 @@ history/expired retrieval is separate from physical tombstone discovery.
 
 The existing pinned local ONNX all-MiniLM-L6-v2 model uses 384-dimensional CPU
 embeddings. Content/query preprocessing is identical. Keywords are a separate FTS5
-index; they do not alter a fact's embedding. Inputs exceeding 256 tokenizer tokens
+index; they do not alter a fact's embedding. Inputs exceeding 512 tokenizer tokens
 are rejected rather than silently truncated.
 
 Provision models explicitly using the [setup guide](memory-service-setup.md).
@@ -169,7 +169,7 @@ operation cancellation is forwarded to the memory calls.
 One recall tool accepts independent optional `semantic_query` or `semantic_queries`
 and `keywords`. Either branch can run alone; both combine ranked results. Keyword
 phrases are literal. A list of queries is searched as one combined text when it fits
-the 256-token embedding limit; otherwise each query is searched alone, truncated to
+the 512-token embedding limit; otherwise each query is searched alone, truncated to
 the limit, and merged by rank. The server checks lifecycle, sources,
 revisions, expiry and dependencies and renders whole evidence/counterevidence
 groups as qualified bullets. Raw tags/ranks are not model context; machine
