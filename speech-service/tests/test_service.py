@@ -16,7 +16,7 @@ class Engine:
 def test_round_trip():
     service = SpeechService(Engine())
     assert service.transcribe(base64.b64encode(b"hello").decode()) == "hello"
-    assert base64.b64decode(service.synthesize("hello")) == b"hello"
+    assert service.synthesize("hello") == b"hello"
 
 
 @pytest.mark.parametrize("data", ["!", "", "Y" * (16 * 1024 * 1024)])

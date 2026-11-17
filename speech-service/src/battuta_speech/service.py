@@ -21,12 +21,12 @@ class SpeechService:
             raise ValueError("Audio is empty or too large")
         return self.engine.transcribe(data)
 
-    def synthesize(self, text: str) -> str:
+    def synthesize(self, text: str) -> bytes:
         if not text.strip() or len(text) > 4000:
             raise ValueError("Text is empty or too long")
         if not self.tts.acquire(blocking=False):
             raise RuntimeError("Speech synthesis is busy; retry later")
         try:
-            return base64.b64encode(self.engine.synthesize(text)).decode("ascii")
+            return self.engine.synthesize(text)
         finally:
             self.tts.release()

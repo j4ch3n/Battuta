@@ -1,6 +1,7 @@
 """Host-local Streamable HTTP MCP server."""
 
 import asyncio
+import base64
 from contextlib import asynccontextmanager
 import json
 from pathlib import Path
@@ -12,7 +13,7 @@ from mcp.server.lowlevel import Server
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, PlainTextResponse, Response
 from starlette.routing import Route
 import uvicorn
 
@@ -23,7 +24,8 @@ async def dispatch(service, name, arguments):
     if name == "transcribe_audio" and set(arguments) == {"audio"} and isinstance(arguments["audio"], str):
         return {"transcript": await asyncio.to_thread(service.transcribe, arguments["audio"])}
     if name == "synthesize_speech" and set(arguments) == {"text"} and isinstance(arguments["text"], str):
-        return {"audio": await asyncio.to_thread(service.synthesize, arguments["text"]), "mime_type": "audio/ogg"}
+        audio = await asyncio.to_thread(service.synthesize, arguments["text"])
+        return {"audio": base64.b64encode(audio).decode("ascii"), "mime_type": "audio/ogg"}
     raise ValueError("Invalid speech request")
 
 
@@ -68,7 +70,24 @@ def create_mcp_app(engine_factory):
     async def health(request):
         return JSONResponse({"ready": "service" in holder}, status_code=200 if "service" in holder else 503)
 
-    return Starlette(routes=[Route("/mcp", endpoint=StreamableHTTPASGIApp(manager)), Route("/health", endpoint=health)], lifespan=lifespan)
+    async def tts(request):
+        service = holder.get("service")
+        if service is None:
+            return PlainTextResponse("Speech service is not ready", status_code=503)
+        body = await request.body()
+        if len(body) > 16_384:
+            return PlainTextResponse("Text is empty or too long", status_code=413)
+        try:
+            audio = await asyncio.to_thread(service.synthesize, body.decode("utf-8"))
+        except UnicodeDecodeError:
+            return PlainTextResponse("Text must be UTF-8", status_code=400)
+        except ValueError as error:
+            return PlainTextResponse(str(error), status_code=400)
+        except RuntimeError as error:
+            return PlainTextResponse(str(error), status_code=503)
+        return Response(audio, media_type="audio/ogg")
+
+    return Starlette(routes=[Route("/mcp", endpoint=StreamableHTTPASGIApp(manager)), Route("/health", endpoint=health), Route("/tts", endpoint=tts, methods=["POST"])], lifespan=lifespan)
 
 
 @click.command()
