@@ -43,7 +43,6 @@ class ReleaseInstallation(unittest.TestCase):
         platform = os.environ["BATTUTA_RELEASE_PLATFORM"]
         archive = f"battuta-{tag}-{platform}-arm64.tar.gz"
         influencer = platform == "raspberry-pi"
-        packages = set(COMMANDS) - {"battuta-memory"} if influencer else set(COMMANDS)
         with tempfile.TemporaryDirectory(prefix="battuta-release-install-", dir="/tmp") as directory:
             work = Path(directory)
             env = {key: value for key, value in os.environ.items() if key not in {"VIRTUAL_ENV", "PYTHONPATH", "UV_PROJECT_ENVIRONMENT", "UV_TOOL_DIR", "UV_TOOL_BIN_DIR", "UV_PYTHON_PREFERENCE"}}
@@ -57,7 +56,7 @@ class ReleaseInstallation(unittest.TestCase):
                     self.assertEqual(Path(name).name, name)
                     self.assertEqual(hashlib.sha256((assets / name).read_bytes()).hexdigest(), digest)
             wheels = [(wheel, wheel_metadata(wheel)) for wheel in assets.glob("*.whl")]
-            self.assertEqual({metadata["Name"] for _, metadata in wheels}, packages)
+            self.assertEqual({metadata["Name"] for _, metadata in wheels}, set(COMMANDS))
             self.assertFalse(list(assets.glob("*-constraints.txt")))
             installed = {}
             for wheel, metadata in wheels:
