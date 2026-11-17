@@ -51,10 +51,10 @@ optional = true
 [[files]]
 operation = "copy"
 sources = [{ root = "profile", path = ".pi/mcp.json" }]
-context = "source"
 target = ".pi/mcp.json"
 destination = "private"
 policy = "create-only"
+optional = true
 
 [setup]
 steps = ["worker-profile"]

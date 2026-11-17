@@ -88,6 +88,11 @@ def configure_release(root: Path, *, env_file: Path, home: Path, deployment: str
     # Provision only after every instance has passed preflight; never start a bot.
     results = []
     skipped = []
+    # Generated MCP is written before private templates so release servers win over template copies.
+    for path, payload in outputs:
+        path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+        content = (json.dumps(payload, indent=2, allow_nan=False) + "\n").encode()
+        results.append((path, write_file(path, content, policy="create-only")))
     for profile, private, manifest in instances:
         path = private / ".pi/settings.json"
         settings = {}
@@ -102,17 +107,13 @@ def configure_release(root: Path, *, env_file: Path, home: Path, deployment: str
                 directory.chmod(0o700)
         elif private in browsers:
             skipped.append(f"Browser setup skipped for {path}; review browser configuration before launch.")
-        results.extend(prepare_files(root, profile, private, [rule.model_copy(update={"policy": "create-only"}) for rule in manifest.files if rule.destination == "private"], context="release"))
+        results.extend(prepare_files(root, profile, private, [rule.model_copy(update={"policy": "create-only"}) for rule in manifest.files if rule.destination == "private"]))
     if deployment == "main":
         cos_private = instance_paths(root, home, "cos-bot")[2]
         dream_env = {**os.environ, **values, "HOME": str(home), "PI_CODING_AGENT_DIR": str(cos_private / ".pi")}
         dream_result = run("node", str(dream), str(root / "bots/cos-bot"), "--release", env=dream_env, stdout=subprocess.PIPE, text=True)
         if dream_result is not None:
             results.extend((Path(item["path"]), item["created"]) for item in json.loads(dream_result.stdout))
-    for path, payload in outputs:
-        path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
-        content = (json.dumps(payload, indent=2, allow_nan=False) + "\n").encode()
-        results.append((path, write_file(path, content, policy="create-only")))
     for path, content in telegram_files:
         results.append((path, write_file(path, content, policy="replace") if content is not None else False))
     click.echo(f"Configured {deployment} deployment with {len(workers)} worker(s); no bots started.")

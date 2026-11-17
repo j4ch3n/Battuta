@@ -63,13 +63,11 @@ def merged_json(target: Path, template: Path, values: dict | None = None) -> byt
     return (json.dumps({**data, **missing}, indent=2, allow_nan=False) + "\n").encode()
 
 
-def prepare_files(root: Path, profile: Path, private: Path, rules: list[FileRule], *, source_profile: Path | None = None, context: str = "source") -> list[tuple[Path, bool]]:
+def prepare_files(root: Path, profile: Path, private: Path, rules: list[FileRule], *, source_profile: Path | None = None) -> list[tuple[Path, bool]]:
     pending = []
     results = []
     targets = set()
     for rule in rules:
-        if rule.context not in {"all", context}:
-            continue
         destination = profile if rule.destination == "profile" else private
         target = safe_path(destination, rule.target)
         if target in targets or (target.exists() and not target.is_file()):

@@ -178,9 +178,11 @@ policy = "replace"
 - `merge` (JSON `copy` only) creates the target from a template when missing and
   otherwise adds only top-level template keys that are absent. Existing keys are
   never overwritten. Invalid JSON fails before any write.
-- `optional = true` skips a rule if an input is missing.
-- `context` defaults to `all`; `source` or `release` restricts layout-specific
-  rules. Source worker MCP is copied; installed MCP is generated separately.
+- `optional = true` skips a rule if an input is missing. Required private
+  templates must be present in the release bundle, or staging fails.
+- Release generates each bot's MCP configuration before copying or merging
+  private templates, so the generated servers win over a shipped worker
+  `mcp.json` template.
 - Paths are relative, cannot traverse upward, and cannot follow symlinks.
   File operations preflight their selected rules before writing.
 

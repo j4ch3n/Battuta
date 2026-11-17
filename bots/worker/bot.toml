@@ -65,10 +65,10 @@ extensions = []
 [[files]]
 operation = "copy"
 sources = [{ root = "profile", path = ".pi/mcp.json" }]
-context = "source"
 target = ".pi/mcp.json"
 destination = "private"
-policy = "create-only"
+policy = "merge"
+optional = true
 
 [skills]
 include = [

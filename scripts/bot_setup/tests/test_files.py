@@ -90,6 +90,11 @@ def test_merge_creates_missing_file_and_adds_only_absent_template_keys(tmp_path)
     assert (private / "output.json").read_bytes() == before
 
 
+def test_merge_accepts_only_json_templates():
+    with pytest.raises(ValueError):
+        rule(policy="merge", sources=[{"root": "profile", "path": "template.txt"}])
+
+
 @pytest.mark.parametrize("bad", ["invalid-target", "missing-template"])
 def test_merge_rejects_bad_json_before_writing(tmp_path, bad):
     profile = tmp_path / "profile"

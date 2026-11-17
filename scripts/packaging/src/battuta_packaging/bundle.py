@@ -119,7 +119,7 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         shutil.copy2(original / "bot.toml", bot / "bot.toml")
         if profile.startswith("worker"):
             shutil.copy2(source / "supabase/functions/assignments/abilities.json", bot / "abilities.json")
-        prepare_files(source, bot, bot, [rule for rule in manifests[profile].files if rule.destination == "profile"], source_profile=original, context="release")
+        prepare_files(source, bot, bot, [rule for rule in manifests[profile].files if rule.destination == "profile"], source_profile=original)
         for name in selections[profile]:
             shutil.copytree(source / "skills-hub" / name, bot / ".pi/skills" / name)
         (bot / ".pi/skills").mkdir(exist_ok=True)
@@ -146,7 +146,14 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
                 (agents / name).write_bytes(content)
         settings = profile_settings(manifests[profile], browser=profile not in ("manager-bot", "worker-influencer"))
         write_json(bot / ".pi/settings.json", settings)
-        shutil.copy2(original / ".pi/web-search.json", bot / ".pi/web-search.json")
+        for rule in manifests[profile].files:
+            if rule.destination != "private":
+                continue
+            for entry in rule.sources:
+                path = original / entry.path
+                if entry.root == "profile" and path.is_file():
+                    (bot / entry.path).parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(path, bot / entry.path)
     for relative in ENTRY_OUTPUTS:
         (destination / relative).parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source / "LICENSE", destination / "bots/LICENSE")
@@ -176,6 +183,11 @@ def validate_bundle(root: Path) -> dict:
                     path = package / name
                     if path.is_symlink() or not path.is_file():
                         raise ValueError(f"extension: {path}")
+            for rule in manifest.files:
+                if rule.destination == "private" and not rule.optional:
+                    for entry in rule.sources:
+                        if entry.root == "profile" and not (bot / entry.path).is_file():
+                            raise ValueError(f"template: {entry.path}")
             if not (bot / "AGENTS.md").is_file():
                 raise ValueError(profile)
             selected = bot / ".pi/skills"
