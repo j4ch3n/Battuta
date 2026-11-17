@@ -46,6 +46,14 @@ policy = "replace"
 
 [[files]]
 operation = "copy"
+sources = [{ root = "profile", path = ".pi/telegram.json" }]
+target = ".pi/telegram.json"
+destination = "private"
+policy = "merge"
+context = "source"
+
+[[files]]
+operation = "copy"
 sources = [{ root = "profile", path = ".pi/web-search.json" }]
 target = ".pi/web-search.json"
 destination = "private"

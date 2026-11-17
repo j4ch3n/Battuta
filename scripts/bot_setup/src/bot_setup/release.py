@@ -15,7 +15,7 @@ from .json_config import read_config
 from .mcp import mcp_payload, validate_memory_url
 from .telegram import telegram_payload
 from .manifest import load_profile
-from .files import prepare_files, write_file
+from .files import merged_json, prepare_files, write_file
 from .runtime import initialize_settings_if_missing
 
 
@@ -55,6 +55,7 @@ def configure_release(root: Path, *, env_file: Path, home: Path, deployment: str
         telegram = telegram_payload(env_file, "COS", values)
         telegram["profiles"]["default"]["botToken"] = "${COS_TELEGRAM_TOKEN}"
     outputs = []
+    telegram_files = []
     browsers = {}
     instances = []
     private_paths = set()
@@ -76,7 +77,7 @@ def configure_release(root: Path, *, env_file: Path, home: Path, deployment: str
         outputs.append((private / ".pi/mcp.json", payload))
         read_config(profile / ".pi/web-search.json")
         if role == "cos":
-            outputs.append((private / ".pi/telegram.json", telegram))
+            telegram_files.append((private / ".pi/telegram.json", merged_json(private / ".pi/telegram.json", profile / ".pi/telegram.json", telegram)))
     if deployment == "main":
         helper = root / "bots/_shared/memory-client/dist/configure-scheduler.js"
         if not helper.is_file():
@@ -112,6 +113,8 @@ def configure_release(root: Path, *, env_file: Path, home: Path, deployment: str
         path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
         content = (json.dumps(payload, indent=2, allow_nan=False) + "\n").encode()
         results.append((path, write_file(path, content, policy="create-only")))
+    for path, content in telegram_files:
+        results.append((path, write_file(path, content, policy="replace") if content is not None else False))
     click.echo(f"Configured {deployment} deployment with {len(workers)} worker(s); no bots started.")
     for path, created in results:
         click.echo(f"{'Created' if created else 'Untouched (setup skipped)'}: {path}")

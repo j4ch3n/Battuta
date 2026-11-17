@@ -10,6 +10,11 @@ def manifest_text(role: str, names: list[str]) -> str:
     return source.read_text().split("[skills]")[0] + "[skills]\ninclude = " + json.dumps(names)
 
 
+def copy_telegram_template(bot: Path) -> None:
+    (bot / ".pi").mkdir(exist_ok=True)
+    (bot / ".pi/telegram.json").write_bytes((Path(__file__).parents[3] / "bots/cos-bot/.pi/telegram.json").read_bytes())
+
+
 def skill_catalog(root: Path, role: str, names=None) -> list[str]:
     (root / "skills-hub").mkdir(parents=True, exist_ok=True)
     names = names if names is not None else ["project-management", "todo", "note-taking", "research", *(["draft-writing"] if role == "cos" else [])]

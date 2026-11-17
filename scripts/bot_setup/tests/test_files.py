@@ -1,5 +1,7 @@
 """Declared preparation preserves private files and validates before writing."""
 
+import json
+
 import pytest
 import click
 
@@ -70,6 +72,40 @@ def test_all_rules_preflight_before_writes(tmp_path, bad):
 def test_optional_missing_source_is_skipped(tmp_path):
     prepare_files(tmp_path, tmp_path / "profile", tmp_path / "private", [rule(optional=True)])
     assert not (tmp_path / "private").exists()
+
+
+def test_merge_creates_missing_file_and_adds_only_absent_template_keys(tmp_path):
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    (profile / "template.json").write_text('{"handlers": [1], "other": true}')
+    private = tmp_path / "private"
+    merge = rule(policy="merge", target="output.json", sources=[{"root": "profile", "path": "template.json"}])
+    prepare_files(tmp_path, profile, private, [merge])
+    assert json.loads((private / "output.json").read_text()) == {"handlers": [1], "other": True}
+    (private / "output.json").write_text('{"handlers": [2], "custom": "kept"}')
+    prepare_files(tmp_path, profile, private, [merge])
+    assert json.loads((private / "output.json").read_text()) == {"handlers": [2], "custom": "kept", "other": True}
+    before = (private / "output.json").read_bytes()
+    prepare_files(tmp_path, profile, private, [merge])
+    assert (private / "output.json").read_bytes() == before
+
+
+@pytest.mark.parametrize("bad", ["invalid-target", "missing-template"])
+def test_merge_rejects_bad_json_before_writing(tmp_path, bad):
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    (profile / "template.json").write_text('{"handlers": [1]}')
+    private = tmp_path / "private"
+    private.mkdir()
+    (private / "output.json").write_text("{not json")
+    merge = rule(policy="merge", target="output.json", sources=[{"root": "profile", "path": "template.json"}])
+    if bad == "missing-template":
+        (profile / "template.json").unlink()
+        (private / "output.json").unlink()
+    with pytest.raises(click.ClickException):
+        prepare_files(tmp_path, profile, private, [merge])
+    if bad == "invalid-target":
+        assert (private / "output.json").read_text() == "{not json"
 
 
 def test_failed_replacement_preserves_existing_file_and_cleans_temporary(tmp_path, monkeypatch):

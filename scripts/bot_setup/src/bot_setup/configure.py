@@ -56,7 +56,6 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
     assignment_server(supabase_url)
     private = resolve_agent_dir(manifest, f"{role}-bot", Path.home()).parent
     validate_private_home(private)
-    telegram = prepare_telegram_config(private, env_file, prefix, values) if "telegram" in steps else None
     url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
     if "browser" in steps:
         browser_settings(bot_dir, private, home=Path.home(), bot="cos-bot")
@@ -84,7 +83,7 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
         run("node", str(root / "memory-client/configure-dream.mjs"), str(bot_dir), env=dream_env)
 
     def telegram_config():
-        path, data, changed = telegram
+        path, data, changed = prepare_telegram_config(private, env_file, prefix, values)
         if changed:
             write_config(path, data, ".telegram-")
 
