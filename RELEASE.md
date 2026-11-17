@@ -111,15 +111,15 @@ directory, not the installation:
   `battuta-speech`, `battuta-bot-setup`, and `battuta-packaging`; main also needs `battuta-memory`.
 - `python-tools-version.txt` and `python-tools-SHA256SUMS`.
 
-Set the real tag, platform, and absolute installation path; paths used by service
-generation must not contain spaces or systemd special characters. From the download
-directory:
+Set the real tag and platform. Ask the owner for the absolute installation path if it
+is not given; do not choose one. It must be new and empty, and service generation
+rejects paths with spaces or systemd special characters. From the download directory:
 
 ```bash
 version=vX.Y.Z
 platform=oracle-ampere # raspberry-pi for the influencer bundle
 archive="battuta-$version-$platform-arm64.tar.gz"
-install_path="$HOME/battuta/$version"
+install_path="<absolute path the owner approved>"
 sha256sum -c "$archive.sha256"
 sha256sum -c python-tools-SHA256SUMS
 tool_version="$(cat python-tools-version.txt)"

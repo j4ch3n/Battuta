@@ -66,10 +66,11 @@ Unpack the archive to read the guide; the installation is extracted separately.
   mkdir release && tar -xzf "$archive" -C release
   less release/RELEASE.md
 
-Choose a versioned installation path. Never reuse a path, and never clear
-~/.battuta or service data.
+Ask the owner for the absolute installation path to use. It must be new and empty,
+and must not contain spaces. Never reuse a path, and never clear ~/.battuta or service
+data. If the owner has not given a path, stop and ask rather than choosing one.
 
-  install_path="$HOME/battuta/$version"
+  install_path="<absolute path the owner approved>"
   deployment={{ deployment }}
 
 Then follow RELEASE.md from "Choose the installation bundle" through step 6,
@@ -84,7 +85,7 @@ succeeds. Device readiness is checked on launch, not during setup.
 5. Upgrade
 ----------
 
-Install a new release into a new, empty path such as `$HOME/battuta/vX.Y.Z`.
+Install a new release into a new, empty path that the owner approves.
 Stop affected services and get owner approval before switching the running
 installation. Existing `~/.battuta` configuration is kept.
 
