@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { selectRecallQuery } from "../recall-context.ts";
+import { selectRecallQueries } from "../recall-context.ts";
 
 const user = (id: string, text: string) => ({
   id,
@@ -28,15 +28,16 @@ test("uses the last three owner messages newest first, excluding assistant, tool
     user("u3", "third"),
     { id: "tool", type: "message", message: { role: "toolResult", content: "secret tool output" } },
   ];
-  expect(selectRecallQuery(entries, "fourth")).toBe("fourth\n\nthird\n\nsecond");
+  expect(selectRecallQueries(entries, "fourth")).toEqual(["fourth", "third", "second"]);
 });
 
 test("does not duplicate the current message when the session already contains it", () => {
-  expect(selectRecallQuery([user("u1", "older"), user("u2", "latest")], "latest")).toBe(
-    "latest\n\nolder",
-  );
+  expect(selectRecallQueries([user("u1", "older"), user("u2", "latest")], "latest")).toEqual([
+    "latest",
+    "older",
+  ]);
 });
 
 test("falls back to a neutral query when there is no owner text", () => {
-  expect(selectRecallQuery([assistant("a1", "reply")], "")).toBe("recent owner context");
+  expect(selectRecallQueries([assistant("a1", "reply")], "")).toEqual(["recent owner context"]);
 });

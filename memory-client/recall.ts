@@ -48,22 +48,24 @@ export function unavailableRecall(reason = "the memory lookup did not finish"): 
   };
 }
 
+const MAX_CONTEXT_BYTES = 4000;
+
 const recallSchema = z.object({
-  context: z.string().refine((v) => Buffer.byteLength(v) <= 2000 && redact(v) === v),
+  context: z.string().refine((v) => Buffer.byteLength(v) <= MAX_CONTEXT_BYTES && redact(v) === v),
   validation_evidence: z.array(memoryRecordSchema),
   current_refs: z.array(z.string()).default([]),
   incomplete: z.boolean(),
 });
 
 export async function runRecall(
-  query: string,
+  messages: string[],
   options: { url: string; signal: AbortSignal },
 ): Promise<PreparedRecall> {
   try {
     const client = new MemoryMcpClient(options.url);
     const data = recallSchema.parse(
       await abortable(
-        client.call("memory_recall", { semantic_query: query }, options.signal),
+        client.call("memory_recall", { semantic_queries: messages }, options.signal),
         options.signal,
       ),
     );

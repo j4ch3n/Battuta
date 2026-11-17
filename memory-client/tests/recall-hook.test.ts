@@ -173,9 +173,9 @@ test("every main CoS start prepares recall before a user, Agent Mail, or other c
     );
     expect(run).toHaveBeenCalledTimes(3);
     expect(run.mock.calls.map((call) => call[0])).toEqual([
-      "hello",
-      "mail update",
-      "scheduled update",
+      ["hello"],
+      ["mail update"],
+      ["scheduled update"],
     ]);
 
     await expect(

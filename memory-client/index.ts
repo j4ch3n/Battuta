@@ -10,7 +10,7 @@ import { extractMemories } from "./extract.ts";
 import { eligibleRecords } from "./records.ts";
 import { abortable } from "./abortable.ts";
 import { prepareCorrectionCandidates } from "./correction-candidates.ts";
-import { selectRecallQuery } from "./recall-context.ts";
+import { selectRecallQueries } from "./recall-context.ts";
 import {
   recallFailureReason,
   runRecall,
@@ -166,7 +166,7 @@ export default function memoryClient(pi: ExtensionAPI) {
     try {
       request.packet = await abortable(
         runRecall(
-          selectRecallQuery(ctx.sessionManager.buildContextEntries(), recallPrompt(event)),
+          selectRecallQueries(ctx.sessionManager.buildContextEntries(), recallPrompt(event)),
           { url: config.url, signal },
         ),
         signal,
