@@ -1,6 +1,7 @@
 # Shared speech operations
 
-One local MCP server at `http://127.0.0.1:8902/mcp` serves CoS and Workers;
+One local server at `http://127.0.0.1:8902` serves CoS and Workers through MCP at
+`/mcp`, and a plain REST route at `POST /tts` for text-to-OGG callers;
 Manager's speech connection is disabled. `transcribe_audio` accepts a base64
 audio file and returns a transcript. `synthesize_speech` accepts English text
 and returns base64 OGG/Opus audio. The tools do not send Telegram messages.
@@ -29,3 +30,11 @@ unmodified as a reference. Review applicable model and voice terms before use.
 Actual ARM64 compatibility, concurrency, speech quality, and CPU/RAM usage must
 be confirmed on the target host. Stop on incompatibility; do not fall back to a
 hosted speech provider or silently substitute a model.
+
+## REST text-to-OGG route
+
+`POST /tts` takes a UTF-8 text body of at most 4,000 characters and returns raw
+`audio/ogg` (OGG/Opus). It shares the synthesis code and single-request guard
+used by `synthesize_speech`. Errors are plain text: `400` for empty, invalid, or
+too-long text; `413` for oversized bodies; `503` when the service is busy or not
+ready.

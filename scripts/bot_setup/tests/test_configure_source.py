@@ -9,7 +9,7 @@ import click
 import pytest
 
 from bot_setup.configure import configure_source
-from skill_fixtures import skill_catalog
+from skill_fixtures import copy_telegram_template, skill_catalog
 
 
 @pytest.fixture(autouse=True)
@@ -30,6 +30,8 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
     (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
     (bot / "AGENTS_dedicated.md").write_text("Dedicated")
     (bot / "package.json").write_text("{}")
+    if role == "cos":
+        copy_telegram_template(bot)
     env = tmp_path / ".env"
     env.write_text("LINEAR_API_TOKEN=private-linear\nSUPABASE_URL=http://localhost:54321\nSUPABASE_SECRET_KEY=private-supabase\n" + ("COS_TELEGRAM_TOKEN=101:private-token\nTELEGRAM_ALLOWED_USER_ID=123\n" if role == "cos" else ""))
     with patch("bot_setup.configure.run") as runtime, patch("bot_setup.install.run") as install:
@@ -50,6 +52,10 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
     runtime_pi = tmp_path / f"home/.battuta/pi-bots/{role}-bot/.pi"
     assert json.loads((runtime_pi / "settings.json").read_text())["defaultThinkingLevel"] == ("low" if role == "cos" else "medium")
     assert (runtime_pi / "telegram.json").exists() == (role == "cos")
+    if role == "cos":
+        telegram = json.loads((runtime_pi / "telegram.json").read_text())
+        assert telegram["outboundHandlers"][0]["output"] == "ogg"
+        assert telegram["profiles"]["default"]["botId"] == 101
     assert all((pi / "skills" / name).is_symlink() for name in names)
     assert json.loads((pi / "settings.json").read_text())["battutaMemoryCapture"]["enabled"] == (role == "cos")
     if role == "cos":
@@ -75,6 +81,8 @@ def test_other_bot_setup_preserves_prepared_worker_tool_restrictions(tmp_path, r
     (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
     (bot / "AGENTS_dedicated.md").write_text("Dedicated")
     (bot / "package.json").write_text("{}")
+    if role == "cos":
+        copy_telegram_template(bot)
     (tmp_path / ".env").write_text("LINEAR_API_TOKEN=private-linear\nSUPABASE_URL=http://localhost:54321\nSUPABASE_SECRET_KEY=private-supabase\nCOS_TELEGRAM_TOKEN=101:private-token\nTELEGRAM_ALLOWED_USER_ID=123\n")
     worker = tmp_path / "bots/worker"
     configure_mcp(worker, role="worker", supabase_url="http://localhost:54321")

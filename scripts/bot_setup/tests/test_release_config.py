@@ -24,6 +24,8 @@ def deployment(tmp_path, monkeypatch):
         (bot / "AGENTS.md").write_text(role)
         (bot / ".pi/settings.json").write_text("{}")
         (bot / ".pi/web-search.json").write_text('{"fetchContent":{"userAgent":"fixture"}}')
+        if role == "cos-bot":
+            (bot / ".pi/telegram.json").write_bytes((Path(__file__).parents[3] / "bots/cos-bot/.pi/telegram.json").read_bytes())
     helper = root / "bots/_shared/memory-client/dist/configure-scheduler.js"
     helper.parent.mkdir(parents=True)
     helper.touch()
@@ -79,6 +81,21 @@ def test_release_preserves_existing_files_and_reports_skips(deployment, capsys):
             browser = json.loads((private_pi / "settings.json").read_text())["pi-browser-use"]
             assert browser["userDataDir"] == str(private_pi / "browser-research")
     assert not (home / ".pi").exists()
+
+
+def test_release_merges_cos_telegram_handler_without_overwriting_existing_values(deployment):
+    root, home, env_file = deployment
+    pi = home / ".battuta/pi-bots/cos-bot/.pi"
+    release.configure_release(root, env_file=env_file, home=home)
+    fresh = json.loads((pi / "telegram.json").read_text())
+    assert fresh["profiles"]["default"]["botToken"] == "${COS_TELEGRAM_TOKEN}"
+    assert fresh["outboundHandlers"][0]["output"] == "ogg"
+    (pi / "telegram.json").write_text(json.dumps({"custom": True, "profiles": {"default": {"botToken": "${COS_TELEGRAM_TOKEN}", "allowedUserId": 1}}}))
+    release.configure_release(root, env_file=env_file, home=home)
+    merged = json.loads((pi / "telegram.json").read_text())
+    assert merged["custom"] is True
+    assert merged["profiles"] == {"default": {"botToken": "${COS_TELEGRAM_TOKEN}", "allowedUserId": 1}}
+    assert merged["outboundHandlers"] == fresh["outboundHandlers"]
 
 
 def test_fresh_release_defaults_survive_browser_setup(deployment):

@@ -1,0 +1,9 @@
+{
+  "outboundHandlers": [
+    {
+      "type": "voice",
+      "template": "curl -sf --data-binary @- -H 'Content-Type: text/plain' http://127.0.0.1:8902/tts -o {ogg}",
+      "output": "ogg"
+    }
+  ]
+}

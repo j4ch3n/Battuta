@@ -1,11 +1,13 @@
 """Small, preflighted file operations shared by source and release setup."""
 
+import json
 import os
 from pathlib import Path
 import tempfile
 
 import click
 
+from .json_config import read_config
 from .manifest import FileRule
 
 
@@ -50,6 +52,17 @@ def write_file(target: Path, content: bytes, *, policy: str) -> bool:
             os.unlink(temporary)
 
 
+def merged_json(target: Path, template: Path, values: dict | None = None) -> bytes | None:
+    if not template.is_file():
+        raise click.ClickException(f"Missing setup template: {template}")
+    defaults = {**read_config(template), **(values or {})}
+    data = read_config(target)
+    missing = {key: value for key, value in defaults.items() if key not in data}
+    if target.exists() and not missing:
+        return None
+    return (json.dumps({**data, **missing}, indent=2, allow_nan=False) + "\n").encode()
+
+
 def prepare_files(root: Path, profile: Path, private: Path, rules: list[FileRule], *, source_profile: Path | None = None, context: str = "source") -> list[tuple[Path, bool]]:
     pending = []
     results = []
@@ -69,6 +82,13 @@ def prepare_files(root: Path, profile: Path, private: Path, rules: list[FileRule
         if rule.operation == "copy" and len(sources) != 1:
             raise click.ClickException("Copy rules require exactly one source")
         if rule.optional and any(not path.exists() for path in sources):
+            continue
+        if rule.policy == "merge":
+            content = merged_json(target, sources[0])
+            if content is None:
+                results.append((target, False))
+            else:
+                pending.append((target, content, "replace"))
             continue
         try:
             content = sources[0].read_bytes() if rule.operation == "copy" else "\n".join(path.read_text() for path in sources).encode()

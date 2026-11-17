@@ -5,7 +5,7 @@ import tomllib
 from typing import Annotated, Literal
 
 import click
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, field_validator, model_validator
 
 
 class Section(BaseModel):
@@ -43,9 +43,15 @@ class FileRule(Section):
     sources: list[FileSource] = Field(min_length=1)
     target: str
     destination: Literal["profile", "private"]
-    policy: Literal["replace", "create-only"]
+    policy: Literal["replace", "create-only", "merge"]
     optional: bool = False
     context: Literal["source", "release", "all"] = "all"
+
+    @model_validator(mode="after")
+    def merge_copies_one_json_template(self):
+        if self.policy == "merge" and (self.operation != "copy" or len(self.sources) != 1):
+            raise ValueError("Merge rules copy exactly one JSON template")
+        return self
 
 
 class Setup(Section):

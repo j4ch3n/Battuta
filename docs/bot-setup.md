@@ -175,11 +175,26 @@ policy = "replace"
   `private` (the private instance home containing `.pi`).
 - `replace` refreshes a generated file atomically. `create-only` preserves an
   existing regular file, including custom bytes.
+- `merge` (JSON `copy` only) creates the target from a template when missing and
+  otherwise adds only top-level template keys that are absent. Existing keys are
+  never overwritten. Invalid JSON fails before any write.
 - `optional = true` skips a rule if an input is missing.
 - `context` defaults to `all`; `source` or `release` restricts layout-specific
   rules. Source worker MCP is copied; installed MCP is generated separately.
 - Paths are relative, cannot traverse upward, and cannot follow symlinks.
   File operations preflight their selected rules before writing.
+
+### CoS voice replies
+
+Setup gives CoS a Telegram voice reply handler backed by the local speech service
+([speech service](speech-service.md)). Explicit voice requests and
+`voice.replyMode` produce spoken replies; the default reply mode stays `manual`.
+The service accepts English text only. If synthesis fails, the reply falls back to
+text. Hosts that already define their own Telegram voice handler keep it, so later
+setup changes do not replace it.
+
+A generated audio file is not proof of delivery; confirm the voice message in
+Telegram separately.
 
 ## Setup and validation
 
