@@ -3,7 +3,7 @@
 import re
 import unicodedata
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
@@ -161,6 +161,7 @@ class Selector(Tagged):
 class RecallRequest(Selector):
     selector: Literal["projects", "global", "all"] = "all"
     semantic_query: str | None = Field(default=None, min_length=1, max_length=16000)
+    semantic_queries: list[Annotated[str, Field(min_length=1, max_length=16000)]] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list, max_length=32)
     limit: int = Field(default=10, ge=1, le=100)
     include_expired: bool = False
@@ -183,10 +184,12 @@ class RecallRequest(Selector):
     @model_validator(mode="after")
     def usable_query(self):
         if self.semantic_query is not None:
-            self.semantic_query = self.semantic_query.strip()
-            if not self.semantic_query:
-                raise ValueError("Blank semantic query")
-        if not self.semantic_query and not self.keywords:
+            self.semantic_queries = [self.semantic_query, *self.semantic_queries]
+            self.semantic_query = None
+        self.semantic_queries = [q.strip() for q in self.semantic_queries]
+        if any(not q for q in self.semantic_queries):
+            raise ValueError("Blank semantic query")
+        if not self.semantic_queries and not self.keywords:
             raise ValueError("Provide semantic_query or keywords")
         return self
 

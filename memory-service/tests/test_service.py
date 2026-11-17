@@ -27,6 +27,8 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
         async def execute(fn): return fn()
         self.backend = UpstreamAdapter(SimpleNamespace(conn=self.conn, _execute_with_retry=execute))
         self.backend.embed = lambda text: b"0"
+        self.backend.embedding_fits = lambda text: True
+        self.backend.truncate_for_embedding = lambda text: text
         self.service = MemoryService(self.backend, MemoryConfig(data_dir=self.root))
         self.add("a", "Atlas note", "proj:atlas,work", 3)
         self.add("b", "Global note", "proj:global,work", 2)

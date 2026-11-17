@@ -4,6 +4,17 @@ import re
 import unicodedata
 
 
+def interleave_ranks(rankings):
+    # Rank-by-rank round robin: each query's top result first, then next ranks, no repeats.
+    seen, merged = set(), []
+    for rank in range(max((len(r) for r in rankings), default=0)):
+        for ranking in rankings:
+            if rank < len(ranking) and ranking[rank] not in seen:
+                seen.add(ranking[rank])
+                merged.append(ranking[rank])
+    return merged
+
+
 def fuse_ranks(semantic_refs, lexical_refs, limit):
     scores = {}
     for branch in (semantic_refs, lexical_refs):

@@ -166,10 +166,11 @@ unavailable context while retaining the instruction profile snapshot. Session
 switch/fork and shutdown cancel pending work; old packets do not accumulate. Pi
 operation cancellation is forwarded to the memory calls.
 
-One recall tool accepts independent optional `semantic_query` and `keywords`.
-The child rewrites them using history. Either branch can run alone; both combine
-ranked results. Keyword phrases are literal, and semantic queries exceeding the
-256-token limit are rejected for rephrasing. The server checks lifecycle, sources,
+One recall tool accepts independent optional `semantic_query` or `semantic_queries`
+and `keywords`. Either branch can run alone; both combine ranked results. Keyword
+phrases are literal. A list of queries is searched as one combined text when it fits
+the 256-token embedding limit; otherwise each query is searched alone, truncated to
+the limit, and merged by rank. The server checks lifecycle, sources,
 revisions, expiry and dependencies and renders whole evidence/counterevidence
 groups as qualified bullets. Raw tags/ranks are not model context; machine
 records remain available to capture and dream callers.

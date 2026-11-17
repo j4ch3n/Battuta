@@ -31,6 +31,8 @@ class StorageFixture(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(storage.close)
         self.adapter = UpstreamAdapter(storage)
         self.adapter.embed = lambda _: b"valid"
+        self.adapter.embedding_fits = lambda _: True
+        self.adapter.truncate_for_embedding = lambda text: text
         self.state = StateStore.open(self.root / "state.db")
         self.addCleanup(self.state.close)
         self.service = MemoryService(self.adapter, config, self.state)

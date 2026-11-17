@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from .scope import resolve_selector, resolve_scope, project_tag
 from .contracts import UpdateRequest, ListRequest
 from .records import eligible_records
-from .retrieval import fuse_ranks
+from .retrieval import fuse_ranks, interleave_ranks
 from .rendering import render_memories, evidence_closure
 from .upstream import TerminalMutationError
 from .consolidation import GlobalConsolidation
@@ -36,9 +36,9 @@ class MemoryService:
             eligible = [r for r in eligible if (not request.kind or r["kind"] == request.kind) and
                 (not request.tags or (all(t in r["tags"] for t in request.tags) if request.tag_match == "all" else any(t in r["tags"] for t in request.tags)))]
             branches, semantic, lexical = {}, [], []
-            if request.semantic_query:
+            if request.semantic_queries:
                 try:
-                    semantic = await self.adapter.search(request.model_copy(update={"limit": min(request.limit, 20)}), selected, [r["ref"] for r in eligible])
+                    semantic = await self._semantic_search(request, selected, eligible)
                     branches["semantic"] = "ready"
                 except ValueError:
                     raise
@@ -56,7 +56,7 @@ class MemoryService:
             if not any(value == "ready" for value in branches.values()):
                 raise RuntimeError("Memory retrieval unavailable")
             lookup = {r["ref"]: r for r in eligible}
-            refs = fuse_ranks([r["ref"] for r in semantic], lexical, request.limit)
+            refs = fuse_ranks(semantic, lexical, request.limit)
             seeds = [lookup[ref] for ref in refs if ref in lookup]
             evidence = evidence_closure(seeds, records)
             view = render_memories(seeds, evidence, datetime.now(timezone.utc))
@@ -64,6 +64,19 @@ class MemoryService:
             return {**view, "records": seeds, "validation_evidence": evidence,
                 "incomplete": incomplete, "branches": branches,
                 "warnings": selected.warnings + (["Memory retrieval is partial"] if incomplete else [])}
+
+    async def _semantic_search(self, request, selected, eligible):
+        # Combined query first; otherwise each query alone, truncated to the embedding limit.
+        eligible_refs = [r["ref"] for r in eligible]
+        limit = min(request.limit, 20)
+        combined = "\n\n".join(request.semantic_queries)
+        queries = [combined] if self.adapter.embedding_fits(combined) else [
+            self.adapter.truncate_for_embedding(q) for q in request.semantic_queries]
+        rankings = []
+        for query in queries:
+            hits = await self.adapter.search(request.model_copy(update={"semantic_query": query, "limit": limit}), selected, eligible_refs)
+            rankings.append([r["ref"] for r in hits])
+        return interleave_ranks(rankings)
 
     async def _reconcile_index(self):
         request = ListRequest(selector="all")
