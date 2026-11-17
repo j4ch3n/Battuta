@@ -22,6 +22,22 @@ export async function captureSettings(directory: string, role: "cos" | "manager"
   }
 }
 
+const recallSchema = z.object({
+  limit: z.number().int().min(1).max(100).catch(10),
+  maxDistance: z.number().gt(0).max(2).catch(0.9),
+});
+export async function recallSettings(directory: string) {
+  try {
+    const settings: unknown = JSON.parse(await readFile(join(directory, "settings.json"), "utf8"));
+    return recallSchema.parse(
+      (settings as { battutaMemoryRecall?: unknown })?.battutaMemoryRecall ?? {},
+    );
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return recallSchema.parse({});
+    throw error;
+  }
+}
+
 export function clientConfig() {
   const role = process.env.AGENT_ROLE;
   if (role !== "cos" && role !== "manager") throw new Error("AGENT_ROLE must be cos or manager");

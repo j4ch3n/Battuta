@@ -21,9 +21,9 @@ afterEach(() => {
   run.mockReset();
 });
 
-const prepared = (status: PreparedRecall["status"] = "ready"): PreparedRecall => ({
+const prepared = (status: PreparedRecall["status"] = "success"): PreparedRecall => ({
   status,
-  context: status === "unavailable" ? "Memory unavailable" : "qualified synthetic evidence",
+  context: status === "failed" ? "Memory unavailable" : "qualified synthetic evidence",
   validationEvidence: [],
   currentRefs: [],
   preparedAt: new Date().toISOString(),
@@ -153,8 +153,8 @@ test("a retained synthetic capture neither suppresses the profile snapshot nor g
     };
     expect(event.systemPromptOptions.sections["owner-profile"]).toContain("Initial owner profile");
     expect(run.mock.calls[0]?.[1]).not.toHaveProperty("capturePending");
-    expect(result.message.content).toContain("memory-context:ready");
-    expect(result.message.content).toContain("qualified synthetic evidence");
+    expect(run.mock.calls[0]?.[1]).toMatchObject({ limit: 10, maxDistance: 0.9 });
+    expect(result.message.content).toBe("qualified synthetic evidence");
   } finally {
     await f.close();
   }
@@ -212,7 +212,7 @@ test.each([
     expect(settled).toBe(false);
     finish(prepared());
     const result = (await pending) as { message: { content: string } };
-    expect(result.message.content).toContain("memory-context:ready");
+    expect(result.message.content).toBe("qualified synthetic evidence");
   } finally {
     await f.close();
   }
@@ -255,7 +255,7 @@ test("expired evidence and obsolete packets are filtered without changing the pr
       f.ctx,
     )) as { messages: { content: string }[] };
     expect(filtered.messages).toEqual([
-      { role: "custom", ...second.message, content: "memory-context:ready\ncurrent evidence" },
+      { role: "custom", ...second.message, content: "current evidence" },
     ]);
     expect(secondEvent.systemPromptOptions.sections["owner-profile"]).toContain(
       "Initial owner profile",
@@ -275,7 +275,7 @@ test("expired evidence and obsolete packets are filtered without changing the pr
       { messages: [{ role: "custom", ...third.message }] },
       f.ctx,
     )) as { messages: { content: string }[] };
-    expect(expiredOnly.messages[0]?.content).toContain("memory-context:unavailable");
+    expect(expiredOnly.messages[0]?.content).toContain("Memory unavailable");
   } finally {
     await f.close();
   }
@@ -296,7 +296,7 @@ test.each(["missing", "oversized", "credential"])(
       const result = (await f.hooks.get("before_agent_start")!(event, f.ctx)) as {
         message: { content: string };
       };
-      expect(result.message.content).toContain("memory-context:ready");
+      expect(result.message.content).toBe("qualified synthetic evidence");
       expect(run).toHaveBeenCalledOnce();
       const profile = event.systemPromptOptions.sections["owner-profile"];
       expect(profile).not.toContain("synthetic-secret");
@@ -320,7 +320,7 @@ test("the bounded recall failure remains explicit and does not remove the loaded
     };
     expect(run).toHaveBeenCalledOnce();
     expect(timeout).toHaveBeenCalledWith(30_000);
-    expect(result.message.content).toContain("memory-context:unavailable");
+    expect(result.message.content).toContain("Memory unavailable");
     expect(event.systemPromptOptions.sections["owner-profile"]).toContain("Initial owner profile");
   } finally {
     await f.close();

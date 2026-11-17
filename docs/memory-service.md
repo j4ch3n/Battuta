@@ -59,8 +59,12 @@ Missing/corrupt/changed weights, tokenizer or hash fallback fail readiness, incl
 on an empty store. The service never downloads a replacement at startup or needs
 chat-provider credentials. Model migration remains separate work.
 
-Hybrid recall reports semantic/lexical branch availability. A failed branch may
-yield labelled partial results; both failing is unavailable, not empty memory.
+Hybrid recall reports per-branch outcome. A failed branch yields `partial`; both
+failing yields `failed`, not empty memory. Recall requires the caller's `limit` and
+`max_distance`: semantic hits with L2 distance above `max_distance` are excluded before
+`limit` applies, and keyword search is capped by `limit` only. Each rendered entry must
+fit 4000 bytes; an oversized entry is omitted and its ref reported. Partial and failed
+recalls are logged without memory content.
 Omitting `keywords` runs semantic-only retrieval. Literal keyword matching,
 scope/eligibility-before-limit and dependency checks are described in the design.
 Recall defaults to every scope; only explicit project/global filters narrow it.
@@ -90,9 +94,9 @@ child's own `memory_recall` MCP tool executes one bounded query and its outcome 
 awaited. Its unmodified AgentTool result is supplied only to the isolated child as
 untrusted evidence for enrichment; the main CoS receives only the child's validated
 packet. Only that named tool counts as the required query; `memory_get` and other
-tool events do not. A failed/cancelled query yields unavailable context honestly.
+tool events do not. A failed/cancelled query yields failed context honestly.
 Native Pi then handles repeated child tool rounds, so the child can rewrite searches,
-inspect results and search again. A skipped/no-tool child result remains unavailable
+inspect results and search again. A skipped/no-tool child result remains failed
 rather than an implicit empty-memory result. The child has no memory-client extension,
 so it cannot recursively prepare recall. Queued input admitted to an existing run is
 not automatically another preparation boundary.
@@ -162,7 +166,7 @@ enablement and awaits its outcome. The query is the last three owner messages, n
 first. The client searches memory, re-fetches each cited record at the same revision,
 and rechecks eligibility. The application bounds search, evidence revalidation and
 the whole preparation with a 30-second deadline; timeout/failure produces explicit
-unavailable context while retaining the instruction profile snapshot. Session
+failed context while retaining the instruction profile snapshot. Session
 switch/fork and shutdown cancel pending work; old packets do not accumulate. Pi
 operation cancellation is forwarded to the memory calls.
 
@@ -176,8 +180,8 @@ groups as qualified bullets. Raw tags/ranks are not model context; machine
 records remain available to capture and dream callers.
 
 Capture-pending work does not suppress the read-only query or owner-profile
-instructions. Status distinguishes ready, partial and unavailable from an empty
-result. Numerical retrieval rank/usage is not belief confidence. At session start
+instructions. Status distinguishes success, partial and failed; a successful empty
+search is `success` with `no relevant memory found`. Numerical retrieval rank/usage is not belief confidence. At session start
 and after each completed compaction, the parent reads shared `ME.md` (maximum
 32,000 bytes), redacts it, and stores that value as the stable `owner-profile`
 instruction-prompt section for the session. A Pi `context_with_system` projection

@@ -183,10 +183,12 @@ class UpstreamAdapter:
             where += " AND m.content_hash IN (SELECT value FROM json_each(?))"
             params.append(json.dumps(eligible_refs))
         # Exact filtered distance search has no global-neighbour candidate cap.
+        # The distance threshold bounds the search before the limit is applied.
         # sqlite-vec still computes distance; upstream owns all stored embeddings.
+        where += " AND vec_distance_l2(e.content_embedding, ?) <= ?"
         rows = await self._rows(f"""SELECT m.*, vec_distance_l2(e.content_embedding, ?) AS distance
             FROM memories m JOIN memory_embeddings e ON m.id=e.rowid
-            WHERE {where} ORDER BY distance, m.content_hash LIMIT ?""", [vector, *params, request.limit])
+            WHERE {where} ORDER BY distance, m.content_hash LIMIT ?""", [vector, *params, vector, request.max_distance, request.limit])
         return [self.record(row) for row in rows]
 
     async def get(self, ref, include_deleted=False):

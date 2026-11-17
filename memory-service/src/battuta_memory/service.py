@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 from .scope import resolve_selector, resolve_scope, project_tag
@@ -11,6 +12,8 @@ from .retrieval import fuse_ranks, interleave_ranks
 from .rendering import render_memories, evidence_closure
 from .upstream import TerminalMutationError
 from .consolidation import GlobalConsolidation
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryService:
@@ -43,8 +46,9 @@ class MemoryService:
                     branches["semantic"] = "ready"
                 except ValueError:
                     raise
-                except Exception:
-                    branches["semantic"] = "unavailable"
+                except Exception as error:
+                    branches["semantic"] = "failed"
+                    logger.warning("Memory recall branch failed: semantic (%s)", type(error).__name__)
             if request.keywords:
                 try:
                     if self.state is None:
@@ -52,19 +56,22 @@ class MemoryService:
                     await self._reconcile_index()
                     lexical = self.state.lexical_search(request.keywords, eligible, min(request.limit, MAX_RECALL_SEARCH_LIMIT))
                     branches["lexical"] = "ready"
-                except Exception:
-                    branches["lexical"] = "unavailable"
+                except Exception as error:
+                    branches["lexical"] = "failed"
+                    logger.warning("Memory recall branch failed: lexical (%s)", type(error).__name__)
             if not any(value == "ready" for value in branches.values()):
+                logger.warning("Memory recall failed; branches=%s", branches)
                 raise RuntimeError("Memory retrieval unavailable")
             lookup = {r["ref"]: r for r in eligible}
             refs = fuse_ranks(semantic, lexical, request.limit)
             seeds = [lookup[ref] for ref in refs if ref in lookup]
             evidence = evidence_closure(seeds, records)
             view = render_memories(seeds, evidence, datetime.now(timezone.utc))
-            incomplete = "unavailable" in branches.values() or view["incomplete"]
-            return {**view, "records": seeds, "validation_evidence": evidence,
-                "incomplete": incomplete, "branches": branches,
-                "warnings": selected.warnings + (["Memory retrieval is partial"] if incomplete else [])}
+            status = "partial" if "failed" in branches.values() or view["omitted_refs"] else "success"
+            if status == "partial":
+                logger.warning("Memory recall partial; branches=%s omitted_refs=%s", branches, view["omitted_refs"])
+            return {**view, "status": status, "records": seeds, "validation_evidence": evidence, "branches": branches,
+                "warnings": selected.warnings + (["Memory retrieval is partial"] if status == "partial" else [])}
 
     async def _semantic_search(self, request, selected, eligible):
         # Combined query first; otherwise each query alone, truncated to the embedding limit.

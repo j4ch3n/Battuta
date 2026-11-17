@@ -18,7 +18,7 @@ class RetrievalTests(StorageFixture):
         claim = await self.service.remember(RememberRequest(content="Nintendo dependent claim", projects=["global"],
             sources=[SOURCE], memory_metadata=metadata))
         await self.service.forget(ForgetRequest(ref=source["ref"]))
-        for query in ({"semantic_query": "Nintendo"}, {"keywords": ["Nintendo"]}):
+        for query in ({"semantic_query": "Nintendo", "limit": 10, "max_distance": 0.9}, {"keywords": ["Nintendo"], "limit": 10, "max_distance": 0.9}):
             result = await self.service.recall(RecallRequest(**query, include_expired=True))
             self.assertEqual(result["records"], [])
         current = await self.adapter.get(claim["ref"])
@@ -28,11 +28,11 @@ class RetrievalTests(StorageFixture):
         a = await self.note_with_metadata("Atlas console", project="atlas", keywords=["Nintendo"])
         b = await self.note_with_metadata("Beacon console", project="beacon", keywords=["Nintendo"])
         with patch.object(self.adapter, "search", side_effect=AssertionError("keyword-only must not embed")) as semantic:
-            result = await self.service.recall(RecallRequest(keywords=["Nintendo"]))
+            result = await self.service.recall(RecallRequest(keywords=["Nintendo"], limit=10, max_distance=0.9))
         semantic.assert_not_called()
         self.assertEqual({r["ref"] for r in result["records"]}, {a["ref"], b["ref"]})
         self.assertEqual(result["branches"], {"lexical": "ready"})
-        self.assertFalse(result["incomplete"])
+        self.assertEqual(result["status"], "success")
 
     def test_query_validation(self):
         for args in ({}, {"semantic_query": " "}, {"keywords": [" "]},
@@ -44,18 +44,18 @@ class RetrievalTests(StorageFixture):
     async def test_keyword_phrase_is_literal_and_semantic_only_never_queries_fts(self):
         target = await self.note_with_metadata("Owner uses Nintendo Switch 2")
         await self.note_with_metadata("Switch to unrelated option 2")
-        result = await self.service.recall(RecallRequest(keywords=["Switch 2"]))
+        result = await self.service.recall(RecallRequest(keywords=["Switch 2"], limit=10, max_distance=0.9))
         self.assertEqual([r["ref"] for r in result["records"]], [target["ref"]])
         from sqlite_vec import serialize_float32
         self.adapter.embed = lambda _: serialize_float32([1.0] + [0.0] * 383)
         with patch.object(self.state, "lexical_search", side_effect=AssertionError("not requested")) as lexical:
-            result = await self.service.recall(RecallRequest(semantic_query="console"))
+            result = await self.service.recall(RecallRequest(semantic_query="console", limit=10, max_distance=0.9))
         lexical.assert_not_called()
         self.assertEqual(result["branches"], {"semantic": "ready"})
 
     async def test_multiple_queries_search_combined_text_when_it_fits(self):
         with patch.object(self.adapter, "search", return_value=[]) as search:
-            await self.service.recall(RecallRequest(semantic_queries=["first", "second"]))
+            await self.service.recall(RecallRequest(semantic_queries=["first", "second"], limit=10, max_distance=0.9))
         self.assertEqual([c.args[0].semantic_query for c in search.call_args_list], ["first\n\nsecond"])
 
     async def test_oversized_queries_search_each_truncated_and_merge_by_rank(self):
@@ -64,7 +64,7 @@ class RetrievalTests(StorageFixture):
         self.adapter.embedding_fits = lambda _: False
         self.adapter.truncate_for_embedding = lambda text: text[:4]
         with patch.object(self.adapter, "search", side_effect=lambda request, *_: rankings[request.semantic_query]) as search:
-            result = await self.service.recall(RecallRequest(semantic_queries=["first", "second"]))
+            result = await self.service.recall(RecallRequest(semantic_queries=["first", "second"], limit=10, max_distance=0.9))
         self.assertEqual([c.args[0].semantic_query for c in search.call_args_list], ["firs", "seco"])
         self.assertEqual([r["ref"] for r in result["records"]], [a, b, c])
 
@@ -82,7 +82,7 @@ class RetrievalTests(StorageFixture):
         target = await self.note_with_metadata("Owner reported buying an NS2", keywords=["NS2", "Nintendo", "gaming"])
         await self.note_with_metadata("Unrelated current choice", keywords=["shopping"])
         with patch.object(self.adapter, "search", return_value=[]):
-            result = await self.service.recall(RecallRequest(keywords=["Nintendo"], selector="global"))
+            result = await self.service.recall(RecallRequest(keywords=["Nintendo"], selector="global", limit=10, max_distance=0.9))
             self.assertEqual([r["ref"] for r in result["records"]], [target["ref"]])
 
     async def test_filters_apply_before_both_candidate_limits_and_query_operators_are_literal(self):
@@ -92,10 +92,10 @@ class RetrievalTests(StorageFixture):
             await self.note_with_metadata(f"Nintendo past event {i}", expires_at="2020-01-01T00:00:00Z")
         await self.note_with_metadata("Nintendo wrong scope", project="beacon")
         target = await self.note_with_metadata("Owner reported buying an NS2", project="atlas", keywords=["Nintendo"])
-        result = await self.service.recall(RecallRequest(semantic_query="Nintendo", keywords=["Nintendo"], selector="projects", projects=["atlas"], limit=1))
+        result = await self.service.recall(RecallRequest(semantic_query="Nintendo", keywords=["Nintendo"], selector="projects", projects=["atlas"], limit=1, max_distance=0.9))
         self.assertEqual([r["ref"] for r in result["records"]], [target["ref"]])
         with patch.object(self.adapter, "search", return_value=[]):
-            result = await self.service.recall(RecallRequest(keywords=['" OR NOT * :'], selector="global"))
+            result = await self.service.recall(RecallRequest(keywords=['" OR NOT * :'], selector="global", limit=10, max_distance=0.9))
             self.assertEqual(result["records"], [])
             self.assertEqual(result["branches"]["lexical"], "ready")
 
@@ -107,10 +107,23 @@ class RetrievalTests(StorageFixture):
         await self.service.recover()
         self.assertEqual(self.state.recover_intents(), [])
         with patch.object(self.adapter, "search", side_effect=RuntimeError("semantic offline")):
-            result = await self.service.recall(RecallRequest(semantic_query="Nintendo", keywords=["Nintendo"], selector="global"))
+            result = await self.service.recall(RecallRequest(semantic_query="Nintendo", keywords=["Nintendo"], selector="global", limit=10, max_distance=0.9))
         self.assertEqual(len(result["records"]), 1)
-        self.assertTrue(result["incomplete"])
-        self.assertEqual(result["branches"]["semantic"], "unavailable")
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["branches"]["semantic"], "failed")
+
+    async def test_zero_matches_are_success_and_total_branch_failure_is_logged_without_content(self):
+        with patch.object(self.adapter, "search", return_value=[]):
+            result = await self.service.recall(RecallRequest(semantic_query="nothing", limit=10, max_distance=0.9))
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["context"], "no relevant memory found")
+        await self.note_with_metadata("Owner reported buying an NS2", keywords=["Nintendo"])
+        with patch.object(self.adapter, "search", side_effect=RuntimeError("semantic offline")), \
+                patch.object(self.state, "lexical_search", side_effect=RuntimeError("lexical offline")):
+            with self.assertLogs("battuta_memory", "WARNING") as logs, self.assertRaises(RuntimeError):
+                await self.service.recall(RecallRequest(semantic_query="Nintendo", keywords=["Nintendo"], selector="global", limit=10, max_distance=0.9))
+        self.assertTrue(any("semantic" in line and "lexical" in line for line in logs.output))
+        self.assertFalse(any("NS2" in line for line in logs.output))
 
     def test_rank_fusion_deduplicates_and_breaks_ties_by_ref(self):
         self.assertEqual(fuse_ranks(["b", "a"], ["a", "b"], 2), ["a", "b"])
