@@ -13,8 +13,9 @@ human acceptance, not agent-run setup checks.
 ## Choose the installation bundle
 
 Ask the owner which bundle to set up if not specified. Use the same verified release
-archive and six Python wheels for both; the bundle controls private configuration
-and generated services, not the files included in the downloaded archive.
+archive for both. Each bundle installs only its wheels: the main bundle needs all six,
+and the influencer bundle needs all except `battuta-memory`. The bundle controls
+private configuration and generated services, not the files included in the archive.
 
 | Bundle             | `deployment` | Configured bots                        | Services to activate after approval                       | Setup validation                                                                           |
 | ------------------ | ------------ | -------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -100,8 +101,8 @@ Download these assets from the selected GitHub Release into a separate download
 directory, not the installation:
 
 - `battuta-vX.Y.Z-linux-arm64.tar.gz` and its `.sha256`.
-- Six wheels: `battuta-project`, `battuta-artifacts`, `battuta-memory`, `battuta-speech`,
-  `battuta-bot-setup`, and `battuta-packaging` (wheel filenames use underscores).
+- Wheels for your bundle (filenames use underscores): `battuta-project`, `battuta-artifacts`,
+  `battuta-speech`, `battuta-bot-setup`, and `battuta-packaging`; main also needs `battuta-memory`.
 - `python-tools-version.txt` and `python-tools-SHA256SUMS`.
 
 Set the real tag and absolute installation path; paths used by service generation
@@ -126,13 +127,17 @@ uv reads that metadata automatically; there are no separate constraint files,
 source installations, or `--with` arguments.
 
 ```bash
-for package in battuta-project battuta-artifacts battuta-memory battuta-speech battuta-bot-setup battuta-packaging; do
+case "$deployment" in
+  main) packages="battuta-project battuta-artifacts battuta-memory battuta-speech battuta-bot-setup battuta-packaging" ;;
+  influencer) packages="battuta-project battuta-artifacts battuta-speech battuta-bot-setup battuta-packaging" ;;
+esac
+for package in $packages; do
   wheel="${package//-/_}-$tool_version-py3-none-any.whl"
   uv tool install --managed-python --python 3.12 --no-build "./$wheel"
 done
 export PATH="$(uv tool dir --bin):$PATH"
-for command in battuta-project battuta-artifact battuta-memory battuta-speech battuta-bot-setup battuta-packaging; do
-  "$command" --help >/dev/null
+for package in $packages; do
+  "${package/battuta-artifacts/battuta-artifact}" --help >/dev/null
 done
 ```
 
@@ -141,8 +146,10 @@ All commands must succeed. A direct wheel URL also works with
 additionally verifies the downloaded top-level wheel checksums and refuses native
 source compilation. Pins are not a dependency hash lock or an offline wheelhouse.
 
-All six tools need their own installation so their CLI commands are exposed.
-An internal dependency inside another tool's environment does not expose its CLI.
+Each listed wheel needs its own tool installation so its CLI command is exposed.
+An internal dependency inside another tool's environment does not expose its CLI,
+so `battuta-project` must be installed even though `battuta-artifacts` depends on it.
+`battuta-bot-setup` is used for configuration and `battuta-packaging` by generated services.
 Project registrations live under `~/.battuta/projects`. Initializing a project
 from GitHub also requires Git and the GitHub CLI (`gh`), authenticated as the bot
 user with access to the intended repository. Name-only initialization needs neither.
