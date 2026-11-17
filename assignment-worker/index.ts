@@ -63,8 +63,8 @@ export default function worker(pi: ExtensionAPI) {
   });
   pi.on("session_start", async (event, ctx) => {
     if (client || stopped) return;
-    const workerId = process.env.BATTUTA_BOT_NAME?.trim();
-    if (!workerId) throw new Error("BATTUTA_BOT_NAME must identify the worker bot");
+    const workerId = process.env.AGENT_ID?.trim();
+    if (!workerId) throw new Error("AGENT_ID must identify the worker bot");
     const configured = process.env.BATTUTA_WORKER_CAPABILITIES;
     if (!configured) throw new Error("BATTUTA_WORKER_CAPABILITIES must contain configured JSON");
     let values: unknown;

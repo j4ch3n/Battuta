@@ -102,7 +102,7 @@ class WorkerLauncherTests(unittest.TestCase):
             binary = root / "bin"
             binary.mkdir()
             node = binary / "node"
-            node.write_text('#!/bin/sh\nprintf "%s\\n" "$PI_CODING_AGENT_DIR" "$PWD" "$BATTUTA_BOT_NAME" "$BATTUTA_PROJECTS_ROOT_HEADER"\n')
+            node.write_text('#!/bin/sh\nprintf "%s\\n" "$PI_CODING_AGENT_DIR" "$PWD" "$AGENT_ID" "$BATTUTA_PROJECTS_ROOT_HEADER"\n')
             node.chmod(0o755)
             chromium = binary / "chromium-browser"
             chromium.write_text("#!/bin/sh\nexit 99\n")

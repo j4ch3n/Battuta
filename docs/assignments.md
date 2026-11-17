@@ -45,7 +45,7 @@ blocked, done, and other states always report false. Exactly one contender wins.
 no blocked/in-progress TODO, and at least one `todo` item.
 
 `claimed_by` records the configured bot ID, such as `worker-1` or `worker-2`, from
-the launcher's `BATTUTA_BOT_NAME`, so the claiming bot can be traced. It is not a
+the launcher's `AGENT_ID`, so the claiming bot can be traced. It is not a
 generated UUID, Pi session ID, or credential. The existing exact `claimed_at` token remains the
 execution fence; writes verify both identity and token. Historical null owners
 remain null and may finish with their original exact token. Terminal/blocked rows

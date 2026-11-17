@@ -45,7 +45,7 @@ function session(
   entries: Entry[] = [],
   autoAccept = true,
 ) {
-  process.env.AGENT_ROLE = role;
+  process.env.AGENT_ID = role;
   const handlers = new Map<string, Handler>(),
     tools = new Map<string, Tool>(),
     messages: Delivery[] = [];

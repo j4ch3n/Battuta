@@ -36,7 +36,7 @@ def run_source_worker(root: Path, *, bot_dir: Path, env_file: Path, node: Path) 
         validate_mobile_device(env)
     acquire_instance_lock(bot_dir)
     prepare_launch_worker(root, profile, bot_dir, bot=bot)
-    env.update(AGENT_ROLE="worker", BATTUTA_BOT_NAME=bot, PI_CODING_AGENT_DIR=str(bot_dir / ".pi"))
+    env.update(AGENT_ROLE="worker", AGENT_ID=bot, PI_CODING_AGENT_DIR=str(bot_dir / ".pi"))
     env.update(assignment_environment(Path.home()))
     env.update(capabilities)
     env.setdefault("BATTUTA_MEMORY_URL", "http://127.0.0.1:8901/mcp")
@@ -62,7 +62,7 @@ def run_source_bot(root: Path, *, bot: str, env_file: Path) -> None:
     initialize_settings_if_missing(private / ".pi", manifest.defaults)
     if fresh and "browser" in manifest.setup.steps:
         configure_browser(profile, private, home=Path.home(), bot=bot)
-    env = {**os.environ, **values, "AGENT_ROLE": role, "BATTUTA_BOT_NAME": bot, "PI_CODING_AGENT_DIR": str(private / ".pi")}
+    env = {**os.environ, **values, "AGENT_ROLE": role, "AGENT_ID": role, "PI_CODING_AGENT_DIR": str(private / ".pi")}
     env.update(assignment_environment(Path.home()))
     env.setdefault("BATTUTA_MEMORY_URL", "http://127.0.0.1:8901/mcp")
     if role == "cos":

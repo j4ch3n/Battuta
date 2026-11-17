@@ -23,16 +23,15 @@ instructions.
 2. Capture only evidence needed for the task. Before a screenshot, check that it
    will not expose credentials or unauthorized personal/account data. Stop and
    request permission if the evidence cannot be shared safely.
-3. Resolve the actual home directory and bot identity (`BATTUTA_BOT_NAME`), then
-   choose a new, bot-prefixed filename under `~/.battuta/browser-screenshot/`,
-   using a UUID or equivalent unique suffix. Pass an **absolute** `filePath` to
+3. Resolve the actual home directory, then choose a new filename under
+   `~/.battuta/browser-screenshot/` that ends in a UUID or equivalent unique suffix. Pass an **absolute** `filePath` to
    `browser_take_screenshot`; tool arguments do not expand `~` or shell variables.
 
    ```text
-   browser_take_screenshot({"pageId": 2, "format": "png", "filePath": "/home/bot/.battuta/browser-screenshot/worker-1-<uuid>.png"})
+   browser_take_screenshot({"pageId": 2, "format": "png", "filePath": "/home/bot/.battuta/browser-screenshot/<uuid>.png"})
    ```
 
-   Substitute the real page ID, home, identity, and suffix; the example is not a
+   Substitute the real page ID, home, and suffix; the example is not a
    fixed path. Confirm the tool succeeded and the file exists before reporting it.
 4. Report the page URL, observed result, and saved evidence path through the
    existing coordination route. Workers return evidence to Manager; Manager can

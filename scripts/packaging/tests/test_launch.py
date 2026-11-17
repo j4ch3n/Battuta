@@ -139,7 +139,7 @@ def test_nested_worker_runtime_directory_retains_logical_identity(installed):
     )
     assert result.returncode == 0, result.stderr
     output = json.loads(result.stdout)
-    assert output["env"]["BATTUTA_BOT_NAME"] == "worker-1"
+    assert output["env"]["AGENT_ID"] == "worker-1"
     assert output["env"]["PI_CODING_AGENT_DIR"] == str(private / "runtime/.pi")
     assert json.loads((private / "runtime/.pi/settings.json").read_text())["defaultThinkingLevel"] == "high"
 

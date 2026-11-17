@@ -36,10 +36,7 @@ const unwrap = <T>(result: { data: T | null; error: { message: string } | null }
 };
 
 export default function (pi: ExtensionAPI) {
-  const role = validate(
-    BotName,
-    process.env.AGENT_ROLE === "worker" ? required("BATTUTA_BOT_NAME") : required("AGENT_ROLE"),
-  );
+  const role = validate(BotName, required("AGENT_ID"));
   const log = (event: string, error?: unknown) =>
     console.error(
       `[agent-mail:${role}] ${event}${error ? `: ${error instanceof Error ? error.message : JSON.stringify(error)}` : ""}`,

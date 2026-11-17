@@ -66,13 +66,13 @@ it. No fake HOME, wrapper, or patched extension is used.
 ## Minimal setup validation
 
 Run as the bot user on the Linux host, with tracing disabled. Stop on any failure.
-Choose one configured browser-enabled bot and repeat only for other selected bots:
+Set `bot` to each bot whose `bot.toml` enables the browser step, and repeat for every such bot:
 
 ```sh
 set -eu
 command -v chromium-browser >/dev/null
 chromium-browser --version
-bot="${BATTUTA_BOT_NAME:?Set BATTUTA_BOT_NAME to the selected browser-enabled bot}"
+bot="<instance name of a browser-enabled bot>"
 private="$HOME/.battuta/pi-bots/$bot/.pi"
 test -s "$private/settings.json"
 test -d "$private/browser-research" && test -w "$private/browser-research"
@@ -87,7 +87,7 @@ human acceptance, not an extension or Pi setup test suite.
 ## Screenshots
 
 The `browser-evidence` skill uses `browser_take_screenshot` with an explicit
-absolute `filePath` under `~/.battuta/browser-screenshot/` and a unique bot-prefixed
+absolute `filePath` under `~/.battuta/browser-screenshot/` and a unique
 filename. CoS uses the existing Telegram attachment bridge for authorized delivery;
 workers return evidence to Manager for coordination. Capture does not require a
 vision model. Queuing an attachment is not proof of delivery. The owner manages

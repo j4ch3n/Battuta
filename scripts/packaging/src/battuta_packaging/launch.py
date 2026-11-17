@@ -60,7 +60,7 @@ def run_bot(root: Path, *, bot: str, env_file: Path, node: Path, mode: str) -> N
     initialize_settings_if_missing(private / ".pi", manifest.defaults)
     if fresh and role != "manager" and profile.name != "worker-influencer":
         configure_browser(profile, private, home=Path.home(), bot=bot)
-    env = {**os.environ, **values, "AGENT_ROLE": role, "BATTUTA_BOT_NAME": bot, "PI_CODING_AGENT_DIR": str(private / ".pi")}
+    env = {**os.environ, **values, "AGENT_ROLE": role, "AGENT_ID": bot if role == "worker" else role, "PI_CODING_AGENT_DIR": str(private / ".pi")}
     env.update(assignment_environment(Path.home()))
     env.update(capabilities)
     env["PATH"] = str(node.parent) + os.pathsep + env.get("PATH", "")

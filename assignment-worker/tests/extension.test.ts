@@ -45,7 +45,7 @@ vi.mock("../workspace.ts", () => ({
   ),
 }));
 beforeEach(() => {
-  vi.stubEnv("BATTUTA_BOT_NAME", "worker-1");
+  vi.stubEnv("AGENT_ID", "worker-1");
   vi.stubEnv("BATTUTA_WORKER_CAPABILITIES", "[]");
 });
 afterEach(() => {
@@ -57,7 +57,7 @@ test.each(["worker-1", "worker-2"])(
   "configured bot %s claims work and owns its lifecycle",
   async (workerId) => {
     vi.useFakeTimers();
-    vi.stubEnv("BATTUTA_BOT_NAME", workerId);
+    vi.stubEnv("AGENT_ID", workerId);
     backend.list.mockResolvedValue({ ok: true, assignments: [] });
     const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
     const sendUserMessage = vi.fn();
@@ -145,7 +145,7 @@ test.each([undefined, "", " "])(
   "refuses startup without a valid configured bot ID: %j",
   async (name) => {
     vi.useFakeTimers();
-    vi.stubEnv("BATTUTA_BOT_NAME", name);
+    vi.stubEnv("AGENT_ID", name);
     const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
     worker({
       on: (event: string, handler: never) => handlers.set(event, handler),
@@ -162,7 +162,7 @@ test.each([undefined, "", " "])(
     const result = await handlers.get("session_start")!({}, ctx).catch((error: unknown) => error);
     await handlers.get("session_shutdown")!({}, ctx);
     expect(result).toBeInstanceOf(Error);
-    expect((result as Error).message).toContain("BATTUTA_BOT_NAME");
+    expect((result as Error).message).toContain("AGENT_ID");
     expect(backend.subscribe).not.toHaveBeenCalled();
   },
 );

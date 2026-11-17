@@ -77,7 +77,7 @@ One serialized coordinator owns at most one binding and one running TODO.
 
 Before subscribing, the extension validates launcher-provided
 `BATTUTA_WORKER_CAPABILITIES` JSON and initializes an immutable capability set.
-The launcher supplies the configured bot ID in `BATTUTA_BOT_NAME`; claims record
+The launcher supplies the configured bot ID (`worker-N`) in `AGENT_ID`, alongside `AGENT_ROLE=worker`; claims record
 that name as `claimed_by` for traceability. A missing or invalid name stops startup
 rather than inventing an ID. Bot names must be distinct wherever operators need
 to distinguish workers across hosts.
