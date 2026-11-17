@@ -18,6 +18,8 @@ from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
 
+REPO_URL = "https://github.com/j4ch3n/Battuta"
+
 PROJECTS = {
     "battuta-project": "project-context-cli",
     "battuta-bot-setup": "scripts/bot_setup",
@@ -95,7 +97,7 @@ def build_wheels(source: Path, output: Path, *, tag: str, tool_version: str) -> 
         raise click.ClickException("Release tag and tool version must match")
     if sys.version_info[:2] != (3, 12):
         raise click.ClickException("Build release wheels using managed Python 3.12")
-    release_url = f"https://github.com/j4ch3n/Battuta/releases/download/{tag}"
+    release_url = f"{REPO_URL}/releases/download/{tag}"
     requirements_by_project = {}
     for name, relative in PROJECTS.items():
         project = source / relative

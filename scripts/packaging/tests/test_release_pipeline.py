@@ -16,6 +16,16 @@ def test_release_promotion_is_gated_by_oracle_installation():
     assert "prerelease" in jobs
 
 
+def test_platform_bundles_build_in_parallel_from_one_wheel_set():
+    jobs = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())["jobs"]
+    assert "wheels" in jobs["build"]["needs"]
+    assert "wheels" in jobs and "prepare" in jobs["wheels"]["needs"]
+    for job in ("build", "verify-install"):
+        platforms = {entry["platform"] for entry in jobs[job]["strategy"]["matrix"]["include"]}
+        assert platforms == {"oracle-ampere", "raspberry-pi"}
+    assert "build" in jobs["prerelease"]["needs"]
+
+
 def test_supabase_dry_runs_on_main_and_deploys_only_on_release():
     ci_jobs = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]
     release_jobs = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())["jobs"]

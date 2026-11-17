@@ -15,7 +15,7 @@ Battuta brings a team of AI agents together to help plan, build, and review soft
 
 ## Getting started
 
-See [local development](.agents/skills/battuta-setup/references/development.md) for working from source or [OCI Ampere A1 release setup](RELEASE.md) for installing on Oracle Linux 9 ARM64.
+See [local development](.agents/skills/battuta-setup/references/development.md) for working from source or [release setup](RELEASE.md) for installing the Oracle Linux 9 or Raspberry Pi OS 12 ARM64 bundles.
 
 ## Further guidance
 

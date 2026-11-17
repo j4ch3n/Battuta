@@ -1,4 +1,4 @@
-name: Release Oracle Linux ARM64 package
+name: Release Battuta ARM64 bundles
 
 on:
   push:
@@ -36,7 +36,7 @@ jobs:
           test -z "$(git status --porcelain)"
           echo "version=${TAG#v}+g$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
-  build:
+  wheels:
     needs: [prepare]
     runs-on: ubuntu-24.04-arm
     steps:
@@ -45,21 +45,60 @@ jobs:
           fetch-depth: 0
       - name: Build Oracle Linux toolchain image
         run: |
-          docker build -t battuta-release \
+          docker build -t battuta-wheels \
             --build-arg NODE_VERSION="$(cat .node-version)" \
             --build-arg PNPM_VERSION="$(python3 -c 'import json; print(json.load(open("package.json"))["packageManager"].split("@")[1])')" \
-            - < scripts/packaging/OracleLinux.Dockerfile
-      - name: Assemble release
+            - < scripts/packaging/OracleAmpere.Dockerfile
+      - name: Build release wheels once
         env:
           TAG: ${{ github.ref_name }}
           TOOL_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           mkdir -p dist
-          docker run --rm -v "$PWD:/source:ro" -v "$PWD/dist:/assets" battuta-release \
-            bash /source/scripts/packaging/release-build.sh "$TAG" "$TOOL_VERSION"
+          docker run --rm -v "$PWD:/source:ro" -v "$PWD/dist:/assets" battuta-wheels \
+            bash /source/scripts/packaging/release-wheels.sh "$TAG" "$TOOL_VERSION"
       - uses: actions/upload-artifact@v6
         with:
-          name: release-assets
+          name: release-wheels
+          path: dist/*
+          if-no-files-found: error
+
+  build:
+    needs: [prepare, wheels]
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      matrix:
+        include:
+          - platform: oracle-ampere
+            dockerfile: OracleAmpere.Dockerfile
+          - platform: raspberry-pi
+            dockerfile: RaspberryPi.Dockerfile
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v7
+        with:
+          name: release-wheels
+          path: wheels
+      - name: Build ${{ matrix.platform }} toolchain image
+        run: |
+          docker build -t "battuta-release-${{ matrix.platform }}" \
+            --build-arg NODE_VERSION="$(cat .node-version)" \
+            --build-arg PNPM_VERSION="$(python3 -c 'import json; print(json.load(open("package.json"))["packageManager"].split("@")[1])')" \
+            - < "scripts/packaging/${{ matrix.dockerfile }}"
+      - name: Assemble ${{ matrix.platform }} release
+        env:
+          TAG: ${{ github.ref_name }}
+          TOOL_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          mkdir -p dist
+          docker run --rm -v "$PWD:/source:ro" -v "$PWD/dist:/assets" -v "$PWD/wheels:/wheels:ro" \
+            "battuta-release-${{ matrix.platform }}" \
+            bash /source/scripts/packaging/release-build.sh "${{ matrix.platform }}" "$TAG" "$TOOL_VERSION"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: release-${{ matrix.platform }}
           path: dist/*
           if-no-files-found: error
 
@@ -72,9 +111,10 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v7
         with:
-          name: release-assets
+          pattern: release-*
+          merge-multiple: true
           path: dist
-      - name: Expose immutable candidate wheel URLs for installation checks
+      - name: Expose immutable candidate assets for installation checks
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
@@ -83,6 +123,13 @@ jobs:
   verify-install:
     needs: [prerelease]
     runs-on: ubuntu-24.04-arm
+    strategy:
+      matrix:
+        include:
+          - platform: oracle-ampere
+            dockerfile: OracleAmpere.Dockerfile
+          - platform: raspberry-pi
+            dockerfile: RaspberryPi.Dockerfile
     steps:
       - uses: actions/checkout@v7
       - name: Download the actual published candidate
@@ -90,19 +137,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: gh release download "$TAG" --dir dist
-      - name: Build clean Oracle Linux toolchain image
+      - name: Build clean ${{ matrix.platform }} toolchain image
         run: |
-          docker build -t battuta-verify \
+          docker build -t "battuta-verify-${{ matrix.platform }}" \
             --build-arg NODE_VERSION="$(cat .node-version)" \
             --build-arg PNPM_VERSION="$(python3 -c 'import json; print(json.load(open("package.json"))["packageManager"].split("@")[1])')" \
-            - < scripts/packaging/OracleLinux.Dockerfile
+            - < "scripts/packaging/${{ matrix.dockerfile }}"
       - name: Install and verify without models or bot startup
         env:
           TAG: ${{ github.ref_name }}
         run: |
           docker run --rm -v "$PWD:/source:ro" -v "$PWD/dist:/assets:ro" \
             -e BATTUTA_RELEASE_ASSETS=/assets -e BATTUTA_RELEASE_TAG="$TAG" \
-            battuta-verify uv run --no-project --python 3.12 \
+            -e BATTUTA_RELEASE_PLATFORM="${{ matrix.platform }}" \
+            "battuta-verify-${{ matrix.platform }}" uv run --no-project --python 3.12 \
             python /source/scripts/packaging/tests/release_install.it.py
 
   deploy-supabase:
