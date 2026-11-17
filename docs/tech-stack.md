@@ -15,7 +15,7 @@ Shared memory uses an isolated Python 3.12 MCP service with pinned mcp-memory-se
 | Artifact catalog           | Python 3.12+, FastAPI/Starlette, SQLite/aiosqlite, Alembic, Click, Jinja2, markdown-it-py, SSE                                                           | `artifact-service/pyproject.toml`, `artifact-service/uv.lock`             |
 | Dependency tooling         | pnpm for Node; uv for Python                                                                                                                             | Root `package.json`; each Python project's `pyproject.toml` and `uv.lock` |
 | Verification               | Prettier, typed ESLint, TypeScript, Vitest/V8 coverage, Deno tests, pgTAP                                                                                | Root and component manifests, check scripts                               |
-| Launch and releases        | Local tmux; Oracle Linux 9 and Raspberry Pi OS 12 ARM64 compiled bot archives; host Node via nvm, Python wheels via uv; numbered systemd worker services | `Makefile`, `scripts/packaging/`, release workflow                        |
+| Launch and releases        | Local tmux; Oracle Linux 9 and Raspberry Pi OS 13 ARM64 compiled bot archives; host Node via nvm, Python wheels via uv; numbered systemd worker services | `Makefile`, `scripts/packaging/`, release workflow                        |
 
 ## Individual shared skills
 
