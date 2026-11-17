@@ -52,6 +52,8 @@ def source(tmp_path, monkeypatch):
         (path / ".pi/auth.json").write_text("private-sentinel")
         (path / ".pi/settings.json").write_text('{"defaultModel":"private-model"}')
         (path / ".pi/web-search.json").write_text("{}")
+        if profile == "cos-bot":
+            (path / ".pi/telegram.json").write_text("{}")
         if profile == "worker":
             (path / "agents").mkdir()
             (path / "agents/researcher.md").write_text("---\nname: researcher\n---\nResearch fixture")
@@ -133,6 +135,13 @@ def test_staged_archive_separates_documentation_and_bots(source, tmp_path):
     (moved / "bots/worker/.pi/skills/research/SKILL.md").unlink()
     with pytest.raises(click.ClickException):
         bundle.validate_bundle(moved)
+
+
+def test_release_ships_telegram_template_only_for_cos(source, tmp_path):
+    target = tmp_path / "release"
+    bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
+    assert (target / "bots/cos-bot/.pi/telegram.json").is_file()
+    assert not (target / "bots/manager-bot/.pi/telegram.json").exists()
 
 
 def test_bundled_workspace_dependencies_are_not_installed_at_runtime(source, tmp_path):

@@ -147,6 +147,8 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         settings = profile_settings(manifests[profile], browser=profile not in ("manager-bot", "worker-influencer"))
         write_json(bot / ".pi/settings.json", settings)
         shutil.copy2(original / ".pi/web-search.json", bot / ".pi/web-search.json")
+        if profile == "cos-bot":
+            shutil.copy2(original / ".pi/telegram.json", bot / ".pi/telegram.json")
     for relative in ENTRY_OUTPUTS:
         (destination / relative).parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source / "LICENSE", destination / "bots/LICENSE")
