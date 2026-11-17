@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { record } from "./fixtures/record.ts";
+import { DreamDiagnosticError } from "../dream-errors.ts";
 
 const call = vi.hoisted(() => vi.fn<(name: string, args: Record<string, unknown>) => unknown>());
 vi.mock("../mcp-client.ts", () => ({
@@ -64,16 +65,45 @@ test.each([
   expect(result.status).toBe("unavailable");
 });
 
-test("unavailable when the search call fails", async () => {
-  call.mockRejectedValue(new Error("Memory backend unavailable"));
+test.each([
+  [
+    "backend error code",
+    () => new DreamDiagnosticError({ stage: "memory", code: "backend_unavailable", message: "x" }),
+    "the memory backend is unavailable",
+  ],
+  [
+    "embedding limit",
+    () => new DreamDiagnosticError({ stage: "memory", code: "embedding_limit", message: "x" }),
+    "the search text is too long for memory search",
+  ],
+  [
+    "connection refused",
+    () => new TypeError("fetch failed"),
+    "the memory service is not reachable",
+  ],
+  [
+    "timeout",
+    () => Object.assign(new Error("timed out"), { name: "TimeoutError" }),
+    "the memory lookup timed out",
+  ],
+  [
+    "unknown failure",
+    () => new Error("secret stack detail"),
+    "an unexpected memory error occurred",
+  ],
+])("unavailable with a friendly reason for %s", async (_label, failure, reason) => {
+  call.mockRejectedValue(failure());
   const result = await runRecall("q", { url: "http://127.0.0.1:8901/mcp", signal: signal() });
-  expect(result.context).toBe("Memory unavailable; this is not an empty memory inventory.");
+  expect(result.status).toBe("unavailable");
+  expect(result.context).toBe(`Memory unavailable: ${reason}. Please let the human owner know.`);
+  expect(result.context).not.toContain("secret");
 });
 
-test("unavailable when returned context exceeds the 2000-byte packet limit", async () => {
+test("unavailable with a size reason when returned context exceeds the 2000-byte packet limit", async () => {
   call.mockImplementation((name) =>
     name === "memory_recall" ? data({ context: "x".repeat(2001) }) : record(),
   );
   const result = await runRecall("q", { url: "http://127.0.0.1:8901/mcp", signal: signal() });
   expect(result.status).toBe("unavailable");
+  expect(result.context).toContain("the memory context was too large");
 });

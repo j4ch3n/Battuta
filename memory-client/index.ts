@@ -11,7 +11,12 @@ import { eligibleRecords } from "./records.ts";
 import { abortable } from "./abortable.ts";
 import { prepareCorrectionCandidates } from "./correction-candidates.ts";
 import { selectRecallQuery } from "./recall-context.ts";
-import { runRecall, unavailableRecall, type PreparedRecall } from "./recall.ts";
+import {
+  recallFailureReason,
+  runRecall,
+  unavailableRecall,
+  type PreparedRecall,
+} from "./recall.ts";
 import { transcribeTelegramVoice } from "./voice-input.ts";
 import { redact } from "./privacy.ts";
 
@@ -167,8 +172,8 @@ export default function memoryClient(pi: ExtensionAPI) {
         signal,
       );
       signal.throwIfAborted();
-    } catch {
-      request.packet = unavailableRecall();
+    } catch (error) {
+      request.packet = unavailableRecall(recallFailureReason(error));
     }
     if (request.controller.signal.aborted || ctx.signal?.aborted || active.get(session) !== request)
       return;
@@ -208,7 +213,7 @@ export default function memoryClient(pi: ExtensionAPI) {
         eligibleRecords(request.packet.validationEvidence, new Date(Date.now())).map((r) => r.ref),
       );
       if (request.packet.currentRefs.some((ref) => !valid.has(ref)))
-        request.packet = unavailableRecall();
+        request.packet = unavailableRecall("a cited memory is no longer eligible");
     }
     return {
       messages: event.messages.flatMap((message) => {
