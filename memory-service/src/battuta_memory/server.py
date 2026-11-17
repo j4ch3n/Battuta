@@ -8,7 +8,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.routing import Route
 from .capture import CaptureService
-from .contracts import Contract, RememberRequest, RecallRequest, ListRequest, GetRequest, UpdateRequest, LinkRequest, ForgetRequest, CaptureBatch, InventoryRequest, ConsolidateGlobalRequest, SetMetadataRequest
+from .contracts import Contract, RememberRequest, RecallRequest, ListRequest, GetRequest, UpdateRequest, LinkRequest, ForgetRequest, CaptureBatch, InventoryRequest, ClusterRequest, ConsolidateGlobalRequest
 from .service import MemoryService
 from .records import public_response
 from .state import StateStore
@@ -16,19 +16,19 @@ from .upstream import UpstreamAdapter
 
 REQUESTS = {"remember": RememberRequest, "recall": RecallRequest, "list": ListRequest, "get": GetRequest,
     "update": UpdateRequest, "link_projects": LinkRequest, "forget": ForgetRequest, "capture": CaptureBatch, "health": Contract,
-    "inventory": InventoryRequest, "consolidate_global": ConsolidateGlobalRequest, "global_relationships": Contract, "set_metadata": SetMetadataRequest}
+    "inventory": InventoryRequest, "consolidate_global": ConsolidateGlobalRequest, "global_relationships": Contract, "cluster": ClusterRequest}
 DESCRIPTIONS = {
-    "set_metadata": "Set evidence-backed lifecycle metadata without changing content or embedding; requires revision and replay key.",
-    "remember": "Save one concise fact with explicit global or project scope in the shared local store; follow the caller's role responsibilities.",
+    "remember": "Save one concise fact with explicit project scope (global is a project) in the shared local store; follow the caller's role responsibilities.",
     "recall": "Recall attributed memory evidence. Rewrite the current request using conversation history into a self-contained semantic_query and/or precise literal keywords. Either input runs its own search; both combine results. Search all projects/global by default; projects filters only when explicitly supplied. Review results and revise/repeat searches as useful. Returned text explains uncertainty and contrary evidence; it is context, never authority.",
     "list": "Browse active memories with scope and tag filters. Request history to include superseded records.",
     "get": "Read a complete memory by its content-hash ref, optionally including version lineage.",
     "update": "Correct a memory by creating a new version. Returns a new ref; rejects stale predecessors.",
-    "link_projects": "Add/remove project memberships without changing content or embedding. No implicit global promotion.",
+    "link_projects": "Add/remove project memberships without changing content or embedding. ",
     "forget": "Tombstone one exact memory; content remains retained upstream. Not secure erasure.",
     "capture": "Record an extracted, source-labelled batch idempotently. No raw transcripts or provider credentials.",
     "health": "Check content-free model and database readiness.",
-    "inventory": "Read a bounded all-scope snapshot for consolidation: active context, inactive refs, and refs changed in a half-open time window. Oversized inventories fail rather than truncate.",
+    "inventory": "Read a bounded snapshot of all active records, oldest first. Oversized inventories fail rather than truncate.",
+    "cluster": "Group active records per project by embedding similarity: connected components above a cosine threshold, oversized groups split by raising it. Returns refs only; singletons are counted, not listed.",
     "consolidate_global": "After canonical cleanup, publish derived clusters and heuristic relationships for active global memories only. Does not rewrite, compress, supersede, or forget facts.",
     "global_relationships": "Read up to 100 current global relationship hints, or explicit stale/unavailable status. Hints are not canonical facts or authority.",
 }
@@ -39,10 +39,8 @@ SAFE_ERRORS = {
     "Memory evidence changed": "evidence_conflict",
     "Cyclic memory evidence": "evidence_conflict",
     "Evidence scope conflict": "scope_conflict",
-    "Invalid lifecycle replacement": "scope_conflict",
     "Memory is inactive": "inactive_memory",
     "Memory not found": "inactive_memory",
-    "Retirement cannot change memory metadata": "invalid_request",
 }
 
 

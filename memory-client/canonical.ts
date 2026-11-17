@@ -23,10 +23,7 @@ export function capturePayloadDigest(payload: Record<string, unknown>): string {
     const projects = normalizedProjects(names as string[]);
     return {
       ...rest,
-      scope: {
-        global: projects.length === 1 && projects[0] === "global",
-        projects: projects[0] === "global" ? [] : projects,
-      },
+      scope: { projects },
     };
   });
   return digest({ ...payload, items });

@@ -43,7 +43,7 @@ class UpstreamContractTests(unittest.IsolatedAsyncioTestCase):
                 for i in range(7):
                     text = f"The owner values clear writing and thoughtful decisions {i}."
                     content_hash = generate_content_hash(text)
-                    await storage.store(Memory(text, content_hash, tags=["scope:global", "writing"]), skip_semantic_dedup=True)
+                    await storage.store(Memory(text, content_hash, tags=["proj:global", "writing"]), skip_semantic_dedup=True)
                     globals_.append(content_hash)
                 ok, _, replacement = await storage.update_memory_versioned(globals_[0], "The owner values clear writing and thoughtful decisions today.")
                 self.assertTrue(ok)

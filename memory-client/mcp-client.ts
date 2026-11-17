@@ -41,11 +41,9 @@ export class MemoryMcpClient {
         "memory_get",
         "memory_remember",
         "memory_update",
-        "memory_set_metadata",
         "memory_forget",
         "memory_link_projects",
-        "memory_consolidate_global",
-        "memory_global_relationships",
+        "memory_cluster",
       ].includes(name)
     )
       throw new Error("Unsupported dream memory operation");
@@ -66,8 +64,6 @@ export class MemoryMcpClient {
         await this.call("memory_get", { ref: args.ref }, signal),
       );
       if (
-        record.projects[0] === "global" ||
-        added.includes("global") ||
         added.some((p) => !available.includes(p)) ||
         removed.some((p) => !available.includes(p) && !record.projects.includes(p))
       )

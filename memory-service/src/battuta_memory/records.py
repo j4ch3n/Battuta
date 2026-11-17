@@ -1,7 +1,5 @@
 """Canonical lifecycle decoding and evidence eligibility; no policy or model calls."""
 
-import hashlib
-import json
 from datetime import datetime
 
 from .contracts import MemoryMetadata, Scope, SourceRef
@@ -64,41 +62,15 @@ def eligible_records(records, now, include_expired=False):
         except ValueError:
             return False
         metadata = record.get("memory_metadata") or {}
-        if metadata.get("status", "active") != "active":
-            return False
         expires = metadata.get("expires_at")
         if expires and not historical and now >= datetime.fromisoformat(expires):
             return False
         for link in metadata.get("evidence", []):
             target = lookup.get(link["ref"])
-            if not target or target["revision"] != link["revision"] or target.get("scope") != record.get("scope"):
+            if not target or target["revision"] != link["revision"] or not set(target["scope"]["projects"]) <= set(record["scope"]["projects"]):
                 return False
             if not valid(link["ref"], link["requirement"] == "historical", visiting | {ref}):
                 return False
         return True
 
     return [record for ref, record in lookup.items() if valid(ref, include_expired, set())]
-
-
-def review_fingerprint(record, evidence_records):
-    lookup = {r["ref"]: r for r in evidence_records}
-    lookup[record["ref"]] = record
-    states, pending = {}, [record["ref"]]
-    while pending:
-        ref = pending.pop()
-        if ref in states:
-            continue
-        value = lookup.get(ref)
-        if value is None:
-            states[ref] = None
-            continue
-        if value.get("metadata_error"):
-            states[ref] = {"revision": value["revision"], "invalid": True}
-            continue
-        metadata = dict(value.get("memory_metadata") or {})
-        metadata.pop("stage", None)
-        links = metadata.pop("evidence", [])
-        states[ref] = {**{k: value.get(k) for k in ("content", "scope", "sources", "kind", "tags", "active", "superseded_by")},
-            "memory_metadata": metadata, "evidence": [{k: v for k, v in link.items() if k != "revision"} for link in links]}
-        pending.extend(link["ref"] for link in links)
-    return hashlib.sha256(json.dumps({"claim": record["ref"], "states": states}, sort_keys=True, ensure_ascii=False).encode()).hexdigest()

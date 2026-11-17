@@ -6,8 +6,7 @@ export const memoryProjectsSchema = z
   .array(z.string())
   .min(1)
   .max(100)
-  .transform((projects) => [...new Set(projects)].sort())
-  .refine((projects) => !projects.includes("global") || projects.length === 1);
+  .transform((projects) => [...new Set(projects)].sort());
 const timestamp = z
   .string()
   .datetime({ offset: true })
@@ -20,10 +19,8 @@ const timestamp = z
   .optional();
 export const memoryMetadataSchema = z
   .object({
-    stage: z.enum(["temporal", "durable"]),
-    knowledge_type: z.enum(["fact", "synthesized-observation", "hypothesis"]),
+    knowledge_type: z.enum(["fact", "inference"]),
     confidence: z.enum(["confirmed", "supported", "tentative", "disputed"]),
-    status: z.enum(["active", "stale", "superseded", "rejected"]),
     keywords: z
       .array(
         z
@@ -60,13 +57,12 @@ export const memoryMetadataSchema = z
       .max(100)
       .default([]),
   })
-  .strict()
   .refine(
     (m) =>
       m.knowledge_type === "fact" ||
       (m.confidence !== "confirmed" &&
         !!m.rationale &&
-        (m.status === "superseded" || m.evidence.some((e) => e.relation === "supports"))),
+        m.evidence.some((e) => e.relation === "supports")),
     "Derived claim needs support and rationale",
   );
 export type MemoryMetadata = z.infer<typeof memoryMetadataSchema>;
@@ -75,7 +71,6 @@ export const memoryRecordSchema = z
   .object({
     ref: memoryRefSchema,
     revision: memoryRefSchema,
-    review_fingerprint: memoryRefSchema.optional(),
     metadata_error: z.literal(false).optional(),
     content: z
       .string()
@@ -122,17 +117,12 @@ export function eligibleRecords(records: MemoryRecord[], now: Date, includeExpir
     const r = lookup.get(ref);
     if (!r || !r.active || !r.sources.length || visiting.has(ref)) return false;
     const m = r.memory_metadata;
-    if (
-      m &&
-      (m.status !== "active" ||
-        (!historical && m.expires_at && now.getTime() >= Date.parse(m.expires_at)))
-    )
-      return false;
+    if (m && !historical && m.expires_at && now.getTime() >= Date.parse(m.expires_at)) return false;
     const eligible = (m?.evidence ?? []).every((link) => {
       const support = lookup.get(link.ref);
       return (
         support?.revision === link.revision &&
-        JSON.stringify([...support.projects].sort()) === JSON.stringify([...r.projects].sort()) &&
+        support.projects.every((p) => r.projects.includes(p)) &&
         valid(link.ref, link.requirement === "historical", new Set([...visiting, ref]))
       );
     });

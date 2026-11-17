@@ -206,24 +206,21 @@ Before local 05:30 the latest due run is yesterday's 05:30; at or after it, toda
 Existing 03:00 tasks are not migrated or removed. An old task with the owned ID/name
 conflicts with setup and requires explicit manual removal by the owner first.
 
-Missing-stage, temporal and changed durable evidence is pending regardless of age.
-The first-release guard is 500 stored records (including inactive history) and
-200,000 bytes of input. Overflow fails visibly. At most 20 pending inputs are
-selected by oldest attempt then ref; failed execution and unselected work remain
-visible. There is no model-directed defer or interpretation revisit queue.
+Each run first soft-deletes expired records, then groups the active records of each
+project by embedding similarity (cosine at least 0.65; groups above 30 records are
+split by raising the threshold in 0.05 steps; singletons are skipped). A record in
+several projects, including `global`, joins each project's groups. A group is edited
+by one model call when it has a new or changed record or no stored summary; otherwise
+it is skipped. There is no per-run input cap. The model sees numbered memories, never
+refs, and returns which to keep or remove and which facts to insert; inserts are saved
+first, then removed records are soft-deleted. One further call proposes tentative
+inferences from all group summaries, linked as supporting evidence to the records they
+cite. An invalid answer is retried once; a group that still fails is recorded and the
+run ends `partial` while other groups proceed. The guards are 2000 stored records and
+200,000 bytes of input per call.
 
-Cleanup, synthesis and challenge are separate validated structured calls, with one
-invalid-output retry per stage. Publication saves facts/metadata, challenged claims,
-then acknowledged replacements' retirements. Cleanup returns only add, replace,
-merge and retire operations; unmentioned selected memories are reviewed unchanged.
-Cleanup facts preserve conversation attribution without memory dependencies.
-Retirement marks the stored record superseded, clears its outgoing evidence and
-does not record a replacement reference. Retired content remains stored but is
-excluded from ordinary recall. Existing dependent claims are not automatically
-rewired and remain ineligible when their evidence is invalid.
-Challenge accepts or rejects; it does not defer. Review never strengthens confidence.
-Explicitly rejected interpretations remain excluded from ordinary recall. Old graph
-tools/data are retained maintenance views, not mandatory v3 stages.
+Each step appends one counts-only line to `dream.log` (`step <time> inventory|expire|
+cluster|edit|publish|hypothesize ...`) next to the daily reflection.
 
 The eligible global sidecar profile refresh is deterministic; untracked `ME.md`
 stays untouched. The existing isolated reflection call writes one private
@@ -232,13 +229,7 @@ It receives actual acknowledged changes, not hidden reasoning or the CoS transcr
 One invalid-output rewrite is allowed. The public summary comes from applied
 operations, never the private reflection.
 
-Checkpoint v4 stores stage/version, input fingerprint, validated artifacts, frozen
-requests, acknowledgements, reviewed fingerprints and pending attempts. Stale
-unpublished stages rebase; acknowledged/uncertain requests retain their identities.
-Unpublished version-3 artifacts without frozen requests rebuild from fresh evidence;
-frozen version-3 requests retain their identities and complete their saved publication.
-Pending version-1/2 journaled mutations finish before v4, without rerunning old
-graph/profile generation or inventing lifecycle review completion.
+Checkpoint v5 stores the inventory, clusters, validated edits, completed groups, reviewed revisions and group summaries; a rerun resumes from it, and inserts replay by idempotency key. Older checkpoints are ignored.
 
 Successful tools return `complete` and their saved public summary. Unselected/invalid
 work or a terminal conflict returns `partial`; errors/cancellation/timeouts are not
@@ -248,9 +239,7 @@ and existing ten-minute caller/shutdown cancellation. No provider fallback is ad
 
 Failures return a structured error containing stage, code, sanitized message and
 retryability when known. The invalid-output retry receives the specific safe
-validation cause; `dream-errors.jsonl` records safe diagnostics without raw invalid
-output, credentials, private memory text or reflections. Unknown exceptions retain
-their stage but do not expose unchecked exception text.
+validation cause. `dream-errors.jsonl` (mode 0600) records the stage, the stop reason and the raw provider error truncated to 800 characters. Model-facing diagnostics carry only the log path, never the error text.
 
 ## Cutover and verification
 

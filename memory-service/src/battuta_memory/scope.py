@@ -8,7 +8,7 @@ def scope_from_projects(projects: list[str]) -> Scope:
 
 
 def projects_from_scope(scope: Scope) -> list[str]:
-    return ["global"] if scope.global_ else scope.projects
+    return scope.projects
 
 
 def project_tag(name: str) -> str:
@@ -21,7 +21,7 @@ def project_from_tag(tag: str) -> str:
 
 
 def resolve_scope(scope: Scope) -> list[str]:
-    return ["scope:global"] if scope.global_ else [project_tag(p) for p in scope.projects]
+    return [project_tag(p) for p in scope.projects]
 
 
 @dataclass
@@ -34,8 +34,8 @@ def resolve_selector(selector: Selector) -> ResolvedSelector:
     if selector.selector == "all":
         return ResolvedSelector(None)
     if selector.selector == "global":
-        return ResolvedSelector(["scope:global"])
+        return ResolvedSelector([project_tag("global")])
     tags = [project_tag(n) for n in selector.projects]
     if selector.include_global:
-        tags.append("scope:global")
+        tags.append(project_tag("global"))
     return ResolvedSelector(tags)

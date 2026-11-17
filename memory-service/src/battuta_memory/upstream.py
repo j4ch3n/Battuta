@@ -119,16 +119,14 @@ class UpstreamAdapter:
             metadata_error = False
         except ValueError:
             metadata, metadata_error = {}, True
-        lifecycle = metadata.get("memory_metadata")
-        superseded = isinstance(lifecycle, dict) and lifecycle.get("status") == "superseded"
         record = {
             "ref": row["content_hash"], "content": row["content"],
-            "scope": {"global": "scope:global" in tags, "projects": sorted(project_from_tag(t) for t in tags if t.startswith("proj:"))},
+            "scope": {"projects": sorted(project_from_tag(t) for t in tags if t.startswith("proj:"))},
             "tags": sorted(t for t in tags if not t.startswith(("scope:", "proj:", "kind:"))),
             "kind": next((t[5:] for t in tags if t.startswith("kind:")), row["memory_type"] or "observation"), "sources": metadata.get("sources", []),
             "created_at": row["created_at"], "updated_at": row["updated_at"],
-            "parent_ref": row.get("parent_id"), "superseded_by": row.get("superseded_by") or (metadata.get("replacement_ref") if row.get("deleted_at") is not None or superseded else None),
-            "active": not row.get("superseded_by") and row.get("deleted_at") is None and not superseded,
+            "parent_ref": row.get("parent_id"), "superseded_by": row.get("superseded_by"),
+            "active": not row.get("superseded_by") and row.get("deleted_at") is None,
             **({"metadata_error": True} if metadata_error else {}),
             **({"memory_metadata": metadata["memory_metadata"]} if "memory_metadata" in metadata else {}),
             **({"distance": row["distance"]} if "distance" in row else {}),
@@ -185,28 +183,29 @@ class UpstreamAdapter:
 
     async def inventory(self, request):
         # One statement supplies a consistent read snapshot. Fail closed rather
-        # than paginate a moving corpus or silently drop old correction targets.
-        rows = await self._rows("SELECT * FROM memories ORDER BY content_hash LIMIT ?", (request.max_records + 1,))
+        # than paginate a moving corpus.
+        rows = await self._rows("SELECT * FROM memories WHERE deleted_at IS NULL AND COALESCE(superseded_by,'')='' ORDER BY created_at, content_hash LIMIT ?", (request.max_records + 1,))
         if len(rows) > request.max_records:
             raise ValueError("Dream inventory exceeds record limit")
         if any(row.get("embedding_pending") for row in rows):
             raise ValueError("Dream inventory has pending embeddings")
-        records, inactive, recent = [], [], []
+        return {"records": [self.record(row) for row in rows]}
+
+    async def cluster(self, request):
+        from .clustering import cluster_projects
+        rows = await self._rows("""SELECT m.content_hash, m.tags, m.created_at, m.embedding_pending, e.content_embedding
+            FROM memories m LEFT JOIN memory_embeddings e ON e.rowid=m.id
+            WHERE m.deleted_at IS NULL AND COALESCE(m.superseded_by,'')=''
+            ORDER BY m.created_at, m.content_hash""")
+        if any(row["embedding_pending"] or row["content_embedding"] is None for row in rows):
+            raise ValueError("Dream inventory has pending embeddings")
+        from .scope import project_from_tag
+        groups = {}
         for row in rows:
-            record = self.record(row)
-            changed = max(row.get("created_at") or 0, row.get("updated_at") or 0, row.get("deleted_at") or 0)
-            if request.window_start <= changed < request.window_end:
-                recent.append(record["ref"])
-            if record["active"]:
-                records.append(record)
-            else:
-                inactive.append({"ref": record["ref"], "superseded_by": record["superseded_by"]})
-        from .records import review_fingerprint
-        for record in records:
-            if not record.get("metadata_error"):
-                record["review_fingerprint"] = review_fingerprint(record, records)
-        return {"records": records, "inactive": inactive, "recent_refs": recent,
-            "window_start": request.window_start, "window_end": request.window_end}
+            for tag in row["tags"].split(","):
+                if tag.startswith("proj:"):
+                    groups.setdefault(project_from_tag(tag), []).append((row["content_hash"], row["content_embedding"]))
+        return {"projects": cluster_projects(groups, request.threshold, request.max_size)}
 
     @staticmethod
     def _global_engines():
@@ -228,14 +227,14 @@ class UpstreamAdapter:
         rows = await self._rows("""SELECT m.*, e.content_embedding FROM memories m
             LEFT JOIN memory_embeddings e ON e.rowid=m.id
             WHERE m.deleted_at IS NULL AND COALESCE(m.superseded_by,'')=''
-            AND instr(',' || m.tags || ',', ',scope:global,') > 0
+            AND instr(',' || m.tags || ',', ',proj:global,') > 0
             ORDER BY m.content_hash LIMIT ?""", (max_records + 1,))
         if len(rows) > max_records:
             raise ValueError("Global graph inventory exceeds record limit")
         records = []
         for row in rows:
             record = self.record(row)
-            if record["scope"]["projects"] or row.get("embedding_pending"):
+            if row.get("embedding_pending"):
                 raise ValueError("Inconsistent global graph input")
             blob = row.get("content_embedding")
             if blob is None or len(blob) != DIMENSION * 4:
@@ -348,12 +347,6 @@ class UpstreamAdapter:
 
     async def metadata(self, payload):
         current = await self.get(payload["ref"], include_deleted=True)
-        if current and not current["active"] and payload.get("memory_metadata", {}).get("status") == "superseded":
-            from .scope import resolve_scope
-            from .contracts import Scope
-            tags = resolve_scope(Scope.model_validate(current["scope"])) + current["tags"] + [f"kind:{current['kind']}"]
-            if current.get("memory_metadata") == payload["memory_metadata"] and current["sources"] == payload["sources"] and current["superseded_by"] == payload.get("replacement_ref") and set(tags) == set(payload["tags"]):
-                return
         if not current or not current["active"]:
             raise ValueError("Memory is inactive")
         metadata = await self._merged_metadata(payload["ref"], payload)
@@ -403,17 +396,12 @@ class UpstreamAdapter:
     async def _merged_metadata(self, ref, payload):
         rows = await self._rows("SELECT metadata FROM memories WHERE content_hash=?", (ref,))
         metadata = json.loads(rows[0]["metadata"] or "{}")
-        metadata.update({key: payload[key] for key in ("sources", "memory_metadata", "replacement_ref") if key in payload})
+        metadata.update({key: payload[key] for key in ("sources", "memory_metadata") if key in payload})
         return metadata
 
     async def delete(self, payload):
         if await self.get(payload["ref"]) is None:
             return
-        if payload.get("replacement_ref"):
-            metadata = await self._merged_metadata(payload["ref"], payload)
-            ok, _ = await self.storage.update_memory_metadata(payload["ref"], {"metadata": metadata})
-            if not ok:
-                raise RuntimeError("Upstream replacement lineage update failed")
         ok, _ = await self.storage.delete(payload["ref"])
         if not ok:
             raise RuntimeError("Upstream deletion failed")

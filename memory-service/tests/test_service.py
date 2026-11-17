@@ -29,7 +29,7 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
         self.backend.embed = lambda text: b"0"
         self.service = MemoryService(self.backend, MemoryConfig(data_dir=self.root))
         self.add("a", "Atlas note", "proj:atlas,work", 3)
-        self.add("b", "Global note", "scope:global,work", 2)
+        self.add("b", "Global note", "proj:global,work", 2)
         self.add("c", "Beacon secret", "proj:beacon,work", 0)
         self.add("d", "Old atlas", "proj:atlas", 1, superseded="a" * 64)
 
@@ -80,26 +80,44 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["warnings"])
         self.assertEqual([r["content"] for r in result["records"]], ["Beacon secret", "Global note", "Atlas note"])
 
-    async def test_inventory_keeps_older_context_and_recent_invalidations(self):
-        self.conn.execute("UPDATE memories SET updated_at=10 WHERE content_hash=?", ("a" * 64,))
+    async def test_inventory_returns_only_active_records_in_creation_order(self):
+        self.conn.execute("UPDATE memories SET created_at=5 WHERE content_hash=?", ("a" * 64,))
         self.conn.execute("UPDATE memories SET deleted_at=11 WHERE content_hash=?", ("c" * 64,))
-        result = await self.service.inventory(InventoryRequest(window_start=10, window_end=12))
-        self.assertEqual([r["ref"] for r in result["records"]], ["a" * 64, "b" * 64])
-        self.assertEqual(result["recent_refs"], ["a" * 64, "c" * 64])
-        self.assertEqual({r["ref"] for r in result["inactive"]}, {"c" * 64, "d" * 64})
-        self.assertNotIn("content", result["inactive"][0])
+        result = await self.service.inventory(InventoryRequest())
+        self.assertEqual(list(result), ["records"])
+        self.assertEqual([r["ref"] for r in result["records"]], ["b" * 64, "a" * 64])
 
-    async def test_inventory_window_is_half_open_and_bounded_without_truncation(self):
-        self.conn.execute("UPDATE memories SET updated_at=12 WHERE content_hash=?", ("a" * 64,))
-        result = await self.service.inventory(InventoryRequest(window_start=10, window_end=12))
-        self.assertEqual(result["recent_refs"], [])
+    async def test_inventory_fails_closed_on_size_and_pending_embeddings(self):
         with self.assertRaisesRegex(ValueError, "limit"):
-            await self.service.inventory(InventoryRequest(window_start=0, window_end=12, max_records=2))
+            await self.service.inventory(InventoryRequest(max_records=1))
+        self.conn.execute("UPDATE memories SET embedding_pending=1 WHERE content_hash=?", ("a" * 64,))
+        with self.assertRaisesRegex(ValueError, "pending embeddings"):
+            await self.service.inventory(InventoryRequest())
 
-    def test_inventory_rejects_invalid_time_windows(self):
-        for start, end in [(12, 12), (13, 12), (-1, 12), (0, float("inf")), (float("nan"), 12)]:
-            with self.subTest(start=start, end=end), self.assertRaises(ValueError):
-                InventoryRequest(window_start=start, window_end=end)
+    async def test_cluster_groups_per_project_and_global_members_join_each_project(self):
+        import numpy as np
+        from battuta_memory.contracts import ClusterRequest
+        self.conn.execute("DELETE FROM memories")
+        self.conn.execute("DELETE FROM memory_embeddings")
+        for char, tags, vector in [("a", "proj:atlas,proj:global", [1, 0]), ("b", "proj:atlas", [1, 0.1]), ("c", "proj:atlas", [0, 1]),
+                ("d", "proj:beacon", [1, 0]), ("e", "proj:global", [1, 0.05])]:
+            self.add(char, char, tags, 0)
+            self.conn.execute("UPDATE memory_embeddings SET content_embedding=? WHERE rowid=(SELECT id FROM memories WHERE content_hash=?)",
+                (np.array(vector + [0] * 382, dtype="<f4").tobytes(), char * 64))
+        self.conn.execute("UPDATE memories SET created_at=id")
+        result = await self.service.cluster(ClusterRequest())
+        by_project = {p["project"]: p for p in result["projects"]}
+        self.assertEqual(list(by_project), ["atlas", "beacon", "global"])
+        self.assertEqual(by_project["atlas"]["clusters"], [["a" * 64, "b" * 64]])
+        self.assertEqual(by_project["atlas"]["singletons"], 1)
+        self.assertEqual(by_project["global"]["clusters"], [["a" * 64, "e" * 64]])
+        self.assertEqual(by_project["beacon"], {"project": "beacon", "clusters": [], "singletons": 1, "largest": 0, "raised": []})
+
+    async def test_cluster_fails_closed_on_pending_embeddings(self):
+        from battuta_memory.contracts import ClusterRequest
+        self.conn.execute("UPDATE memories SET embedding_pending=1 WHERE content_hash=?", ("a" * 64,))
+        with self.assertRaisesRegex(ValueError, "pending embeddings"):
+            await self.service.cluster(ClusterRequest())
 
     async def test_record_revision_changes_with_scope_and_state_not_distance(self):
         record = await self.service.get(GetRequest(ref="a" * 64))

@@ -1,5 +1,5 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { DreamModelError, dreamCompletion } from "../dream-model.ts";
 
 test("uses the configured Pi model and records usage without a conversation turn", async () => {
@@ -58,9 +58,18 @@ test.each(["length", "error", "toolUse"])(
   },
 );
 
-test("classifies provider errors without retaining private messages", () => {
-  const error = new DreamModelError("error", "HTTP 429 rate limit: private evidence and secret");
-  expect(error).toMatchObject({ stopReason: "error", category: "rate_limit" });
-  expect(JSON.stringify(error)).not.toContain("private evidence");
-  expect(new DreamModelError("unexpected private value", "secret").stopReason).toBe("unknown");
+test("keeps the raw provider message and does not cap output tokens", async () => {
+  const complete = vi.fn(() =>
+    Promise.resolve({ stopReason: "error", errorMessage: "529 overloaded_error: try later" }),
+  );
+  const ctx = { model: {}, modelRegistry: { complete } } as unknown as ExtensionContext;
+  const error = await dreamCompletion(ctx)("p", "e", new AbortController().signal).catch(
+    (e: unknown) => e,
+  );
+  expect(error).toMatchObject({
+    stopReason: "error",
+    providerMessage: "529 overloaded_error: try later",
+  });
+  expect((complete.mock.calls[0] as unknown[])[2]).not.toHaveProperty("maxTokens");
+  expect(new DreamModelError("unexpected value", "x").stopReason).toBe("unknown");
 });

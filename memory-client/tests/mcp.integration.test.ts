@@ -278,7 +278,6 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
       expect(recalled.branches.lexical).toBe("ready");
       const captured = memoryRecordSchema.parse(recalled.records[0]);
       expect(captured.memory_metadata).toMatchObject({
-        stage: "temporal",
         confidence: "confirmed",
         keywords: ["NS2", "Nintendo", "Nintendo Switch 2", "gaming"],
       });
@@ -289,16 +288,10 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
           prepareProjects,
           now: () => new Date(),
           call: (name, args, abort, catalog) => client.call(name, args, abort, catalog),
-          complete: (prompt) => {
-            if (prompt.includes("Stage: cleanup")) {
-              return Promise.resolve('{"operations":[]}');
-            }
-            if (prompt.includes("Stage: synthesis")) return Promise.resolve('{"proposals":[]}');
-            if (prompt.includes("Stage: challenge")) return Promise.resolve('{"decisions":[]}');
-            return Promise.resolve(
+          complete: () =>
+            Promise.resolve(
               "I reviewed the purchase without increasing its confidence or assuming a long-term preference.",
-            );
-          },
+            ),
         },
         signal,
       );
@@ -306,8 +299,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
         await client.call("memory_get", { ref: captured.ref }, signal),
       );
       expect(promoted.ref).toBe(captured.ref);
-      expect(promoted.revision).not.toBe(captured.revision);
-      expect(promoted.memory_metadata).toMatchObject({ stage: "durable", confidence: "confirmed" });
+      expect(promoted.memory_metadata).toMatchObject({ confidence: "confirmed" });
       const packet = (await client.call(
         "memory_recall",
         { semantic_query: "Nintendo console", keywords: ["Nintendo"] },
@@ -325,7 +317,7 @@ test.skipIf(process.env.BATTUTA_MEMORY_INTEGRATION !== "1")(
           idempotency_key: "console-interest",
           memory_metadata: {
             ...promoted.memory_metadata,
-            knowledge_type: "hypothesis",
+            knowledge_type: "inference",
             confidence: "tentative",
             rationale: "A possible current interest, not a confirmed enduring trait",
             evidence: [

@@ -22,10 +22,8 @@ The owned `memory_metadata` JSON key contains independent dimensions:
 
 | Field            | Meaning                                                                                                                            |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `stage`          | `temporal`: not yet dream-reviewed; `durable`: reviewed, not permanent or certain.                                                 |
-| `knowledge_type` | `fact`, `synthesized-observation`, or `hypothesis`.                                                                                |
+| `knowledge_type` | `fact` or `inference`. An inference needs a rationale and supporting evidence and is never `confirmed`.                            |
 | `confidence`     | `confirmed`, `supported`, `tentative`, or `disputed`; never a numerical belief probability.                                        |
-| `status`         | `active`, `stale`, `superseded`, or `rejected`. Existing physical tombstones remain separate.                                      |
 | `keywords`       | At most 20 unique terms, 80 characters each. Preserve display spelling; normalize Unicode/case for matching.                       |
 | `mentioned_at`   | Nullable source-statement instant, not extraction time.                                                                            |
 | `expires_at`     | Nullable exclusive current-recall boundary. Require an explicit timezone and normalize to UTC.                                     |
@@ -55,17 +53,15 @@ or the inference is omitted. No arbitrary TTL or physical deletion is automatic.
 ## Scope and identity
 
 Public writes and records use a required `projects` array of 1–100 strings:
-`["global"]` alone, or one or more project names. The client checks names against
+one or more project names. `global` is an ordinary project for the owner's personal facts and may be combined with others. The client checks names against
 the complete `battuta-project list --json` catalog, without another name syntax or
 length restriction. The server trusts names, lowercases/deduplicates/sorts them,
 and never reads the registry or current selection. Lowercase-equivalent names
-share server membership; a registered case variant of `global` conflicts with the
-reserved option. Membership is relevance, not authorization or privacy isolation.
+share server membership; Membership is relevance, not authorization or privacy isolation.
 
-Storage keeps `scope:global` and `proj:<name>` tags. Project tag values are
+Storage keeps `proj:<name>` tags (`proj:global` for global). Project tag values are
 percent-escaped for lossless comma-delimited storage; existing slug tags are
-unchanged. Internal records and canonical digest/revision inputs retain the old
-scope shape. Only typed public response locations translate to `projects`.
+unchanged. Internal scope is `{projects}`; public response locations expose `projects`.
 `kind` describes meaning, such as preference/decision/event; extra tags filter topics.
 Reserved `scope:`, `proj:` and `kind:` prefixes and commas are not caller tags.
 
@@ -84,18 +80,12 @@ error, not permission to broaden membership, confidence or expiry. Explicit
 and upstream automatic conflict-tag mutations are disabled; CoS proposes changes.
 
 `memory_update` creates a version with predecessor/successor lineage.
-`memory_set_metadata` requires ref, expected revision, replay key and full owned
-metadata; it merges unrelated JSON fields and reuses content identity/embedding.
-Its optional `replacement_ref` records lifecycle supersession after the replacement
-is acknowledged. Sources and original content remain accessible through history.
-Status-only withdrawal may retain unchanged evidence links after their sources
-are corrected or forgotten; new claims and explicit mutation guards stay strict.
-`memory_forget` is an explicit tombstone, not secure erasure or bulk retirement.
+`memory_forget` soft-deletes one ref (`deleted_at`); deleted records are skipped by recall, listing, clustering and dreaming, while evidence links to them still resolve. It is not secure erasure. Unknown stored metadata fields are ignored on read; writes stay validated.
 
-Public revisions cover content, scope, source and lifecycle changes. Inventory also
-supplies a meaningful review fingerprint across reachable claim/evidence state,
-excluding stage/review bookkeeping. Stale dependency revisions separately remain
-pending. Unchanged durable metadata is not rewritten just to record another review.
+Public revisions cover content, scope, source and lifecycle changes. Inventory returns active records only.
+
+`memory_cluster` returns, per project, groups of mutually similar active records
+(refs only), singleton counts and any threshold raises.
 
 ## Storage and retrieval
 
@@ -203,26 +193,18 @@ independent profile. Reads do not overwrite private files.
 
 CoS's existing scheduler requests the approved dream at local 05:30, with startup
 catch-up, the existing model selection and no tool-capable dream subagent.
-Missing-stage, temporal and changed durable evidence is pending regardless of age.
-Within the 500-record/200,000-byte guard, select at most 20 oldest-attempt inputs;
-unselected work remains explicit. New reviews have no model-directed defer or
-interpretation revisit queue.
-
-The extension hard-codes cleanup → synthesis → challenge → publication. Each model
-stage returns validated structured artifacts, with one invalid-output retry.
-Cleanup emits only add/replace/merge/retire operations; omitted selected inputs are
-reviewed unchanged. Every synthesis needs an accept/reject challenge. Challenge uses original evidence and contrary
-scoped retrieval, not hidden reasoning. Empty synthesis is valid. With no eligible
-pending inputs, validated empty stages avoid unnecessary model calls.
-
-Publish facts/metadata, then challenged derived claims, then supersede only sources
-whose replacements were acknowledged. Replacement evidence must explicitly name
-the reviewed cleanup content, never blindly inherit lineage. Guard source coverage,
-scope, revisions, confidence, rejection history and metadata. Rejected hypotheses
-remain excluded from current recall. Deterministic checks cannot establish semantic
-truth or recognize every paraphrased rejected interpretation: owner evaluation remains
-necessary. Profile refresh uses actual eligible outputs, then the existing private
-reflection/public-summary boundary. `ME.md` is not rewritten.
+The dream runs expire → cluster → edit → publish → hypothesize → refresh. Expired
+records are soft-deleted first. Active records are grouped per project by cosine
+similarity of their stored embeddings (0.65, groups above 30 split by 0.05 steps,
+singletons skipped); multi-project and global records join each project's groups.
+One model call edits each group containing a new or changed record: the model sees
+numbered memories without refs and returns keep/remove numbers plus facts to insert,
+validated in code. Inserts are saved first, then removed records are soft-deleted.
+One call over all group summaries proposes tentative inferences, linked as supporting
+evidence to cited records. An invalid answer is retried once; a failing group makes
+the run `partial` without stopping others. Guards: 2000 records, 200,000 bytes per call.
+Profile refresh uses eligible global records, then the private reflection/public
+summary boundary. `ME.md` is not rewritten.
 
 New dream publications validate a fresh client catalog before requests are frozen;
 frozen retries retain their snapshot and identity even after registry changes.
@@ -235,25 +217,11 @@ Scheduler setup and catch-up use the same local 05:30 boundary and owned job ID.
 Existing 03:00 tasks are not migrated: ownership conflicts require manual owner
 removal before setup. No live scheduler changes are part of this update.
 
-Cleanup-created facts preserve conversation sources but have no outgoing memory
-dependencies. Retirements set status to superseded and clear outgoing evidence,
-without adding replacement references. Content stays stored; ordinary recall
-excludes retired memories and existing claims with invalid dependencies.
+Checkpoint v5 persists inventory, clusters, validated edits, completed groups,
+reviewed revisions and group summaries. A cross-process lock prevents concurrent
+runs; resume replays inserts by idempotency key. Older checkpoints are ignored.
 
-Checkpoint v4 persists stage, input fingerprint, schema/prompt versions, validated
-artifacts, frozen requests, acknowledgements, reviewed fingerprints and pending
-attempt progress. A cross-process lock prevents concurrent runs. Resume stale
-unpublished stages against fresh evidence; never regenerate acknowledged/uncertain
-requests. Finish legacy journaled operations using their original identities before
-v3, without rerunning old graph/profile reasoning or inventing review completion.
-Unpublished version-3 proposals rebuild unless mutation requests are frozen; frozen
-requests retain their exact arguments and identities during publication recovery.
-On a later scheduled day, unpublished failed batches rotate by attempt order only
-when no mutation request is frozen; their pending work and legacy receipts remain.
-Oversized inventory and partial publication remain visibly incomplete.
-
-Old global-relationship tools/data remain optional, revision-checked maintenance
-views. V3 dreaming never requires `memory_consolidate_global` or graph hints.
+Old global-relationship tools/data remain optional maintenance views; dreaming does not use them.
 
 There is no commission-time origin/ref-selection gate or second recall pass.
 CoS chooses relevant prepared owner evidence for Agent Mail and must not forward

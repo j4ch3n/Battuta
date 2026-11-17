@@ -18,31 +18,11 @@ export class DreamDiagnosticError extends Error {
 
 // Only code-owned messages may cross the model/tool boundary.
 const rules = new Set([
-  "Duplicate operation id",
-  "Repeated dream source",
-  "Addition needs a reviewed input",
-  "Unknown cleanup target",
-  "Repeated mutation target",
-  "Unknown dream source",
-  "Cross-scope dream claim",
-  "Too many dream source citations",
+  "Invalid memory number",
+  "Repeated memory number",
+  "Unknown cluster number",
   "Duplicate proposed content",
   "Dreaming cannot fabricate confirmation",
-  "Unknown or repeated dream source",
-  "Wrong dream knowledge type",
-  "New proposals start active until challenge",
-  "Invalid dream evidence",
-  "Evidence lacks source coverage",
-  "Use retain for unchanged content; do not resurrect a rejected interpretation",
-  "Duplicate synthesis id",
-  "Synthesis needs a reviewed input",
-  "Synthesis cannot use retired or deferred evidence",
-  "Unknown cleanup evidence",
-  "Synthesis must explicitly cite the reviewed replacement content",
-  "Every synthesis needs an explicit challenge verdict",
-  "Challenge must accept or reject",
-  "Replacement cannot depend on retired evidence",
-  "Replacement must be distinct from retired sources",
 ]);
 const operational = new Set([
   "Dream already running",
@@ -59,32 +39,17 @@ const operational = new Set([
   "Dream reflection evidence exceeds budget",
 ]);
 const fields = new Set([
-  "operations",
-  "id",
-  "type",
+  "keep",
+  "remove",
+  "insert",
   "summary",
-  "ref",
-  "refs",
+  "hypotheses",
+  "clusters",
   "content",
-  "kind",
-  "source_refs",
-  "memory_metadata",
-  "knowledge_type",
   "confidence",
   "keywords",
-  "mentioned_at",
   "expires_at",
   "rationale",
-  "evidence",
-  "revision",
-  "relation",
-  "requirement",
-  "stage",
-  "status",
-  "proposals",
-  "cleanup_evidence",
-  "decisions",
-  "verdict",
 ]);
 
 export function dreamDiagnostic(error: unknown, stage: string): DreamDiagnostic {
@@ -132,9 +97,7 @@ export function dreamDiagnostic(error: unknown, stage: string): DreamDiagnostic 
     ].slice(0, 5);
     return {
       stage,
-      code: ["cleanup", "synthesis", "challenge"].includes(stage)
-        ? "invalid_artifact"
-        : "invalid_state",
+      code: ["edit", "hypothesize"].includes(stage) ? "invalid_artifact" : "invalid_state",
       message: `Structured output violates the schema. ${constraints.join("; ")}.`.slice(0, 1000),
       paths,
       retryable: true,

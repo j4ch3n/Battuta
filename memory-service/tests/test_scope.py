@@ -11,6 +11,7 @@ class ScopeTests(unittest.TestCase):
     def test_explicit_multi_project_membership(self):
         for names, expected in [
             (["Beacon", "Atlas", "Atlas"], ["atlas", "beacon"]),
+            (["Global", "Atlas"], ["atlas", "global"]),
             (["my project", "项目", "X" * 65], ["my project", "x" * 65, "项目"]),
             (["one,two", "%2c"], ["%2c", "one,two"]),
         ]:
@@ -22,20 +23,19 @@ class ScopeTests(unittest.TestCase):
                 self.assertEqual(len(resolve_scope(scope)), len(expected))
 
     def test_explicit_selection_only(self):
-        self.assertEqual(resolve_selector(Selector(selector="global")).tags, ["scope:global"])
+        self.assertEqual(resolve_selector(Selector(selector="global")).tags, ["proj:global"])
         self.assertIsNone(resolve_selector(Selector(selector="all")).tags)
         self.assertEqual(resolve_selector(Selector(selector="projects", projects=["Atlas"])).tags,
-            ["proj:atlas", "scope:global"])
-        for args in ({}, {"selector": "current"}, {"selector": "projects"},
-                     {"selector": "projects", "projects": ["global"]}):
+            ["proj:atlas", "proj:global"])
+        for args in ({}, {"selector": "current"}, {"selector": "projects"}):
             with self.subTest(args=args), self.assertRaises(ValueError):
                 Selector(**args)
 
     def test_invalid_membership_structure(self):
-        for names in ([], ["global", "atlas"], ["GLOBAL", "Atlas"], [42], ["x"] * 101):
+        for names in ([], [42], ["x"] * 101):
             with self.subTest(names=names), self.assertRaises(ValueError):
                 RememberRequest(content="note", projects=names)
-        for args in ({}, {"scope": {"global": True}}):
+        for args in ({}, {"scope": {"projects": ["atlas"]}}):
             with self.subTest(args=args), self.assertRaises(ValueError):
                 RememberRequest(content="note", **args)
 

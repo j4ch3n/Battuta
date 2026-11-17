@@ -11,7 +11,7 @@ from battuta_memory.service import MemoryService
 class CaptureTests(StorageFixture):
     async def test_new_wire_replays_a_historical_capture_receipt_without_embedding(self):
         legacy = {"session_id": "s", "batch_id": "batch", "agent_id": "cos", "items": [{
-            "item_id": "fact-1", "content": "Useful fact", "scope": {"global": True, "projects": []},
+            "item_id": "fact-1", "content": "Useful fact", "scope": {"projects": ["global"]},
             "tags": [], "kind": "observation", "idempotency_key": None,
             "sources": [{"agent_id": "cos", "session_id": "s", "entry_id": "entry-1"}],
         }]}
@@ -32,7 +32,7 @@ class CaptureTests(StorageFixture):
         old = await self.service.remember(RememberRequest(content="Owner owns an NS2", projects=["global"], sources=[SOURCE], memory_metadata=fact()["memory_metadata"]))
         source = await self.adapter.get(old["ref"])
         link = {"ref": old["ref"], "revision": source["revision"], "relation": "supports", "requirement": "current"}
-        derived = await self.service.remember(RememberRequest(content="Owner may want console games", projects=["global"], sources=[SOURCE], memory_metadata=fact(knowledge_type="hypothesis", confidence="tentative", rationale="Possible interest", evidence=[link])["memory_metadata"]))
+        derived = await self.service.remember(RememberRequest(content="Owner may want console games", projects=["global"], sources=[SOURCE], memory_metadata=fact(knowledge_type="inference", confidence="tentative", rationale="Possible interest", evidence=[link])["memory_metadata"]))
         item = {"item_id": "correction", "content": "Owner returned the NS2", "projects": ["global"], "sources": [SOURCE], "memory_metadata": fact()["memory_metadata"], "correction": {"ref": old["ref"], "revision": source["revision"]}}
         batch = self.batch([item])
         capture = CaptureService(self.service)
@@ -41,7 +41,7 @@ class CaptureTests(StorageFixture):
         self.assertEqual(await capture.ingest(batch), result)
         self.assertFalse((await self.adapter.get(old["ref"]))["active"])
         replacement = await self.adapter.get(result["items"][0]["ref"])
-        self.assertEqual(replacement["memory_metadata"]["stage"], "temporal")
+        self.assertEqual(replacement["scope"], {"projects": ["global"]})
         self.assertEqual(eligible_records([replacement, await self.adapter.get(derived["ref"])], NOW), [replacement])
 
     def batch(self, items=None):

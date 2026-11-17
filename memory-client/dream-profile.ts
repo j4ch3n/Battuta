@@ -11,7 +11,7 @@ export const trackedProfileSchema = z.object({
             .array(z.object({ ref: memoryRefSchema, revision: memoryRefSchema }).strict())
             .min(1)
             .max(100),
-          knowledge_type: z.enum(["fact", "synthesized-observation", "hypothesis"]),
+          knowledge_type: z.enum(["fact", "inference"]),
           confidence: z.enum(["confirmed", "supported", "tentative", "disputed"]),
         })
         .strict(),

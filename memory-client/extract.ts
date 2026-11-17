@@ -124,13 +124,11 @@ export async function extractMemories(
     )
       throw new Error("Unknown correction target");
     const memory_metadata = memoryMetadataSchema.parse({
-      stage: "temporal",
       knowledge_type: "fact",
       confidence:
         cited.some((m) => !m.speaker) && item.confidence === "confirmed"
           ? "tentative"
           : item.confidence,
-      status: "active",
       keywords: item.keywords,
       mentioned_at: cited[0]?.mentioned_at ?? null,
       expires_at: item.expires_at,

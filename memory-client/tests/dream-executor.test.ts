@@ -70,7 +70,7 @@ test.each(["fuzzy", "p/missing", "p/dream extra"])(
   },
 );
 
-test("records private, bounded failure diagnostics without error contents", async () => {
+test("records failures privately, with raw provider errors only in the log", async () => {
   const directory = await mkdtemp(join(tmpdir(), "dream-errors-"));
   try {
     vi.stubEnv("BATTUTA_MEMORY_DATA_DIR", directory);
@@ -79,29 +79,36 @@ test("records private, bounded failure diagnostics without error contents", asyn
       deps.onStage?.("reflection");
       return Promise.reject(new Error("private evidence and secret"));
     });
-    await expect(executeDream(h.ctx, h.options)).rejects.toThrow("failed");
+    const first = await executeDream(h.ctx, h.options).catch((e: unknown) => e);
     const path = join(directory, "dream-errors.jsonl");
-    const text = await readFile(path, "utf8");
-    expect(JSON.parse(text)).toMatchObject({
+    const read = async () =>
+      (await readFile(path, "utf8"))
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as { rawError: string; stopReason?: string });
+    expect((await read())[0]).toMatchObject({
       stage: "reflection",
       failure: "failed",
       reason: "unexpected_error",
+      rawError: "Error: private evidence and secret",
     });
-    expect(text).not.toContain("private evidence");
     expect((await stat(path)).mode & 0o777).toBe(0o600);
+    const raw = "HTTP 529 overloaded_error " + "x".repeat(10000);
     run.mockImplementationOnce((deps) => {
       deps.onStage?.("reflection");
-      return Promise.reject(new DreamModelError("error", "HTTP 429 private secret"));
+      return Promise.reject(new DreamModelError("error", raw));
     });
-    await expect(executeDream(h.ctx, h.options)).rejects.toThrow("failed");
-    const lines = (await readFile(path, "utf8")).trim().split("\n");
-    expect(JSON.parse(lines[1])).toMatchObject({
-      stage: "reflection",
-      reason: "Dream model did not finish",
-      stopReason: "error",
-      modelErrorCategory: "rate_limit",
-    });
-    expect(lines[1]).not.toContain("private secret");
+    const second = await executeDream(h.ctx, h.options).catch((e: unknown) => e);
+    const entry = (await read())[1];
+    expect(entry.stopReason).toBe("error");
+    expect(entry.rawError.startsWith("HTTP 529 overloaded_error")).toBe(true);
+    expect(entry.rawError.length).toBeLessThan(raw.length);
+    for (const failure of [first, second]) {
+      const shown = JSON.stringify((failure as { diagnostic: unknown }).diagnostic);
+      expect(shown).not.toContain("overloaded_error");
+      expect(shown).not.toContain("private evidence");
+      expect(shown).toContain(path);
+    }
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
