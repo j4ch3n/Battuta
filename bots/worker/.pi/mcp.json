@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "assignments": {
+      "url": "http://127.0.0.1:54321/functions/v1/assignments",
+      "headers": {
+        "apikey": "${SUPABASE_SECRET_KEY}"
+      },
+      "exposure": "hidden",
+      "description": "Shared project assignments, ordered TODOs, and local note paths",
+      "toolExposure": {
+        "list_assignments": "codemode",
+        "get_assignment": "codemode",
+        "prepare_notes": "codemode",
+        "locate_notes": "codemode"
+      }
+    },
+    "memory": {
+      "enabled": false
+    }
+  }
+}
