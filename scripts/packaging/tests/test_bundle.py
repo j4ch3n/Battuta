@@ -137,11 +137,13 @@ def test_staged_archive_separates_documentation_and_bots(source, tmp_path):
         bundle.validate_bundle(moved)
 
 
-def test_release_ships_telegram_template_only_for_cos(source, tmp_path):
+def test_release_ships_merge_templates_from_manifest(source, tmp_path):
     target = tmp_path / "release"
     bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
     assert (target / "bots/cos-bot/.pi/telegram.json").is_file()
+    assert (target / "bots/cos-bot/.pi/web-search.json").is_file()
     assert not (target / "bots/manager-bot/.pi/telegram.json").exists()
+    assert not (target / "bots/worker/.pi/mcp.json").exists()
 
 
 def test_bundled_workspace_dependencies_are_not_installed_at_runtime(source, tmp_path):
