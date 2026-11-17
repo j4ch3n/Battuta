@@ -90,6 +90,8 @@ class WorkerLauncherTests(unittest.TestCase):
             source = root / "assignment-worker/index.ts"
             source.parent.mkdir(parents=True)
             source.write_text("export default () => {}")
+            (root / "agent-mail").mkdir()
+            (root / "agent-mail/index.ts").write_text("export default () => {}")
             prepare_source_extensions(root, profile, manifest.extensions)
             configure_mcp(profile, role="worker", supabase_url="http://127.0.0.1:54321")
             (profile / ".pi/web-search.json").write_text('{"fetchContent":{"userAgent":"fixture mobile browser"}}')
@@ -100,7 +102,7 @@ class WorkerLauncherTests(unittest.TestCase):
             binary = root / "bin"
             binary.mkdir()
             node = binary / "node"
-            node.write_text('#!/bin/sh\nprintf "%s\\n" "$PI_CODING_AGENT_DIR" "$PWD" "$BATTUTA_BOT_NAME" "$BATTUTA_PROJECTS_ROOT_HEADER"\n')
+            node.write_text('#!/bin/sh\nprintf "%s\\n" "$PI_CODING_AGENT_DIR" "$PWD" "$AGENT_ID" "$BATTUTA_PROJECTS_ROOT_HEADER"\n')
             node.chmod(0o755)
             chromium = binary / "chromium-browser"
             chromium.write_text("#!/bin/sh\nexit 99\n")
@@ -116,7 +118,6 @@ class WorkerLauncherTests(unittest.TestCase):
             self.assertEqual(unquote(lines[3]), str(self.home / ".battuta/projects"))
             settings = json.loads((bot / ".pi/settings.json").read_text())
             self.assertEqual(settings["defaultThinkingLevel"], "high")
-            self.assertTrue(settings["defaultModel"])
             self.assertNotIn("extensions", settings)
             self.assertEqual(settings["packages"], manifest.packages.pi)
             self.assertEqual((profile / ".pi/extensions/assignment-worker.ts").resolve(), source)

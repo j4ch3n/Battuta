@@ -14,7 +14,9 @@ const assignment = {
   claimed_at: null,
   claimed_by: null,
   require_abilities: [],
+  difficulty: "easy",
   lease_expired_at: null,
+  lease_expired: false,
   blocker: null,
   dependencies: [],
   ready: true,
@@ -192,6 +194,7 @@ Deno.test("note tools return caller-local guidance respecting assignment status"
                 lease_expired_at: ["in_process", "blocked"].includes(status)
                   ? "2026-11-04T12:45:00+00:00"
                   : null,
+                lease_expired: false,
                 blocker: status === "blocked" ? "Missing input" : null,
                 ready: status === "active",
                 notes_path,

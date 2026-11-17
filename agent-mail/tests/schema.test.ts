@@ -65,7 +65,7 @@ test("LLM expectations translate to offsets; runtime owns identity and conversat
 
 test("strict LLM schemas reject malformed, coerced, omitted and injected fields", () => {
   for (const bad of [
-    { ...intent, recipient: "engineer" },
+    { ...intent, recipient: "bad name" },
     { ...intent, recipient: agent.role },
     { ...intent, sender_role: "manager" },
     { ...intent, response_due: "tomorrow" },
@@ -119,6 +119,7 @@ test("injected JSON includes current and parent composite references", () => {
     sender: "manager",
     recipient: "cos",
     message_type: "chat",
+    delivery: "queue",
     content: content("Answer"),
     response_due: null,
     created_at: "2026-09-30T12:00:00Z",
@@ -170,4 +171,22 @@ test("one role-independent schema requires explicit requests and evidence-backed
     content("Oversized", { context: Array(30).fill("x".repeat(4000)) }),
   ])
     assert.throws(() => sendRequest(agent, { ...intent, content: bad }));
+});
+
+test("recipients are bot names and delivery is limited to queue or steer", () => {
+  const base = { message_type: "chat", content: content("Hello"), reply_expectation: null };
+  for (const recipient of ["worker-1", "manager", "cos"])
+    assert.doesNotThrow(() => validate(SendArguments, { ...base, recipient }));
+  for (const delivery of ["queue", "steer"])
+    assert.equal(
+      sendRequest(agent, { ...base, recipient: "worker-1", delivery }).delivery,
+      delivery,
+    );
+  for (const bad of [
+    { recipient: "bad name" },
+    { recipient: "" },
+    { recipient: "w", delivery: "now" },
+  ])
+    assert.throws(() => sendRequest(agent, { ...base, ...bad }));
+  assert.throws(() => sendRequest(agent, { ...base, recipient: agent.role }));
 });

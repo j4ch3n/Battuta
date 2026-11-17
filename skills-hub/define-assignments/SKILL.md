@@ -42,6 +42,26 @@ permitted actions, inputs, and expected evidence for phone work. If the required
 worker, device, access, or authority is unavailable, surface the blocker rather
 than routing to an incompatible worker or expanding permission.
 
+## Choose a difficulty
+
+Set `difficulty` on every assignment; it selects the worker's model. Omitting it
+means `easy`. Judge by how much uncertainty and judgment the work needs, not by
+its topic or size. A stronger model costs more, so use the lowest level that can
+finish the work reliably.
+
+- `easy`: the path is known and the result is easy to check. Examples: bulk data
+  curation, a simple single-module feature, a bug with a known cause, a
+  reproducing test and a single-module fix.
+- `medium`: the worker must investigate or decide before acting. Examples: a bug
+  whose cause is not yet identified, multi-step research.
+- `hard`: the work spans boundaries or fails in non-obvious ways. Examples:
+  cross-module or schema changes, failures a medium attempt could not explain.
+- `hail_mary`: a last resort after a `hard` attempt failed.
+
+When a worker is blocked or unable, replan one level up with the blocker as
+context; do not skip levels. Reviews of diffs, tests and results are
+assignments too, and use the same reasoning.
+
 ## How and why
 
 Plan the next useful milestone from current evidence. When discovery is needed,

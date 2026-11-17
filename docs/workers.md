@@ -12,8 +12,7 @@ dispatch queue, result queue, or scheduler daemon is introduced.
   assignment plans and prerequisites. Assignment delegation is mandatory for
   worker-level research, implementation, artifacts and execution verification,
   through complete assignments for the next useful milestone, adapting later
-  assignments to reviewed findings. Manager may run bounded read-only review
-  spot-checks without taking over implementation or formal verification.
+  assignments to reviewed findings. Manager commissions reviews as assignments.
   It remains available for asynchronous results,
   reviews evidence and unblocks/replans/escalates to CoS. Managerial records and
   ticket/PR administration remain Manager-owned. Unavailable delegation is a
@@ -25,6 +24,14 @@ dispatch queue, result queue, or scheduler daemon is introduced.
 
 See [assignment runtime](assignments.md) for schema, RPC/tool, dependency, state,
 and privilege contracts. Assignment completion is not product acceptance.
+
+## Model by difficulty
+
+Each assignment has a difficulty: `easy` (the default), `medium`, `hard`, or `hail_mary`. Before the
+first TODO the worker selects the model named by `MODEL_FOR_EASY_TASKS`, `MODEL_FOR_MEDIUM_TASKS`,
+`MODEL_FOR_HARD_TASKS`, or `MODEL_FOR_HAIL_MARY_TASKS`, written as `provider/model-id` in the
+worker's environment. An unset variable keeps Pi's default model. A malformed or
+unknown value blocks the assignment with a reason naming the variable.
 
 ## Native Pi lifecycle
 
@@ -70,7 +77,7 @@ One serialized coordinator owns at most one binding and one running TODO.
 
 Before subscribing, the extension validates launcher-provided
 `BATTUTA_WORKER_CAPABILITIES` JSON and initializes an immutable capability set.
-The launcher supplies the configured bot ID in `BATTUTA_BOT_NAME`; claims record
+The launcher supplies the configured bot ID (`worker-N`) in `AGENT_ID`, alongside `AGENT_ROLE=worker`; claims record
 that name as `claimed_by` for traceability. A missing or invalid name stops startup
 rather than inventing an ID. Bot names must be distinct wherever operators need
 to distinguish workers across hosts.
@@ -144,7 +151,7 @@ handoff content in TODO results; local notes alone are not cross-host evidence.
 ## Notification and manual operations
 
 After confirmed done/blocked persistence, the extension sends one chat from
-`worker` to `manager`, using the assignment conversation UUID. Mail contains
+the worker's bot name to the `manager` mailbox, using the assignment conversation UUID. Mail contains
 bounded outcomes/evidence and points to the full authoritative ledger. Its sole
 automatic completion check verifies done plus a nonempty terminal TODO set;
 it does not claim independent implementation or product verification.

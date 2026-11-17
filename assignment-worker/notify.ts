@@ -117,6 +117,8 @@ export function buildManagerContent(detail: Detail): MessageContent {
 export function createNotifier(options: {
   client: SupabaseClient;
   conversationId: string;
+  senderName: string;
+  managerName: string;
   appendEntry: ExecutionSessions["appendEntry"];
 }): (detail: Detail) => Promise<MailDelivery> {
   let identity: string | undefined;
@@ -134,8 +136,8 @@ export function createNotifier(options: {
       const content = buildManagerContent(detail);
       options.appendEntry("assignment-mail", { ...target, state: "pending" });
       stored = await sendProgrammaticMail(options.client, {
-        senderRole: "worker",
-        recipientRole: "manager",
+        senderRole: options.senderName,
+        recipientRole: options.managerName,
         conversationId: options.conversationId,
         content,
       });

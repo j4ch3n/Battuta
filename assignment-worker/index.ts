@@ -10,6 +10,7 @@ import { createAssignmentClient } from "./client.ts";
 import { createCoordinator } from "./coordinator.ts";
 import { ExecutionResultSchema, parseAbilities, parseBinding } from "./contracts.ts";
 import { createNotifier } from "./notify.ts";
+import { modelForDifficulty } from "./models.ts";
 import { ensureAssignmentWorkspace } from "./workspace.ts";
 import type { AssignmentClient, Coordinator, Detail } from "./types.ts";
 
@@ -62,8 +63,8 @@ export default function worker(pi: ExtensionAPI) {
   });
   pi.on("session_start", async (event, ctx) => {
     if (client || stopped) return;
-    const workerId = process.env.BATTUTA_BOT_NAME?.trim();
-    if (!workerId) throw new Error("BATTUTA_BOT_NAME must identify the worker bot");
+    const workerId = process.env.AGENT_ID?.trim();
+    if (!workerId) throw new Error("AGENT_ID must identify the worker bot");
     const configured = process.env.BATTUTA_WORKER_CAPABILITIES;
     if (!configured) throw new Error("BATTUTA_WORKER_CAPABILITIES must contain configured JSON");
     let values: unknown;
@@ -107,6 +108,8 @@ export default function worker(pi: ExtensionAPI) {
     const notifier = createNotifier({
       client: db,
       conversationId: ctx.sessionManager.getSessionId(),
+      senderName: workerId,
+      managerName: "manager",
       appendEntry: (kind, data) => pi.appendEntry(kind, data),
     });
     coordinator = createCoordinator({
@@ -146,6 +149,16 @@ export default function worker(pi: ExtensionAPI) {
           if (result.cancelled) throw new Error("Assignment conversation replacement cancelled");
           return binding;
         },
+        async useModel(detail: Detail) {
+          const choice = modelForDifficulty(process.env, detail.assignment.difficulty);
+          if (!choice) return;
+          if ("error" in choice) throw new Error(choice.error);
+          const model = context?.modelRegistry.find(choice.provider, choice.id);
+          if (!model || !(await pi.setModel(model)))
+            throw new Error(
+              `${choice.variable} model ${choice.provider}/${choice.id} is unknown or has no credentials`,
+            );
+        },
         runTodo(_binding, todo, detail, workspace) {
           if (stopped) throw new Error("Worker session was disposed");
           pi.sendMessage(
@@ -180,7 +193,13 @@ export default function worker(pi: ExtensionAPI) {
     if (event.reason !== "new") wake();
   });
   pi.on("agent_before_settle", (event) => {
-    coordinator?.observeBoundary(event.outcome);
+    const last = [...event.context.contextMessages]
+      .reverse()
+      .find((message) => message.role === "assistant");
+    coordinator?.observeBoundary(
+      event.outcome,
+      last && "errorMessage" in last ? last.errorMessage : undefined,
+    );
   });
   pi.on("agent_settled", async (event, ctx) => {
     context = ctx;

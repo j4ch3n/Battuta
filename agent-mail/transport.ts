@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MessageContent } from "./content.ts";
 import { validateContent } from "./content.ts";
 import {
-  SenderRole,
+  BotName,
   MessageRef,
   StoredMessage,
   sendRequest,
@@ -48,17 +48,15 @@ export async function invokeMail(
 export async function sendProgrammaticMail(
   client: MailClient,
   input: {
-    senderRole: "cos" | "manager" | "worker";
-    recipientRole: "cos" | "manager";
+    senderRole: string;
+    recipientRole: string;
     conversationId: string;
     content: MessageContent;
   },
 ): Promise<MessageReference> {
   let request: ReturnType<typeof sendRequest>;
   try {
-    const role = validate(SenderRole, input.senderRole);
-    if (role === "worker" && input.recipientRole !== "manager")
-      throw new Error("Workers report only to Manager");
+    const role = validate(BotName, input.senderRole);
     const sessionId = validate(MessageRef.properties.conversation_id, input.conversationId);
     request = sendRequest(
       { role, sessionId },

@@ -14,6 +14,7 @@ export interface Assignment {
   claimed_by: string | null;
   require_abilities: string[];
   lease_expired_at: string | null;
+  lease_expired: boolean;
   blocker: string | null;
   dependencies: { assignment_id: string; project: string; status: string }[];
   ready: boolean;

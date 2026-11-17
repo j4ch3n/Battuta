@@ -8,7 +8,7 @@ select ok(not has_table_privilege('anon','public.assignments','SELECT'), 'no ano
 select ok(not has_table_privilege('authenticated','public.todos','INSERT'), 'no user writes');
 select ok(not has_table_privilege('service_role','public.todos','UPDATE'), 'backend uses RPC for updates');
 select ok(not has_table_privilege('service_role','public.assignments','INSERT'), 'backend uses RPC for creation');
-select ok(not has_function_privilege('anon','public.assignment_create(text,text,text[],text,text[],text[])','EXECUTE'), 'anonymous RPC refused');
+select ok(not has_function_privilege('anon','public.assignment_create(text,text,text[],text,text[],text[],public.assignment_difficulty)','EXECUTE'), 'anonymous RPC refused');
 select ok(not has_function_privilege('authenticated','public.assignment_get(text,text)','EXECUTE'), 'user RPC refused');
 select ok(has_function_privilege('service_role','public.assignment_get(text,text)','EXECUTE'), 'backend RPC allowed');
 select ok(not has_function_privilege('service_role','public.assignment_valid_project(text)','EXECUTE'), 'helper private');
@@ -36,7 +36,7 @@ cross join unnest(array[
  'public.assignment_close(text,text,text)',
  'public.assignment_prepare_notes(text,text)',
  'public.assignment_locate_notes(text,text)',
- 'public.assignment_create(text,text,text[],text,text[],text[])',
+ 'public.assignment_create(text,text,text[],text,text[],text[],public.assignment_difficulty)',
  'public.assignment_claim(text,text,text,text[])',
  'public.assignment_start_todo(text,text,timestamptz,integer,timestamptz,text)',
  'public.assignment_record_todo_result(text,text,timestamptz,integer,timestamptz,text,text,text[],text,text)',

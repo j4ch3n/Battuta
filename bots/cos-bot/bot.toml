@@ -6,8 +6,7 @@ env_prefix = "COS"
 pi_coding_agent_dir = "cos-bot/.pi"
 
 [defaults]
-provider = "openai"
-model = "gpt-6.1-sol"
+difficulty = "medium"
 thinking = "low"
 
 [packages]

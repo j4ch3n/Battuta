@@ -87,7 +87,6 @@ def test_fresh_release_defaults_survive_browser_setup(deployment):
     for bot, thinking in (("cos-bot", "low"), ("manager-bot", "medium"), ("worker-1", "high"), ("worker-2", "high")):
         settings = json.loads((home / ".battuta/pi-bots" / bot / ".pi/settings.json").read_text())
         assert settings["defaultThinkingLevel"] == thinking
-        assert settings["defaultModel"]
 
 
 def test_repeated_release_leaves_created_files_unchanged(deployment, capsys):

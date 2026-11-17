@@ -32,7 +32,7 @@ constraints, acceptance/input references, and existing prerequisite IDs. Depende
 may cross projects but remain immutable; only prerequisites done unlock execution.
 Duplicate prerequisite IDs mean one dependency. Cancelled prerequisites do not
 satisfy dependents. Choose non-conflicting workspace boundaries or dependencies.
-Omit `require_abilities` for ordinary work; it defaults to `["research"]`.
+Omit `require_abilities` for ordinary work; it defaults to `["research"]`. Omit `difficulty` for easy work; levels are `easy`, `medium`, `hard`, `hail_mary`.
 For influencer work, explicitly require `["mobile-control"]`. Empty requirements
 are invalid. Unknown names reject the whole write; read the correction message
 rather than guessing aliases.
@@ -44,7 +44,7 @@ replace the assignment when requirements must change.
 
 | Tool | Inputs beyond project/assignment ID | Use |
 | --- | --- | --- |
-| create_assignment | goal, nonempty initial_todos, optional constraints, depends_on_assignment_ids and require_abilities | Publish one complete initial plan; requires project, not an existing assignment ID |
+| create_assignment | goal, nonempty initial_todos, optional constraints, depends_on_assignment_ids, require_abilities and difficulty | Publish one complete initial plan; requires project, not an existing assignment ID |
 | list_assignments | optional project and status | Inspect all or project work, readiness, and claiming bot; no assignment ID |
 | get_assignment | None | Read authoritative detail, evidence, dependencies, and ordered TODOs |
 | append_todos | nonempty descriptions array | Append consecutive positions to active/blocked work |
@@ -67,8 +67,10 @@ later calls.
 | --- | --- |
 | `status` | Distinguish waiting (`active`), claimed (`in_process`), blocked, and terminal work |
 | `ready` | See whether prerequisites and TODO state currently permit a claim; it does not reserve work |
-| `claimed_by` | Identify the claiming bot, such as `worker-1`; a retained name is not proof it is still running, and a blank name alone does not prove work is available |
+| `claimed_by` | The claiming bot's Agent Mail mailbox, such as `worker-1`; mail it to chase or steer that bot. A retained name is not proof it is still running, and a blank name alone does not prove work is available |
+| `lease_expired` | True when an `in_process` assignment has run past its 45-minute lease (UTC); the worker is likely gone or stuck. Replan: mail `claimed_by` once, then create a new assignment one difficulty level up if there is no reply. Always false for blocked, done, and other states |
 | `require_abilities` | Read the exact abilities a worker must all satisfy |
+| `difficulty` | Read the level that selects the worker's model |
 | TODO `summary` / `evidence` / `blocker` | Evaluate actual outcomes, verification, and missing inputs before accepting results or replanning |
 
 On `ok: false` or a tool error, read the explanation and use the returned error

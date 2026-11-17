@@ -4,6 +4,7 @@ import {
   UncertainAssignmentWriteError,
   blockAndInspect,
 } from "./client.ts";
+import { describeFailure } from "./errors.ts";
 import { parseAbilities, parseExecutionResult } from "./contracts.ts";
 import type {
   Coordinator,
@@ -27,6 +28,8 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     current: TodoRow | undefined,
     accepted: ExecutionResult | undefined;
   let boundary: "completed" | "aborted" | "error" | undefined;
+  let boundaryError: string | undefined;
+  let modelSelected = false;
   let tail: Promise<unknown> = Promise.resolve();
   let reconciling: Promise<void> | undefined;
   const abilities: ReadonlySet<string> = parseAbilities(options.capabilities);
@@ -75,6 +78,8 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     current = undefined;
     accepted = undefined;
     boundary = undefined;
+    boundaryError = undefined;
+    modelSelected = false;
     phase = "idle";
     queueMicrotask(() => {
       void coordinator.reconcile("idle");
@@ -143,6 +148,15 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
       return;
     }
     phase = "persisting";
+    if (!modelSelected) {
+      try {
+        await sessions.useModel(latest);
+        modelSelected = true;
+      } catch (error) {
+        await blockRun(error instanceof Error ? error.message : "Model could not be selected");
+        return;
+      }
+    }
     let started;
     try {
       started = await assignments.start({
@@ -162,6 +176,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     current = started.todo;
     accepted = undefined;
     boundary = undefined;
+    boundaryError = undefined;
     phase = "executing";
     sessions.runTodo({ ...binding }, structuredClone(current), latest, workspace);
   }
@@ -301,8 +316,10 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
         return Promise.resolve({ accepted: true as const });
       });
     },
-    observeBoundary(outcome) {
-      if (!stopped && phase === "executing") boundary = outcome;
+    observeBoundary(outcome, errorMessage) {
+      if (stopped || phase !== "executing") return;
+      boundary = outcome;
+      boundaryError = errorMessage;
     },
     settle(event) {
       return serial(async () => {
@@ -311,7 +328,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
           await blockRun(
             event.aborted || boundary === "aborted"
               ? "Execution was aborted before confirmed completion"
-              : "Execution ended with an unrecoverable error",
+              : describeFailure(boundaryError),
           );
           return;
         }

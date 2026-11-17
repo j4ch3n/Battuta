@@ -57,8 +57,7 @@ class Runtime(Section):
 
 
 class Defaults(Section):
-    provider: Annotated[str, StringConstraints(min_length=1)]
-    model: Annotated[str, StringConstraints(min_length=1)]
+    difficulty: Literal["easy", "medium", "hard", "hail_mary"]
     thinking: Literal["off", "minimal", "low", "medium", "high", "xhigh"]
 
 

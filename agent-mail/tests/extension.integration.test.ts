@@ -17,6 +17,7 @@ type Delivery = {
   content: string;
   display: boolean;
   details: { message_ref: MessageReference };
+  options?: { deliverAs?: string };
 };
 type Entry =
   | {
@@ -39,12 +40,12 @@ type Tool = {
 };
 
 function session(
-  role: "cos" | "manager",
+  role: string,
   id: string = randomUUID(),
   entries: Entry[] = [],
   autoAccept = true,
 ) {
-  process.env.AGENT_ROLE = role;
+  process.env.AGENT_ID = role;
   const handlers = new Map<string, Handler>(),
     tools = new Map<string, Tool>(),
     messages: Delivery[] = [];
@@ -76,7 +77,8 @@ function session(
     appendEntry(customType: string, data: unknown) {
       entries.push({ type: "custom", customType, data });
     },
-    sendMessage(message: Delivery) {
+    sendMessage(message: Delivery, options?: Delivery["options"]) {
+      message.options = options;
       messages.push(message);
       if (autoAccept) void accept(message);
     },
@@ -101,7 +103,7 @@ function session(
 }
 const intent = (
   summary: string,
-  recipient: "cos" | "manager" = "manager",
+  recipient: string = "manager",
   expectation: Static<typeof SendArguments>["reply_expectation"] = null,
 ): Static<typeof SendArguments> => ({
   recipient,
@@ -466,3 +468,34 @@ test("ambiguous reply failures persist across restart and never trigger automati
     await cleanup([conversation]);
   }
 });
+
+test.each([
+  ["steer", "steer"],
+  ["queue", "followUp"],
+  [undefined, "followUp"],
+] as const)(
+  "delivery %s reaches a bot-name mailbox as deliverAs %s",
+  async (delivery, deliverAs) => {
+    process.env.SUPABASE_URL = url;
+    process.env.SUPABASE_SECRET_KEY = secret;
+    const lead = session("manager"),
+      worker = session("worker-1", randomUUID(), [], false);
+    try {
+      await lead.start();
+      await worker.start();
+      const sent = await lead.execute("send_agent_message", {
+        ...intent("Change course", "worker-1"),
+        ...(delivery ? { delivery } : {}),
+      });
+      const ref = sent.details.message_ref;
+      await wait(() =>
+        worker.messages.some((message) => message.details.message_ref.id === ref.id),
+      );
+      assert.equal(worker.messages.at(-1)!.options?.deliverAs, deliverAs);
+    } finally {
+      await worker.stop();
+      await lead.stop();
+      await cleanup([lead.id]);
+    }
+  },
+);

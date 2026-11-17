@@ -11,7 +11,7 @@ from bot_setup.instances import acquire_instance_lock, instance_paths, worker_na
 from bot_setup.release import validate_private_home
 from bot_setup.manifest import load_profile
 from bot_setup.mcp import assignment_environment
-from bot_setup.runtime import initialize_settings_if_missing
+from bot_setup.runtime import initialize_settings_if_missing, model_args
 
 from .runtime import check_node, check_packages
 
@@ -60,7 +60,7 @@ def run_bot(root: Path, *, bot: str, env_file: Path, node: Path, mode: str) -> N
     initialize_settings_if_missing(private / ".pi", manifest.defaults)
     if fresh and role != "manager" and profile.name != "worker-influencer":
         configure_browser(profile, private, home=Path.home(), bot=bot)
-    env = {**os.environ, **values, "AGENT_ROLE": role, "BATTUTA_BOT_NAME": bot, "PI_CODING_AGENT_DIR": str(private / ".pi")}
+    env = {**os.environ, **values, "AGENT_ROLE": role, "AGENT_ID": bot if role == "worker" else role, "PI_CODING_AGENT_DIR": str(private / ".pi")}
     env.update(assignment_environment(Path.home()))
     env.update(capabilities)
     env["PATH"] = str(node.parent) + os.pathsep + env.get("PATH", "")
@@ -78,6 +78,7 @@ def run_bot(root: Path, *, bot: str, env_file: Path, node: Path, mode: str) -> N
     os.chdir(profile)
     # Pi's offline flag prevents startup package installs, not provider requests.
     args = [str(node), str(cli), "--approve", "--offline", "--session-dir", str(private / ".pi" / ("sessions" if role == "worker" else "mail-sessions"))]
+    args += model_args(manifest.defaults, env)
     if role != "worker":
         args.append("--continue")
     os.execve(str(node), args, env)

@@ -15,6 +15,7 @@ const row = {
   id: "123456abcdef",
   sender: "worker",
   recipient: "manager",
+  delivery: "queue",
   message_type: "chat",
   content: input.content,
   status: "created",
@@ -60,7 +61,8 @@ test.each(["worker", "cos", "manager"] as const)(
 test("invalid role, identity, or content never reaches the transport", async () => {
   const invoke = vi.fn();
   for (const patch of [
-    { recipientRole: "cos" as const },
+    { recipientRole: "bad name" },
+    { recipientRole: input.senderRole },
     { conversationId: "bad" },
     { content: { ...input.content, summary: " " } },
   ]) {

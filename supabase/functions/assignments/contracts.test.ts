@@ -21,6 +21,20 @@ Deno.test("creation defaults specialist requirements and rejects malformed sets"
   }
 });
 
+Deno.test("creation accepts only known difficulty levels", () => {
+  const input = { project: "Atlas", goal: "Goal", initial_todos: ["Step"] };
+  for (const difficulty of ["easy", "medium", "hard", "hail_mary"])
+    assert.equal(
+      toolContracts.create_assignment.input.parse({ ...input, difficulty }).difficulty,
+      difficulty,
+    );
+  for (const difficulty of ["extreme", "", null, 1])
+    assert.equal(
+      toolContracts.create_assignment.input.safeParse({ ...input, difficulty }).success,
+      false,
+    );
+});
+
 Deno.test("claim requires code-owned identity and an explicit ability set", () => {
   assert.equal(toolContracts.claim_assignment.input.safeParse(target).success, false);
   assert.deepEqual(

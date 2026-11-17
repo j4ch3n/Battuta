@@ -48,6 +48,7 @@ test.each([
           claimed_by: "worker-test",
           session_file: "/session",
         }),
+      useModel: vi.fn(() => Promise.resolve()),
       runTodo: vi.fn(),
       appendEntry: vi.fn(),
     },

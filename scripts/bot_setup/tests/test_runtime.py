@@ -7,7 +7,7 @@ import click
 import pytest
 
 from bot_setup.manifest import parse_manifest, Defaults
-from bot_setup.runtime import resolve_agent_dir, initialize_settings_if_missing
+from bot_setup.runtime import resolve_agent_dir, initialize_settings_if_missing, model_args
 
 
 def manifest(directory, role="cos"):
@@ -51,13 +51,11 @@ def test_symlinked_ancestor_is_rejected(tmp_path):
 
 def test_missing_settings_created_privately_and_concurrently(tmp_path):
     directory = tmp_path / "bot/.pi"
-    defaults = Defaults(provider="example", model="test-model", thinking="high")
+    defaults = Defaults(difficulty="medium", thinking="high")
     with ThreadPoolExecutor(max_workers=8) as executor:
         list(executor.map(lambda _: initialize_settings_if_missing(directory, defaults), range(16)))
     path = directory / "settings.json"
-    assert json.loads(path.read_text()) == {
-        "defaultProvider": "example", "defaultModel": "test-model", "defaultThinkingLevel": "high",
-    }
+    assert json.loads(path.read_text()) == {"defaultThinkingLevel": "high"}
     assert path.stat().st_mode & 0o777 == 0o600
     assert list(directory.iterdir()) == [path]
 
@@ -66,7 +64,7 @@ def test_missing_settings_created_privately_and_concurrently(tmp_path):
 def test_existing_settings_are_not_backfilled_or_reformatted(tmp_path, original):
     path = tmp_path / "settings.json"
     path.write_text(original)
-    initialize_settings_if_missing(tmp_path, Defaults(provider="example", model="other", thinking="low"))
+    initialize_settings_if_missing(tmp_path, Defaults(difficulty="easy", thinking="low"))
     assert path.read_text() == original
 
 
@@ -80,7 +78,7 @@ def test_unsafe_existing_settings_fail_without_replacement(tmp_path, kind):
     else:
         path.mkdir()
     with pytest.raises(click.ClickException) as error:
-        initialize_settings_if_missing(tmp_path, Defaults(provider="example", model="other", thinking="low"))
+        initialize_settings_if_missing(tmp_path, Defaults(difficulty="easy", thinking="low"))
     assert "private-sentinel" not in str(error.value)
     if kind == "malformed":
         assert path.read_text() == "private-sentinel"
@@ -89,3 +87,14 @@ def test_unsafe_existing_settings_fail_without_replacement(tmp_path, kind):
         assert not (tmp_path / "outside").exists()
     else:
         assert path.is_dir()
+
+
+@pytest.mark.parametrize("difficulty", ["easy", "medium", "hard", "hail_mary"])
+def test_model_args_follow_env_for_difficulty(difficulty):
+    env = {f"MODEL_FOR_{name}_TASKS": f"p/{name}" for name in ("EASY", "MEDIUM", "HARD", "HAIL_MARY")}
+    assert model_args(Defaults(difficulty=difficulty, thinking="low"), env) == ["--model", f"p/{difficulty.upper()}"]
+
+
+@pytest.mark.parametrize("env", [{}, {"MODEL_FOR_EASY_TASKS": "  "}])
+def test_model_args_empty_when_env_unset(env):
+    assert model_args(Defaults(difficulty="easy", thinking="low"), env) == []
