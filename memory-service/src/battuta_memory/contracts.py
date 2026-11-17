@@ -164,7 +164,8 @@ class RecallRequest(Selector):
     semantic_query: str | None = Field(default=None, min_length=1, max_length=MAX_QUERY_CHARS)
     semantic_queries: list[Annotated[str, Field(min_length=1, max_length=MAX_QUERY_CHARS)]] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list, max_length=32)
-    limit: int = Field(default=10, ge=1, le=100)
+    limit: int = Field(ge=1, le=100)
+    max_distance: float = Field(gt=0, le=2)
     include_expired: bool = False
 
     @model_validator(mode="before")

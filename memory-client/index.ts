@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { randomUUID } from "node:crypto";
-import { clientConfig, captureSettings } from "./config.ts";
+import { clientConfig, captureSettings, recallSettings } from "./config.ts";
 import { readOwnerProfile } from "./profile-loader.ts";
 import { CaptureQueue } from "./capture-queue.ts";
 import { CaptureRuntime } from "./lifecycle.ts";
@@ -11,12 +11,7 @@ import { eligibleRecords } from "./records.ts";
 import { abortable } from "./abortable.ts";
 import { prepareCorrectionCandidates } from "./correction-candidates.ts";
 import { selectRecallQueries } from "./recall-context.ts";
-import {
-  recallFailureReason,
-  runRecall,
-  unavailableRecall,
-  type PreparedRecall,
-} from "./recall.ts";
+import { failedRecall, recallFailureReason, runRecall, type PreparedRecall } from "./recall.ts";
 import { transcribeTelegramVoice } from "./voice-input.ts";
 import { redact } from "./privacy.ts";
 
@@ -28,7 +23,7 @@ interface PreparedRequest {
   packet: PreparedRecall;
 }
 function content(request: PreparedRequest) {
-  return `memory-context:${request.packet.status}\n${request.packet.context}`;
+  return request.packet.context;
 }
 
 function recallPrompt(event: {
@@ -155,7 +150,7 @@ export default function memoryClient(pi: ExtensionAPI) {
     const request: PreparedRequest = {
       id: randomUUID(),
       controller: new AbortController(),
-      packet: unavailableRecall(),
+      packet: failedRecall(),
     };
     active.set(session, request);
     const deadline = AbortSignal.timeout(RECALL_DEADLINE_MS);
@@ -164,16 +159,17 @@ export default function memoryClient(pi: ExtensionAPI) {
       : AbortSignal.any([request.controller.signal, deadline]);
     const config = clientConfig();
     try {
+      const settings = await recallSettings(config.directory);
       request.packet = await abortable(
         runRecall(
           selectRecallQueries(ctx.sessionManager.buildContextEntries(), recallPrompt(event)),
-          { url: config.url, signal },
+          { url: config.url, signal, limit: settings.limit, maxDistance: settings.maxDistance },
         ),
         signal,
       );
       signal.throwIfAborted();
     } catch (error) {
-      request.packet = unavailableRecall(recallFailureReason(error));
+      request.packet = failedRecall(recallFailureReason(error));
     }
     if (request.controller.signal.aborted || ctx.signal?.aborted || active.get(session) !== request)
       return;
@@ -213,7 +209,7 @@ export default function memoryClient(pi: ExtensionAPI) {
         eligibleRecords(request.packet.validationEvidence, new Date(Date.now())).map((r) => r.ref),
       );
       if (request.packet.currentRefs.some((ref) => !valid.has(ref)))
-        request.packet = unavailableRecall("a cited memory is no longer eligible");
+        request.packet = failedRecall("a cited memory is no longer eligible");
     }
     return {
       messages: event.messages.flatMap((message) => {

@@ -15,8 +15,23 @@ class RenderingTests(unittest.TestCase):
                 {"ref": counter["ref"], "revision": counter["revision"], "relation": "contradicts", "requirement": "historical"}]}
         view = render_memories([claim], [support, counter, claim], datetime.now(timezone.utc))
         self.assertNotIn("Possible pattern", view["context"])
-        self.assertTrue(view["incomplete"])
-        self.assertLessEqual(len(view["context"].encode()), 2000)
+        self.assertEqual(view["omitted_refs"], ["c" * 64])
+        self.assertEqual(view["context"], "no relevant memory found")
+
+    def test_oversized_entry_is_omitted_and_other_entries_still_render(self):
+        big = {**fact(), "ref": "b" * 64, "content": "Large " * 900}
+        normal = {**fact(), "ref": "c" * 64, "content": "Ordinary fact"}
+        view = render_memories([big, normal], [big, normal], datetime.now(timezone.utc))
+        self.assertEqual(view["omitted_refs"], ["b" * 64])
+        self.assertEqual(view["current_refs"], ["c" * 64])
+        self.assertIn("Ordinary fact", view["context"])
+        self.assertNotIn("Large", view["context"])
+
+    def test_empty_selection_is_neutral_without_header_or_omission_note(self):
+        view = render_memories([], [], datetime.now(timezone.utc))
+        self.assertEqual(view["context"], "no relevant memory found")
+        self.assertEqual(view["omitted_refs"], [])
+        self.assertNotIn("untrusted context", view["context"])
 
     def test_attributed_fact_is_rendered_without_raw_metadata_dump(self):
         record = fact()
@@ -48,4 +63,4 @@ class RenderingTests(unittest.TestCase):
                 view = render_memories([claim], [support, counter, claim], datetime.now(timezone.utc))
                 self.assertIn("Counterevidence against " + claim["ref"], view["context"])
                 self.assertIn(counter["content"], view["context"])
-                self.assertFalse(view["incomplete"])
+                self.assertEqual(view["omitted_refs"], [])

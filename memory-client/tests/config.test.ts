@@ -2,7 +2,7 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
-import { captureSettings, clientConfig } from "../config.ts";
+import { captureSettings, clientConfig, recallSettings } from "../config.ts";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -29,6 +29,29 @@ test("capture configuration validates new defaults and explicit disable", async 
     expect(await captureSettings(dir)).toEqual({ enabled: false, batchMessages: 4 });
     await writeFile(join(dir, "settings.json"), '{"battutaMemoryCapture":{"batchMessages":0}}');
     await expect(captureSettings(dir)).rejects.toThrow();
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("recall settings return valid values and fall back per field when invalid", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "memory-recall-settings-"));
+  try {
+    const defaults = await recallSettings(dir);
+    expect(defaults.limit).toBeGreaterThan(0);
+    expect(defaults.maxDistance).toBeGreaterThan(0);
+    await writeFile(
+      join(dir, "settings.json"),
+      '{"battutaMemoryRecall":{"limit":25,"maxDistance":1.2}}',
+    );
+    expect(await recallSettings(dir)).toEqual({ limit: 25, maxDistance: 1.2 });
+    await writeFile(
+      join(dir, "settings.json"),
+      '{"battutaMemoryRecall":{"limit":0,"maxDistance":3}}',
+    );
+    expect(await recallSettings(dir)).toEqual(defaults);
+    await writeFile(join(dir, "settings.json"), '{"battutaMemoryRecall":{"limit":7}}');
+    expect(await recallSettings(dir)).toEqual({ limit: 7, maxDistance: defaults.maxDistance });
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

@@ -30,7 +30,7 @@ class ProtocolTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("scope", result["validation_evidence"][0])
             self.assertEqual(result["metadata"], {"scope": "user supplied"})
             self.assertEqual(record["scope"], {"projects": ["atlas"]})
-            recalled = (await client.call_tool("memory_recall", {"keywords": ["note"]})).structuredContent["data"]
+            recalled = (await client.call_tool("memory_recall", {"keywords": ["note"], "limit": 10, "max_distance": 0.9})).structuredContent["data"]
             self.assertEqual(recalled["validation_evidence"][0]["projects"], ["atlas"])
             self.assertNotIn("scope", recalled["validation_evidence"][0])
 
@@ -41,15 +41,17 @@ class ProtocolTests(unittest.IsolatedAsyncioTestCase):
         async with create_connected_server_and_client_session(server) as client:
             tools = (await client.list_tools()).tools
             self.assertEqual({t.name for t in tools}, {"memory_" + n for n in ("remember", "recall", "list", "get", "update", "link_projects", "forget", "capture", "health", "inventory", "cluster", "consolidate_global", "global_relationships")})
-            self.assertIn("semantic_query", next(t for t in tools if t.name == "memory_recall").inputSchema["properties"])
+            recall_schema = next(t for t in tools if t.name == "memory_recall").inputSchema
+            self.assertIn("semantic_query", recall_schema["properties"])
+            self.assertTrue({"limit", "max_distance"} <= set(recall_schema.get("required", [])))
             health = await client.call_tool("memory_health", {})
             self.assertTrue(health.structuredContent["data"]["ready"])
-            failure = await client.call_tool("memory_recall", {"semantic_query": "note"})
+            failure = await client.call_tool("memory_recall", {"semantic_query": "note", "limit": 10, "max_distance": 0.9})
             self.assertTrue(failure.isError)
             self.assertFalse(failure.structuredContent["ok"])
             self.assertNotIn("private content", str(failure))
             service.recall.side_effect = sqlite3.OperationalError("database locked")
-            failure = await client.call_tool("memory_recall", {"semantic_query": "note"})
+            failure = await client.call_tool("memory_recall", {"semantic_query": "note", "limit": 10, "max_distance": 0.9})
             self.assertIsNotNone(failure.structuredContent)
             self.assertTrue(failure.structuredContent["error"]["retryable"])
         # A separate client can reconnect to the same server.
@@ -57,9 +59,12 @@ class ProtocolTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse((await client.call_tool("memory_health", {})).isError)
 
     async def test_recall_text_is_rendered_and_machine_envelope_is_preserved(self):
-        service = SimpleNamespace(recall=AsyncMock(return_value={"context": "- Qualified attributed evidence", "records": [{"ref": "a" * 64}], "incomplete": False}))
+        service = SimpleNamespace(recall=AsyncMock(return_value={"context": "- Qualified attributed evidence", "records": [{"ref": "a" * 64}], "status": "partial", "omitted_refs": ["b" * 64]}))
         async with create_connected_server_and_client_session(create_protocol_server(lambda: service)) as client:
-            result = await client.call_tool("memory_recall", {"keywords": ["console"]})
+            result = await client.call_tool("memory_recall", {"keywords": ["console"], "limit": 10, "max_distance": 0.9})
             self.assertFalse(result.isError)
             self.assertEqual(result.content[0].text, "- Qualified attributed evidence")
             self.assertEqual(result.structuredContent["data"]["records"][0]["ref"], "a" * 64)
+            self.assertEqual(result.structuredContent["data"]["status"], "partial")
+            self.assertEqual(result.structuredContent["data"]["omitted_refs"], ["b" * 64])
+            self.assertNotIn("incomplete", result.structuredContent["data"])

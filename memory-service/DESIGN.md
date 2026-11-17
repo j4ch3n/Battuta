@@ -110,7 +110,9 @@ through bound `json_each` membership; FTS matches literal quoted Unicode-normali
 terms against content/keywords and joins current indexed revisions. Raw MATCH syntax
 is never interpolated. Reciprocal-rank fusion uses constant 60 and stable ref ties;
 ranking numbers are not belief confidence. Automatic calls cap each branch at 20.
-One failed branch gives labelled partial results; both unavailable is an error.
+Semantic search also drops hits with L2 distance above the caller's `max_distance`
+before the candidate limit. One failed branch gives `partial` results; both failing is
+`failed`.
 
 Index reconciliation runs after journal recovery and canonical mutations, before
 receipts complete, and before lexical results are served. Metadata-only keyword

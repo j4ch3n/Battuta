@@ -30,10 +30,10 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
         self.backend.embedding_fits = lambda text: True
         self.backend.truncate_for_embedding = lambda text: text
         self.service = MemoryService(self.backend, MemoryConfig(data_dir=self.root))
-        self.add("a", "Atlas note", "proj:atlas,work", 3)
-        self.add("b", "Global note", "proj:global,work", 2)
+        self.add("a", "Atlas note", "proj:atlas,work", 1.5)
+        self.add("b", "Global note", "proj:global,work", 1)
         self.add("c", "Beacon secret", "proj:beacon,work", 0)
-        self.add("d", "Old atlas", "proj:atlas", 1, superseded="a" * 64)
+        self.add("d", "Old atlas", "proj:atlas", 0.5, superseded="a" * 64)
 
     def add(self, char, content, tags, distance, superseded=None):
         cursor = self.conn.execute("INSERT INTO memories(content_hash,content,tags,memory_type,metadata,created_at,updated_at,superseded_by,version,embedding_pending) VALUES(?,?,?,?,?,?,?,?,1,0)",
@@ -43,9 +43,9 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
     async def test_scoped_recall_filters_before_limit(self):
         for n in range(30):
             self.add(str(n), "Distractor", "proj:beacon", 0)
-        result = await self.service.recall(RecallRequest(semantic_query="note", selector="projects", projects=["Atlas"], limit=2))
+        result = await self.service.recall(RecallRequest(semantic_query="note", selector="projects", projects=["Atlas"], limit=2, max_distance=2))
         self.assertEqual([r["content"] for r in result["records"]], ["Global note", "Atlas note"])
-        self.assertFalse(result["incomplete"])
+        self.assertEqual(result["status"], "success")
 
     async def test_scope_and_tag_and_kind_not_scope_or_tag(self):
         result = await self.service.list(ListRequest(selector="projects", projects=["atlas"], tags=["work"], kind="observation"))
@@ -73,12 +73,12 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
             await self.service.list(ListRequest(selector="all"))
 
     async def test_explicit_global_only_returns_global_records(self):
-        result = await self.service.recall(RecallRequest(semantic_query="note", selector="global"))
+        result = await self.service.recall(RecallRequest(semantic_query="note", selector="global", limit=10, max_distance=2))
         self.assertFalse(result["warnings"])
         self.assertEqual([r["content"] for r in result["records"]], ["Global note"])
 
     async def test_default_recall_searches_all_scopes(self):
-        result = await self.service.recall(RecallRequest(semantic_query="note"))
+        result = await self.service.recall(RecallRequest(semantic_query="note", limit=10, max_distance=2))
         self.assertFalse(result["warnings"])
         self.assertEqual([r["content"] for r in result["records"]], ["Beacon secret", "Global note", "Atlas note"])
 

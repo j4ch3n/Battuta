@@ -32,10 +32,10 @@ class UpstreamContractTests(unittest.IsolatedAsyncioTestCase):
                 adapter = UpstreamAdapter(storage)
                 from sqlite_vec import serialize_float32
                 adapter.embed = lambda _: serialize_float32([1.0] + [0.0] * 383)
-                result = await adapter.search(RecallRequest(semantic_query="fact"), ResolvedSelector(["proj:atlas"]))
+                result = await adapter.search(RecallRequest(semantic_query="fact", limit=10, max_distance=0.9), ResolvedSelector(["proj:atlas"]))
                 self.assertEqual([r["ref"] for r in result], [newer])
                 self.assertEqual([r["ref"] for r in await adapter.history(newer)], [ref, newer])
-                self.assertEqual(await adapter.search(RecallRequest(semantic_query="fact"), ResolvedSelector(["proj:beacon"])), [])
+                self.assertEqual(await adapter.search(RecallRequest(semantic_query="fact", limit=10, max_distance=0.9), ResolvedSelector(["proj:beacon"])), [])
                 # The derived graph is global-only, uses surviving hashes, and
                 # must never write back through upstream consolidation storage.
                 self.assertEqual((await adapter.global_snapshot())["records"], [])
@@ -85,5 +85,38 @@ class UpstreamContractTests(unittest.IsolatedAsyncioTestCase):
                             await adapter.global_snapshot(max_records=1 if mode == "overflow" else 500)
                         storage.conn.execute("UPDATE memories SET embedding_pending=0")
                         storage.conn.commit()
+            finally:
+                await storage.close()
+
+    async def test_semantic_search_excludes_distances_above_max_distance_before_limit(self):
+        from mcp_memory_service.storage.sqlite_vec import SqliteVecMemoryStorage
+        from mcp_memory_service.models.memory import Memory
+        from mcp_memory_service.utils.hashing import generate_content_hash
+        from sqlite_vec import serialize_float32
+        async def fake_model(storage):
+            storage.embedding_dimension = 384
+            storage.embedding_model = object()
+        def vector(distance):
+            # Unit vector at L2 distance `distance` from the query [1, 0, ...].
+            c = 1 - distance * distance / 2
+            return serialize_float32([c, math.sqrt(1 - c * c)] + [0.0] * 382)
+        with tempfile.TemporaryDirectory() as folder, patch.object(SqliteVecMemoryStorage, "_initialize_embedding_model", fake_model), patch.object(SqliteVecMemoryStorage, "_generate_embedding", return_value=[1.0] + [0.0] * 383):
+            storage = SqliteVecMemoryStorage(str(Path(folder) / "memory.db"))
+            await storage.initialize()
+            try:
+                refs = {}
+                for name, distance in (("near", 0.5), ("mid", 0.7), ("far", 1.2)):
+                    text = f"fact {name}"
+                    refs[name] = generate_content_hash(text)
+                    await storage.store(Memory(text, refs[name], tags=["proj:atlas"]), skip_semantic_dedup=True)
+                    storage.conn.execute("UPDATE memory_embeddings SET content_embedding=? WHERE rowid=(SELECT id FROM memories WHERE content_hash=?)", (vector(distance), refs[name]))
+                storage.conn.commit()
+                adapter = UpstreamAdapter(storage)
+                adapter.embed = lambda _: serialize_float32([1.0] + [0.0] * 383)
+                selector = ResolvedSelector(["proj:atlas"])
+                result = await adapter.search(RecallRequest(semantic_query="fact", limit=10, max_distance=0.9), selector)
+                self.assertEqual([r["ref"] for r in result], [refs["near"], refs["mid"]])
+                result = await adapter.search(RecallRequest(semantic_query="fact", limit=1, max_distance=0.9), selector)
+                self.assertEqual([r["ref"] for r in result], [refs["near"]])
             finally:
                 await storage.close()

@@ -4,7 +4,7 @@ from battuta_memory.contracts import CaptureBatch, UpdateRequest, RecallRequest
 
 class ContractTests(unittest.TestCase):
     def test_recall_queries_are_stripped_and_single_query_joins_the_list(self):
-        request = RecallRequest(semantic_query=" first ", semantic_queries=[" second "])
+        request = RecallRequest(semantic_query=" first ", semantic_queries=[" second "], limit=10, max_distance=0.9)
         self.assertEqual(request.semantic_queries, ["first", "second"])
         for queries in (["  "], ["ok", ""]):
             with self.subTest(queries=queries), self.assertRaises(ValueError):
@@ -43,7 +43,13 @@ class ContractTests(unittest.TestCase):
     def test_recall_limits_are_validated_not_truncated(self):
         for limit in (0, 101):
             with self.subTest(limit=limit), self.assertRaises(ValueError):
-                RecallRequest(semantic_query="hello", limit=limit)
+                RecallRequest(semantic_query="hello", limit=limit, max_distance=0.9)
+
+    def test_recall_requires_limit_and_max_distance(self):
+        for overrides in ({"limit": None}, {"max_distance": None}, {"max_distance": 0}, {"max_distance": 2.5}):
+            with self.subTest(overrides=overrides), self.assertRaises(ValueError):
+                RecallRequest(**{"semantic_query": "hello", "limit": 10, "max_distance": 0.9, **overrides})
+        self.assertEqual(RecallRequest(semantic_query="hello", limit=10, max_distance=0.9).max_distance, 0.9)
 
     def test_capture_rejects_foreign_session_citation(self):
         with self.assertRaises(ValueError):
