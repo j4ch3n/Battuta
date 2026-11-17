@@ -3,14 +3,14 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, expect, test, vi } from "vitest";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { PreparedRecall } from "../recall-agent.ts";
+import type { PreparedRecall } from "../recall.ts";
 import { CaptureQueue } from "../capture-queue.ts";
 import { record } from "./fixtures/record.ts";
 
-const run = vi.hoisted(() => vi.fn<typeof import("../recall-agent.ts").runRecallAgent>());
-vi.mock("../recall-agent.ts", async (original) => ({
-  ...(await original<typeof import("../recall-agent.ts")>()),
-  runRecallAgent: run,
+const run = vi.hoisted(() => vi.fn<typeof import("../recall.ts").runRecall>());
+vi.mock("../recall.ts", async (original) => ({
+  ...(await original<typeof import("../recall.ts")>()),
+  runRecall: run,
 }));
 import extension from "../index.ts";
 
@@ -152,7 +152,7 @@ test("a retained synthetic capture neither suppresses the profile snapshot nor g
       message: { content: string };
     };
     expect(event.systemPromptOptions.sections["owner-profile"]).toContain("Initial owner profile");
-    expect(run.mock.calls[0]?.[2]).not.toHaveProperty("capturePending");
+    expect(run.mock.calls[0]?.[1]).not.toHaveProperty("capturePending");
     expect(result.message.content).toContain("memory-context:ready");
     expect(result.message.content).toContain("qualified synthetic evidence");
   } finally {
@@ -172,10 +172,10 @@ test("every main CoS start prepares recall before a user, Agent Mail, or other c
       f.ctx,
     );
     expect(run).toHaveBeenCalledTimes(3);
-    expect(run.mock.calls.map((call) => call[0].current)).toEqual([
-      "hello",
-      "mail update",
-      "scheduled update",
+    expect(run.mock.calls.map((call) => call[0])).toEqual([
+      ["hello"],
+      ["mail update"],
+      ["scheduled update"],
     ]);
 
     await expect(

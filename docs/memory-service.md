@@ -17,7 +17,7 @@ authorized maintenance calls; it is not a conversational runtime skill.
 | Dream state          | `dream-config.json`, `dream-lock.db`, `dream-state.json`, `dream-profile.json`, `dream.log`, `dream-errors.jsonl`. |
 | `ME.md`              | Preserved private owner text; never automatically treated as verified evidence or overwritten by v3 dreams.        |
 
-CoS conversational recall uses an isolated recall agent. Main CoS receives
+CoS conversational recall is a host-side search performed by the memory client. Main CoS receives
 prepared context without memory tools or a memory skill. Capture and approved
 dreaming retain programmatic access. Manager has a direct native MCP connection
 and selects `project-memory` for project/global retrieval and supported
@@ -51,7 +51,7 @@ history/expired retrieval is separate from physical tombstone discovery.
 
 The existing pinned local ONNX all-MiniLM-L6-v2 model uses 384-dimensional CPU
 embeddings. Content/query preprocessing is identical. Keywords are a separate FTS5
-index; they do not alter a fact's embedding. Inputs exceeding 256 tokenizer tokens
+index; they do not alter a fact's embedding. Inputs exceeding 512 tokenizer tokens
 are rejected rather than silently truncated.
 
 Provision models explicitly using the [setup guide](memory-service-setup.md).
@@ -157,17 +157,20 @@ queued capture is best-effort understanding, not proof a particular fact was sav
 
 ## Automatic context and delegation
 
-Every main-CoS preparation invokes the recall agent independently of capture
-enablement and awaits its outcome. The application bounds child setup, transport,
-query, evidence revalidation and model preparation with a 30-second deadline;
-timeout/failure produces explicit unavailable context while retaining the instruction
-profile snapshot. Session switch/fork and shutdown cancel pending work; old packets
-do not accumulate. Available Pi operation cancellation is forwarded to the child.
+Every main-CoS preparation runs a host-side recall independently of capture
+enablement and awaits its outcome. The query is the last three owner messages, newest
+first. The client searches memory, re-fetches each cited record at the same revision,
+and rechecks eligibility. The application bounds search, evidence revalidation and
+the whole preparation with a 30-second deadline; timeout/failure produces explicit
+unavailable context while retaining the instruction profile snapshot. Session
+switch/fork and shutdown cancel pending work; old packets do not accumulate. Pi
+operation cancellation is forwarded to the memory calls.
 
-One recall tool accepts independent optional `semantic_query` and `keywords`.
-The child rewrites them using history. Either branch can run alone; both combine
-ranked results. Keyword phrases are literal, and semantic queries exceeding the
-256-token limit are rejected for rephrasing. The server checks lifecycle, sources,
+One recall tool accepts independent optional `semantic_query` or `semantic_queries`
+and `keywords`. Either branch can run alone; both combine ranked results. Keyword
+phrases are literal. A list of queries is searched as one combined text when it fits
+the 512-token embedding limit; otherwise each query is searched alone, truncated to
+the limit, and merged by rank. The server checks lifecycle, sources,
 revisions, expiry and dependencies and renders whole evidence/counterevidence
 groups as qualified bullets. Raw tags/ranks are not model context; machine
 records remain available to capture and dream callers.

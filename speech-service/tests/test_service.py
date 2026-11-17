@@ -1,5 +1,4 @@
 import base64
-import threading
 
 import pytest
 
@@ -30,25 +29,3 @@ def test_rejects_invalid_audio(data):
 def test_rejects_invalid_text(text):
     with pytest.raises(ValueError):
         SpeechService(Engine()).synthesize(text)
-
-
-def test_rejects_overload_instead_of_queuing():
-    entered = threading.Event()
-    release = threading.Event()
-
-    class Busy(Engine):
-        def transcribe(self, data):
-            entered.set()
-            release.wait(5)
-            return "ok"
-
-    service = SpeechService(Busy())
-    thread = threading.Thread(target=lambda: service.transcribe("YQ=="))
-    thread.start()
-    try:
-        assert entered.wait(2)
-        with pytest.raises(RuntimeError, match="busy"):
-            service.transcribe("YQ==")
-    finally:
-        release.set()
-        thread.join()

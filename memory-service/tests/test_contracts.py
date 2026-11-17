@@ -3,6 +3,13 @@ from battuta_memory.contracts import CaptureBatch, UpdateRequest, RecallRequest
 
 
 class ContractTests(unittest.TestCase):
+    def test_recall_queries_are_stripped_and_single_query_joins_the_list(self):
+        request = RecallRequest(semantic_query=" first ", semantic_queries=[" second "])
+        self.assertEqual(request.semantic_queries, ["first", "second"])
+        for queries in (["  "], ["ok", ""]):
+            with self.subTest(queries=queries), self.assertRaises(ValueError):
+                RecallRequest(semantic_queries=queries)
+
     def test_source_provenance_accepts_current_role_identities(self):
         from battuta_memory.contracts import SourceRef
         for role in ("cos", "manager"):

@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from battuta_memory.contracts import RecallRequest, RememberRequest, ForgetRequest
-from battuta_memory.retrieval import fuse_ranks
+from battuta_memory.retrieval import fuse_ranks, interleave_ranks
 from test_mutations import StorageFixture
 from test_records import SOURCE, fact
 
@@ -52,6 +52,27 @@ class RetrievalTests(StorageFixture):
             result = await self.service.recall(RecallRequest(semantic_query="console"))
         lexical.assert_not_called()
         self.assertEqual(result["branches"], {"semantic": "ready"})
+
+    async def test_multiple_queries_search_combined_text_when_it_fits(self):
+        with patch.object(self.adapter, "search", return_value=[]) as search:
+            await self.service.recall(RecallRequest(semantic_queries=["first", "second"]))
+        self.assertEqual([c.args[0].semantic_query for c in search.call_args_list], ["first\n\nsecond"])
+
+    async def test_oversized_queries_search_each_truncated_and_merge_by_rank(self):
+        a, b, c = [(await self.note_with_metadata(f"note {name}"))["ref"] for name in "abc"]
+        rankings = {"firs": [{"ref": a}, {"ref": b}], "seco": [{"ref": b}, {"ref": c}]}
+        self.adapter.embedding_fits = lambda _: False
+        self.adapter.truncate_for_embedding = lambda text: text[:4]
+        with patch.object(self.adapter, "search", side_effect=lambda request, *_: rankings[request.semantic_query]) as search:
+            result = await self.service.recall(RecallRequest(semantic_queries=["first", "second"]))
+        self.assertEqual([c.args[0].semantic_query for c in search.call_args_list], ["firs", "seco"])
+        self.assertEqual([r["ref"] for r in result["records"]], [a, b, c])
+
+    def test_interleave_ranks_takes_each_top_rank_first_without_repeats(self):
+        cases = [([["a", "b"], ["b", "c"]], ["a", "b", "c"]), ([["a"], []], ["a"]), ([], [])]
+        for rankings, expected in cases:
+            with self.subTest(rankings=rankings):
+                self.assertEqual(interleave_ranks(rankings), expected)
 
     async def note_with_metadata(self, content, project=None, **metadata):
         return await self.service.remember(RememberRequest(content=content, projects=[project] if project else ["global"],

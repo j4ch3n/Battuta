@@ -14,10 +14,10 @@ def test_rejects_invalid_audio():
 def test_limits_decoded_audio_duration(monkeypatch):
     class Result:
         returncode = 0
-        stdout = b"\0" * (16000 * 2 * 121)
+        stdout = b"\0" * (16000 * 2 * 301)
 
     monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: Result())
-    with pytest.raises(ValueError, match="long"):
+    with pytest.raises(ValueError, match="300 seconds"):
         decode_audio(b"audio")
 
 

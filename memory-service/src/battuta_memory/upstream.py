@@ -11,6 +11,7 @@ from importlib.metadata import version
 from pathlib import Path
 
 from .config import DIMENSION, MODEL, MemoryConfig
+from .limits import EMBEDDING_TOKEN_LIMIT, EMBEDDING_TRUNCATION_SLACK
 
 
 class TerminalMutationError(ValueError):
@@ -88,14 +89,25 @@ class UpstreamAdapter:
         await self.assert_real_embeddings()
         return {"ready": True, "model": self.manifest, "upstream_version": version("mcp-memory-service")}
 
-    def embed(self, text):
-        from sqlite_vec import serialize_float32
-        tokenizer = self.storage.embedding_model._tokenizer
+    def _counter(self):
         # Inspect untruncated token count, not the model's truncated encode result.
         from tokenizers import Tokenizer
-        counter = Tokenizer.from_str(tokenizer.to_str())
+        counter = Tokenizer.from_str(self.storage.embedding_model._tokenizer.to_str())
         counter.no_truncation()
-        if len(counter.encode(text).ids) > 256:
+        return counter
+
+    def embedding_fits(self, text):
+        return len(self._counter().encode(text).ids) <= EMBEDDING_TOKEN_LIMIT
+
+    def truncate_for_embedding(self, text):
+        # shortcut: leaves slack below the limit so re-tokenizing the decoded text still fits, upgrade if exact fit matters
+        counter = self._counter()
+        ids = counter.encode(text, add_special_tokens=False).ids
+        return text if self.embedding_fits(text) else counter.decode(ids[:EMBEDDING_TOKEN_LIMIT - EMBEDDING_TRUNCATION_SLACK])
+
+    def embed(self, text):
+        from sqlite_vec import serialize_float32
+        if not self.embedding_fits(text):
             raise ValueError("Memory exceeds embedding token limit; split or rephrase")
         return serialize_float32(self.storage._generate_embedding(text))
 

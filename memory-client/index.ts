@@ -10,8 +10,14 @@ import { extractMemories } from "./extract.ts";
 import { eligibleRecords } from "./records.ts";
 import { abortable } from "./abortable.ts";
 import { prepareCorrectionCandidates } from "./correction-candidates.ts";
-import { selectRecallInput } from "./recall-context.ts";
-import { runRecallAgent, unavailableRecall, type PreparedRecall } from "./recall-agent.ts";
+import { selectRecallQueries } from "./recall-context.ts";
+import {
+  recallFailureReason,
+  runRecall,
+  unavailableRecall,
+  type PreparedRecall,
+} from "./recall.ts";
+import { transcribeTelegramVoice } from "./voice-input.ts";
 import { redact } from "./privacy.ts";
 
 const RECALL_DEADLINE_MS = 30_000;
@@ -126,6 +132,10 @@ export default function memoryClient(pi: ExtensionAPI) {
       ).initialize(ctx.sessionManager.getSessionId(), ctx.sessionManager.getBranch());
     });
   });
+  pi.on("input", async (event) => {
+    const text = await transcribeTelegramVoice(event.text);
+    return text === undefined ? { action: "continue" } : { action: "transform", text };
+  });
   pi.on("before_agent_start", async (event, ctx) => {
     addProfileSnapshot(event);
     const session = ctx.sessionManager.getSessionId();
@@ -155,20 +165,15 @@ export default function memoryClient(pi: ExtensionAPI) {
     const config = clientConfig();
     try {
       request.packet = await abortable(
-        runRecallAgent(
-          selectRecallInput(ctx.sessionManager.buildContextEntries(), recallPrompt(event)),
-          ctx,
-          {
-            url: config.url,
-            signal,
-            onUsage: (usage) => pi.appendEntry("memory-recall-usage", { usage }),
-          },
+        runRecall(
+          selectRecallQueries(ctx.sessionManager.buildContextEntries(), recallPrompt(event)),
+          { url: config.url, signal },
         ),
         signal,
       );
       signal.throwIfAborted();
-    } catch {
-      request.packet = unavailableRecall();
+    } catch (error) {
+      request.packet = unavailableRecall(recallFailureReason(error));
     }
     if (request.controller.signal.aborted || ctx.signal?.aborted || active.get(session) !== request)
       return;
@@ -208,7 +213,7 @@ export default function memoryClient(pi: ExtensionAPI) {
         eligibleRecords(request.packet.validationEvidence, new Date(Date.now())).map((r) => r.ref),
       );
       if (request.packet.currentRefs.some((ref) => !valid.has(ref)))
-        request.packet = unavailableRecall();
+        request.packet = unavailableRecall("a cited memory is no longer eligible");
     }
     return {
       messages: event.messages.flatMap((message) => {
