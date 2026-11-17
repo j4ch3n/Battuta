@@ -45,11 +45,10 @@ class FileRule(Section):
     destination: Literal["profile", "private"]
     policy: Literal["replace", "create-only", "merge"]
     optional: bool = False
-    context: Literal["source", "release", "all"] = "all"
 
     @model_validator(mode="after")
     def merge_copies_one_json_template(self):
-        if self.policy == "merge" and (self.operation != "copy" or len(self.sources) != 1):
+        if self.policy == "merge" and (self.operation != "copy" or len(self.sources) != 1 or not self.sources[0].path.endswith(".json")):
             raise ValueError("Merge rules copy exactly one JSON template")
         return self
 

@@ -41,6 +41,8 @@ def installed(tmp_path):
             (package / "pnpm-lock.yaml").write_text("")
         (bot / "AGENTS.md").write_text("instructions")
         (bot / ".pi/settings.json").write_text("{}")
+        if profile == "cos-bot":
+            (bot / ".pi/telegram.json").write_text("{}")
         cli = bot / "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
         cli.parent.mkdir(parents=True)
         cli.write_text('console.log(JSON.stringify({cwd:process.cwd(),env:process.env,args:process.argv.slice(2)}))')

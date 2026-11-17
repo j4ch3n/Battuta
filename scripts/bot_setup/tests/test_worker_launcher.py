@@ -136,13 +136,15 @@ class WorkerLauncherTests(unittest.TestCase):
             self.assertEqual((bot / ".pi/mcp.json").read_bytes(), (profile / ".pi/mcp.json").read_bytes())
             self.assertEqual((bot / ".pi/web-search.json").read_bytes(), (profile / ".pi/web-search.json").read_bytes())
             self.assertEqual((bot / ".pi/settings.json").read_text(), private_settings)
-            for name in ("auth.json", "mcp.json", "web-search.json"):
+            for name in ("auth.json", "web-search.json"):
                 (bot / ".pi" / name).write_text("private-state")
+            (bot / ".pi/mcp.json").write_text('{"mcpServers": {"custom": {}}}')
             again = subprocess.run(args, env=env, capture_output=True, text=True)
             self.assertEqual(again.returncode, 0, again.stderr)
             self.assertEqual((bot / ".pi/settings.json").read_text(), private_settings)
-            for name in ("auth.json", "mcp.json", "web-search.json"):
+            for name in ("auth.json", "web-search.json"):
                 self.assertEqual((bot / ".pi" / name).read_text(), "private-state")
+            self.assertEqual(json.loads((bot / ".pi/mcp.json").read_text()), {"mcpServers": {"custom": {}}})
 
     def test_missing_shared_mcp_stops_before_launch_with_configuration_command(self):
         with tempfile.TemporaryDirectory(dir="/tmp") as directory:

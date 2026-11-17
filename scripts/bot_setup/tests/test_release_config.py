@@ -83,6 +83,15 @@ def test_release_preserves_existing_files_and_reports_skips(deployment, capsys):
     assert not (home / ".pi").exists()
 
 
+def test_release_generated_mcp_wins_over_shipped_worker_template(deployment):
+    root, home, env_file = deployment
+    (root / "bots/worker/.pi/mcp.json").write_text('{"mcpServers":{"stale":{}}}')
+    release.configure_release(root, env_file=env_file, home=home)
+    servers = json.loads((home / ".battuta/pi-bots/worker-1/.pi/mcp.json").read_text())["mcpServers"]
+    assert "stale" not in servers
+    assert "assignments" in servers
+
+
 def test_release_merges_cos_telegram_handler_without_overwriting_existing_values(deployment):
     root, home, env_file = deployment
     pi = home / ".battuta/pi-bots/cos-bot/.pi"

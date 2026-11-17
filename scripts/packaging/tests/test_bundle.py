@@ -55,6 +55,7 @@ def source(tmp_path, monkeypatch):
         if profile == "cos-bot":
             (path / ".pi/telegram.json").write_text("{}")
         if profile == "worker":
+            (path / ".pi/mcp.json").write_text("{}")
             (path / "agents").mkdir()
             (path / "agents/researcher.md").write_text("---\nname: researcher\n---\nResearch fixture")
             (path / "agents/reviewer.md").write_text("---\nname: reviewer\n---\nReview fixture")
@@ -137,13 +138,20 @@ def test_staged_archive_separates_documentation_and_bots(source, tmp_path):
         bundle.validate_bundle(moved)
 
 
-def test_release_ships_merge_templates_from_manifest(source, tmp_path):
+def test_release_ships_private_templates_declared_in_manifests(source, tmp_path):
     target = tmp_path / "release"
     bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
     assert (target / "bots/cos-bot/.pi/telegram.json").is_file()
     assert (target / "bots/cos-bot/.pi/web-search.json").is_file()
+    assert (target / "bots/worker/.pi/mcp.json").is_file()
     assert not (target / "bots/manager-bot/.pi/telegram.json").exists()
-    assert not (target / "bots/worker/.pi/mcp.json").exists()
+    assert not (target / "bots/worker-influencer/.pi/mcp.json").exists()
+
+
+def test_stage_rejects_missing_required_private_template(source, tmp_path):
+    (source / "bots/cos-bot/.pi/telegram.json").unlink()
+    with pytest.raises(click.ClickException):
+        bundle.stage_bots(source, tmp_path / "release", tag="v1.2.3", tool_version="1.2.3+gabc1234")
 
 
 def test_bundled_workspace_dependencies_are_not_installed_at_runtime(source, tmp_path):
