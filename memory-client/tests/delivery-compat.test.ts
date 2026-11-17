@@ -66,13 +66,13 @@ test.each([1, 2, 3])(
     expect(JSON.stringify(state)).toBe(before);
   },
 );
-test("capture digest preserves historical scope representation and lowercases new labels", () => {
+test("capture digest lowercases and sorts project labels", () => {
   const old = {
     batch_id: "frozen",
     items: [
       {
         item_id: "same",
-        scope: { global: false, projects: ["atlas", "beacon"] },
+        scope: { projects: ["atlas", "beacon"] },
         sources: ["same"],
       },
     ],
@@ -86,6 +86,6 @@ test("capture digest preserves historical scope representation and lowercases ne
 
 test("capture digest orders non-BMP project names like Python's Unicode sorting", () => {
   expect(capturePayloadDigest({ items: [{ projects: ["😀", "\ue000"] }] })).toBe(
-    digest({ items: [{ scope: { global: false, projects: ["\ue000", "😀"] } }] }),
+    digest({ items: [{ scope: { projects: ["\ue000", "😀"] } }] }),
   );
 });

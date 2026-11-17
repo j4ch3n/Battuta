@@ -53,7 +53,7 @@ test("preserves safe MCP error details but not arbitrary server messages", async
   }
 });
 
-test.each([{ projects: ["unknown"] }, { projects: [] }, { projects: ["global", "atlas"] }])(
+test.each([{ projects: ["unknown"] }, { projects: [] }])(
   "rejects invalid direct writes before opening transport: %j",
   async ({ projects }) => {
     transport.result = { structuredContent: { ok: true, data: {} } };
@@ -165,7 +165,7 @@ test.each([false, true])(
   },
 );
 
-test.each(["memory_inventory", "memory_consolidate_global", "memory_global_relationships"])(
+test.each(["memory_inventory", "memory_cluster"])(
   "dispatches %s and closes the client",
   async (name) => {
     transport.result = { structuredContent: { ok: true, data: { records: [] } } };

@@ -18,15 +18,8 @@ def project_names(names):
 
 
 class Scope(Contract):
-    global_: bool = Field(alias="global", strict=True)
-    projects: list[str] = Field(default_factory=list)
+    projects: list[str] = Field(min_length=1)
     _projects = field_validator("projects")(project_names)
-
-    @model_validator(mode="after")
-    def unambiguous(self):
-        if self.global_ == bool(self.projects):
-            raise ValueError("Scope must be global OR one or more projects")
-        return self
 
 
 class OriginalMail(Contract):
@@ -93,10 +86,9 @@ class EvidenceLink(EvidenceRef):
 
 
 class MemoryMetadata(Contract):
-    stage: Literal["temporal", "durable"]
-    knowledge_type: Literal["fact", "synthesized-observation", "hypothesis"]
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+    knowledge_type: Literal["fact", "inference"]
     confidence: Literal["confirmed", "supported", "tentative", "disputed"]
-    status: Literal["active", "stale", "superseded", "rejected"]
     keywords: list[str] = Field(default_factory=list, max_length=20)
     mentioned_at: str | None = None
     expires_at: str | None = None
@@ -117,7 +109,7 @@ class MemoryMetadata(Contract):
 
     @model_validator(mode="after")
     def supported_claim(self):
-        if self.knowledge_type != "fact" and (not self.rationale or (self.status != "superseded" and not any(e.relation == "supports" for e in self.evidence))):
+        if self.knowledge_type != "fact" and (not self.rationale or not any(e.relation == "supports" for e in self.evidence)):
             raise ValueError("Derived claims require supporting evidence and rationale")
         if self.knowledge_type != "fact" and self.confidence == "confirmed":
             raise ValueError("Inference is not owner confirmation")
@@ -129,17 +121,9 @@ class RememberContent(Tagged):
     projects: list[str] = Field(min_length=1, max_length=100)
     _projects = field_validator("projects")(project_names)
 
-    @field_validator("projects")
-    @classmethod
-    def exclusive_global(cls, names):
-        if "global" in names and names != ["global"]:
-            raise ValueError("Global membership must stand alone")
-        return names
-
     @property
     def scope(self):
-        return Scope.model_validate({"global": self.projects == ["global"],
-            "projects": [] if self.projects == ["global"] else self.projects})
+        return Scope(projects=self.projects)
 
     kind: str = Field(default="observation", pattern=r"^[a-z][a-z0-9_-]{0,39}$")
     sources: list[SourceRef] = Field(default_factory=list, max_length=200)
@@ -171,8 +155,6 @@ class Selector(Tagged):
     def projects_selector(self):
         if (self.selector == "projects") != bool(self.projects):
             raise ValueError("Projects required only for projects selector")
-        if "global" in self.projects:
-            raise ValueError("Use explicit global selection")
         return self
 
 
@@ -215,15 +197,12 @@ class ListRequest(Selector):
 
 
 class InventoryRequest(Contract):
-    window_start: float = Field(ge=0, allow_inf_nan=False)
-    window_end: float = Field(gt=0, allow_inf_nan=False)
     max_records: int = Field(default=500, ge=1, le=2000)
 
-    @model_validator(mode="after")
-    def ordered_window(self):
-        if self.window_start >= self.window_end:
-            raise ValueError("Inventory window must be ordered")
-        return self
+
+class ClusterRequest(Contract):
+    threshold: float = Field(default=0.65, gt=0, lt=1)
+    max_size: int = Field(default=30, ge=2, le=200)
 
 
 class ConsolidateGlobalRequest(Contract):
@@ -275,16 +254,8 @@ class LinkRequest(GetRequest):
         return self
 
 
-class SetMetadataRequest(GetRequest, EvidenceGuard):
-    expected_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
-    idempotency_key: str = Field(min_length=1, max_length=200)
-    memory_metadata: MemoryMetadata
-    replacement_ref: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-
-
 class ForgetRequest(GetRequest, EvidenceGuard):
     expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    replacement_ref: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     dry_run: bool = False
 
 

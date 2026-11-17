@@ -1,24 +1,23 @@
 from unittest.mock import patch
 
-from battuta_memory.contracts import RecallRequest, RememberRequest, SetMetadataRequest
+from battuta_memory.contracts import RecallRequest, RememberRequest, ForgetRequest
 from battuta_memory.retrieval import fuse_ranks
 from test_mutations import StorageFixture
 from test_records import SOURCE, fact
 
 
 class RetrievalTests(StorageFixture):
-    async def test_retired_memory_and_dependent_claim_are_excluded_from_recall(self):
+    async def test_forgotten_memory_and_dependent_claim_are_excluded_from_recall(self):
         from sqlite_vec import serialize_float32
         self.adapter.embed = lambda _: serialize_float32([1.0] + [0.0] * 383)
         support = await self.note_with_metadata("Nintendo retired support", keywords=["Nintendo"])
         source = await self.adapter.get(support["ref"])
-        metadata = {**fact()["memory_metadata"], "knowledge_type": "hypothesis", "confidence": "tentative",
+        metadata = {**fact()["memory_metadata"], "knowledge_type": "inference", "confidence": "tentative",
             "rationale": "A supported claim", "evidence": [{"ref": source["ref"], "revision": source["revision"],
             "relation": "supports", "requirement": "current"}]}
         claim = await self.service.remember(RememberRequest(content="Nintendo dependent claim", projects=["global"],
             sources=[SOURCE], memory_metadata=metadata))
-        await self.service.set_metadata(SetMetadataRequest(ref=source["ref"], expected_revision=source["revision"],
-            idempotency_key="retire-source", memory_metadata={**source["memory_metadata"], "status": "superseded", "evidence": []}))
+        await self.service.forget(ForgetRequest(ref=source["ref"]))
         for query in ({"semantic_query": "Nintendo"}, {"keywords": ["Nintendo"]}):
             result = await self.service.recall(RecallRequest(**query, include_expired=True))
             self.assertEqual(result["records"], [])
@@ -58,24 +57,18 @@ class RetrievalTests(StorageFixture):
         return await self.service.remember(RememberRequest(content=content, projects=[project] if project else ["global"],
             sources=[SOURCE], memory_metadata=fact(**metadata)["memory_metadata"]))
 
-    async def test_alias_lexical_retrieval_and_metadata_only_index_refresh(self):
+    async def test_alias_lexical_retrieval(self):
         target = await self.note_with_metadata("Owner reported buying an NS2", keywords=["NS2", "Nintendo", "gaming"])
         await self.note_with_metadata("Unrelated current choice", keywords=["shopping"])
         with patch.object(self.adapter, "search", return_value=[]):
             result = await self.service.recall(RecallRequest(keywords=["Nintendo"], selector="global"))
             self.assertEqual([r["ref"] for r in result["records"]], [target["ref"]])
-            record = await self.adapter.get(target["ref"])
-            with patch.object(self.adapter, "embed", side_effect=AssertionError("metadata must not embed")):
-                await self.service.set_metadata(SetMetadataRequest(ref=target["ref"], expected_revision=record["revision"], idempotency_key="alias", memory_metadata={**record["memory_metadata"], "keywords": ["console"]}))
-            self.assertEqual((await self.service.recall(RecallRequest(keywords=["Nintendo"], selector="global")))["records"], [])
-            self.assertEqual((await self.service.recall(RecallRequest(keywords=["console"], selector="global")))["records"][0]["ref"], target["ref"])
 
     async def test_filters_apply_before_both_candidate_limits_and_query_operators_are_literal(self):
         from sqlite_vec import serialize_float32
         self.adapter.embed = lambda _: serialize_float32([1.0] + [0.0] * 383)
         for i in range(22):
             await self.note_with_metadata(f"Nintendo past event {i}", expires_at="2020-01-01T00:00:00Z")
-        await self.note_with_metadata("Nintendo rejected claim", status="rejected")
         await self.note_with_metadata("Nintendo wrong scope", project="beacon")
         target = await self.note_with_metadata("Owner reported buying an NS2", project="atlas", keywords=["Nintendo"])
         result = await self.service.recall(RecallRequest(semantic_query="Nintendo", keywords=["Nintendo"], selector="projects", projects=["atlas"], limit=1))

@@ -36,10 +36,8 @@ vi.mock("../recall-session.ts", () => ({
       sources: [{ agent_id: "cos", session_id: "s", entry_id: "e" }],
       active: true,
       memory_metadata: {
-        stage: "temporal",
         knowledge_type: "fact",
         confidence: "confirmed",
-        status: "active",
         keywords: [],
         evidence: [],
       },

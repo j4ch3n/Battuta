@@ -40,60 +40,6 @@ class StorageFixture(unittest.IsolatedAsyncioTestCase):
 
 
 class MutationTests(StorageFixture):
-    async def test_frozen_v3_retirement_can_promote_stage_without_changing_claim(self):
-        from battuta_memory.contracts import SetMetadataRequest
-        from test_records import SOURCE, fact
-        values = dict(projects=["global"], sources=[SOURCE], memory_metadata=fact()["memory_metadata"])
-        old = await self.service.remember(RememberRequest(content="Legacy original", **values))
-        new = await self.service.remember(RememberRequest(content="Legacy replacement", **values))
-        original = await self.adapter.get(old["ref"])
-        replacement = await self.adapter.get(new["ref"])
-        request = SetMetadataRequest(ref=old["ref"], expected_revision=original["revision"],
-            idempotency_key="legacy-frozen-retire", replacement_ref=new["ref"],
-            memory_metadata={**original["memory_metadata"], "stage": "durable", "status": "superseded"},
-            evidence=[{"ref": new["ref"], "revision": replacement["revision"]}])
-        receipt = await self.service.set_metadata(request)
-        self.assertEqual(await self.service.set_metadata(request), receipt)
-        self.assertFalse((await self.adapter.get(old["ref"]))["active"])
-
-    async def test_retire_derived_claim_after_support_withdrawal(self):
-        from battuta_memory.contracts import SetMetadataRequest, GetRequest
-        from test_records import SOURCE, fact
-        values = dict(projects=["global"], sources=[SOURCE], memory_metadata=fact()["memory_metadata"])
-        support = await self.service.remember(RememberRequest(content="Retirement support", **values))
-        source = await self.adapter.get(support["ref"])
-        claims = []
-        for kind in ("hypothesis", "synthesized-observation"):
-            metadata = {**values["memory_metadata"], "knowledge_type": kind, "confidence": "tentative",
-                "rationale": "Supported claim", "evidence": [{"ref": source["ref"], "revision": source["revision"],
-                "relation": "supports", "requirement": "current"}]}
-            claim = await self.service.remember(RememberRequest(content=f"Claim {kind}", **{**values, "memory_metadata": metadata}))
-            before = await self.adapter.get(claim["ref"])
-            claims.append((kind, claim, before))
-        await self.service.forget(ForgetRequest(ref=source["ref"]))
-        for kind, claim, before in claims:
-            retired = {**before["memory_metadata"], "status": "superseded", "evidence": []}
-            request = SetMetadataRequest(ref=claim["ref"], expected_revision=before["revision"],
-                idempotency_key=f"retire-{kind}", memory_metadata=retired)
-            with self.assertRaises(ValueError):
-                await self.service.set_metadata(SetMetadataRequest(ref=claim["ref"], expected_revision=before["revision"],
-                    idempotency_key=f"tamper-{kind}", memory_metadata={**retired, "confidence": "disputed"}))
-            with self.assertRaises(ValueError):
-                await self.service.set_metadata(request.model_copy(update={"expected_revision": "0" * 64, "idempotency_key": f"stale-{kind}"}))
-            await self.service.set_metadata(request)
-            after = await self.adapter.get(claim["ref"], include_deleted=True)
-            self.assertFalse(after["active"])
-            self.assertEqual(after["memory_metadata"], retired)
-            self.assertEqual(after["sources"], before["sources"])
-            self.assertEqual(after["content"], before["content"])
-            self.assertIsNone(after["superseded_by"])
-            self.assertEqual(self.adapter.storage.conn.execute("SELECT count(*) FROM memories WHERE content_hash=?", (claim["ref"],)).fetchone()[0], 1)
-            with self.assertRaises(ValueError):
-                await self.service.get(GetRequest(ref=claim["ref"]))
-            with self.assertRaises(ValueError):
-                SetMetadataRequest(ref=claim["ref"], expected_revision=after["revision"],
-                    idempotency_key=f"reactivate-{kind}", memory_metadata={**retired, "status": "active"})
-
     async def test_opaque_projects_round_trip_and_link_without_registry(self):
         from battuta_memory.contracts import RecallRequest
         names = ["Atlas", "My Project", "one,two", "%2c", "项目", "X" * 65]
@@ -108,102 +54,56 @@ class MutationTests(StorageFixture):
         await self.service.link_projects(LinkRequest(ref=created["ref"], add=["New Project"], remove=["ONE,TWO"]))
         self.assertEqual((await self.adapter.get(created["ref"]))["scope"]["projects"], ["%2c", "atlas", "my project", "new project", "x" * 65, "项目"])
 
-    async def test_withdrawal_preserves_old_evidence_but_cannot_change_claim_or_bypass_guards(self):
-        from battuta_memory.contracts import SetMetadataRequest
-        from test_records import SOURCE, fact
-        for withdrawn in ("forgotten", "corrected"):
-            with self.subTest(withdrawn=withdrawn):
-                values = dict(projects=["global"], sources=[SOURCE], memory_metadata=fact()["memory_metadata"])
-                support = await self.service.remember(RememberRequest(content=f"Support {withdrawn}", **values))
-                source = await self.adapter.get(support["ref"])
-                metadata = {**values["memory_metadata"], "knowledge_type": "hypothesis", "confidence": "tentative", "rationale": "Possible pattern", "evidence": [{"ref": source["ref"], "revision": source["revision"], "relation": "supports", "requirement": "historical"}]}
-                claim = await self.service.remember(RememberRequest(content=f"Claim {withdrawn}", **{**values, "memory_metadata": metadata}))
-                before = await self.adapter.get(claim["ref"])
-                if withdrawn == "forgotten":
-                    await self.service.forget(ForgetRequest(ref=source["ref"]))
-                else:
-                    await self.service.update(UpdateRequest(ref=source["ref"], content="Corrected supporting fact", reason="Owner correction"))
-                request = dict(ref=claim["ref"], expected_revision=before["revision"], idempotency_key=f"reject-{withdrawn}", memory_metadata={**before["memory_metadata"], "status": "rejected"})
-                for change in ({"rationale": "New unsupported explanation"}, {"confidence": "disputed"}, {"evidence": [{**metadata["evidence"][0], "revision": "0" * 64}]}):
-                    with self.subTest(change=change), self.assertRaises(ValueError):
-                        await self.service.set_metadata(SetMetadataRequest(**{**request, "memory_metadata": {**request["memory_metadata"], **change}}))
-                with self.assertRaisesRegex(ValueError, "evidence"):
-                    await self.service.set_metadata(SetMetadataRequest(**request, evidence=[{"ref": source["ref"], "revision": source["revision"]}]))
-                receipt = await self.service.set_metadata(SetMetadataRequest(**request))
-                self.assertEqual(await self.service.set_metadata(SetMetadataRequest(**request)), receipt)
-                after = await self.adapter.get(claim["ref"])
-                self.assertEqual(after["sources"], before["sources"])
-                self.assertEqual(after["memory_metadata"], request["memory_metadata"])
-                with self.assertRaises(ValueError):
-                    await self.service.set_metadata(SetMetadataRequest(**{**request, "expected_revision": after["revision"], "idempotency_key": f"reactivate-{withdrawn}", "memory_metadata": {**after["memory_metadata"], "status": "active"}}))
-
     async def test_malformed_old_metadata_does_not_block_inventory_or_valid_work(self):
         from battuta_memory.contracts import InventoryRequest
         from test_records import SOURCE, fact
-        for index, malformed in enumerate(("{broken", '{"sources":[],"memory_metadata":{"stage":"unknown"}}')):
+        for index, malformed in enumerate(("{broken", '{"sources":[],"memory_metadata":{"knowledge_type":"unknown"}}')):
             old = await self.service.remember(self.note(f"Old record {index}"))
             self.adapter.storage.conn.execute("UPDATE memories SET metadata=? WHERE content_hash=?", (malformed, old["ref"]))
             self.adapter.storage.conn.commit()
             await self.service.remember(RememberRequest(content=f"Valid attributed fact {index}", projects=["global"], sources=[SOURCE], memory_metadata=fact()["memory_metadata"]))
-            inventory = await self.service.inventory(InventoryRequest(window_start=0, window_end=9999999999))
+            inventory = await self.service.inventory(InventoryRequest())
             historical = next(r for r in inventory["records"] if r["ref"] == old["ref"])
             self.assertTrue(historical["metadata_error"])
             self.assertEqual(self.adapter.storage.conn.execute("SELECT metadata FROM memories WHERE content_hash=?", (old["ref"],)).fetchone()[0], malformed)
 
-    async def test_lifecycle_supersession_survives_lost_ack_with_sources_and_history(self):
-        from battuta_memory.contracts import SetMetadataRequest, GetRequest
-        from test_records import SOURCE, fact
-        values = dict(projects=["global"], sources=[SOURCE], memory_metadata=fact()["memory_metadata"])
-        old = await self.service.remember(RememberRequest(content="Original attributed fact", **values))
-        new = await self.service.remember(RememberRequest(content="Consolidated attributed fact", **values))
-        original = await self.adapter.get(old["ref"])
-        replacement = await self.adapter.get(new["ref"])
-        request = SetMetadataRequest(ref=old["ref"], expected_revision=original["revision"], idempotency_key="retire", replacement_ref=new["ref"],
-            memory_metadata={**original["memory_metadata"], "status": "superseded"}, evidence=[{"ref": new["ref"], "revision": replacement["revision"]}])
-        with patch.object(self.state, "complete_intent", side_effect=RuntimeError("lost acknowledgement")):
-            with self.assertRaises(RuntimeError):
-                await self.service.set_metadata(request)
-        await self.service.recover()
-        receipt = await self.service.set_metadata(request)
-        self.assertEqual(receipt["ref"], old["ref"])
-        historical = await self.service.get(GetRequest(ref=old["ref"], include_history=True))
-        self.assertEqual(historical["sources"], [SOURCE])
-        self.assertEqual([r["ref"] for r in historical["history"]], [old["ref"], new["ref"]])
-        self.assertEqual(self.state.recover_intents(), [])
-
-    async def test_metadata_promotion_preserves_vector_sources_and_unrelated_json_and_replays(self):
-        import json
-        from battuta_memory.contracts import SetMetadataRequest
-        from test_records import fact, SOURCE
-        request = RememberRequest(content="Owner reported buying an NS2", projects=["global"], sources=[SOURCE], memory_metadata=fact()["memory_metadata"])
-        first = await self.service.remember(request)
-        self.adapter.storage.conn.execute("UPDATE memories SET metadata=json_set(metadata, '$.custom', 'preserve') WHERE content_hash=?", (first["ref"],))
-        self.adapter.storage.conn.commit()
-        before = await self.adapter.get(first["ref"])
-        vector = self.adapter.storage.conn.execute("SELECT content_embedding FROM memory_embeddings").fetchone()[0]
-        update = SetMetadataRequest(ref=first["ref"], expected_revision=before["revision"], idempotency_key="promote", memory_metadata={**before["memory_metadata"], "stage": "durable"})
-        with patch.object(self.adapter, "embed", side_effect=AssertionError("metadata must not embed")):
-            receipt = await self.service.set_metadata(update)
-            self.assertEqual(await self.service.set_metadata(update), receipt)
-        after = await self.adapter.get(first["ref"])
-        self.assertEqual(after["sources"], [SOURCE])
-        self.assertEqual(after["memory_metadata"]["confidence"], "confirmed")
-        self.assertNotEqual(after["revision"], before["revision"])
-        self.assertEqual(after["ref"], before["ref"])
-        self.assertEqual(self.adapter.storage.conn.execute("SELECT content_embedding FROM memory_embeddings").fetchone()[0], vector)
-        self.assertEqual(json.loads(self.adapter.storage.conn.execute("SELECT metadata FROM memories WHERE content_hash=?", (first["ref"],)).fetchone()[0])["custom"], "preserve")
-
-    async def test_metadata_rejects_self_support_and_incompatible_duplicates(self):
-        from battuta_memory.contracts import SetMetadataRequest
+    async def test_duplicates_with_incompatible_metadata_or_sources_conflict(self):
         from test_records import fact, SOURCE
         base = dict(content="Attributed claim", projects=["global"], sources=[SOURCE], memory_metadata=fact()["memory_metadata"])
-        first = await self.service.remember(RememberRequest(**base))
-        record = await self.adapter.get(first["ref"])
+        await self.service.remember(RememberRequest(**base))
         for change in ({"memory_metadata": {**base["memory_metadata"], "expires_at": "2027-01-01T00:00:00Z"}}, {"sources": [{**SOURCE, "entry_id": "different"}]}):
             with self.subTest(change=change), self.assertRaisesRegex(ValueError, "conflict"):
                 await self.service.remember(RememberRequest(**{**base, **change}))
-        with self.assertRaisesRegex(ValueError, "[Cc]ycl"):
-            await self.service.set_metadata(SetMetadataRequest(ref=first["ref"], expected_revision=record["revision"], idempotency_key="cycle", memory_metadata={**base["memory_metadata"], "evidence": [{"ref": first["ref"], "revision": record["revision"], "relation": "supports", "requirement": "current"}]}))
+
+    async def test_mixed_global_and_project_records_and_evidence_subset(self):
+        from battuta_memory.contracts import GetRequest
+        from test_records import fact, SOURCE
+        support = await self.service.remember(RememberRequest(content="Shared support", projects=["global", "atlas"], sources=[SOURCE], memory_metadata=fact()["memory_metadata"]))
+        record = await self.adapter.get(support["ref"])
+        self.assertEqual(record["scope"]["projects"], ["atlas", "global"])
+        for selector in ({"selector": "global"}, {"selector": "projects", "projects": ["atlas"], "include_global": False}):
+            with self.subTest(selector=selector):
+                listed = await self.service.list(ListRequest(**selector))
+                self.assertEqual([r["ref"] for r in listed["records"]], [support["ref"]])
+        link = {"ref": record["ref"], "revision": record["revision"], "relation": "supports", "requirement": "current"}
+        metadata = {**fact()["memory_metadata"], "knowledge_type": "inference", "confidence": "tentative", "rationale": "Pattern", "evidence": [link]}
+        for projects, allowed in ((["atlas", "global", "beacon"], True), (["atlas", "global"], True), (["atlas"], False), (["global"], False)):
+            with self.subTest(projects=projects):
+                request = RememberRequest(content=f"Claim {projects}", projects=projects, sources=[SOURCE], memory_metadata=metadata)
+                if allowed:
+                    claim = await self.service.remember(request)
+                    self.assertEqual((await self.service.get(GetRequest(ref=claim["ref"])))["scope"]["projects"], sorted(projects))
+                else:
+                    with self.assertRaisesRegex(ValueError, "scope"):
+                        await self.service.remember(request)
+
+    async def test_inventory_lists_active_records_only(self):
+        from battuta_memory.contracts import InventoryRequest
+        kept = await self.service.remember(self.note("Kept"))
+        gone = await self.service.remember(self.note("Gone"))
+        await self.service.forget(ForgetRequest(ref=gone["ref"]))
+        inventory = await self.service.inventory(InventoryRequest())
+        self.assertEqual([r["ref"] for r in inventory["records"]], [kept["ref"]])
 
     async def test_optional_guards_preserve_legacy_receipt_identities(self):
         request = self.note(key="legacy")
@@ -211,7 +111,7 @@ class MutationTests(StorageFixture):
         legacy.pop("evidence", None)
         legacy.pop("memory_metadata", None)
         legacy.pop("projects")
-        legacy["scope"] = {"global": False, "projects": ["atlas"]}
+        legacy["scope"] = {"projects": ["atlas"]}
         receipt = {"ref": "a" * 64, "outcome": "created"}
         self.state.prepare_intent("remember:legacy", self.service.digest(legacy), {"unused": True})
         self.state.complete_intent("remember:legacy", receipt)
@@ -233,7 +133,7 @@ class MutationTests(StorageFixture):
         self.assertEqual(await self.service.update(update), receipt)
         forget = ForgetRequest(ref="a" * 64)
         legacy_forget = forget.model_dump(mode="json", by_alias=True)
-        for field in ("evidence", "expected_revision", "replacement_ref"):
+        for field in ("evidence", "expected_revision"):
             legacy_forget.pop(field, None)
         key = "forget:" + forget.ref
         forgotten = {"ref": forget.ref, "forgotten": True}
@@ -275,7 +175,7 @@ class MutationTests(StorageFixture):
                 await operation(request)
         self.assertTrue((await self.adapter.get(target["ref"]))["active"])
 
-    async def test_update_unions_sources_and_forget_lineage_survives_restart(self):
+    async def test_update_unions_sources_and_forget_survives_restart(self):
         from battuta_memory.contracts import InventoryRequest
         a = {"agent_id": "cos", "session_id": "a", "entry_id": "1"}
         b = {"agent_id": "cos", "session_id": "b", "entry_id": "2"}
@@ -283,7 +183,7 @@ class MutationTests(StorageFixture):
         second = await self.service.remember(RememberRequest(**{**self.note("Second").model_dump(by_alias=True), "sources": [b]}))
         updated = await self.service.update(UpdateRequest(ref=first["ref"], content="Combined", reason="merge", sources=[b]))
         self.assertEqual((await self.adapter.get(updated["ref"]))["sources"], [a, b])
-        await self.service.forget(ForgetRequest(ref=second["ref"], replacement_ref=updated["ref"]))
+        await self.service.forget(ForgetRequest(ref=second["ref"]))
         storage = type(self.adapter.storage)(str(self.root / "memory.db"))
         await storage.initialize()
         self.addAsyncCleanup(storage.close)
@@ -291,8 +191,8 @@ class MutationTests(StorageFixture):
         self.addCleanup(state.close)
         restarted = MemoryService(UpstreamAdapter(storage), self.service.config, state)
         await restarted.recover()
-        inventory = await restarted.inventory(InventoryRequest(window_start=0, window_end=9999999999))
-        self.assertIn({"ref": second["ref"], "superseded_by": updated["ref"]}, inventory["inactive"])
+        inventory = await restarted.inventory(InventoryRequest())
+        self.assertEqual([r["ref"] for r in inventory["records"]], [updated["ref"]])
         self.assertIsNone(await restarted.adapter.get(second["ref"]))
 
     async def test_remember_receipt_reports_actual_reused_content_and_historical_state(self):
@@ -305,21 +205,6 @@ class MutationTests(StorageFixture):
         self.assertEqual(receipt["revision"], (await self.adapter.get(first["ref"]))["revision"])
         await self.service.forget(ForgetRequest(ref=first["ref"]))
         self.assertEqual(await self.service.remember(request), receipt)
-
-    async def test_merge_forget_requires_an_active_distinct_same_scope_replacement(self):
-        first = await self.service.remember(self.note())
-        replacement = await self.service.remember(self.note("Merged fact"))
-        other_scope = await self.service.remember(self.note("Other scope", project=None))
-        for ref in (first["ref"], other_scope["ref"]):
-            with self.subTest(ref=ref), self.assertRaises(ValueError):
-                await self.service.forget(ForgetRequest(ref=first["ref"], replacement_ref=ref))
-        source = await self.service.remember(self.note("Redundant fact"))
-        result = await self.service.forget(ForgetRequest(ref=source["ref"], replacement_ref=replacement["ref"]))
-        self.assertTrue(result["forgotten"])
-        await self.service.forget(ForgetRequest(ref=replacement["ref"]))
-        with self.assertRaises(ValueError):
-            await self.service.forget(ForgetRequest(ref=first["ref"], replacement_ref=replacement["ref"]))
-        self.assertTrue((await self.adapter.get(first["ref"]))["active"])
 
     async def test_dream_preconditions_reject_changed_membership_without_mutation(self):
         first = await self.service.remember(self.note())
@@ -393,13 +278,14 @@ class MutationTests(StorageFixture):
         with self.assertRaisesRegex(ValueError, "inactive"):
             await self.service.update(UpdateRequest(ref=first["ref"], content="Stale correction", reason="late"))
 
-    async def test_final_membership_and_global_link_rejected(self):
+    async def test_final_membership_cannot_be_removed_but_global_is_an_ordinary_project(self):
         first = await self.service.remember(self.note())
         with self.assertRaises(ValueError):
             await self.service.link_projects(LinkRequest(ref=first["ref"], remove=["atlas"]))
-        global_ = await self.service.remember(self.note("Global", None))
-        with self.assertRaises(ValueError):
-            await self.service.link_projects(LinkRequest(ref=global_["ref"], add=["atlas"]))
+        await self.service.link_projects(LinkRequest(ref=first["ref"], add=["global"]))
+        self.assertEqual((await self.adapter.get(first["ref"]))["scope"]["projects"], ["atlas", "global"])
+        await self.service.link_projects(LinkRequest(ref=first["ref"], remove=["atlas"]))
+        self.assertEqual((await self.adapter.get(first["ref"]))["scope"]["projects"], ["global"])
 
     async def test_forget_preview_and_completed_retry_do_not_resurrect(self):
         first = await self.service.remember(self.note(key="stable"))

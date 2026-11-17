@@ -24,8 +24,7 @@ def render_memories(seeds, evidence, now, max_bytes=2000):
         metadata = record.get("memory_metadata")
         labels = "unreviewed attributed record; confidence unavailable"
         if metadata:
-            labels = f'{metadata["knowledge_type"]}; {metadata["confidence"]}; ' + (
-                "temporal (not yet dream-reviewed)" if metadata["stage"] == "temporal" else "durable (reviewed, not proven or permanent)")
+            labels = f'{metadata["knowledge_type"]}; {metadata["confidence"]}'
             if metadata.get("expires_at"):
                 labels += "; expires " + metadata["expires_at"]
                 if now >= datetime.fromisoformat(metadata["expires_at"]):

@@ -11,8 +11,7 @@ class CaptureService:
     def digest(batch):
         value = batch.model_dump(mode="json", by_alias=True, exclude={"payload_digest"})
         for item in value["items"]:
-            projects = item.pop("projects")
-            item["scope"] = {"global": projects == ["global"], "projects": [] if projects == ["global"] else projects}
+            item["scope"] = {"projects": item.pop("projects")}
             if item.get("memory_metadata") is None:
                 item.pop("memory_metadata", None)
             if item.get("correction") is None:
@@ -38,7 +37,7 @@ class CaptureService:
                 if item.correction:
                     receipt = await self.service.update(UpdateRequest(ref=item.correction.ref, expected_revision=item.correction.revision,
                         content=item.content, reason="Attributed conversation correction", sources=item.sources, memory_metadata=item.memory_metadata),
-                        expected_scope=item.scope.model_dump(by_alias=True))
+                        expected_scope=item.scope.model_dump())
                 else:
                     receipt = await self.service.remember(request)
                 results.append({"item_id": item.item_id, "status": "completed", **receipt})

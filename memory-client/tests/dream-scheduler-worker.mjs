@@ -49,13 +49,14 @@ const server = createServer(async (req, res) => {
     else {
       assert.equal(input.method, "tools/call");
       const name = input.params.name;
-      assert.ok(["memory_inventory"].includes(name));
+      assert.ok(["memory_inventory", "memory_cluster"].includes(name));
       await evidenceGate;
       let value;
       if (name === "memory_inventory") {
         inventoryCalls++;
-        value = { records: [], recent_refs: [], inactive: [], ...input.params.arguments };
-      } else if (name === "memory_global_relationships")
+        value = { records: [] };
+      } else if (name === "memory_cluster") value = { projects: [] };
+      else if (name === "memory_global_relationships")
         value = {
           status: "unavailable",
           generation_id: null,

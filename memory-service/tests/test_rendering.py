@@ -9,7 +9,7 @@ class RenderingTests(unittest.TestCase):
         support = fact()
         counter = {**fact(), "ref": "b" * 64, "content": "Contrary event " * 200}
         claim = {**fact(), "ref": "c" * 64, "content": "Possible pattern"}
-        claim["memory_metadata"] = {**claim["memory_metadata"], "knowledge_type": "hypothesis", "confidence": "tentative",
+        claim["memory_metadata"] = {**claim["memory_metadata"], "knowledge_type": "inference", "confidence": "tentative",
             "rationale": "Possible explanation", "evidence": [
                 {"ref": support["ref"], "revision": support["revision"], "relation": "supports", "requirement": "historical"},
                 {"ref": counter["ref"], "revision": counter["revision"], "relation": "contradicts", "requirement": "historical"}]}
@@ -39,7 +39,7 @@ class RenderingTests(unittest.TestCase):
                 counter = {**fact(), "ref": "b" * 64, "content": "Owner explicitly disliked that activity"}
                 claim = {**fact(), "ref": "c" * 64, "content": "Owner may like that activity"}
                 contrary = {"ref": counter["ref"], "revision": counter["revision"], "relation": "contradicts", "requirement": "historical"}
-                claim["memory_metadata"] = {**claim["memory_metadata"], "knowledge_type": "hypothesis", "confidence": "tentative",
+                claim["memory_metadata"] = {**claim["memory_metadata"], "knowledge_type": "inference", "confidence": "tentative",
                     "rationale": "Possible pattern", "evidence": [{"ref": support["ref"], "revision": support["revision"], "relation": "supports", "requirement": "historical"}]}
                 if nested:
                     support["memory_metadata"]["evidence"] = [contrary]

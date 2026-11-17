@@ -59,6 +59,6 @@ test("validates only catalog membership, not slug syntax", () => {
     "my project",
   ]);
   expect(validateMemoryProjects(["项目", "x".repeat(100)], catalog)).toHaveLength(2);
-  for (const projects of [["atlas"], ["unknown"], [], ["global", "Atlas"], [42]])
+  for (const projects of [["atlas"], ["unknown"], [], [42]])
     expect(() => validateMemoryProjects(projects, catalog)).toThrow();
 });

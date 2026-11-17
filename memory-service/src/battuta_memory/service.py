@@ -97,12 +97,17 @@ class MemoryService:
         return {**record, **view, "validation_evidence": evidence}
 
     async def inventory(self, request):
-        # Includes every scope explicitly; no selected-project fallback. Mutations
-        # and pending recovery cannot interleave with the inventory read.
+        # Mutations and pending recovery cannot interleave with the inventory read.
         async with self.mutations:
             if self.state is not None:
                 await self._recover()
             return await self.adapter.inventory(request)
+
+    async def cluster(self, request):
+        async with self.mutations:
+            if self.state is not None:
+                await self._recover()
+            return await self.adapter.cluster(request)
 
     @staticmethod
     def digest(value):
@@ -123,7 +128,7 @@ class MemoryService:
             value.pop("evidence", None)
         if isinstance(request, UpdateRequest) and not value.get("sources"):
             value.pop("sources", None)
-        for field in ("expected_revision", "replacement_ref", "memory_metadata"):
+        for field in ("expected_revision", "memory_metadata"):
             if value.get(field) is None:
                 value.pop(field, None)
         return value
@@ -178,19 +183,19 @@ class MemoryService:
             current = await self.adapter.get(ref, include_deleted=True)
             sources = [s.wire() for s in request.sources]
             metadata = request.memory_metadata.model_dump(mode="json") if request.memory_metadata is not None else None
-            await self._validate_metadata(ref, metadata, request.scope.model_dump(by_alias=True), sources)
+            await self._validate_metadata(ref, metadata, request.scope.model_dump(), sources)
             outcome = "created"
             operation = "store"
             if current:
                 if not current["active"]:
                     raise ValueError("Inactive history conflict")
-                if current["scope"] != request.scope.model_dump(by_alias=True):
+                if current["scope"] != request.scope.model_dump():
                     raise ValueError("Duplicate scope conflict")
                 if current["sources"] != sources or current.get("memory_metadata") != metadata:
                     raise ValueError("Duplicate attribution or metadata conflict")
                 existing = current["scope"]["projects"]
                 projects = sorted(set(existing + request.scope.projects))
-                tags = (["scope:global"] if request.scope.global_ else [project_tag(p) for p in projects]) + sorted(set(current["tags"] + request.tags)) + [f"kind:{current['kind']}"]
+                tags = [project_tag(p) for p in projects] + sorted(set(current["tags"] + request.tags)) + [f"kind:{current['kind']}"]
                 sources = list({self.digest(s): s for s in current["sources"] + sources}.values())
                 if len(sources) > 200:
                     raise ValueError("Too many source citations")
@@ -220,7 +225,7 @@ class MemoryService:
             if target in seen:
                 return
             record = await self._active(target)
-            if record["scope"] != scope:
+            if not set(record["scope"]["projects"]) <= set(scope["projects"]):
                 raise ValueError("Evidence scope conflict")
             for link in (record.get("memory_metadata") or {}).get("evidence", []):
                 await visit(link["ref"], path | {target})
@@ -230,33 +235,6 @@ class MemoryService:
             record = await self._active(link["ref"])
             if record["revision"] != link["revision"]:
                 raise ValueError("Memory evidence changed")
-
-    async def set_metadata(self, request):
-        async def plan():
-            current = await self._active(request.ref)
-            if current["revision"] != request.expected_revision:
-                raise ValueError("Memory changed since inventory")
-            metadata = request.memory_metadata.model_dump(mode="json")
-            prior = current.get("memory_metadata")
-            withdrawal = prior is not None and metadata["status"] in {"stale", "superseded", "rejected"} and (
-                metadata == {**prior, "status": metadata["status"]}
-                or (metadata["status"] == "superseded" and (
-                    metadata == {**prior, "status": "superseded", "evidence": []}
-                    or (request.replacement_ref is not None and metadata == {**prior, "stage": "durable", "status": "superseded"}))))
-            if prior is not None and metadata["status"] == "superseded" and not withdrawal:
-                raise ValueError("Retirement cannot change memory metadata")
-            if not withdrawal:
-                await self._validate_metadata(request.ref, metadata, current["scope"], current["sources"])
-            replacement = None
-            if request.replacement_ref is not None:
-                replacement = await self._active(request.replacement_ref)
-                if request.replacement_ref == request.ref or replacement["scope"] != current["scope"] or metadata["status"] != "superseded":
-                    raise ValueError("Invalid lifecycle replacement")
-            tags = (["scope:global"] if current["scope"]["global"] else [project_tag(p) for p in current["scope"]["projects"]]) + current["tags"] + [f"kind:{current['kind']}"]
-            return {"operation": "metadata", "ref": request.ref, "tags": tags, "sources": current["sources"], "memory_metadata": metadata,
-                **({"replacement_ref": request.replacement_ref} if replacement else {}),
-                "result": {"ref": request.ref, "before": current["content"]}}
-        return await self._mutation("metadata:" + request.idempotency_key, request, plan)
 
     async def update(self, request, expected_scope=None):
         async def plan():
@@ -269,7 +247,7 @@ class MemoryService:
             ref = self.adapter.content_ref(request.content)
             if await self.adapter.get(ref, include_deleted=True):
                 raise ValueError("Version content already exists; explicit conflict resolution required")
-            scope_tags = ["scope:global"] if current["scope"]["global"] else [project_tag(p) for p in current["scope"]["projects"]]
+            scope_tags = [project_tag(p) for p in current["scope"]["projects"]]
             kind = request.kind or current["kind"]
             sources = list({self.digest(s): s for s in current["sources"] + [s.wire() for s in request.sources]}.values())
             if len(sources) > 200:
@@ -285,10 +263,6 @@ class MemoryService:
     async def link_projects(self, request):
         async def plan():
             current = await self._active(request.ref)
-            if current["scope"]["global"]:
-                raise ValueError("Cannot link global memory to projects")
-            if "global" in request.add:
-                raise ValueError("Cannot promote project memory to global")
             names = sorted((set(current["scope"]["projects"]) | set(request.add)) - set(request.remove))
             if not names:
                 raise ValueError("Cannot remove final project")
@@ -304,10 +278,6 @@ class MemoryService:
             current = await self._active(request.ref)
             if request.expected_revision is not None and current["revision"] != request.expected_revision:
                 raise ValueError("Memory changed since inventory")
-            if request.replacement_ref is not None:
-                replacement = await self._active(request.replacement_ref)
-                if request.replacement_ref == request.ref or replacement["scope"] != current["scope"]:
-                    raise ValueError("Merge replacement must be distinct and have identical scope")
-            return {"operation": "delete", "ref": request.ref, "replacement_ref": request.replacement_ref,
+            return {"operation": "delete", "ref": request.ref,
                 "result": {"ref": request.ref, "forgotten": True, "before": current["content"], "retention": "Tombstone retains content; not secure erasure"}}
         return await self._mutation("forget:" + request.ref, request, plan)

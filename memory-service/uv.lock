@@ -150,6 +150,7 @@ source = { editable = "." }
 dependencies = [
     { name = "mcp" },
     { name = "mcp-memory-service", extra = ["sqlite"] },
+    { name = "numpy" },
     { name = "pydantic" },
     { name = "pyyaml" },
 ]
@@ -158,6 +159,7 @@ dependencies = [
 requires-dist = [
     { name = "mcp", specifier = ">=1.26,<2" },
     { name = "mcp-memory-service", extras = ["sqlite"], specifier = "==12.1.1" },
+    { name = "numpy", specifier = ">=2,<3" },
     { name = "pydantic", specifier = ">=2.12,<3" },
     { name = "pyyaml", specifier = ">=6,<7" },
 ]

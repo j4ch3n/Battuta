@@ -8,7 +8,7 @@ Call memory_recall directly. Supply a self-contained semantic_query and/or preci
 
 You may issue multiple independent queries, inspect the returned evidence, revise queries, and read exact refs with memory_get. Continue as useful until enough relevant evidence is available or further searches are unlikely to help. Do not repeat an unchanged failed/unproductive query without a reason. If a query exceeds the embedding tokenizer limit, shorten or split it. No fixed search sequence or number of rounds is required.
 
-Return a compact selection of the server's qualified evidence. Prefer whole server-rendered bullets verbatim, including references, source attribution, uncertainty, rationale and required contrary evidence. You may reorder/deduplicate/consolidate, but never invent memories, strengthen confidence, hide necessary counterevidence, or turn a hypothesis into owner confirmation. Temporal/durable describe review stage, not truth. Omit irrelevant nearest neighbours. Do not answer the user or include your thinking or search transcript.
+Return a compact selection of the server's qualified evidence. Prefer whole server-rendered bullets verbatim, including references, source attribution, uncertainty, rationale and required contrary evidence. You may reorder/deduplicate/consolidate, but never invent memories, strengthen confidence, hide necessary counterevidence, or turn a hypothesis into owner confirmation. Inference means derived, not owner-stated. Omit irrelevant nearest neighbours. Do not answer the user or include your thinking or search transcript.
 
 Final response must be only JSON: {"status":"ready","context":"qualified memory bullets"}. Allowed statuses:
 

@@ -15,7 +15,7 @@ class ProtocolTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(result.structuredContent["error"]["retryable"])
 
     async def test_public_records_translate_only_typed_memberships(self):
-        record = {"ref": "a" * 64, "scope": {"global": False, "projects": ["atlas"]},
+        record = {"ref": "a" * 64, "scope": {"projects": ["atlas"]},
             "metadata": {"scope": "user supplied"}, "revision": "b" * 64}
         service = SimpleNamespace(
             get=AsyncMock(return_value={**record, "history": [record], "validation_evidence": [record]}),
@@ -29,7 +29,7 @@ class ProtocolTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result["validation_evidence"][0]["projects"], ["atlas"])
             self.assertNotIn("scope", result["validation_evidence"][0])
             self.assertEqual(result["metadata"], {"scope": "user supplied"})
-            self.assertEqual(record["scope"], {"global": False, "projects": ["atlas"]})
+            self.assertEqual(record["scope"], {"projects": ["atlas"]})
             recalled = (await client.call_tool("memory_recall", {"keywords": ["note"]})).structuredContent["data"]
             self.assertEqual(recalled["validation_evidence"][0]["projects"], ["atlas"])
             self.assertNotIn("scope", recalled["validation_evidence"][0])
@@ -40,7 +40,7 @@ class ProtocolTests(unittest.IsolatedAsyncioTestCase):
         server = create_protocol_server(lambda: service)
         async with create_connected_server_and_client_session(server) as client:
             tools = (await client.list_tools()).tools
-            self.assertEqual({t.name for t in tools}, {"memory_" + n for n in ("remember", "recall", "list", "get", "update", "set_metadata", "link_projects", "forget", "capture", "health", "inventory", "consolidate_global", "global_relationships")})
+            self.assertEqual({t.name for t in tools}, {"memory_" + n for n in ("remember", "recall", "list", "get", "update", "link_projects", "forget", "capture", "health", "inventory", "cluster", "consolidate_global", "global_relationships")})
             self.assertIn("semantic_query", next(t for t in tools if t.name == "memory_recall").inputSchema["properties"])
             health = await client.call_tool("memory_health", {})
             self.assertTrue(health.structuredContent["data"]["ready"])

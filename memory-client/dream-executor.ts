@@ -92,12 +92,14 @@ export async function executeDream(
         : error instanceof Error && known.includes(error.message)
           ? error.message
           : "unexpected_error";
+    const logPath = join(clientConfig().dataDirectory, "dream-errors.jsonl");
+    const pointer = `The raw error is in the private log ${logPath}. Do not read that log unless the human asks for the reason.`;
     const diagnostic: DreamDiagnostic =
       error instanceof DreamModelError
         ? {
             stage,
-            code: `model_${error.category}`,
-            message: `Dream model did not finish (${error.stopReason}; ${error.category}).`,
+            code: "model_error",
+            message: `Dream model did not finish (${error.stopReason}). ${pointer}`,
           }
         : failure === "cancelled" || failure === "timed_out"
           ? {
@@ -106,10 +108,11 @@ export async function executeDream(
               message: `Dream ${failure.replace("_", " ")}. Frozen requests were preserved.`,
             }
           : dreamDiagnostic(error, stage);
+    if (diagnostic.code === "unexpected_error") diagnostic.message += ` ${pointer}`;
     try {
       const directory = clientConfig().dataDirectory;
       await mkdir(directory, { recursive: true, mode: 0o700 });
-      const file = await open(join(directory, "dream-errors.jsonl"), "a", 0o600);
+      const file = await open(logPath, "a", 0o600);
       try {
         await file.chmod(0o600);
         await file.writeFile(
@@ -119,9 +122,13 @@ export async function executeDream(
             failure,
             reason,
             diagnostic,
-            ...(error instanceof DreamModelError
-              ? { stopReason: error.stopReason, modelErrorCategory: error.category }
-              : {}),
+            ...(error instanceof DreamModelError ? { stopReason: error.stopReason } : {}),
+            rawError: (error instanceof DreamModelError
+              ? error.providerMessage
+              : error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error)
+            ).slice(0, 800),
           }) + "\n",
         );
       } finally {
