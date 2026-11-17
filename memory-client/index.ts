@@ -10,8 +10,9 @@ import { extractMemories } from "./extract.ts";
 import { eligibleRecords } from "./records.ts";
 import { abortable } from "./abortable.ts";
 import { prepareCorrectionCandidates } from "./correction-candidates.ts";
-import { selectRecallInput } from "./recall-context.ts";
-import { runRecallAgent, unavailableRecall, type PreparedRecall } from "./recall-agent.ts";
+import { selectRecallQuery } from "./recall-context.ts";
+import { runRecall, unavailableRecall, type PreparedRecall } from "./recall.ts";
+import { transcribeTelegramVoice } from "./voice-input.ts";
 import { redact } from "./privacy.ts";
 
 const RECALL_DEADLINE_MS = 30_000;
@@ -126,6 +127,10 @@ export default function memoryClient(pi: ExtensionAPI) {
       ).initialize(ctx.sessionManager.getSessionId(), ctx.sessionManager.getBranch());
     });
   });
+  pi.on("input", async (event) => {
+    const text = await transcribeTelegramVoice(event.text);
+    return text === undefined ? { action: "continue" } : { action: "transform", text };
+  });
   pi.on("before_agent_start", async (event, ctx) => {
     addProfileSnapshot(event);
     const session = ctx.sessionManager.getSessionId();
@@ -155,14 +160,9 @@ export default function memoryClient(pi: ExtensionAPI) {
     const config = clientConfig();
     try {
       request.packet = await abortable(
-        runRecallAgent(
-          selectRecallInput(ctx.sessionManager.buildContextEntries(), recallPrompt(event)),
-          ctx,
-          {
-            url: config.url,
-            signal,
-            onUsage: (usage) => pi.appendEntry("memory-recall-usage", { usage }),
-          },
+        runRecall(
+          selectRecallQuery(ctx.sessionManager.buildContextEntries(), recallPrompt(event)),
+          { url: config.url, signal },
         ),
         signal,
       );

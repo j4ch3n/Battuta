@@ -1,43 +1,42 @@
 import { expect, test } from "vitest";
-import { selectRecallInput } from "../recall-context.ts";
+import { selectRecallQuery } from "../recall-context.ts";
 
-test("selects latest summary and ten human/assistant texts, never tool or thinking blocks", () => {
-  const entries = [
-    { type: "compaction", summary: "latest summary" },
-    { type: "compaction", summary: "old retained summary" },
-    ...Array.from({ length: 12 }, (_, i) => ({
-      id: `e${i}`,
-      type: "message",
-      message: {
-        role: i % 2 ? "assistant" : "user",
-        content: [
-          { type: "thinking", thinking: "private" },
-          { type: "text", text: `text ${i}` },
-          { type: "toolCall", name: "bash", arguments: {} },
-        ],
-      },
-    })),
-    { id: "tool", type: "message", message: { role: "toolResult", content: "secret tool output" } },
-    { id: "mail", type: "custom_message", customType: "agent-mail", content: "mail" },
-    {
-      id: "empty",
-      type: "message",
-      message: { role: "assistant", content: [{ type: "thinking", thinking: "hidden" }] },
-    },
-  ];
-  const input = selectRecallInput(entries, "text 11");
-  expect(input.summary).toBe("latest summary");
-  expect(input.history.map((m) => m.text)).toEqual(
-    Array.from({ length: 10 }, (_, i) => `text ${i + 2}`),
-  );
-  expect(input.current).toBe("text 11");
-  expect(JSON.stringify(input)).not.toMatch(/private|bash|tool output|mail|hidden/);
+const user = (id: string, text: string) => ({
+  id,
+  type: "message",
+  message: { role: "user", content: [{ type: "text", text }] },
+});
+const assistant = (id: string, text: string) => ({
+  id,
+  type: "message",
+  message: {
+    role: "assistant",
+    content: [
+      { type: "thinking", thinking: "private" },
+      { type: "text", text },
+      { type: "toolCall", name: "bash", arguments: {} },
+    ],
+  },
 });
 
-test("missing summary and short retained history remain unchanged except credential redaction", () => {
-  const input = selectRecallInput(
-    [{ id: "e", type: "message", message: { role: "user", content: "hello" } }],
-    "hello",
+test("uses the last three owner messages newest first, excluding assistant, tool and thinking content", () => {
+  const entries = [
+    user("u1", "first"),
+    assistant("a1", "assistant reply"),
+    user("u2", "second"),
+    assistant("a2", "another reply"),
+    user("u3", "third"),
+    { id: "tool", type: "message", message: { role: "toolResult", content: "secret tool output" } },
+  ];
+  expect(selectRecallQuery(entries, "fourth")).toBe("fourth\n\nthird\n\nsecond");
+});
+
+test("does not duplicate the current message when the session already contains it", () => {
+  expect(selectRecallQuery([user("u1", "older"), user("u2", "latest")], "latest")).toBe(
+    "latest\n\nolder",
   );
-  expect(input).toEqual({ history: [{ role: "user", text: "hello" }], current: "hello" });
+});
+
+test("falls back to a neutral query when there is no owner text", () => {
+  expect(selectRecallQuery([assistant("a1", "reply")], "")).toBe("recent owner context");
 });

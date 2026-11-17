@@ -2,19 +2,21 @@
 
 import subprocess
 
+MAX_AUDIO_SECONDS = 300
+
 
 def decode_audio(data: bytes) -> bytes:
     try:
         result = subprocess.run(
-            ["ffmpeg", "-v", "error", "-protocol_whitelist", "pipe", "-i", "pipe:0", "-t", "121", "-ac", "1", "-ar", "16000", "-f", "s16le", "pipe:1"],
+            ["ffmpeg", "-v", "error", "-protocol_whitelist", "pipe", "-i", "pipe:0", "-t", str(MAX_AUDIO_SECONDS + 1), "-ac", "1", "-ar", "16000", "-f", "s16le", "pipe:1"],
             input=data, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=60, check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise ValueError("Cannot decode audio") from error
     if result.returncode or not result.stdout:
         raise ValueError("Unsupported or malformed audio")
-    if len(result.stdout) > 16000 * 2 * 120:
-        raise ValueError("Audio is too long (maximum 120 seconds)")
+    if len(result.stdout) > 16000 * 2 * MAX_AUDIO_SECONDS:
+        raise ValueError(f"Audio is too long (maximum {MAX_AUDIO_SECONDS} seconds)")
     return result.stdout
 
 
