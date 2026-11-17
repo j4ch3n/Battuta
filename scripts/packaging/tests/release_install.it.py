@@ -40,6 +40,10 @@ class ReleaseInstallation(unittest.TestCase):
     def test_verified_artifacts_install_without_source_or_constraints(self):
         assets = Path(os.environ["BATTUTA_RELEASE_ASSETS"]).resolve()
         tag = os.environ["BATTUTA_RELEASE_TAG"]
+        platform = os.environ["BATTUTA_RELEASE_PLATFORM"]
+        archive = f"battuta-{tag}-{platform}-arm64.tar.gz"
+        influencer = platform == "raspberry-pi"
+        packages = set(COMMANDS) - {"battuta-memory"} if influencer else set(COMMANDS)
         with tempfile.TemporaryDirectory(prefix="battuta-release-install-", dir="/tmp") as directory:
             work = Path(directory)
             env = {key: value for key, value in os.environ.items() if key not in {"VIRTUAL_ENV", "PYTHONPATH", "UV_PROJECT_ENVIRONMENT", "UV_TOOL_DIR", "UV_TOOL_BIN_DIR", "UV_PYTHON_PREFERENCE"}}
@@ -47,13 +51,13 @@ class ReleaseInstallation(unittest.TestCase):
             Path(env["HOME"]).mkdir()
             def run(*args, **kwargs):
                 return subprocess.run(args, env=kwargs.pop("env", env), cwd=work, check=True, text=True, **kwargs)
-            for manifest in (assets / "python-tools-SHA256SUMS", assets / f"battuta-{tag}-linux-arm64.tar.gz.sha256"):
+            for manifest in (assets / "python-tools-SHA256SUMS", assets / f"{archive}.sha256"):
                 for line in manifest.read_text().splitlines():
                     digest, name = line.split()
                     self.assertEqual(Path(name).name, name)
                     self.assertEqual(hashlib.sha256((assets / name).read_bytes()).hexdigest(), digest)
             wheels = [(wheel, wheel_metadata(wheel)) for wheel in assets.glob("*.whl")]
-            self.assertEqual(len(wheels), 6)
+            self.assertEqual({metadata["Name"] for _, metadata in wheels}, packages)
             self.assertFalse(list(assets.glob("*-constraints.txt")))
             installed = {}
             for wheel, metadata in wheels:
@@ -81,7 +85,7 @@ for value in data['requires']:
                 payload = json.dumps({"requires": metadata.get_all("Requires-Dist", []), "versions": json.loads(versions)})
                 run(str(installed["battuta-packaging"][1] / "bin/python"), "-c", check, input=payload)
             root = work / "relocated-install"
-            run(str(installed["battuta-packaging"][0] / "battuta-packaging"), "extract-bots", "--archive", str(assets / f"battuta-{tag}-linux-arm64.tar.gz"), "--root", str(root))
+            run(str(installed["battuta-packaging"][0] / "battuta-packaging"), "extract-bots", "--archive", str(assets / archive), "--root", str(root))
             node = shutil.which("node", path=env["PATH"])
             run(str(installed["battuta-packaging"][0] / "battuta-packaging"), "install-runtime", "--root", str(root), "--node", node)
             entries = [str(path.relative_to(root)) for path in (root / "bots").glob("*/.pi/extensions/*/dist/index.js")]
@@ -90,18 +94,23 @@ for value in data['requires']:
             run(node, "--input-type=module", "-e", code)
             env_file = work / ".env.prod"
             template = run(str(installed["battuta-bot-setup"][0] / "battuta-bot-setup"), "env-example", capture_output=True).stdout
-            env_file.write_text(template + "\nBATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=general\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\nLINEAR_API_TOKEN=fixture\nCOS_TELEGRAM_TOKEN=101:fixture\nTELEGRAM_ALLOWED_USER_ID=123\nBATTUTA_DREAM_MODEL=fixture/model\n")
-            agent = Path(env["HOME"]) / ".battuta/pi-bots/cos-bot/.pi"
-            agent.mkdir(parents=True)
-            (agent / "settings.json").write_text("{}")
-            run(str(installed["battuta-bot-setup"][0] / "battuta-bot-setup"), "configure-release", "--root", str(root), "--env-file", str(env_file))
-            self.assertTrue((Path(env["HOME"]) / ".battuta/pi-bots/worker-2/.pi/mcp.json").is_file())
-            self.assertFalse((root / "skills-hub").exists())
-            # Only disposable schedule/config files: no scheduler or model is running.
-            settings = json.loads((root / "bots/cos-bot/.pi/settings.json").read_text())
-            self.assertNotIn("extensions", settings)
-            self.assertTrue((root / "bots/cos-bot/.pi/extensions/dream/dist/index.js").is_file())
-            run(str(installed["battuta-memory"][1] / "bin/python"), "-c", "import sqlite3,sqlite_vec,onnxruntime,tokenizers; c=sqlite3.connect(':memory:'); c.enable_load_extension(True); sqlite_vec.load(c); c.close(); assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()")
+            if influencer:
+                env_file.write_text(template + "\nBATTUTA_WORKER_1_TYPE=influencer\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\nLINEAR_API_TOKEN=fixture\nCOS_TELEGRAM_TOKEN=101:fixture\nTELEGRAM_ALLOWED_USER_ID=123\nBATTUTA_DREAM_MODEL=fixture/model\n")
+                run(str(installed["battuta-bot-setup"][0] / "battuta-bot-setup"), "configure-release", "--root", str(root), "--env-file", str(env_file), "--deployment", "influencer")
+                self.assertFalse((root / "skills-hub").exists())
+            else:
+                env_file.write_text(template + "\nBATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=general\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\nLINEAR_API_TOKEN=fixture\nCOS_TELEGRAM_TOKEN=101:fixture\nTELEGRAM_ALLOWED_USER_ID=123\nBATTUTA_DREAM_MODEL=fixture/model\n")
+                agent = Path(env["HOME"]) / ".battuta/pi-bots/cos-bot/.pi"
+                agent.mkdir(parents=True)
+                (agent / "settings.json").write_text("{}")
+                run(str(installed["battuta-bot-setup"][0] / "battuta-bot-setup"), "configure-release", "--root", str(root), "--env-file", str(env_file), "--deployment", "main")
+                self.assertTrue((Path(env["HOME"]) / ".battuta/pi-bots/worker-2/.pi/mcp.json").is_file())
+                self.assertFalse((root / "skills-hub").exists())
+                # Only disposable schedule/config files: no scheduler or model is running.
+                settings = json.loads((root / "bots/cos-bot/.pi/settings.json").read_text())
+                self.assertNotIn("extensions", settings)
+                self.assertTrue((root / "bots/cos-bot/.pi/extensions/dream/dist/index.js").is_file())
+                run(str(installed["battuta-memory"][1] / "bin/python"), "-c", "import sqlite3,sqlite_vec,onnxruntime,tokenizers; c=sqlite3.connect(':memory:'); c.enable_load_extension(True); sqlite_vec.load(c); c.close(); assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()")
 
 
 if __name__ == "__main__":

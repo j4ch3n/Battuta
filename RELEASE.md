@@ -1,7 +1,8 @@
-# OCI Ampere A1 release setup
+# Battuta release setup
 
-Fresh Battuta installation on **Oracle Linux 9 / AArch64**, as the ordinary bot
-user. nvm and uv must already be configured. Do not install them, replace system
+Fresh Battuta installation on **AArch64** as the ordinary bot user: **Oracle Linux 9**
+(platform `oracle-ampere`, main bundle) or **Raspberry Pi OS 12 / Debian bookworm**
+(platform `raspberry-pi`, influencer bundle). nvm and uv must already be configured. Do not install them, replace system
 Python, or run Battuta with sudo. Remote Supabase migrations and Edge Functions
 must already be provisioned separately.
 
@@ -12,9 +13,11 @@ human acceptance, not agent-run setup checks.
 
 ## Choose the installation bundle
 
-Ask the owner which bundle to set up if not specified. Use the same verified release
-archive and six Python wheels for both; the bundle controls private configuration
-and generated services, not the files included in the downloaded archive.
+Ask the owner which bundle to set up if not specified. Each bundle has its own
+platform archive and install instructions: main uses `oracle-ampere`, influencer uses
+`raspberry-pi`. Each bundle installs only its wheels: main needs all six, and
+influencer needs all except `battuta-memory`. The bundle controls private
+configuration and generated services, not the files included in the archive.
 
 | Bundle             | `deployment` | Configured bots                        | Services to activate after approval                       | Setup validation                                                                           |
 | ------------------ | ------------ | -------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -72,15 +75,19 @@ guide does not migrate deployments or provide database rollback.
 
 Use Bash with shell tracing disabled. The bot user needs `curl`, `sha256sum`,
 `script`, working systemd user services, and tmux for requested UI maintenance.
-Oracle Linux native libraries include `libstdc++` and `libgomp`; have the
+The OS native libraries include `libstdc++` and `libgomp`; have the
 administrator supply missing OS packages rather than changing system packages
 during agent-run checks.
 
 ```bash
 set -euo pipefail
 case "${deployment:-}" in main|influencer) ;; *) printf 'STOP: choose a bundle first.\n' >&2; exit 1 ;; esac
+case "${platform:-}" in oracle-ampere|raspberry-pi) ;; *) printf 'STOP: set platform from the instructions.\n' >&2; exit 1 ;; esac
 source /etc/os-release
-test "$ID" = ol && test "${VERSION_ID%%.*}" = 9
+case "$platform" in
+  oracle-ampere) test "$ID" = ol && test "${VERSION_ID%%.*}" = 9 ;;
+  raspberry-pi) test "$ID" = debian && test "${VERSION_ID%%.*}" = 12 ;;
+esac
 test "$(uname -m)" = aarch64
 test "$(getconf LONG_BIT)" = 64
 command -v uv curl sha256sum script systemctl tmux
@@ -99,18 +106,21 @@ not by starting a bot during setup.
 Download these assets from the selected GitHub Release into a separate download
 directory, not the installation:
 
-- `battuta-vX.Y.Z-linux-arm64.tar.gz` and its `.sha256`.
-- Six wheels: `battuta-project`, `battuta-artifacts`, `battuta-memory`, `battuta-speech`,
-  `battuta-bot-setup`, and `battuta-packaging` (wheel filenames use underscores).
+- `battuta-vX.Y.Z-<platform>-arm64.tar.gz` and its `.sha256`, for your platform.
+- Wheels for your bundle (filenames use underscores): `battuta-project`, `battuta-artifacts`,
+  `battuta-speech`, `battuta-bot-setup`, and `battuta-packaging`; main also needs `battuta-memory`.
 - `python-tools-version.txt` and `python-tools-SHA256SUMS`.
 
-Set the real tag and absolute installation path; paths used by service generation
-must not contain spaces or systemd special characters. From the download directory:
+Set the real tag and platform. Ask the owner for the absolute installation path if it
+is not given; do not choose one. It must be new and empty, and service generation
+rejects paths with spaces or systemd special characters. From the download directory:
 
 ```bash
 version=vX.Y.Z
-install_path="$HOME/battuta/current"
-sha256sum -c "battuta-$version-linux-arm64.tar.gz.sha256"
+platform=oracle-ampere # raspberry-pi for the influencer bundle
+archive="battuta-$version-$platform-arm64.tar.gz"
+install_path="<absolute path the owner approved>"
+sha256sum -c "$archive.sha256"
 sha256sum -c python-tools-SHA256SUMS
 tool_version="$(cat python-tools-version.txt)"
 ```
@@ -126,13 +136,17 @@ uv reads that metadata automatically; there are no separate constraint files,
 source installations, or `--with` arguments.
 
 ```bash
-for package in battuta-project battuta-artifacts battuta-memory battuta-speech battuta-bot-setup battuta-packaging; do
+case "$deployment" in
+  main) packages="battuta-project battuta-artifacts battuta-memory battuta-speech battuta-bot-setup battuta-packaging" ;;
+  influencer) packages="battuta-project battuta-artifacts battuta-speech battuta-bot-setup battuta-packaging" ;;
+esac
+for package in $packages; do
   wheel="${package//-/_}-$tool_version-py3-none-any.whl"
   uv tool install --managed-python --python 3.12 --no-build "./$wheel"
 done
 export PATH="$(uv tool dir --bin):$PATH"
-for command in battuta-project battuta-artifact battuta-memory battuta-speech battuta-bot-setup battuta-packaging; do
-  "$command" --help >/dev/null
+for package in $packages; do
+  "${package/battuta-artifacts/battuta-artifact}" --help >/dev/null
 done
 ```
 
@@ -141,8 +155,10 @@ All commands must succeed. A direct wheel URL also works with
 additionally verifies the downloaded top-level wheel checksums and refuses native
 source compilation. Pins are not a dependency hash lock or an offline wheelhouse.
 
-All six tools need their own installation so their CLI commands are exposed.
-An internal dependency inside another tool's environment does not expose its CLI.
+Each listed wheel needs its own tool installation so its CLI command is exposed.
+An internal dependency inside another tool's environment does not expose its CLI,
+so `battuta-project` must be installed even though `battuta-artifacts` depends on it.
+`battuta-bot-setup` is used for configuration and `battuta-packaging` by generated services.
 Project registrations live under `~/.battuta/projects`. Initializing a project
 from GitHub also requires Git and the GitHub CLI (`gh`), authenticated as the bot
 user with access to the intended repository. Name-only initialization needs neither.
@@ -153,7 +169,7 @@ Generated services include the uv tool directory on `PATH`; ensure custom Git an
 
 ```bash
 battuta-packaging extract-bots \
-  --archive "battuta-$version-linux-arm64.tar.gz" --root "$install_path"
+  --archive "$archive" --root "$install_path"
 node_version="$(uv run --no-project --python 3.12 python -c 'import json,sys; print(json.load(open(sys.argv[1]))["node"])' "$install_path/bots/release.json")"
 package_manager="$(uv run --no-project --python 3.12 python -c 'import json,sys; print(json.load(open(sys.argv[1]))["packageManager"])' "$install_path/bots/release.json")"
 source "${NVM_DIR:-$HOME/.nvm}/nvm.sh"

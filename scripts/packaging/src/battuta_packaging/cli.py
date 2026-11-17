@@ -12,6 +12,7 @@ from .runtime import install_runtime
 from .launch import run_bot
 from bot_setup.env import read_env
 from .wheel_metadata import build_wheels
+from .instructions import BUNDLES, render_instructions
 
 
 @click.group()
@@ -27,6 +28,19 @@ def main():
 def wheels(source, output, tag, tool_version):
     """Build self-describing release wheels from checked-in runtime locks."""
     build_wheels(source, output, tag=tag, tool_version=tool_version)
+
+
+@main.command("render-instructions")
+@click.option("--source", required=True, type=click.Path(exists=True, file_okay=False, path_type=Path, resolve_path=True))
+@click.option("--platform", required=True, type=click.Choice(sorted(BUNDLES)))
+@click.option("--tag", required=True)
+@click.option("--tool-version", required=True)
+@click.option("--archive", required=True, type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--wheels-dir", required=True, type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option("--output", required=True, type=click.Path(dir_okay=False, path_type=Path))
+def instructions(source, platform, tag, tool_version, archive, wheels_dir, output):
+    """Render the platform install instructions for a release."""
+    output.write_text(render_instructions(source, platform, tag=tag, tool_version=tool_version, archive=archive, wheels_dir=wheels_dir))
 
 
 @main.command("stage-bots")

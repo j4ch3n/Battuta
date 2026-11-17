@@ -1,0 +1,106 @@
+Battuta {{ tag }} install instructions: Raspberry Pi (influencer machine)
+========================================================================
+
+Bundle:        influencer (one influencer worker, artifacts, speech)
+Platform:      Raspberry Pi OS 12 (Debian bookworm) on 64-bit ARM (AArch64)
+Tool version:  {{ tool_version }}
+Release page:  {{ release_url }}
+Repository:    {{ repo_url }}
+
+Run these steps as the ordinary bot user. Do not use sudo. Stop on any failed
+command. Follow RELEASE.md in the archive for the detailed setup; it is the
+authoritative guide for the setup steps in sections 4 to 6 below.
+
+1. Download
+-----------
+
+Download into a new, empty directory outside the installation path.
+
+  Archive:            {{ release_url }}/{{ archive_name }}
+  Archive checksum:   {{ release_url }}/{{ archive_name }}.sha256
+  Archive SHA-256:    {{ archive_sha256 }}
+  Wheel checksums:    {{ release_url }}/python-tools-SHA256SUMS
+  Tool version file:  {{ release_url }}/python-tools-version.txt
+{% for wheel in wheels %}
+  {{ wheel.package }}:
+    {{ wheel.url }}
+    SHA-256: {{ wheel.sha256 }}
+{% endfor %}
+
+The influencer bundle does not use `battuta-memory`.
+
+2. Verify checksums
+-------------------
+
+Every check must report OK. Never extract or install an unverified download.
+
+  version={{ tag }}
+  platform={{ platform }}
+  archive="{{ archive_name }}"
+  sha256sum -c "$archive.sha256"
+  sha256sum -c python-tools-SHA256SUMS
+  tool_version="$(cat python-tools-version.txt)"
+
+3. Install or upgrade the Python tools
+--------------------------------------
+
+Install the wheels for this bundle. Each wheel needs its own tool
+installation so its command is on PATH. `--force` replaces an earlier version
+of the same tool, which is how upgrades are applied.
+
+{% for wheel in wheels %}
+  uv tool install --managed-python --python 3.12 --no-build --force "./{{ wheel.filename }}"
+{% endfor %}
+  export PATH="$(uv tool dir --bin):$PATH"
+  battuta-project --help >/dev/null
+  battuta-artifact --help >/dev/null
+  battuta-speech --help >/dev/null
+  battuta-bot-setup --help >/dev/null
+  battuta-packaging --help >/dev/null
+
+4. Extract the release and read RELEASE.md
+------------------------------------------
+
+Unpack the archive to read the guide; the installation is extracted separately.
+
+  mkdir release && tar -xzf "$archive" -C release
+  less release/RELEASE.md
+
+Ask the owner for the absolute installation path to use. It must be new and empty,
+and must not contain spaces. Never reuse a path, and never clear ~/.battuta or service
+data. If the owner has not given a path, stop and ask rather than choosing one.
+
+  install_path="<absolute path the owner approved>"
+  deployment={{ deployment }}
+
+Then follow RELEASE.md from "Choose the installation bundle" through step 6,
+using the same archive and `install_path`. Sections 1 to 3 above cover RELEASE.md
+steps 1 and 2, so start at RELEASE.md step 3 with `battuta-packaging extract-bots`.
+Choose the influencer bundle, which configures exactly one influencer worker.
+
+ADB is required on this machine: the owner provides an authorized Android device
+with USB debugging, and ADBKeyboard for Unicode input. Confirm `command -v adb`
+succeeds. Device readiness is checked on launch, not during setup.
+
+5. Upgrade
+----------
+
+Install a new release into a new, empty path that the owner approves.
+Stop affected services and get owner approval before switching the running
+installation. Existing `~/.battuta` configuration is kept.
+
+6. Launch the server
+--------------------
+
+Launch is an owner decision. After setup validation passes, generate the
+services and review the printed activation command, which covers artifacts,
+speech, and the influencer worker. Activate it only with owner approval.
+
+  battuta-packaging install-services --root "$install_path" \
+    --env-file "$HOME/.battuta/.env.prod" --node "$node" --deployment "$deployment"
+
+7. Links
+
+  Release page:      {{ release_url }}
+  Repository:        {{ repo_url }}
+  Archive (contains RELEASE.md):  {{ release_url }}/{{ archive_name }}
