@@ -11,8 +11,7 @@ from importlib.metadata import version
 from pathlib import Path
 
 from .config import DIMENSION, MODEL, MemoryConfig
-
-EMBEDDING_TOKEN_LIMIT = 512
+from .limits import EMBEDDING_TOKEN_LIMIT, EMBEDDING_TRUNCATION_SLACK
 
 
 class TerminalMutationError(ValueError):
@@ -104,7 +103,7 @@ class UpstreamAdapter:
         # shortcut: leaves slack below the limit so re-tokenizing the decoded text still fits, upgrade if exact fit matters
         counter = self._counter()
         ids = counter.encode(text, add_special_tokens=False).ids
-        return text if self.embedding_fits(text) else counter.decode(ids[:EMBEDDING_TOKEN_LIMIT - 16])
+        return text if self.embedding_fits(text) else counter.decode(ids[:EMBEDDING_TOKEN_LIMIT - EMBEDDING_TRUNCATION_SLACK])
 
     def embed(self, text):
         from sqlite_vec import serialize_float32

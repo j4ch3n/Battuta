@@ -5,6 +5,7 @@ import unicodedata
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from .limits import MAX_TEXT_CHARS
 
 
 class Contract(BaseModel):
@@ -117,7 +118,7 @@ class MemoryMetadata(Contract):
 
 
 class RememberContent(Tagged):
-    content: str = Field(min_length=1, max_length=16000)
+    content: str = Field(min_length=1, max_length=MAX_TEXT_CHARS)
     projects: list[str] = Field(min_length=1, max_length=100)
     _projects = field_validator("projects")(project_names)
 
@@ -160,8 +161,8 @@ class Selector(Tagged):
 
 class RecallRequest(Selector):
     selector: Literal["projects", "global", "all"] = "all"
-    semantic_query: str | None = Field(default=None, min_length=1, max_length=16000)
-    semantic_queries: list[Annotated[str, Field(min_length=1, max_length=16000)]] = Field(default_factory=list)
+    semantic_query: str | None = Field(default=None, min_length=1, max_length=MAX_TEXT_CHARS)
+    semantic_queries: list[Annotated[str, Field(min_length=1, max_length=MAX_TEXT_CHARS)]] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list, max_length=32)
     limit: int = Field(default=10, ge=1, le=100)
     include_expired: bool = False
@@ -229,7 +230,7 @@ class UpdateRequest(GetRequest, EvidenceGuard):
     memory_metadata: MemoryMetadata | None = None
     sources: list[SourceRef] = Field(default_factory=list, max_length=200)
     expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    content: str = Field(min_length=1, max_length=16000)
+    content: str = Field(min_length=1, max_length=MAX_TEXT_CHARS)
     reason: str = Field(min_length=1, max_length=1000)
     kind: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_-]{0,39}$")
     tags: list[str] | None = None

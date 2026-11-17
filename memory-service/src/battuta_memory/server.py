@@ -8,6 +8,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.routing import Route
 from .capture import CaptureService
+from .limits import EMBEDDING_TOKEN_LIMIT
 from .contracts import Contract, RememberRequest, RecallRequest, ListRequest, GetRequest, UpdateRequest, LinkRequest, ForgetRequest, CaptureBatch, InventoryRequest, ClusterRequest, ConsolidateGlobalRequest
 from .service import MemoryService
 from .records import public_response
@@ -74,7 +75,7 @@ def create_protocol_server(get_service):
             # ValidationError strings include rejected content: never return them verbatim.
             embedding_limit = validation and str(error).startswith("Memory exceeds embedding token limit")
             payload = {"ok": False, "error": {"code": "embedding_limit" if embedding_limit else "invalid_request" if validation else "backend_unavailable",
-                "message": "Semantic query exceeds 512 tokenizer tokens; shorten or split it" if embedding_limit else "Invalid request or conflicting memory state" if validation else "Memory backend unavailable; retry later",
+                "message": f"Semantic query exceeds {EMBEDDING_TOKEN_LIMIT} tokenizer tokens; shorten or split it" if embedding_limit else "Invalid request or conflicting memory state" if validation else "Memory backend unavailable; retry later",
                 "retryable": not validation}}
             if validation and type(error) is ValueError and str(error) in SAFE_ERRORS:
                 payload["error"].update(code=SAFE_ERRORS[str(error)], message=str(error))

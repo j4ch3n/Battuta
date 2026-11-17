@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from .scope import resolve_selector, resolve_scope, project_tag
 from .contracts import UpdateRequest, ListRequest
+from .limits import MAX_RECALL_SEARCH_LIMIT
 from .records import eligible_records
 from .retrieval import fuse_ranks, interleave_ranks
 from .rendering import render_memories, evidence_closure
@@ -49,7 +50,7 @@ class MemoryService:
                     if self.state is None:
                         raise RuntimeError("Keyword index unavailable")
                     await self._reconcile_index()
-                    lexical = self.state.lexical_search(request.keywords, eligible, min(request.limit, 20))
+                    lexical = self.state.lexical_search(request.keywords, eligible, min(request.limit, MAX_RECALL_SEARCH_LIMIT))
                     branches["lexical"] = "ready"
                 except Exception:
                     branches["lexical"] = "unavailable"
@@ -68,7 +69,7 @@ class MemoryService:
     async def _semantic_search(self, request, selected, eligible):
         # Combined query first; otherwise each query alone, truncated to the embedding limit.
         eligible_refs = [r["ref"] for r in eligible]
-        limit = min(request.limit, 20)
+        limit = min(request.limit, MAX_RECALL_SEARCH_LIMIT)
         combined = "\n\n".join(request.semantic_queries)
         queries = [combined] if self.adapter.embedding_fits(combined) else [
             self.adapter.truncate_for_embedding(q) for q in request.semantic_queries]

@@ -3,6 +3,7 @@
 import json
 import re
 from datetime import datetime
+from .limits import MAX_RECALL_CONTEXT_BYTES
 from .records import eligible_records
 
 
@@ -13,7 +14,7 @@ def _redact(text):
     return re.sub(r"\b(?:[A-Za-z][A-Za-z0-9_]*_)?(?:password|passwd|pwd|api[ _-]?key|api[ _-]?secret|access[ _-]?token|refresh[ _-]?token|auth[ _-]?token|client[ _-]?secret|private[ _-]?key|secret[ _-]?key|token)['\"]?\s*(?:(?:is(?: set to)?|was(?: set to)?|equals)\s+|[=:]\s*)[^\r\n]+", "[REDACTED:credential]", text, flags=re.I)
 
 
-def render_memories(seeds, evidence, now, max_bytes=4000):
+def render_memories(seeds, evidence, now, max_bytes=MAX_RECALL_CONTEXT_BYTES):
     lookup = {r["ref"]: r for r in evidence}
     current = {r["ref"] for r in eligible_records(evidence, now)}
     historical = {r["ref"] for r in eligible_records(evidence, now, True)}
