@@ -2,6 +2,8 @@ import json
 import os
 import sqlite3
 
+import sqlite_vec
+
 
 class StateStore:
     def __init__(self, conn):
@@ -13,6 +15,9 @@ class StateStore:
         fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
         os.close(fd)
         conn = sqlite3.connect(path)
+        conn.enable_load_extension(True)
+        sqlite_vec.load(conn)
+        conn.enable_load_extension(False)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS intents(key TEXT PRIMARY KEY, digest TEXT NOT NULL, payload TEXT, result TEXT);
@@ -21,6 +26,14 @@ class StateStore:
             CREATE TABLE IF NOT EXISTS global_graph(slot TEXT PRIMARY KEY CHECK(slot IN ('active','draft')), payload TEXT NOT NULL);
             CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(ref UNINDEXED, content, keywords);
             CREATE TABLE IF NOT EXISTS memory_fts_revisions(ref TEXT PRIMARY KEY, revision TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS memory_vectors(
+                id INTEGER PRIMARY KEY,
+                ref TEXT NOT NULL,
+                kind TEXT NOT NULL CHECK(kind IN ('primary','hypothesis','cue','none')),
+                angle TEXT,
+                embedding BLOB NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS memory_vectors_ref ON memory_vectors(ref);
             PRAGMA user_version=1;
         """)
         return cls(conn)
@@ -95,6 +108,54 @@ class StateStore:
             JOIN memory_fts_revisions r ON r.ref=memory_fts.ref
             JOIN json_each(?) e ON e.key=r.ref AND e.value=r.revision
             WHERE memory_fts MATCH ? ORDER BY bm25(memory_fts), memory_fts.ref LIMIT ?""", (eligible, match, limit))]
+
+    @staticmethod
+    def _own_kind(record):
+        inference = (record.get("memory_metadata") or {}).get("knowledge_type") == "inference"
+        return "hypothesis" if inference else "primary"
+
+    def missing_vector_refs(self, records):
+        have = {ref for (ref,) in self.conn.execute("SELECT ref FROM memory_vectors WHERE kind IN ('primary','hypothesis')")}
+        return [r["ref"] for r in records if r["active"] and r["ref"] not in have]
+
+    def reconcile_vectors(self, records, vectors):
+        active = {r["ref"]: r for r in records if r["active"]}
+        own = dict(self.conn.execute("SELECT ref,kind FROM memory_vectors WHERE kind IN ('primary','hypothesis')"))
+        with self.conn:
+            for (ref,) in self.conn.execute("SELECT DISTINCT ref FROM memory_vectors").fetchall():
+                if ref not in active:
+                    self.conn.execute("DELETE FROM memory_vectors WHERE ref=?", (ref,))
+            for ref, record in active.items():
+                kind = self._own_kind(record)
+                if ref in own:
+                    if own[ref] != kind:
+                        self.conn.execute("UPDATE memory_vectors SET kind=?,angle=? WHERE ref=? AND kind IN ('primary','hypothesis')", (kind, kind, ref))
+                elif ref in vectors:
+                    self.conn.execute("INSERT INTO memory_vectors(ref,kind,angle,embedding) VALUES(?,?,?,?)", (ref, kind, kind, vectors[ref]))
+
+    def vector_search(self, query, refs, max_distance, limit):
+        if not refs:
+            return []
+        return [row[0] for row in self.conn.execute("""SELECT v.ref FROM memory_vectors v
+            JOIN json_each(?) e ON e.value=v.ref
+            WHERE v.kind!='none'
+            GROUP BY v.ref HAVING min(vec_distance_l2(v.embedding,?))<=?
+            ORDER BY min(vec_distance_l2(v.embedding,?)), v.ref LIMIT ?""", (json.dumps(refs), query, max_distance, query, limit))]
+
+    def cue_targets(self, records, limit):
+        done = {ref for (ref,) in self.conn.execute("SELECT ref FROM memory_vectors WHERE kind IN ('cue','none')")}
+        return [r["ref"] for r in records if r["active"] and r["ref"] not in done][:limit]
+
+    def replace_cues(self, ref, cues):
+        with self.conn:
+            own = self.conn.execute("SELECT embedding FROM memory_vectors WHERE ref=? AND kind IN ('primary','hypothesis')", (ref,)).fetchone()
+            if not own:
+                raise ValueError("Memory has no vector")
+            self.conn.execute("DELETE FROM memory_vectors WHERE ref=? AND kind IN ('cue','none')", (ref,))
+            if cues:
+                self.conn.executemany("INSERT INTO memory_vectors(ref,kind,angle,embedding) VALUES(?,'cue',?,?)", [(ref, angle, blob) for angle, blob in cues])
+            else:
+                self.conn.execute("INSERT INTO memory_vectors(ref,kind,angle,embedding) VALUES(?,'none',NULL,?)", (ref, own[0]))
 
     def _graph(self, slot):
         row = self.conn.execute("SELECT payload FROM global_graph WHERE slot=?", (slot,)).fetchone()
