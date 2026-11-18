@@ -3,7 +3,8 @@
     "assignments": {
       "url": "http://127.0.0.1:54321/functions/v1/assignments",
       "headers": {
-        "apikey": "${SUPABASE_SECRET_KEY}"
+        "apikey": "${SUPABASE_SECRET_KEY}",
+        "X-Battuta-Projects-Root": "${BATTUTA_PROJECTS_ROOT_HEADER}"
       },
       "exposure": "hidden",
       "description": "Shared project assignments, ordered TODOs, and local note paths",
@@ -16,6 +17,21 @@
     },
     "memory": {
       "enabled": false
+    },
+    "speech": {
+      "url": "http://127.0.0.1:8902/mcp",
+      "exposure": "codemode"
+    },
+    "assignment-files": {
+      "url": "http://127.0.0.1:54321/functions/v1/assignment-files",
+      "headers": {
+        "apikey": "${SUPABASE_SECRET_KEY}"
+      },
+      "exposure": "hidden",
+      "toolExposure": {
+        "list_assignment_files": "codemode",
+        "download_assignment_file": "codemode"
+      }
     }
   }
 }
