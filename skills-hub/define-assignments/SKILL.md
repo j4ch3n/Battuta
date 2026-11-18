@@ -26,7 +26,7 @@ permission to publish, interact, or access an account or device.
 
 | Mission | Requirement | Available functions |
 | --- | --- | --- |
-| General research or other non-mobile work | `research` | The general worker can research with web access, use a browser, and delegate to researcher and reviewer subagents. Use it for investigation, analysis, and other work that does not require a phone. |
+| General research or other non-mobile work | `research` | The general worker can research with web access, use a browser, delegate research to a subagent, and delegate coding, planning and review to Claude Code. Use it for investigation, analysis, and other work that does not require a phone. |
 | Work on an authorized Android device | `mobile-control` | The influencer worker can control the phone and access the web. Use it to browse apps, prepare content, or, only when explicitly authorized, post or reply. |
 
 With todo, omit `require_abilities` for the default

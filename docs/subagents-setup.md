@@ -61,7 +61,7 @@ test -f bots/worker/.pi/skills/research/SKILL.md
 test -f bots/worker/.pi/skills/research/references/investigation.md
 ```
 
-Inspect the package version and both definitions, then verify instance copies
+Inspect the package version and the definition, then verify instance copies
 under `$HOME/.battuta/pi-bots/worker-N/.pi/agents/`. For releases, inspect the
 equivalent files inside the installation. Missing files or an incorrect version
 mean setup is incomplete; stop rather than starting workers.

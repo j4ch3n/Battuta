@@ -62,6 +62,8 @@ export default function worker(pi: ExtensionAPI) {
     },
   });
   pi.on("before_agent_start", (event) => {
+    // Only bots that install the delegate tool may be told to use it.
+    if (!pi.getAllTools().some((tool) => tool.name === "delegate")) return;
     event.systemPromptOptions.sections["delegation-models"] = renderDelegationSection(
       delegationCatalog(process.env),
     );

@@ -24,7 +24,7 @@ test.each([undefined, "", "  "])("unset value %j leaves the tier out", (value) =
   expect(delegationCatalog({ MODEL_FOR_EASY_TASKS: value })).toEqual([]);
 });
 
-test.each(["openai/gpt-x", "gpt-x", "anthropic/", "/gpt-x"])(
+test.each(["openai/gpt-x", "gpt-x", "anthropic/", "/gpt-x", "anthropic/claude haiku"])(
   "value %j is unusable and names its variable",
   (value) => {
     const [entry] = delegationCatalog({ MODEL_FOR_MEDIUM_TASKS: value });

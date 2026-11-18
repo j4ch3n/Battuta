@@ -17,7 +17,7 @@ export function delegationCatalog(env: Record<string, string | undefined>): Cata
     const slash = value.indexOf("/");
     const model = value.slice(slash + 1);
     entries.push(
-      slash > 0 && value.slice(0, slash) === "anthropic" && model
+      slash > 0 && value.slice(0, slash) === "anthropic" && model && !/\s/.test(model)
         ? { tier, variable, model }
         : { tier, variable, error: `${variable} must be anthropic/<model-id>` },
     );

@@ -167,7 +167,7 @@ test.each([undefined, "", " "])(
   },
 );
 
-test("session start injects the delegation model catalog into the prompt sections", async () => {
+async function promptSections(toolNames: string[]) {
   vi.stubEnv("MODEL_FOR_EASY_TASKS", "anthropic/claude-easy-test");
   const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => unknown>();
   worker({
@@ -176,10 +176,19 @@ test("session start injects the delegation model catalog into the prompt section
     registerCommand: vi.fn(),
     setActiveTools: vi.fn(),
     sendUserMessage: vi.fn(),
+    getAllTools: () => toolNames.map((name) => ({ name })),
   } as unknown as ExtensionAPI);
   const event = { systemPromptOptions: { sections: {} as Record<string, string> } };
   await handlers.get("before_agent_start")!(event, {} as ExtensionContext);
-  expect(event.systemPromptOptions.sections["delegation-models"]).toContain("claude-easy-test");
+  return event.systemPromptOptions.sections;
+}
+
+test("a bot with the delegate tool gets the delegation model catalog in its prompt", async () => {
+  expect((await promptSections(["delegate"]))["delegation-models"]).toContain("claude-easy-test");
+});
+
+test("a bot without the delegate tool gets no delegation section", async () => {
+  expect(await promptSections(["read"])).not.toHaveProperty("delegation-models");
 });
 
 test("a bound native extension dispatches its TODO through Pi without a host sender", async () => {
