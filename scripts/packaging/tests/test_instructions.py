@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[3]
 TAG = "v0.3.4"
 TOOL_VERSION = "0.3.4+g189e492"
 RELEASE_URL = f"https://github.com/j4ch3n/Battuta/releases/download/{TAG}"
-PACKAGES = ["battuta_project", "battuta_artifacts", "battuta_memory", "battuta_speech", "battuta_bot_setup", "battuta_packaging"]
+PACKAGES = ["battuta_project", "battuta_artifacts", "battuta_memory", "battuta_speech", "battuta_doc", "battuta_bot_setup", "battuta_packaging"]
 
 
 @pytest.fixture
@@ -39,7 +39,7 @@ def render(release, platform):
     "platform,expected,absent",
     [
         ("oracle-ampere", PACKAGES, []),
-        ("raspberry-pi", [p for p in PACKAGES if p != "battuta_memory"], ["battuta_memory"]),
+        ("raspberry-pi", [p for p in PACKAGES if p not in ("battuta_memory", "battuta_doc")], ["battuta_memory", "battuta_doc"]),
     ],
 )
 def test_each_bundle_lists_only_its_wheels_with_release_links_and_digests(release, platform, expected, absent):

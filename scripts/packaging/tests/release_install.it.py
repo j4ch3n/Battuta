@@ -17,6 +17,7 @@ COMMANDS = {
     "battuta-artifacts": "battuta-artifact",
     "battuta-memory": "battuta-memory",
     "battuta-speech": "battuta-speech",
+    "battuta-doc": "battuta-doc",
     "battuta-bot-setup": "battuta-bot-setup",
     "battuta-packaging": "battuta-packaging",
 }

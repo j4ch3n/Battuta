@@ -123,18 +123,18 @@ def services(root, env_file, node, replace, deployment):
 
 
 @main.command("run-component")
-@click.option("--component", required=True, type=click.Choice(["memory", "artifacts", "speech"]))
+@click.option("--component", required=True, type=click.Choice(["memory", "artifacts", "speech", "doc"]))
 @click.option("--env-file", required=True, type=click.Path(exists=True, dir_okay=False, path_type=Path))
 def component(component, env_file):
     """Run an installed application server with its private environment."""
-    command = {"memory": "battuta-memory", "artifacts": "battuta-artifact", "speech": "battuta-speech"}[component]
+    command = {"memory": "battuta-memory", "artifacts": "battuta-artifact", "speech": "battuta-speech", "doc": "battuta-doc"}[component]
     executable = shutil.which(command)
     if not executable:
         raise click.ClickException(f"Install {command} from the matching release wheel first")
     env = {**os.environ, **read_env(env_file)}
     env = {key: value for key, value in env.items() if "TELEGRAM" not in key}
     os.umask(0o077)
-    os.execve(executable, [executable] if component == "speech" else [executable, "serve"], env)
+    os.execve(executable, [executable] if component in ("speech", "doc") else [executable, "serve"], env)
 
 
 if __name__ == "__main__":

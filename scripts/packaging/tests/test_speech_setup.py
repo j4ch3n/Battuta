@@ -10,6 +10,12 @@ def test_verify_speech_reports_missing_assets(tmp_path, monkeypatch):
     assert "missing or invalid" in result.output
 
 
+def test_doc_release_wheel_is_registered():
+    from battuta_packaging.wheel_metadata import PROJECTS
+
+    assert PROJECTS["battuta-doc"] == "doc-service"
+
+
 def test_speech_release_wheel_is_registered():
     from battuta_packaging.wheel_metadata import PROJECTS
 
