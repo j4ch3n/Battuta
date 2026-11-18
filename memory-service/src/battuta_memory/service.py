@@ -80,16 +80,22 @@ class MemoryService:
         combined = "\n\n".join(request.semantic_queries)
         queries = [combined] if self.adapter.embedding_fits(combined) else [
             self.adapter.truncate_for_embedding(q) for q in request.semantic_queries]
+        if self.state is None:
+            raise RuntimeError("Vector index unavailable")
+        await self._reconcile_index()
         rankings = []
         for query in queries:
-            hits = await self.adapter.search(request.model_copy(update={"semantic_query": query, "limit": limit}), selected, eligible_refs)
-            rankings.append([r["ref"] for r in hits])
+            vector = await asyncio.to_thread(self.adapter.embed, query)
+            rankings.append(self.state.vector_search(vector, eligible_refs, request.max_distance, limit))
         return interleave_ranks(rankings)
 
     async def _reconcile_index(self):
         request = ListRequest(selector="all")
         records = await self.adapter.list(request, resolve_selector(request))
         self.state.reconcile_index(records)
+        missing = self.state.missing_vector_refs(records)
+        self.state.reconcile_vectors(records, await self.adapter.vectors(missing))
+        return records
 
     async def list(self, request):
         selected = resolve_selector(request)
@@ -123,6 +129,24 @@ class MemoryService:
             if self.state is not None:
                 await self._recover()
             return await self.adapter.inventory(request)
+
+    async def cue_targets(self, request):
+        async with self.mutations:
+            await self._recover()
+            records = sorted((r for r in await self._reconcile_index() if r["active"]), key=lambda r: (r["created_at"], r["ref"]))
+            refs = set(self.state.cue_targets(records, request.limit))
+            return {"records": [r for r in records if r["ref"] in refs]}
+
+    async def set_cues(self, request):
+        async with self.mutations:
+            await self._recover()
+            await self._reconcile_index()
+            current = await self._active(request.ref)
+            if request.expected_revision is not None and current["revision"] != request.expected_revision:
+                raise ValueError("Memory changed since inventory")
+            cues = [(cue.angle, await asyncio.to_thread(self.adapter.embed, cue.text)) for cue in request.cues]
+            self.state.replace_cues(request.ref, cues)
+            return {"ref": request.ref, "cues": len(cues)}
 
     async def cluster(self, request):
         async with self.mutations:

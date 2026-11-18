@@ -91,7 +91,9 @@ Public revisions cover content, scope, source and lifecycle changes. Inventory r
 
 One server process owns the data-directory lock. Upstream owns `memory.db` and
 SQLite/sqlite-vec embeddings. Battuta owns `state.db`: mutation/capture receipts,
-recovery intents, a rebuildable FTS5 index with indexed revisions, and retained
+recovery intents, a rebuildable FTS5 index with indexed revisions, `memory_vectors` (each
+active memory's own vector copied from upstream plus Dream-written recall cue vectors,
+rebuilt by reconcile except for cues), and retained
 optional global-graph generations. These databases are not one transaction.
 CoS's private capture queue and dream checkpoint are delivery/review state, not
 another canonical store. No per-project database or `MEMORY.md` is created.

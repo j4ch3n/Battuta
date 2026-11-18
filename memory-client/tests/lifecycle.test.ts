@@ -247,7 +247,7 @@ const entries = (count: number) =>
   Array.from({ length: count }, (_, i) => ({
     type: "message",
     id: String(i),
-    message: { role: i === 0 ? "user" : "assistant", content: `fact ${i}` },
+    message: { role: i % 2 === 0 ? "user" : "assistant", content: `fact ${i}` },
   }));
 
 test("pre-compaction awaits durable persistence but not extraction or upload, sharing settled-turn recovery", async () => {
@@ -344,11 +344,12 @@ test("a new settled turn survives while an earlier upload is pending", async () 
     await runtime.settle("s", entries(1));
     await uploading;
     await runtime.startRequest("s", entries(1));
-    await runtime.settle("s", entries(2));
+    await runtime.settle("s", entries(3));
     const restored = await CaptureQueue.open(dir, "cos");
     expect(restored.jobs().flatMap((job) => job.segment.messages.map((m) => m.entry_id))).toEqual([
       "0",
       "1",
+      "2",
     ]);
     expect(restored.jobs().every((job) => Object.keys(job.segment).join() === "messages")).toBe(
       true,
@@ -357,6 +358,7 @@ test("a new settled turn survives while an earlier upload is pending", async () 
     await runtime.recover();
     expect(queue.jobs().flatMap((job) => job.segment.messages.map((m) => m.entry_id))).toEqual([
       "1",
+      "2",
     ]);
     await runtime.recover();
     expect(queue.jobs()).toEqual([]);
@@ -566,7 +568,7 @@ test("oversized memories allow one durable rephrase, not repeated paid extractio
   }
 });
 
-test("mail remains attributed while internal runs are excluded and sessions keep their sources", async () => {
+test("mail is not captured while sessions keep their sources and internal runs are excluded", async () => {
   const dir = await mkdtemp(join(tmpdir(), "runtime-"));
   try {
     const queue = await CaptureQueue.open(dir, "cos");
@@ -580,25 +582,43 @@ test("mail remains attributed while internal runs are excluded and sessions keep
     await runtime.startRequest("s", []);
     await runtime.startRequest("other", []);
     await runtime.flush("s", [
-      {
-        id: "mail",
-        type: "custom_message",
-        customType: "agent-mail",
-        content: JSON.stringify({
-          message_ref: { conversation_id: "c", id: "m" },
-          sender: "manager",
-          content: { summary: "Report" },
-        }),
-      },
+      { id: "mail", type: "custom_message", customType: "agent-mail", content: "Report" },
     ]);
     await runtime.flush("other", entries(2));
-    expect(queue.jobs().map((j) => j.session_id)).toEqual(["s", "other"]);
-    expect(queue.jobs()[0].segment.messages[0]).toMatchObject({
-      speaker: "agent",
-      original_mail: { sender: "manager" },
-    });
+    expect(queue.jobs().map((j) => j.session_id)).toEqual(["other"]);
     await runtime.startRequest("internal", [], { capture: false });
     await runtime.settle("internal", entries(2));
+    expect(queue.jobs()).toHaveLength(1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("settled turns batch until the configured pair count; lifecycle flush sends the remainder", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-batch-"));
+  try {
+    const queue = await CaptureQueue.open(dir, "cos");
+    const runtime = new CaptureRuntime(
+      queue,
+      {
+        prepare,
+        extract: () => Promise.reject(new Error("offline")),
+        upload: async () => {},
+        now: () => 0,
+        notify: () => {},
+      },
+      3,
+    );
+    await runtime.startRequest("s", []);
+    await runtime.settle("s", entries(2));
+    await runtime.settle("s", entries(4));
+    expect(queue.jobs()).toHaveLength(0);
+    expect(queue.pendingTurns("s")).toBe(2);
+    await runtime.settle("s", entries(6));
+    expect(queue.jobs()).toHaveLength(1);
+    expect(queue.pendingTurns("s")).toBe(0);
+    await runtime.settle("s", entries(8));
+    await runtime.flush("s", entries(8));
     expect(queue.jobs()).toHaveLength(2);
   } finally {
     await rm(dir, { recursive: true, force: true });

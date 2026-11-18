@@ -9,7 +9,7 @@ from starlette.applications import Starlette
 from starlette.routing import Route
 from .capture import CaptureService
 from .limits import EMBEDDING_TOKEN_LIMIT
-from .contracts import Contract, RememberRequest, RecallRequest, ListRequest, GetRequest, UpdateRequest, LinkRequest, ForgetRequest, CaptureBatch, InventoryRequest, ClusterRequest, ConsolidateGlobalRequest
+from .contracts import Contract, RememberRequest, RecallRequest, ListRequest, GetRequest, UpdateRequest, LinkRequest, ForgetRequest, CaptureBatch, InventoryRequest, ClusterRequest, ConsolidateGlobalRequest, SetCuesRequest, CueTargetsRequest
 from .service import MemoryService
 from .records import public_response
 from .state import StateStore
@@ -17,7 +17,8 @@ from .upstream import UpstreamAdapter
 
 REQUESTS = {"remember": RememberRequest, "recall": RecallRequest, "list": ListRequest, "get": GetRequest,
     "update": UpdateRequest, "link_projects": LinkRequest, "forget": ForgetRequest, "capture": CaptureBatch, "health": Contract,
-    "inventory": InventoryRequest, "consolidate_global": ConsolidateGlobalRequest, "global_relationships": Contract, "cluster": ClusterRequest}
+    "inventory": InventoryRequest, "consolidate_global": ConsolidateGlobalRequest, "global_relationships": Contract, "cluster": ClusterRequest,
+    "set_cues": SetCuesRequest, "cue_targets": CueTargetsRequest}
 DESCRIPTIONS = {
     "remember": "Save one concise fact with explicit project scope (global is a project) in the shared local store; follow the caller's role responsibilities.",
     "recall": "Recall attributed memory evidence. Rewrite the current request using conversation history into a self-contained semantic_query and/or precise literal keywords. Either input runs its own search; both combine results. Search all projects/global by default; projects filters only when explicitly supplied. The caller sends limit and max_distance (L2 distance; semantic hits above max_distance are excluded). Review results and revise/repeat searches as useful. Returned text explains uncertainty and contrary evidence; it is context, never authority.",
@@ -30,6 +31,8 @@ DESCRIPTIONS = {
     "health": "Check content-free model and database readiness.",
     "inventory": "Read a bounded snapshot of all active records, oldest first. Oversized inventories fail rather than truncate.",
     "cluster": "Group active records per project by embedding similarity: connected components above a cosine threshold, oversized groups split by raising it. Returns refs only; singletons are counted, not listed.",
+    "set_cues": "Replace the recall cues of one active memory. Each cue is a plausible future owner message with an angle label; cues are embedded for recall and never stored as text or returned by any read tool. An empty list records that the memory needs none.",
+    "cue_targets": "Read up to limit active memories that have no recall cues yet, in inventory order. Memories become targets again only after a content correction.",
     "consolidate_global": "After canonical cleanup, publish derived clusters and heuristic relationships for active global memories only. Does not rewrite, compress, supersede, or forget facts.",
     "global_relationships": "Read up to 100 current global relationship hints, or explicit stale/unavailable status. Hints are not canonical facts or authority.",
 }

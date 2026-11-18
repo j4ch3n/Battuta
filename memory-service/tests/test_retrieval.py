@@ -54,18 +54,24 @@ class RetrievalTests(StorageFixture):
         self.assertEqual(result["branches"], {"semantic": "ready"})
 
     async def test_multiple_queries_search_combined_text_when_it_fits(self):
-        with patch.object(self.adapter, "search", return_value=[]) as search:
-            await self.service.recall(RecallRequest(semantic_queries=["first", "second"], limit=10, max_distance=0.9))
-        self.assertEqual([c.args[0].semantic_query for c in search.call_args_list], ["first\n\nsecond"])
+        embedded = []
+        self.adapter.embed = lambda text: embedded.append(text) or text.encode()
+        await self.service.recall(RecallRequest(semantic_queries=["first", "second"], limit=10, max_distance=0.9))
+        self.assertEqual(embedded, ["first\n\nsecond"])
 
     async def test_oversized_queries_search_each_truncated_and_merge_by_rank(self):
         a, b, c = [(await self.note_with_metadata(f"note {name}"))["ref"] for name in "abc"]
-        rankings = {"firs": [{"ref": a}, {"ref": b}], "seco": [{"ref": b}, {"ref": c}]}
+        rankings = {"firs": [a, b], "seco": [b, c]}
+        self.adapter.embed = lambda text: text.encode()
         self.adapter.embedding_fits = lambda _: False
         self.adapter.truncate_for_embedding = lambda text: text[:4]
-        with patch.object(self.adapter, "search", side_effect=lambda request, *_: rankings[request.semantic_query]) as search:
+        searched = []
+        def search(vector, refs, max_distance, limit):
+            searched.append(vector.decode())
+            return rankings[vector.decode()]
+        with patch.object(self.state, "vector_search", side_effect=search):
             result = await self.service.recall(RecallRequest(semantic_queries=["first", "second"], limit=10, max_distance=0.9))
-        self.assertEqual([c.args[0].semantic_query for c in search.call_args_list], ["firs", "seco"])
+        self.assertEqual(searched, ["firs", "seco"])
         self.assertEqual([r["ref"] for r in result["records"]], [a, b, c])
 
     def test_interleave_ranks_takes_each_top_rank_first_without_repeats(self):

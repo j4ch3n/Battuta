@@ -120,3 +120,27 @@ class UpstreamContractTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual([r["ref"] for r in result], [refs["near"]])
             finally:
                 await storage.close()
+
+    async def test_vectors_returns_stored_blobs_and_skips_pending(self):
+        from mcp_memory_service.storage.sqlite_vec import SqliteVecMemoryStorage
+        from mcp_memory_service.models.memory import Memory
+        from mcp_memory_service.utils.hashing import generate_content_hash
+        from sqlite_vec import serialize_float32
+        async def fake_model(storage):
+            storage.embedding_dimension = 384
+            storage.embedding_model = object()
+        stored = serialize_float32([1.0] + [0.0] * 383)
+        with tempfile.TemporaryDirectory() as folder, patch.object(SqliteVecMemoryStorage, "_initialize_embedding_model", fake_model), patch.object(SqliteVecMemoryStorage, "_generate_embedding", return_value=[1.0] + [0.0] * 383):
+            storage = SqliteVecMemoryStorage(str(Path(folder) / "memory.db"))
+            await storage.initialize()
+            try:
+                ready, pending = generate_content_hash("ready fact"), generate_content_hash("pending fact")
+                for ref, text in ((ready, "ready fact"), (pending, "pending fact")):
+                    await storage.store(Memory(text, ref, tags=["proj:atlas"]), skip_semantic_dedup=True)
+                storage.conn.execute("UPDATE memories SET embedding_pending=1 WHERE content_hash=?", (pending,))
+                storage.conn.commit()
+                adapter = UpstreamAdapter(storage)
+                self.assertEqual(await adapter.vectors([ready, pending, "unknown"]), {ready: stored})
+                self.assertEqual(await adapter.vectors([]), {})
+            finally:
+                await storage.close()

@@ -31,6 +31,8 @@ export interface DreamDependencies {
 
 const ref = z.string().regex(/^[0-9a-f]{64}$/);
 const MAX_INVENTORY = 2000;
+const CUE_BATCH = 20;
+const MAX_CUE_TARGETS = 200;
 const CONFIDENCE = ["disputed", "tentative", "supported", "confirmed"];
 
 const safeText = (max: number) =>
@@ -156,6 +158,36 @@ export function validateEdit(value: unknown, members: MemoryRecord[], all: Memor
     insert: output.insert,
     summary: output.summary,
   };
+}
+
+const cuesOutputSchema = z
+  .object({
+    memories: z.array(
+      z
+        .object({
+          n: z.number().int(),
+          cues: z
+            .array(
+              z
+                .object({
+                  angle: z.string().regex(/^[a-z][a-z0-9_-]{0,39}$/),
+                  text: safeText(1000),
+                })
+                .strict(),
+            )
+            .max(100),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+export function validateCues(value: unknown, memberCount: number) {
+  const output = cuesOutputSchema.parse(value);
+  const numbers = output.memories.map((m) => m.n);
+  if (numbers.some((n) => n < 1 || n > memberCount)) throw new Error("Invalid memory number");
+  if (new Set(numbers).size !== numbers.length) throw new Error("Repeated memory number");
+  return output.memories;
 }
 
 export function validateHypotheses(value: unknown, clusterCount: number) {
@@ -479,6 +511,60 @@ export async function runDream(
       }
     }
     await log(`hypothesize clusters=${summarized.length} generated=${generated}`);
+
+    deps.onStage?.("cues");
+    // Progress lives in the service (memories without cues), so only this run's attempts are tracked.
+    const attempted = new Set<string>();
+    let cueMemories = 0;
+    let cuesWritten = 0;
+    for (;;) {
+      const data = z
+        .object({ records: z.array(z.unknown()) })
+        .parse(
+          await deps.call(
+            "memory_cue_targets",
+            { limit: Math.min(MAX_CUE_TARGETS, CUE_BATCH + attempted.size) },
+            signal,
+          ),
+        );
+      const targets = data.records
+        .flatMap((item) => {
+          const r = memoryRecordSchema.safeParse(item);
+          return r.success && !attempted.has(r.data.ref) ? [r.data] : [];
+        })
+        .slice(0, CUE_BATCH);
+      if (!targets.length) break;
+      for (const r of targets) attempted.add(r.ref);
+      try {
+        const cued = await structured(
+          deps,
+          "dream-cues.md",
+          "cues",
+          { cue_memories: targets.map((r, i) => modelView(r, i + 1)) },
+          (value) => validateCues(value, targets.length),
+          signal,
+        );
+        for (const { n, cues } of cued) {
+          const target = targets[n - 1];
+          try {
+            await deps.call(
+              "memory_set_cues",
+              { ref: target.ref, expected_revision: target.revision, cues },
+              signal,
+            );
+            cueMemories++;
+            cuesWritten += cues.length;
+          } catch (error) {
+            // A memory that changed or fails alone must not block the rest; it is retried next run.
+            if (!(error instanceof Error) || signal.aborted) throw error;
+            await log(`cues skipped=${error.message.slice(0, 80)}`);
+          }
+        }
+      } catch (error) {
+        await fail(error, "cues", `cues:${targets[0].ref.slice(0, 8)}`);
+      }
+    }
+    await log(`cues memories=${cueMemories} written=${cuesWritten}`);
 
     deps.onStage?.("refresh");
     const current = await inventory();

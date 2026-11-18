@@ -20,7 +20,7 @@ def public_record(record):
 def public_response(operation, data):
     if operation in ("get", "forget"):
         return public_record(data)
-    if operation in ("recall", "list", "inventory"):
+    if operation in ("recall", "list", "inventory", "cue_targets"):
         result = {**data, "records": [public_record(r) for r in data["records"]]}
         if operation == "recall" and "validation_evidence" in data:
             result["validation_evidence"] = [public_record(r) for r in data["validation_evidence"]]

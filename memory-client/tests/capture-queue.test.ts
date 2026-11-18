@@ -14,7 +14,7 @@ const entry = (id: string, text: string) => ({
   type: "message",
   message: { role: "user", content: text },
 });
-test("filters reasoning, tools and profile context; keeps labelled incoming mail", () => {
+test("filters reasoning, tools and profile context; excludes agent mail", () => {
   const entries = [
     entry("1", "hello"),
     {
@@ -36,11 +36,7 @@ test("filters reasoning, tools and profile context; keeps labelled incoming mail
       content: "Manager says use sqlite",
     },
   ];
-  expect(collectMessages(entries).map((m) => m.text)).toEqual([
-    "hello",
-    "answer",
-    "[inter-bot mail] Manager says use sqlite",
-  ]);
+  expect(collectMessages(entries).map((m) => m.text)).toEqual(["hello", "answer"]);
 });
 test("large messages are fully split at bounded segment sizes", () => {
   const segments = splitSegments([{ entry_id: "e", text: "x".repeat(25000) }]);
@@ -56,31 +52,21 @@ test("large messages are fully split at bounded segment sizes", () => {
   ).toBe("x".repeat(25000));
 });
 
-test("collection and splitting preserve speaker, time and original mail identity", () => {
-  const ref = { conversation_id: "mail-conversation", id: "123456789abc" };
+test.each([
+  ["transcript only", "[telegram] hi\nbuy milk", "[telegram] hi\nbuy milk"],
+  ["attachment listing", "note\n[attachments] /d\n- /a.jpg\n- /b.pdf\nafter", "note\nafter"],
+  ["failed transcription", "[voice message could not be transcribed: no speech was detected]", ""],
+])("owner text keeps the chat only: %s", (_name, text, expected) => {
+  expect(collectMessages([entry("1", text)]).map((m) => m.text)).toEqual(
+    expected ? [expected] : [],
+  );
+});
+test("collection preserves speaker and time", () => {
   const messages = collectMessages([
     { ...entry("owner", "Monday call"), timestamp: "2026-11-06T10:00:00+08:00" },
-    {
-      id: "mail",
-      type: "message",
-      message: {
-        role: "custom",
-        customType: "agent-mail",
-        content: JSON.stringify({
-          message_ref: ref,
-          sender: "manager",
-          created_at: "2026-11-05T00:00:00Z",
-          content: { summary: "Reported result" },
-        }),
-      },
-    },
   ]);
   expect(messages[0].speaker).toBe("owner");
   expect(messages[0].mentioned_at).toBe("2026-11-06T10:00:00+08:00");
-  expect(splitSegments(messages)[0].messages[1].original_mail).toEqual({
-    message_ref: ref,
-    sender: "manager",
-  });
 });
 test("durable accumulator survives a crash below threshold and redacts before storage", async () => {
   const dir = await mkdtemp(join(tmpdir(), "capture-test-"));

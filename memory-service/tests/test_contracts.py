@@ -55,3 +55,19 @@ class ContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             CaptureBatch(session_id="current", batch_id="b", agent_id="manager", payload_digest="a" * 64,
                 items=[{"item_id": "i", "content": "note", "projects": ["global"], "sources": [{"agent_id": "manager", "session_id": "other", "entry_id": "e"}]}])
+
+    def test_cue_requests_validate_angle_text_and_count(self):
+        from battuta_memory.contracts import SetCuesRequest, CueTargetsRequest
+        ref = "a" * 64
+        cue = {"angle": "situation", "text": "I am planning a trip"}
+        self.assertEqual(SetCuesRequest(ref=ref, cues=[]).cues, [])
+        self.assertEqual(CueTargetsRequest().limit, 20)
+        bad = [{"cues": [{**cue, "angle": a}]} for a in ("Situation", "1task", "", "a" * 41, "has space")]
+        bad += [{"cues": [{**cue, "text": t}]} for t in ("", "x" * 1001)]
+        bad += [{"cues": [cue] * 101}, {"ref": "short", "cues": []}, {"cues": [], "extra": 1}]
+        for args in bad:
+            with self.subTest(args=str(args)[:60]), self.assertRaises(ValueError):
+                SetCuesRequest(**{"ref": ref, **args})
+        for limit in (0, 201):
+            with self.subTest(limit=limit), self.assertRaises(ValueError):
+                CueTargetsRequest(limit=limit)

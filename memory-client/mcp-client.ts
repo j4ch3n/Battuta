@@ -44,6 +44,8 @@ export class MemoryMcpClient {
         "memory_forget",
         "memory_link_projects",
         "memory_cluster",
+        "memory_cue_targets",
+        "memory_set_cues",
       ].includes(name)
     )
       throw new Error("Unsupported dream memory operation");

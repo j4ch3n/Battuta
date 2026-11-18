@@ -73,7 +73,9 @@ Each group that contains a new or changed record is edited by one model call tha
 removes or replaces memories; new facts are inserted before the replaced records are
 soft-deleted. One further call proposes tentative inferences across all group summaries,
 each linked as supporting evidence to the records it cites. Failed groups end the run as
-`partial` while the others complete.
+`partial` while the others complete. A last cue step adds recall cues (embeddings of
+plausible future owner messages) to memories that have none, using `memory_cue_targets`
+and `memory_set_cues`; cues are never returned by any read tool.
 
 Failed dream calls return `isError:true` and structured details with `status` and
 `error` (`stage`, `code`, sanitized `message`, optional `retryable`/`paths`).

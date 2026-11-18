@@ -40,7 +40,7 @@ class ProtocolTests(unittest.IsolatedAsyncioTestCase):
         server = create_protocol_server(lambda: service)
         async with create_connected_server_and_client_session(server) as client:
             tools = (await client.list_tools()).tools
-            self.assertEqual({t.name for t in tools}, {"memory_" + n for n in ("remember", "recall", "list", "get", "update", "link_projects", "forget", "capture", "health", "inventory", "cluster", "consolidate_global", "global_relationships")})
+            self.assertEqual({t.name for t in tools}, {"memory_" + n for n in ("remember", "recall", "list", "get", "update", "link_projects", "forget", "capture", "health", "inventory", "cluster", "consolidate_global", "global_relationships", "set_cues", "cue_targets")})
             recall_schema = next(t for t in tools if t.name == "memory_recall").inputSchema
             self.assertIn("semantic_query", recall_schema["properties"])
             self.assertTrue({"limit", "max_distance"} <= set(recall_schema.get("required", [])))
@@ -68,3 +68,16 @@ class ProtocolTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result.structuredContent["data"]["status"], "partial")
             self.assertEqual(result.structuredContent["data"]["omitted_refs"], ["b" * 64])
             self.assertNotIn("incomplete", result.structuredContent["data"])
+
+    async def test_cue_tools_dispatch_to_the_service(self):
+        record = {"ref": "a" * 64, "scope": {"projects": ["atlas"]}, "revision": "b" * 64}
+        service = SimpleNamespace(set_cues=AsyncMock(return_value={"ref": "a" * 64, "cues": 1}),
+            cue_targets=AsyncMock(return_value={"records": [record]}))
+        async with create_connected_server_and_client_session(create_protocol_server(lambda: service)) as client:
+            targets = (await client.call_tool("memory_cue_targets", {"limit": 5})).structuredContent["data"]
+            self.assertEqual(targets["records"][0]["projects"], ["atlas"])
+            self.assertEqual(service.cue_targets.await_args.args[0].limit, 5)
+            args = {"ref": "a" * 64, "expected_revision": "b" * 64, "cues": [{"angle": "task", "text": "I need to plan"}]}
+            result = (await client.call_tool("memory_set_cues", args)).structuredContent["data"]
+            self.assertEqual(result, {"ref": "a" * 64, "cues": 1})
+            self.assertEqual(service.set_cues.await_args.args[0].cues[0].angle, "task")
