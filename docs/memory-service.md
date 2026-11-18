@@ -65,6 +65,13 @@ failing yields `failed`, not empty memory. Recall requires the caller's `limit` 
 `limit` applies, and keyword search is capped by `limit` only. Each rendered entry must
 fit 4000 bytes; an oversized entry is omitted and its ref reported. Partial and failed
 recalls are logged without memory content.
+Semantic recall searches the service-owned `memory_vectors` table in `state.db`, not
+upstream's embedding table. It holds one row per active memory for its own vector
+(`primary` for facts, `hypothesis` for inferences) plus any number of recall cues:
+embeddings of plausible future owner messages that map back to the memory. A memory
+matches by its best row and is returned once; cue text is never stored or returned.
+The table is derived: it is reconciled from upstream after every mutation, at startup
+and before a search, and rows of retired, superseded or corrected memories are removed.
 Omitting `keywords` runs semantic-only retrieval. Literal keyword matching,
 scope/eligibility-before-limit and dependency checks are described in the design.
 Recall defaults to every scope; only explicit project/global filters narrow it.
@@ -228,8 +235,14 @@ cite. An invalid answer is retried once; a group that still fails is recorded an
 run ends `partial` while other groups proceed. The guards are 2000 stored records and
 200,000 bytes of input per call.
 
+A final cue step asks the model, in batches of 20 memories, for recall cues for every
+active memory that has none, and writes them through `memory_set_cues`. A memory the
+model gives no cues is marked processed so it is not asked again. A memory that fails
+alone is retried on the next run; the first run after deployment processes every
+existing memory.
+
 Each step appends one counts-only line to `dream.log` (`step <time> inventory|expire|
-cluster|edit|publish|hypothesize ...`) next to the daily reflection.
+cluster|edit|publish|hypothesize|cues ...`) next to the daily reflection.
 
 The eligible global sidecar profile refresh is deterministic; untracked `ME.md`
 stays untouched. The existing isolated reflection call writes one private
