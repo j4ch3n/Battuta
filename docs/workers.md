@@ -118,8 +118,10 @@ or error overrides a submitted success; missing reports become blockers.
 
 Approved work tools and assignment inspection/notes are available. Memory context
 arrives through the commission; workers do not connect to memory MCP.
-Claim/status/control/mail mutations are excluded from model tool
-registration, including native MCP/codemode discovery. Shell and the backend
+Claim/status/control mutations are excluded from model tool
+registration, including native MCP/codemode discovery. Workers keep
+`send_agent_message` and `reply_agent_message` (Manager-only routing, see
+[agent mail](agent-mail.md)); `delegate` is active where its package is installed. Shell and the backend
 secret still make this a trusted process, **not a security sandbox**. No Telegram,
 worker inbox, nested assignment creation, owner-profile preload, or memory capture runs.
 The worker may use the native subagent extension for bounded research and review;
