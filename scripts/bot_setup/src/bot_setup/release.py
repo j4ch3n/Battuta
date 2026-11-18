@@ -8,7 +8,8 @@ import subprocess
 import click
 
 from .browser import browser_directories, browser_settings
-from .claude_skills import install_claude_skills, prepared_claude_skills
+from .claude_mcp import register_doc_service
+from .claude_skills import claude_dir, install_claude_skills, prepared_claude_skills
 from .env import read_env, required
 from .instances import deployment_workers, instance_paths, worker_environment
 from .install import run
@@ -90,6 +91,8 @@ def configure_release(root: Path, *, env_file: Path, home: Path, deployment: str
     # Provision only after every instance has passed preflight; never start a bot.
     results = []
     skipped = []
+    if deployment == "main" and workers and register_doc_service(home, deployment=deployment):
+        results.append((claude_dir(home) / "mcp: battuta-doc", True))
     # Generated MCP is written before private templates so release servers win over template copies.
     for path, payload in outputs:
         path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)

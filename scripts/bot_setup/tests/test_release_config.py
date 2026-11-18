@@ -35,7 +35,12 @@ def deployment(tmp_path, monkeypatch):
     helper.touch()
     helper.with_name("configure-dream.js").touch()
     monkeypatch.setattr(release, "run", lambda *args, **kwargs: None)
+    registrations.clear()
+    monkeypatch.setattr(release, "register_doc_service", lambda home, *, deployment: registrations.append(deployment) or True)
     return root, home, env_file
+
+
+registrations = []
 
 
 def test_release_provisions_dream_before_scheduler_initialization(deployment, monkeypatch):
@@ -95,6 +100,12 @@ def test_release_shares_research_skill_with_claude_code_once(deployment):
     skill.write_text("customized")
     release.configure_release(root, env_file=env_file, home=home)
     assert skill.read_text() == "customized"
+
+
+def test_main_release_registers_document_service_once_per_run(deployment):
+    root, home, env_file = deployment
+    release.configure_release(root, env_file=env_file, home=home)
+    assert registrations == ["main"]
 
 
 def test_release_generated_mcp_wins_over_shipped_worker_template(deployment):

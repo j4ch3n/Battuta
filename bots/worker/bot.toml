@@ -96,7 +96,7 @@ policy = "create-only"
 
 # Skills shared with Claude Code sessions on the host; each must also be selected below.
 [claude]
-skills = ["research"]
+skills = ["research", "read-documents"]
 
 [skills]
 include = [
@@ -106,6 +106,7 @@ include = [
   "draft-writing",
   "execute-assignment",
   "research",
+  "read-documents",
   "browser-evidence",
   "artifacts",
   "prd",
