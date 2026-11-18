@@ -2,7 +2,13 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, expect, test } from "vitest";
-import { dreamRunId, runDream, validateEdit, validateHypotheses } from "../dream-runtime.ts";
+import {
+  dreamRunId,
+  runDream,
+  validateCues,
+  validateEdit,
+  validateHypotheses,
+} from "../dream-runtime.ts";
 import type { DreamDependencies } from "../dream-runtime.ts";
 import type { MemoryRecord } from "../records.ts";
 import { record } from "./fixtures/record.ts";
@@ -44,6 +50,9 @@ class Backend {
   next = 100;
   failForgetOnce = false;
   clusters: string[][] = [];
+  cueable = false;
+  failCues = false;
+  cued = new Map<string, Record<string, unknown>>();
   constructor(records: MemoryRecord[]) {
     for (const r of records) this.records.set(r.ref, r);
   }
@@ -83,6 +92,15 @@ class Backend {
       }
       return { ref: this.keys.get(key) };
     }
+    if (name === "memory_cue_targets") {
+      const open = [...this.records.values()].filter((r) => this.cueable && !this.cued.has(r.ref));
+      return { records: open.slice(0, args.limit as number) };
+    }
+    if (name === "memory_set_cues") {
+      if (this.failCues) throw new Error("backend down");
+      this.cued.set(args.ref as string, args);
+      return { ref: args.ref, cues: (args.cues as unknown[]).length };
+    }
     if (name === "memory_get") return this.records.get(args.ref as string);
     if (name === "memory_forget") {
       if (this.failForgetOnce) {
@@ -118,7 +136,16 @@ const REFLECTION = "Reviewed memory clusters.";
 
 function harness(backend: Backend, edit: unknown, hypotheses: unknown = { hypotheses: [] }) {
   const evidence: string[] = [];
-  const prompts = { edit: 0, hypothesize: 0 };
+  const prompts = { edit: 0, hypothesize: 0, cues: 0 };
+  const cueAnswer = {
+    value: undefined as unknown,
+    default: (ev: string) => ({
+      memories: (JSON.parse(ev) as { cue_memories: { n: number }[] }).cue_memories.map(({ n }) => ({
+        n,
+        cues: [{ angle: "situation", text: `cue ${n}` }],
+      })),
+    }),
+  };
   let day = new Date("2026-11-17T12:00:00Z");
   const deps: DreamDependencies = {
     directory,
@@ -127,6 +154,10 @@ function harness(backend: Backend, edit: unknown, hypotheses: unknown = { hypoth
     call: backend.call,
     complete: (_prompt, ev) => {
       evidence.push(ev);
+      if (ev.includes('"cue_memories"')) {
+        prompts.cues++;
+        return Promise.resolve(JSON.stringify(cueAnswer.value ?? cueAnswer.default(ev)));
+      }
       if (ev.includes('"memories"')) {
         prompts.edit++;
         return Promise.resolve(JSON.stringify(edit));
@@ -138,7 +169,7 @@ function harness(backend: Backend, edit: unknown, hypotheses: unknown = { hypoth
       return Promise.resolve(REFLECTION);
     },
   };
-  return { deps, evidence, prompts, setDay: (d: Date) => (day = d) };
+  return { deps, evidence, prompts, cueAnswer, setDay: (d: Date) => (day = d) };
 }
 
 const signal = () => new AbortController().signal;
@@ -308,4 +339,96 @@ test.each([
   [{ hypotheses: [hypothesis("a", [1]), hypothesis("a", [1])] }, "Duplicate proposed content"],
 ])("validateHypotheses rejects %#", (value, error) => {
   expect(() => validateHypotheses(value, 2)).toThrow(error);
+});
+
+test("cue stage writes cues after hypotheses and before the profile refresh", async () => {
+  const backend = new Backend([
+    mem(1, "Atlas uses PostgreSQL"),
+    mem(2, "Atlas database is Postgres 15"),
+  ]);
+  backend.clusters = [[hex(1), hex(2)]];
+  backend.cueable = true;
+  const h = harness(backend, merge, {
+    hypotheses: [
+      { content: "Atlas favours Postgres", keywords: [], rationale: "Repeated", clusters: [1] },
+    ],
+  });
+  expect((await runDream(h.deps, signal())).status).toBe("complete");
+  const log = backend.log;
+  expect(log.indexOf("memory_cue_targets")).toBeGreaterThan(log.lastIndexOf("memory_remember"));
+  expect(log.indexOf("memory_cue_targets")).toBeLessThan(log.lastIndexOf("memory_inventory"));
+  expect(backend.cued.size).toBe(backend.records.size);
+  for (const [ref, args] of backend.cued) {
+    expect(args).toMatchObject({
+      expected_revision: backend.records.get(ref)!.revision,
+      cues: [{ angle: "situation", text: expect.stringMatching(/^cue \d$/) as unknown }],
+    });
+  }
+  expect(h.prompts.cues).toBe(1);
+});
+
+test("a memory the model gives no cues is written with an empty list", async () => {
+  const backend = new Backend([mem(1, "Atlas uses PostgreSQL")]);
+  backend.cueable = true;
+  const h = harness(backend, merge);
+  h.cueAnswer.value = { memories: [{ n: 1, cues: [] }] };
+  await runDream(h.deps, signal());
+  expect(backend.cued.get(hex(1))).toMatchObject({ cues: [] });
+});
+
+test("invalid cue output twice skips the batch and ends partial", async () => {
+  const backend = new Backend([mem(1, "a"), mem(2, "b")]);
+  backend.cueable = true;
+  const h = harness(backend, merge);
+  h.cueAnswer.value = { memories: [{ n: 9, cues: [] }] };
+  expect((await runDream(h.deps, signal())).status).toBe("partial");
+  expect(h.prompts.cues).toBe(2);
+  expect(backend.log).not.toContain("memory_set_cues");
+});
+
+test("targets that keep failing are attempted once per run", async () => {
+  const backend = new Backend([mem(1, "a"), mem(2, "b"), mem(3, "c")]);
+  backend.cueable = true;
+  backend.failCues = true;
+  const h = harness(backend, merge);
+  expect((await runDream(h.deps, signal())).status).toBe("complete");
+  expect(backend.log.filter((n) => n === "memory_set_cues")).toHaveLength(3);
+  expect(h.prompts.cues).toBe(1);
+});
+
+test("later targets are reached when the first batch keeps failing", async () => {
+  const backend = new Backend(Array.from({ length: 25 }, (_, i) => mem(i + 1, `fact ${i + 1}`)));
+  backend.cueable = true;
+  const h = harness(backend, merge);
+  const call = backend.call;
+  backend.call = (name, args, s) =>
+    name === "memory_set_cues" && parseInt(String(args.ref), 16) <= 20
+      ? Promise.reject(new Error("down"))
+      : call(name, args, s);
+  h.deps.call = backend.call;
+  await runDream(h.deps, signal());
+  expect([...backend.cued.keys()].sort()).toEqual([21, 22, 23, 24, 25].map(hex));
+});
+
+const goodCues = { memories: [{ n: 1, cues: [{ angle: "own_words", text: "I use Postgres" }] }] };
+test("validateCues returns numbered cues", () => {
+  expect(validateCues(goodCues, 2)).toEqual(goodCues.memories);
+});
+test.each([
+  ["number out of range", { memories: [{ n: 3, cues: [] }] }],
+  ["number zero", { memories: [{ n: 0, cues: [] }] }],
+  [
+    "repeated number",
+    {
+      memories: [
+        { n: 1, cues: [] },
+        { n: 1, cues: [] },
+      ],
+    },
+  ],
+  ["bad angle", { memories: [{ n: 1, cues: [{ angle: "Own Words", text: "x" }] }] }],
+  ["empty text", { memories: [{ n: 1, cues: [{ angle: "task", text: " " }] }] }],
+  ["secret text", { memories: [{ n: 1, cues: [{ angle: "task", text: "password: hunter2" }] }] }],
+])("validateCues rejects %s", (_name, value) => {
+  expect(() => validateCues(value, 2)).toThrow();
 });
