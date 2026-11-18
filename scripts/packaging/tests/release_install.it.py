@@ -49,6 +49,14 @@ class ReleaseInstallation(unittest.TestCase):
             env = {key: value for key, value in os.environ.items() if key not in {"VIRTUAL_ENV", "PYTHONPATH", "UV_PROJECT_ENVIRONMENT", "UV_TOOL_DIR", "UV_TOOL_BIN_DIR", "UV_PYTHON_PREFERENCE"}}
             env.update(HOME=str(work / "home"), UV_CACHE_DIR=str(work / "cache"), XDG_CONFIG_HOME=str(work / "config"), XDG_DATA_HOME=str(work / "data"), LINEAR_API_TOKEN="fixture")
             Path(env["HOME"]).mkdir()
+            # Third-party CLIs are stubbed: the clean image does not ship them and the check must not touch real accounts.
+            stubs = work / "stubs"
+            stubs.mkdir()
+            claude_log = work / "claude-calls.log"
+            claude = stubs / "claude"
+            claude.write_text(f'#!/bin/sh\necho "$@" >> "{claude_log}"\n[ "$1 $2" = "mcp get" ] && exit 1\nexit 0\n')
+            claude.chmod(0o755)
+            env["PATH"] = f"{stubs}{os.pathsep}{env['PATH']}"
             def run(*args, **kwargs):
                 return subprocess.run(args, env=kwargs.pop("env", env), cwd=work, check=True, text=True, **kwargs)
             for manifest in (assets / "python-tools-SHA256SUMS", assets / f"{archive}.sha256"):
@@ -104,6 +112,7 @@ for value in data['requires']:
                 agent.mkdir(parents=True)
                 (agent / "settings.json").write_text("{}")
                 run(str(installed["battuta-bot-setup"][0] / "battuta-bot-setup"), "configure-release", "--root", str(root), "--env-file", str(env_file), "--deployment", "main")
+                self.assertIn("mcp add-json --scope user battuta-doc", claude_log.read_text())
                 self.assertTrue((Path(env["HOME"]) / ".battuta/pi-bots/worker-2/.pi/mcp.json").is_file())
                 self.assertFalse((root / "skills-hub").exists())
                 # Only disposable schedule/config files: no scheduler or model is running.
