@@ -95,7 +95,7 @@ def test_influencer_installs_only_worker_and_support_services(deployment, capsys
     (profile / "abilities.json").write_text('{"mobile-control": {}}')
     env.write_text("BATTUTA_WORKER_1_TYPE=influencer\n")
     services.install_services(root, env_file=env, node=node, deployment="influencer")
-    assert {p.name for p in units.iterdir()} == {"battuta-worker@.service", "battuta-artifacts.service", "battuta-speech.service"}
+    assert {p.name for p in units.iterdir()} == {"battuta-worker@.service", "battuta-artifacts.service"}
     assert "battuta-memory.service" not in (units / "battuta-worker@.service").read_text()
     output = capsys.readouterr().out
     assert "battuta-worker@1.service" in output

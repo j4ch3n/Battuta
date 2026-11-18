@@ -48,7 +48,7 @@ def assignment_server(supabase_url: str) -> dict:
     return {"url": supabase_url.rstrip("/") + "/functions/v1/assignments", "headers": {"apikey": "${SUPABASE_SECRET_KEY}", "X-Battuta-Projects-Root": "${BATTUTA_PROJECTS_ROOT_HEADER}"}, "exposure": "codemode", "description": "Shared project assignments, ordered TODOs, and local note paths"}
 
 
-def mcp_payload(*, role: Literal["cos", "manager", "worker"], supabase_url: str, memory_url: str | None = None) -> dict:
+def mcp_payload(*, role: Literal["cos", "manager", "worker"], supabase_url: str, memory_url: str | None = None, speech: bool = True) -> dict:
     if role not in {"cos", "manager", "worker"}:
         raise click.ClickException("Bot role must be cos or manager")
     url = validate_memory_url(memory_url) if role in {"cos", "manager"} else None
@@ -69,7 +69,7 @@ def mcp_payload(*, role: Literal["cos", "manager", "worker"], supabase_url: str,
     else:
         servers["memory"] = {"enabled": False}
     servers["assignments"] = assignment
-    servers["speech"] = {"url": "http://127.0.0.1:8902/mcp", "exposure": "codemode"} if role in {"cos", "worker"} else {"enabled": False}
+    servers["speech"] = {"url": "http://127.0.0.1:8902/mcp", "exposure": "codemode"} if speech and role in {"cos", "worker"} else {"enabled": False}
     if role == "worker":
         assignment["exposure"] = "hidden"
         assignment["toolExposure"] = {name: "codemode" for name in ("list_assignments", "get_assignment", "prepare_notes", "locate_notes")}

@@ -22,7 +22,7 @@ configuration and generated services, not the files included in the archive.
 | Bundle             | `deployment` | Configured bots                        | Services to activate after approval                                  | Setup validation                                                                           |
 | ------------------ | ------------ | -------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | Main machine       | `main`       | CoS, Manager, selected general workers | memory, artifacts, speech, documents, CoS, Manager, selected workers | Bundle validation, private configuration and named service status                          |
-| Influencer machine | `influencer` | Exactly one influencer worker          | artifacts, speech, selected worker                                   | Bundle validation, worker private configuration, ADB availability and named service status |
+| Influencer machine | `influencer` | Exactly one influencer worker          | artifacts, selected worker                                           | Bundle validation, worker private configuration, ADB availability and named service status |
 
 Set `deployment=main` or `deployment=influencer` in the trusted shell before
 continuing. Pass that same value to both configuration and service generation.
@@ -108,7 +108,7 @@ directory, not the installation:
 
 - `battuta-vX.Y.Z-<platform>-arm64.tar.gz` and its `.sha256`, for your platform.
 - Wheels for your bundle (filenames use underscores): `battuta-project`, `battuta-artifacts`,
-  `battuta-speech`, `battuta-bot-setup`, and `battuta-packaging`; main also needs `battuta-memory` and `battuta-doc`.
+  `battuta-bot-setup`, and `battuta-packaging`; main also needs `battuta-memory`, `battuta-speech` and `battuta-doc`.
 - `python-tools-version.txt` and `python-tools-SHA256SUMS`.
 
 Set the real tag and platform. Ask the owner for the absolute installation path if it
@@ -138,7 +138,7 @@ source installations, or `--with` arguments.
 ```bash
 case "$deployment" in
   main) packages="battuta-project battuta-artifacts battuta-memory battuta-speech battuta-doc battuta-bot-setup battuta-packaging" ;;
-  influencer) packages="battuta-project battuta-artifacts battuta-speech battuta-bot-setup battuta-packaging" ;;
+  influencer) packages="battuta-project battuta-artifacts battuta-bot-setup battuta-packaging" ;;
 esac
 for package in $packages; do
   wheel="${package//-/_}-$tool_version-py3-none-any.whl"
@@ -260,13 +260,13 @@ if [[ "${deployment:?Choose main or influencer}" == main ]]; then
   battuta-memory model install
   battuta-memory model verify --json
   battuta-memory doctor --json
+  battuta-packaging install-speech
+  battuta-packaging verify-speech
 fi
 battuta-artifact setup
-battuta-packaging install-speech
-battuta-packaging verify-speech
 ```
 
-These provision the selected memory model/data, artifact schema, and speech assets without starting bots.
+These provision the selected memory model/data, artifact schema, and (main only) speech assets without starting bots.
 Every command must succeed. Optional offline model input and detailed native
 prerequisites belong to the component guides below. Do not invoke a model provider,
 authenticate Pi, or message bots as a setup check.
@@ -280,8 +280,8 @@ battuta-packaging install-services --root "$install_path" \
 ```
 
 The main bundle writes CoS, Manager, memory, artifact, speech, document, and
-`battuta-worker@.service` definitions. The influencer bundle writes only artifact,
-speech, and `battuta-worker@.service` definitions. Confirm the printed activation
+`battuta-worker@.service` definitions. The influencer bundle writes only artifact
+and `battuta-worker@.service` definitions. Confirm the printed activation
 list matches the table above before proceeding.
 It prints the exact reload/activation commands for the configured count, but does
 not execute them. Conflicting units, symlinks, and excess running workers stop setup.
