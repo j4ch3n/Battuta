@@ -263,6 +263,7 @@ test("a bound native extension dispatches its TODO through Pi without a host sen
     "get_subagent_result",
     "steer_subagent",
     "delegate",
+    "delegate_modes",
     "send_agent_message",
     "reply_agent_message",
   ]) {

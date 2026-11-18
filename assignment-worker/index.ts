@@ -99,6 +99,7 @@ export default function worker(pi: ExtensionAPI) {
       "report_execution_result",
       // Only installed tools activate: `delegate` comes from the general worker's package, not the influencer's.
       "delegate",
+      "delegate_modes",
       "send_agent_message",
       "reply_agent_message",
       "mcp__assignments__list_assignments",
