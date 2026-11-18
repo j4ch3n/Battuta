@@ -56,7 +56,7 @@ def test_page_line_table_covers_every_page_without_gaps():
 
 def test_figure_png_chart_csv_and_kind(tmp_path):
     from PIL import Image
-    from docling_core.types.doc import ImageRef, PictureMeta, TableData
+    from docling_core.types.doc import ImageRef, PictureMeta
     from docling_core.types.doc.document import PictureClassificationMetaField, PictureClassificationPrediction, TabularChartMetaField
     from docling_core.types.doc.base import Size
 
