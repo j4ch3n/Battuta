@@ -190,3 +190,8 @@ test("recipients are bot names and delivery is limited to queue or steer", () =>
     assert.throws(() => sendRequest(agent, { ...base, ...bad }));
   assert.throws(() => sendRequest(agent, { ...base, recipient: agent.role }));
 });
+
+test("assignment_id is accepted on send and never forwarded to the server", () => {
+  const request = sendRequest(agent, { ...intent, recipient: "worker-1", assignment_id: "a1" });
+  assert.equal("assignment_id" in request, false);
+});

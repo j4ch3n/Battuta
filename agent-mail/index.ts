@@ -8,13 +8,15 @@ import { Type, type TSchema } from "typebox";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   envelope,
-  mailTools,
   MessageRef,
   reference,
   referenceKey,
   replyRequest,
+  replyTool,
   BotName,
+  SendArguments,
   sendRequest,
+  sendTool,
   StoredMessage,
   validate,
   validateCoverage,
@@ -22,6 +24,7 @@ import {
   type MessageReference,
 } from "./schemas.ts";
 
+import { checkSendRoute } from "./routing.ts";
 import { invokeMail, UncertainWriteError } from "./transport.ts";
 
 const required = (key: string) => {
@@ -191,8 +194,33 @@ export default function (pi: ExtensionAPI) {
     }
   });
 
+  type Agent = { role: string; sessionId: string };
+  type Request = ReturnType<typeof sendRequest> | ReturnType<typeof replyRequest>;
+  type Prepare = (agent: Agent, args: unknown) => Promise<Request>;
+
+  async function claimant(assignmentId: string) {
+    if (!db) throw new Error("Agent mail is disconnected");
+    const response = await db.rpc("agent_mail_assignment_claimant", {
+      p_assignment_id: assignmentId,
+    });
+    if (response.error) throw new Error(response.error.message);
+    return (response.data as string | null) ?? null;
+  }
+  const prepareSend: Prepare = async (agent, args) => {
+    const { assignment_id } = validate(SendArguments, args);
+    const request = sendRequest(agent, args);
+    await checkSendRoute({
+      sender: agent.role,
+      recipient: request.recipient_role,
+      assignmentId: assignment_id,
+      claimant,
+    });
+    return request;
+  };
+  const prepareReply: Prepare = (agent, args) => Promise.resolve(replyRequest(agent, args));
+
   async function submit(
-    name: string,
+    prepare: Prepare,
     args: unknown,
     context: ExtensionContext,
     signal?: AbortSignal,
@@ -204,8 +232,7 @@ export default function (pi: ExtensionAPI) {
         context.sessionManager.getSessionId(),
       ),
     };
-    const request =
-      name === "send_agent_message" ? sendRequest(agent, args) : replyRequest(agent, args);
+    const request = await prepare(agent, args);
     if (!db) throw new Error("Agent mail is disconnected");
     const cache = new Map<string, Message>();
     const load = async (ref: MessageReference): Promise<Message> => {
@@ -310,17 +337,19 @@ export default function (pi: ExtensionAPI) {
       details: { message_ref: reference(row), status: row.status, response_due: row.response_due },
     };
   }
-  for (const tool of mailTools) {
+  for (const [tool, prepare] of [
+    [sendTool, prepareSend],
+    [replyTool, prepareReply],
+  ] as const) {
     pi.registerTool<TSchema>({
       ...tool,
-      label: tool.name === "send_agent_message" ? "Send agent mail" : "Reply to agent mail",
       promptSnippet:
         "Send or reply with the shared structured JSON contract; ordinary text does not send mail.",
       promptGuidelines: [
         "Answer incoming mail that expects a response with reply_agent_message. State an honest conclusion, clarification or progress; never invent completion evidence.",
       ],
       async execute(_callId, args, signal, _onUpdate, context) {
-        return submit(tool.name, args, context, signal);
+        return submit(prepare, args, context, signal);
       },
     });
   }

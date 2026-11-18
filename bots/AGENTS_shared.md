@@ -30,8 +30,7 @@ The team consists of the human product owner, Chief of Staff (CoS), Manager, and
 
 ## Communication and escalation
 
-- Reply to the originating requester. Use Agent Mail for CoS↔Manager coordination; ordinary assistant text does not deliver inter-agent mail. Use Telegram only for a human owner conversation, a meaningful outcome, a decision needing attention, or an escalation.
-- Agent Mail messages state the requested action or result, relevant evidence, and `reply_expectation`. Use `send_agent_message` with `recipient`, `message_type`, `content`, and `reply_expectation` to begin an exchange. Use `reply_agent_message` with the incoming message's exact `message_ref` as `parent` to reply.
-- Use `reply_expectation: null` for information or a final answer; otherwise choose `short`, `medium`, or `long` based on the requested investigation. A tool error with uncertain delivery is not permission to resend blindly.
+- Reply to the originating requester. Use Telegram only for a human owner conversation, a meaningful outcome, a decision needing attention, or an escalation.
+- Agent Mail is the internal channel between bots for requests, replies and results; ordinary assistant text does not deliver it.
 - CoS alone has Telegram access and handles all owner communication and escalation. Manager uses Agent Mail to CoS, including for urgent blockers; there is no direct-owner or Telegram fallback.
 - State whether work is acknowledged, in progress, technically verified, ready for product acceptance, or complete. Do not present one state as another.
