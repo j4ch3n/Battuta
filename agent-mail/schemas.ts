@@ -44,20 +44,20 @@ export const ReplyArguments = Type.Object(
   { additionalProperties: false },
 );
 
-export const mailTools = [
-  {
-    name: "send_agent_message",
-    description:
-      "Send a structured JSON message to another bot by bot name. Workers can send only to manager. Mail to a worker is only a follow-up on an assignment: pass assignment_id and the worker's name from that assignment's claimed_by; give new work by creating an assignment instead. All bots use the same content schema: include every field, [] for unused lists and null for unused sections. A request requires a reply expectation. Link later results to the original request with related_messages. Use chat for ordinary mail; chase for an intentional follow-up. delivery queue (default) is handled after the recipient's current work; steer interrupts it between tool calls, so reserve it for urgent corrections. Choose short for acknowledgement, medium for bounded investigation, long for deeper review.",
-    parameters: SendArguments,
-  },
-  {
-    name: "reply_agent_message",
-    description:
-      "Answer incoming mail using the shared structured content schema. Copy message_ref into parent, not in_reply_to. Include every content field; use [] or null for unused sections. State a conclusion, clarification, or honest progress. For a complete result, copy request requirements exactly into evidence-backed required checks. A new request requires a reply expectation; otherwise use null.",
-    parameters: ReplyArguments,
-  },
-];
+export const sendTool = {
+  name: "send_agent_message",
+  label: "Send agent mail",
+  description:
+    "Send a structured JSON message to another bot by bot name. Workers can send only to manager. Mail to a worker is only a follow-up on an assignment: pass assignment_id and the worker's name from that assignment's claimed_by; give new work by creating an assignment instead. All bots use the same content schema: include every field, [] for unused lists and null for unused sections. A request requires a reply expectation. Link later results to the original request with related_messages. Use chat for ordinary mail; chase for an intentional follow-up. delivery queue (default) is handled after the recipient's current work; steer interrupts it between tool calls, so reserve it for urgent corrections. Choose short for acknowledgement, medium for bounded investigation, long for deeper review.",
+  parameters: SendArguments,
+};
+export const replyTool = {
+  name: "reply_agent_message",
+  label: "Reply to agent mail",
+  description:
+    "Answer incoming mail using the shared structured content schema. Copy message_ref into parent, not in_reply_to. Include every content field; use [] or null for unused sections. State a conclusion, clarification, or honest progress. For a complete result, copy request requirements exactly into evidence-backed required checks. A new request requires a reply expectation; otherwise use null.",
+  parameters: ReplyArguments,
+};
 
 export function validate<T extends TSchema>(schema: T, input: unknown): Static<T> {
   // Check before Parse: never coerce or clean malformed LLM arguments into a send.
