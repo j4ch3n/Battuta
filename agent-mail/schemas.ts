@@ -31,7 +31,12 @@ const ReplyExpectation = Type.Union([
 const intent = { message_type: MessageType, content: Content, reply_expectation: ReplyExpectation };
 
 export const SendArguments = Type.Object(
-  { recipient: BotName, delivery: Type.Optional(Delivery), ...intent },
+  {
+    recipient: BotName,
+    delivery: Type.Optional(Delivery),
+    assignment_id: Type.Optional(Type.String()),
+    ...intent,
+  },
   { additionalProperties: false },
 );
 export const ReplyArguments = Type.Object(
@@ -43,7 +48,7 @@ export const mailTools = [
   {
     name: "send_agent_message",
     description:
-      "Send a structured JSON message to another bot by bot name. All bots use the same content schema: include every field, [] for unused lists and null for unused sections. A request requires a reply expectation. Link later results to the original request with related_messages. Use chat for ordinary mail; chase for an intentional follow-up. delivery queue (default) is handled after the recipient's current work; steer interrupts it between tool calls, so reserve it for urgent corrections. Choose short for acknowledgement, medium for bounded investigation, long for deeper review.",
+      "Send a structured JSON message to another bot by bot name. Workers can send only to manager. Mail to a worker is only a follow-up on an assignment: pass assignment_id and the worker's name from that assignment's claimed_by; give new work by creating an assignment instead. All bots use the same content schema: include every field, [] for unused lists and null for unused sections. A request requires a reply expectation. Link later results to the original request with related_messages. Use chat for ordinary mail; chase for an intentional follow-up. delivery queue (default) is handled after the recipient's current work; steer interrupts it between tool calls, so reserve it for urgent corrections. Choose short for acknowledgement, medium for bounded investigation, long for deeper review.",
     parameters: SendArguments,
   },
   {
