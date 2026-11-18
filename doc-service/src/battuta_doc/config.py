@@ -7,10 +7,11 @@ from pathlib import Path
 
 
 class DocError(Exception):
-    def __init__(self, code: str, message: str = ""):
+    def __init__(self, code: str, message: str = "", **data):
         super().__init__(message or code)
         self.code = code
         self.message = message or code
+        self.data = data
 
 
 @dataclass(frozen=True)
