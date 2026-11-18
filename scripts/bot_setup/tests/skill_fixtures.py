@@ -1,13 +1,17 @@
 """Small source catalogs for development setup tests."""
 
 import json
+import re
 from pathlib import Path
 
 
 def manifest_text(role: str, names: list[str]) -> str:
     profile = "worker" if role == "worker" else f"{role}-bot"
     source = Path(__file__).parents[3] / "bots" / profile / "bot.toml"
-    return source.read_text().split("[skills]")[0] + "[skills]\ninclude = " + json.dumps(names)
+    head = source.read_text().split("[skills]")[0]
+    # Fixture catalogs hold only the named skills (and the research fixture), so share only those with Claude Code.
+    head = re.sub(r'(\[claude\]\nskills = )(\[.*?\])', lambda m: m.group(1) + json.dumps([n for n in json.loads(m.group(2)) if n in names or n == "research"]), head, flags=re.S)
+    return head + "[skills]\ninclude = " + json.dumps(names)
 
 
 def write_delegate_templates(profile: Path) -> None:

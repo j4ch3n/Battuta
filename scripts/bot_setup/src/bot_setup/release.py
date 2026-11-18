@@ -8,7 +8,8 @@ import subprocess
 import click
 
 from .browser import browser_directories, browser_settings
-from .claude_skills import install_claude_skills, prepared_claude_skills
+from .claude_mcp import register_doc_service
+from .claude_skills import CLAUDE_SKILLS, claude_dir, install_claude_skills, prepared_claude_skills
 from .env import read_env, required
 from .instances import deployment_workers, instance_paths, worker_environment
 from .install import run
@@ -69,7 +70,7 @@ def configure_release(root: Path, *, env_file: Path, home: Path, deployment: str
         if not (profile / "AGENTS.md").is_file() or not (profile / ".pi/settings.json").is_file():
             raise click.ClickException(f"Missing installed role profile: {profile}")
         validate_private_home(private)
-        prepared_claude_skills(profile, manifest)
+        prepared_claude_skills(profile / CLAUDE_SKILLS, manifest)
         instances.append((profile, private, manifest))
         if role != "manager" and profile.name != "worker-influencer":
             if not (private / ".pi/settings.json").exists():
@@ -90,6 +91,8 @@ def configure_release(root: Path, *, env_file: Path, home: Path, deployment: str
     # Provision only after every instance has passed preflight; never start a bot.
     results = []
     skipped = []
+    if deployment == "main" and workers and register_doc_service(home, deployment=deployment):
+        results.append((claude_dir(home) / "mcp: battuta-doc", True))
     # Generated MCP is written before private templates so release servers win over template copies.
     for path, payload in outputs:
         path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
@@ -109,7 +112,7 @@ def configure_release(root: Path, *, env_file: Path, home: Path, deployment: str
                 directory.chmod(0o700)
         elif private in browsers:
             skipped.append(f"Browser setup skipped for {path}; review browser configuration before launch.")
-        results.extend(install_claude_skills(profile, manifest, home))
+        results.extend(install_claude_skills(profile / CLAUDE_SKILLS, manifest, home))
         results.extend(prepare_files(root, profile, private, [rule.model_copy(update={"policy": "create-only"}) for rule in manifest.files if rule.destination == "private"]))
     if deployment == "main":
         cos_private = instance_paths(root, home, "cos-bot")[2]

@@ -19,10 +19,10 @@ platform archive and install instructions: main uses `oracle-ampere`, influencer
 influencer needs all except `battuta-memory`. The bundle controls private
 configuration and generated services, not the files included in the archive.
 
-| Bundle             | `deployment` | Configured bots                        | Services to activate after approval                       | Setup validation                                                                           |
-| ------------------ | ------------ | -------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Main machine       | `main`       | CoS, Manager, selected general workers | memory, artifacts, speech, CoS, Manager, selected workers | Bundle validation, private configuration and named service status                          |
-| Influencer machine | `influencer` | Exactly one influencer worker          | artifacts, speech, selected worker                        | Bundle validation, worker private configuration, ADB availability and named service status |
+| Bundle             | `deployment` | Configured bots                        | Services to activate after approval                                  | Setup validation                                                                           |
+| ------------------ | ------------ | -------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Main machine       | `main`       | CoS, Manager, selected general workers | memory, artifacts, speech, documents, CoS, Manager, selected workers | Bundle validation, private configuration and named service status                          |
+| Influencer machine | `influencer` | Exactly one influencer worker          | artifacts, speech, selected worker                                   | Bundle validation, worker private configuration, ADB availability and named service status |
 
 Set `deployment=main` or `deployment=influencer` in the trusted shell before
 continuing. Pass that same value to both configuration and service generation.
@@ -108,7 +108,7 @@ directory, not the installation:
 
 - `battuta-vX.Y.Z-<platform>-arm64.tar.gz` and its `.sha256`, for your platform.
 - Wheels for your bundle (filenames use underscores): `battuta-project`, `battuta-artifacts`,
-  `battuta-speech`, `battuta-bot-setup`, and `battuta-packaging`; main also needs `battuta-memory`.
+  `battuta-speech`, `battuta-bot-setup`, and `battuta-packaging`; main also needs `battuta-memory` and `battuta-doc`.
 - `python-tools-version.txt` and `python-tools-SHA256SUMS`.
 
 Set the real tag and platform. Ask the owner for the absolute installation path if it
@@ -137,7 +137,7 @@ source installations, or `--with` arguments.
 
 ```bash
 case "$deployment" in
-  main) packages="battuta-project battuta-artifacts battuta-memory battuta-speech battuta-bot-setup battuta-packaging" ;;
+  main) packages="battuta-project battuta-artifacts battuta-memory battuta-speech battuta-doc battuta-bot-setup battuta-packaging" ;;
   influencer) packages="battuta-project battuta-artifacts battuta-speech battuta-bot-setup battuta-packaging" ;;
 esac
 for package in $packages; do
@@ -279,7 +279,7 @@ battuta-packaging install-services --root "$install_path" \
   --deployment "${deployment:?Choose main or influencer}"
 ```
 
-The main bundle writes CoS, Manager, memory, artifact, speech, and
+The main bundle writes CoS, Manager, memory, artifact, speech, document, and
 `battuta-worker@.service` definitions. The influencer bundle writes only artifact,
 speech, and `battuta-worker@.service` definitions. Confirm the printed activation
 list matches the table above before proceeding.
@@ -361,6 +361,7 @@ the owner confirms it.
 | Pi, Telegram, agent mail, project-spec | Compiled bundle plus install-runtime; remote Supabase is provisioned separately |
 | Shared memory and nightly CoS dream    | [Memory setup](docs/memory-service-setup.md)                                    |
 | Shared speech MCP                      | [Speech setup](docs/speech-service-setup.md)                                    |
+| Document parsing MCP (main only)       | [Document service setup](docs/doc-service-setup.md)                             |
 | Artifact service and CLI               | [Artifact setup](docs/artifact-service-setup.md)                                |
 | Project-management CLI                 | Installed with the Python wheels above                                          |
 | Assignment MCP                         | [Assignment setup](docs/assignments-setup.md)                                   |

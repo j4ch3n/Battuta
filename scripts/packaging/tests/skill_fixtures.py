@@ -1,6 +1,7 @@
 """Small filesystem catalogs and bundles for packaging contract tests."""
 
 import json
+import tomllib
 from pathlib import Path
 
 
@@ -24,7 +25,8 @@ def skill_catalog(root: Path, role: str, names=None) -> list[str]:
         names = ["project-management", "todo", "note-taking", "research"]
         if role == "cos":
             names.append("draft-writing")
-    for name in names:
+    claude = tomllib.loads(manifest_text(role, [])).get("claude", {}).get("skills", [])
+    for name in [*names, *(n for n in claude if n not in names)]:
         source = root / "skills-hub" / name
         (source / "references").mkdir(parents=True, exist_ok=True)
         (source / "SKILL.md").write_text(f"---\nname: {name}\n---\n")

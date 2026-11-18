@@ -8,6 +8,7 @@ import subprocess
 import tarfile
 
 import click
+from bot_setup.claude_skills import CLAUDE_SKILLS
 from bot_setup.skills import load_selection
 from bot_setup.files import prepare_files
 from bot_setup.manifest import load_profile
@@ -74,9 +75,12 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
                 if path.is_symlink() or not path.is_file():
                     raise click.ClickException(f"Missing regular extension package file: {path}")
     worker_agents = render_worker_agents(source / "bots/worker", manifests["worker"])
-    for names in selections.values():
+    claude_skills = {profile: manifest.claude.skills if manifest.claude else [] for profile, manifest in manifests.items()}
+    for names in [*selections.values(), *claude_skills.values()]:
         for name in names:
             skill = source / "skills-hub" / name
+            if not (skill / "SKILL.md").is_file():
+                raise click.ClickException(f"Missing skill or invalid entry point: {skill / 'SKILL.md'}")
             if any(path.is_symlink() for path in [skill, *skill.rglob("*")]):
                 raise click.ClickException(f"Skill resources must not be symlinks: {name}")
     for relative in ("docs", "RELEASE.md",
@@ -123,6 +127,8 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
         for name in selections[profile]:
             shutil.copytree(source / "skills-hub" / name, bot / ".pi/skills" / name)
         (bot / ".pi/skills").mkdir(exist_ok=True)
+        for name in claude_skills[profile]:
+            shutil.copytree(source / "skills-hub" / name, bot / CLAUDE_SKILLS / name)
         for extension in manifests[profile].extensions:
             entry = Path(extension.source)
             owner = source / entry.parent
@@ -190,6 +196,9 @@ def validate_bundle(root: Path) -> dict:
                             raise ValueError(f"template: {entry.path}")
             if not (bot / "AGENTS.md").is_file():
                 raise ValueError(profile)
+            for name in manifest.claude.skills if manifest.claude else []:
+                if not (bot / CLAUDE_SKILLS / name / "SKILL.md").is_file():
+                    raise ValueError(f"claude skill: {name}")
             selected = bot / ".pi/skills"
             if {p.name for p in selected.iterdir()} != set(metadata["skills"][profile]):
                 raise ValueError("skills")

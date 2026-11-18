@@ -1,4 +1,4 @@
-"""Claude Code skills are shared from prepared bot skills without overwriting host files."""
+"""Claude Code skills are shared from a skill catalog without overwriting host files."""
 
 import os
 from pathlib import Path
@@ -19,8 +19,8 @@ include = []
 '''.replace("'", '"'), "fixture.toml")
 
 
-def prepared(profile: Path, name="research"):
-    skill = profile / ".pi/skills" / name
+def prepared(catalog: Path, name="research"):
+    skill = catalog / name
     (skill / "references").mkdir(parents=True)
     (skill / "SKILL.md").write_text("skill")
     (skill / "references/notes.md").write_text("notes")
@@ -28,8 +28,8 @@ def prepared(profile: Path, name="research"):
 
 
 def test_skill_tree_is_copied_into_claude_directory(tmp_path):
-    prepared(tmp_path / "bot")
-    results = install_claude_skills(tmp_path / "bot", manifest(["research"]), tmp_path / "home")
+    prepared(tmp_path / "catalog")
+    results = install_claude_skills(tmp_path / "catalog", manifest(["research"]), tmp_path / "home")
     root = Path(os.environ["CLAUDE_CONFIG_DIR"]) / "skills/research"
     assert (root / "SKILL.md").read_text() == "skill"
     assert (root / "references/notes.md").read_text() == "notes"
@@ -37,11 +37,11 @@ def test_skill_tree_is_copied_into_claude_directory(tmp_path):
 
 
 def test_existing_files_are_preserved_and_reported(tmp_path):
-    prepared(tmp_path / "bot")
+    prepared(tmp_path / "catalog")
     target = Path(os.environ["CLAUDE_CONFIG_DIR"]) / "skills/research/SKILL.md"
     target.parent.mkdir(parents=True)
     target.write_text("customized")
-    results = install_claude_skills(tmp_path / "bot", manifest(["research"]), tmp_path / "home")
+    results = install_claude_skills(tmp_path / "catalog", manifest(["research"]), tmp_path / "home")
     assert target.read_text() == "customized"
     assert (target, False) in results
 
@@ -52,7 +52,7 @@ def test_manifest_without_claude_section_installs_nothing(tmp_path):
 
 def test_unprepared_skill_fails_before_writing(tmp_path):
     with pytest.raises(click.ClickException):
-        install_claude_skills(tmp_path / "bot", manifest(["research"]), tmp_path / "home")
+        install_claude_skills(tmp_path / "catalog", manifest(["research"]), tmp_path / "home")
     assert not (Path(os.environ["CLAUDE_CONFIG_DIR"]) / "skills").exists()
 
 

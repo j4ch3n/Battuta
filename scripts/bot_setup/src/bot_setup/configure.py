@@ -140,7 +140,7 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
     prepare_worker_agents(agents, bot_dir)
     prepare_files(root, profile, bot_dir, [rule for rule in manifest.files if rule.destination == "profile"])
     write_config(path, settings, ".settings-")
-    install_claude_skills(bot_dir, manifest, Path.home())
+    install_claude_skills(root / "skills-hub", manifest, Path.home())
     configure_mcp(bot_dir, role="worker", memory_url=memory_url, supabase_url=supabase_url)
     if not shared_catalog:
         agent_env = {**os.environ, "PI_CODING_AGENT_DIR": str(bot_dir / ".pi")}

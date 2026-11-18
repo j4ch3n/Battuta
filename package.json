@@ -36,7 +36,7 @@
     "check:skills": "uv run --project scripts/bot_setup --locked battuta-bot-setup skills check --root .",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm check:support",
     "check:all": "pnpm check && pnpm test:integration",
-    "precommit": "uv run --project scripts/bot_setup --locked battuta-bot-setup skills check --root . --staged && lint-staged --concurrent false"
+    "precommit": "uv run --project scripts/bot_setup --locked battuta-bot-setup skills check --root . --staged && lint-staged --concurrent false && node scripts/checks/staged-support.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

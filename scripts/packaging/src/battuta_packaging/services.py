@@ -66,10 +66,15 @@ RestartSec=5
 [Install]
 WantedBy=default.target
 '''
-    components = ("memory", "artifacts", "speech") if deployment == "main" else ("artifacts", "speech")
+    components = ("memory", "artifacts", "speech", "doc") if deployment == "main" else ("artifacts", "speech")
     for component in components:
         extra = "Environment=MCP_MEMORY_ONNX_ALLOW_DOWNLOAD=false\n" if component == "memory" else "NoNewPrivileges=true\nProtectSystem=strict\nProtectHome=read-only\n"
         preflight = f"ExecStartPre={executable} verify-speech\n" if component == "speech" else ""
+        if component == "doc":
+            data = Path.home() / ".battuta/doc-service"
+            # "+" runs the directory creation outside the sandbox that makes the rest of $HOME read-only
+            preflight = f"ExecStartPre=+/usr/bin/install -d -m 0700 {data}\n"
+            extra += f"ReadWritePaths={data}\nEnvironment=HF_HOME={data}/hf\nEnvironment=XDG_CACHE_HOME={data}/cache\n"
         units[f"battuta-{component}.service"] = f'''[Unit]
 Description=Battuta {component}
 After=network-online.target

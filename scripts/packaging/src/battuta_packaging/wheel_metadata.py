@@ -26,6 +26,7 @@ PROJECTS = {
     "battuta-artifacts": "artifact-service",
     "battuta-memory": "memory-service",
     "battuta-speech": "speech-service",
+    "battuta-doc": "doc-service",
     "battuta-packaging": "scripts/packaging",
 }
 

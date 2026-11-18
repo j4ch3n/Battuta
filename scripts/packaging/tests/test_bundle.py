@@ -64,6 +64,8 @@ def source(tmp_path, monkeypatch):
     skill.mkdir(parents=True)
     for name in ("SKILL.md", "LICENSE", "tools.md"):
         (skill / name).write_text(name)
+    (root / "skills-hub/read-documents").mkdir()
+    (root / "skills-hub/read-documents/SKILL.md").write_text("claude only")
     # The package boundary returns selections; packaging owns copying and validation.
     monkeypatch.setattr(bundle, "load_selection", lambda manifest, catalog: ["research"])
     monkeypatch.setattr(bundle.subprocess, "check_output", lambda *args, **kwargs: "a" * 40)

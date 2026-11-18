@@ -31,6 +31,9 @@ def installed(tmp_path):
         else:
             manifest = manifest_text(profile.removesuffix("-bot"), [])
         (bot / "bot.toml").write_text(manifest)
+        for name in tomllib.loads(manifest).get("claude", {}).get("skills", []):
+            (bot / ".claude-skills" / name).mkdir(parents=True)
+            (bot / ".claude-skills" / name / "SKILL.md").write_text(name)
         if profile.startswith("worker"):
             (bot / "abilities.json").write_text('{"research": {}, "mobile-control": {}}')
         if profile == "worker":

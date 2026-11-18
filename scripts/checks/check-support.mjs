@@ -18,7 +18,7 @@ function pythonTests(directory, project) {
   const tests = resolve(root, directory);
   run(
     "uv",
-    project.startsWith("scripts/") || project === "speech-service"
+    project.startsWith("scripts/") || project === "speech-service" || project === "doc-service"
       ? [...prefix, "-m", "pytest", tests, "-q"]
       : [...prefix, "-m", "unittest", "discover", "-s", tests, "-v"],
   );
@@ -33,13 +33,17 @@ const groups = {
   scripts: ["scripts/bot_setup", "scripts/packaging"],
   "memory-service": ["memory-service"],
   "speech-service": ["speech-service"],
+  "doc-service": ["doc-service"],
   "artifact-service": ["artifact-service"],
   "project-context-cli": ["project-context-cli"],
 };
 const selected = process.argv.slice(2);
 if (selected.some((name) => !Object.hasOwn(groups, name)))
   throw new Error("Unknown support check group");
-const names = selected.length ? selected : Object.keys(groups);
+// doc-service installs Docling and its model stack, so it runs only when named or selected by changed paths.
+const names = selected.length
+  ? selected
+  : Object.keys(groups).filter((name) => name !== "doc-service");
 if (names.includes("scripts")) {
   run("bash", ["-n", "scripts/packaging/release-build.sh", "scripts/bot_setup/run-dev.sh"]);
   run("bash", ["-n", "scripts/setup-memory.sh", "scripts/setup-artifacts.sh"]);
