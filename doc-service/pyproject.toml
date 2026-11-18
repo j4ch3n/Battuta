@@ -1,0 +1,24 @@
+[project]
+name = "battuta-doc"
+version = "0.1.0"
+description = "Battuta shared local document parsing MCP service"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "click>=8.1,<9",
+  "docling==2.150.1",
+  "mcp>=1.26,<2",
+  "uvicorn>=0.30,<1",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<10"]
+
+[project.scripts]
+battuta-doc = "battuta_doc.server:main"
+
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/battuta_doc"]
