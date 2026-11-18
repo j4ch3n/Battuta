@@ -130,8 +130,9 @@ class JobManager:
                          "converted_at": data.get("finished"), "bytes": _folder_bytes(folder)})
         return rows
 
-    def sweep(self) -> int:
-        cutoff = time.time() - self.settings.retention_days * 86400
+    def sweep(self, older_than_days: float | None = None) -> int:
+        days = self.settings.retention_days if older_than_days is None else older_than_days
+        cutoff = time.time() - days * 86400
         removed = 0
         for folder in list(self.docs_dir.iterdir()):
             live = self._jobs.get(folder.name)
