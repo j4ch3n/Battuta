@@ -18,6 +18,9 @@ def test_commit_hook_uses_staged_selection_and_release_gate_uses_checkout(tmp_pa
     manifest = tmp_path / "bots/worker/bot.toml"
     manifest.parent.mkdir(parents=True)
     manifest.write_text('[skills]\ninclude=["research"]')
+    support = tmp_path / "scripts/checks/staged-support.mjs"
+    support.parent.mkdir(parents=True)
+    support.write_text("")  # stub: the support-test runner is outside this gate
     binary = tmp_path / "node_modules/.bin"
     binary.mkdir(parents=True)
     uv = binary / "uv"

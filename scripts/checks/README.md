@@ -10,5 +10,6 @@ Thin Node runners coordinate repository checks; they are not bot runtime code.
 | `check-supabase.mjs`   | Run database and integration checks against an isolated temporary stack. |
 | `check-support.mjs`    | Run shell checks and each Python project's tests in its own environment. |
 | `lint-staged-code.mjs` | Send staged code to ESLint or Deno lint during commits.                  |
+| `staged-support.mjs`   | Run only the Python support groups whose files are staged.               |
 
 See [development commands](../../docs/commands.md) for the maintained command reference.

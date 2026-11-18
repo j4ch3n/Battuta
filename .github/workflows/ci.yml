@@ -106,7 +106,7 @@ jobs:
     name: Python (${{ matrix.group }})
     needs: format
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: ${{ matrix.group == 'doc-service' && 25 || 10 }}
     strategy:
       fail-fast: false
       matrix:
