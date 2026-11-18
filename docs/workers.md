@@ -25,13 +25,19 @@ dispatch queue, result queue, or scheduler daemon is introduced.
 See [assignment runtime](assignments.md) for schema, RPC/tool, dependency, state,
 and privilege contracts. Assignment completion is not product acceptance.
 
-## Model by difficulty
+## Delegation and models
 
-Each assignment has a difficulty: `easy` (the default), `medium`, `hard`, or `hail_mary`. Before the
-first TODO the worker selects the model named by `MODEL_FOR_EASY_TASKS`, `MODEL_FOR_MEDIUM_TASKS`,
-`MODEL_FOR_HARD_TASKS`, or `MODEL_FOR_HAIL_MARY_TASKS`, written as `provider/model-id` in the
-worker's environment. An unset variable keeps Pi's default model. A malformed or
-unknown value blocks the assignment with a reason naming the variable.
+A worker's own Pi model comes from `[defaults] model` in `bots/worker/bot.toml`
+([bot setup](bot-setup.md)). Each assignment's difficulty (`easy` by default, `medium`,
+`hard`, `hail_mary`) is the Manager's advice only; it does not select a model.
+
+The worker delegates planning, implementing and reviewing to headless Claude Code runs
+(see [delegation setup](delegation-setup.md)) and decides each run's mode, model tier
+(`economy`, `balanced` or `max`), scope and objective. A session-start prompt section lists
+the tiers from `MODEL_FOR_EASY_TASKS`, `MODEL_FOR_MEDIUM_TASKS` and `MODEL_FOR_HARD_TASKS`
+(`anthropic/<model-id>`); hail-mary work also uses `max`. A tier whose variable is unset
+or not Anthropic is shown as unavailable. The worker reads each run's summary, resumes a
+session only when the objective continues, and starts a fresh session for review.
 
 ## Native Pi lifecycle
 

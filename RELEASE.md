@@ -366,7 +366,8 @@ the owner confirms it.
 | Assignment MCP                         | [Assignment setup](docs/assignments-setup.md)                                   |
 | Assignment remote files                | [Remote files setup](docs/assignment-remote-files-setup.md)                     |
 | Workers and numbered instances         | [Worker setup](docs/workers-setup.md)                                           |
-| Worker researcher/reviewer subagents   | [Subagent setup](docs/subagents-setup.md)                                       |
+| Worker researcher subagent             | [Subagent setup](docs/subagents-setup.md)                                       |
+| Worker Claude Code delegation          | [Delegation setup](docs/delegation-setup.md)                                    |
 | CoS and worker browsers                | [Browser setup](docs/browser-setup.md)                                          |
 | Google CLI                             | [Google setup](docs/gogcli-setup.md)                                            |
 | Luma                                   | [Luma setup](docs/luma-setup.md)                                                |

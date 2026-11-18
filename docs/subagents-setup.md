@@ -39,12 +39,11 @@ private authentication into a release or child folder.
 ## Types and context
 
 - `researcher` uses local inspection and the installed web-access extension.
-- `reviewer` uses inspection tools and shell commands for requested checks.
 
-Both use standalone prompts, no inherited conversation or ambient skills, and no
-further delegation. The researcher explicitly preloads only `research`; the
-reviewer preloads no skills. Only the researcher loads web access; neither loads the assignment
-worker lifecycle extension. Worker instructions explain when to use each type;
+It uses a standalone prompt, no inherited conversation or ambient skills, and no
+further delegation. It explicitly preloads only `research`, loads web access, and
+does not load the assignment worker lifecycle extension. Review and test runs are
+delegated to Claude Code instead; see [delegation setup](delegation-setup.md). Worker instructions explain when to use each type;
 the extension supplies native `Agent` tool help.
 
 These are trusted processes, not a sandbox. Subagents return findings to their
@@ -58,7 +57,6 @@ assignment completion.
 ```sh
 test -f bots/worker/.pi/npm/node_modules/@tintinweb/pi-subagents/package.json
 test -f bots/worker/.pi/agents/researcher.md
-test -f bots/worker/.pi/agents/reviewer.md
 test -f bots/worker/.pi/skills/research/SKILL.md
 test -f bots/worker/.pi/skills/research/references/investigation.md
 ```
@@ -71,9 +69,7 @@ mean setup is incomplete; stop rather than starting workers.
 ## Separate manual functional checks
 
 With a test-only assignment and normal worker authentication, ask a researcher
-for a bounded source-backed answer and a reviewer to run a harmless local test.
-Confirm the custom types resolve, web tools work, reviewer reports actual
-commands/results, and neither starts an assignment coordinator or registers
-`report_execution_result`. Confirm the parent integrates their evidence and only
+for a bounded source-backed answer. Confirm the custom type resolves, web tools work,
+and it does not start an assignment coordinator or register `report_execution_result`. Confirm the parent integrates their evidence and only
 the bound worker reports execution once. Do not use production assignments or
 send production mail merely to validate installation.

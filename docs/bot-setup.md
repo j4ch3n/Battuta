@@ -103,7 +103,7 @@ by the parent worker; extension names must be backed by a package in `[packages]
 Setup renders native `skills` and `extensions` frontmatter into generated agent
 definitions, so source prompt files must not declare those keys themselves.
 The agent's `tools` restriction remains in the prompt. The researcher requests
-web-access tools; the reviewer requests neither skills nor extensions.
+web-access tools.
 
 Source setup materializes inherited skill files for native subagent discovery;
 release bundles include the selected skills and render the same agent definitions.
@@ -120,7 +120,7 @@ home. For example:
 pi_coding_agent_dir = "cos-bot/.pi"
 
 [defaults]
-model = "anthropic/claude-haiku-5.5"
+model = "anthropic/claude-haiku-5-5"
 thinking = "low"
 ```
 
@@ -149,9 +149,9 @@ Current initial defaults:
 
 | Role    | Model                         | Thinking |
 | ------- | ----------------------------- | -------- |
-| CoS     | `anthropic/claude-haiku-5.5`  | low      |
-| Manager | `anthropic/claude-sonnet-5.5` | medium   |
-| Worker  | `anthropic/claude-haiku-5.5`  | high     |
+| CoS     | `anthropic/claude-haiku-5-5`  | low      |
+| Manager | `anthropic/claude-sonnet-5-5` | medium   |
+| Worker  | `anthropic/claude-haiku-5-5`  | medium   |
 
 Setup does not authenticate, check provider model availability or invoke a model;
 confirm each manifest model matches the operator's account.

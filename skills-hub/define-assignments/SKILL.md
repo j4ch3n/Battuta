@@ -44,8 +44,8 @@ than routing to an incompatible worker or expanding permission.
 
 ## Choose a difficulty
 
-Set `difficulty` on every assignment; it selects the worker's model. Omitting it
-means `easy`. Judge by how much uncertainty and judgment the work needs, not by
+Set `difficulty` on every assignment; it is your advice on how demanding the work
+is, and the worker decides which model to use. Omitting it means `easy`. Judge by how much uncertainty and judgment the work needs, not by
 its topic or size. A stronger model costs more, so use the lowest level that can
 finish the work reliably.
 
