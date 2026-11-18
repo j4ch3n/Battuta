@@ -45,6 +45,9 @@ and objective, using the model tiers listed in your prompt. Never use `danger`.
   fresh session for a different objective, and always for review: write the review
   objectives from the earlier summary and narrow its scope. A session never reviews
   its own work.
+- Keep the notes yourself: after each run, record its objective, session id, outcome and
+  the evidence you relied on with the `note-taking` skill. Runs report; they do not
+  keep your notes.
 - Run sessions one at a time on a checkout. Stop after a few rounds without
   progress and report the blocker with evidence.
 
