@@ -167,6 +167,21 @@ test.each([undefined, "", " "])(
   },
 );
 
+test("session start injects the delegation model catalog into the prompt sections", async () => {
+  vi.stubEnv("MODEL_FOR_EASY_TASKS", "anthropic/claude-easy-test");
+  const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => unknown>();
+  worker({
+    on: (event: string, handler: never) => handlers.set(event, handler),
+    registerTool: vi.fn(),
+    registerCommand: vi.fn(),
+    setActiveTools: vi.fn(),
+    sendUserMessage: vi.fn(),
+  } as unknown as ExtensionAPI);
+  const event = { systemPromptOptions: { sections: {} as Record<string, string> } };
+  await handlers.get("before_agent_start")!(event, {} as ExtensionContext);
+  expect(event.systemPromptOptions.sections["delegation-models"]).toContain("claude-easy-test");
+});
+
 test("a bound native extension dispatches its TODO through Pi without a host sender", async () => {
   vi.useFakeTimers();
   const row = detail();

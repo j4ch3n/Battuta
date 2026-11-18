@@ -1,0 +1,42 @@
+const tiers = [
+  { tier: "economy", variable: "MODEL_FOR_EASY_TASKS" },
+  { tier: "balanced", variable: "MODEL_FOR_MEDIUM_TASKS" },
+  { tier: "max", variable: "MODEL_FOR_HARD_TASKS" },
+] as const;
+
+export type Tier = (typeof tiers)[number]["tier"];
+export type CatalogEntry =
+  { tier: Tier; variable: string; model: string } | { tier: Tier; variable: string; error: string };
+
+/** Claude Code models a worker may delegate to; hail-mary work also uses `max`, so its variable is not read. */
+export function delegationCatalog(env: Record<string, string | undefined>): CatalogEntry[] {
+  const entries: CatalogEntry[] = [];
+  for (const { tier, variable } of tiers) {
+    const value = env[variable]?.trim();
+    if (!value) continue;
+    const slash = value.indexOf("/");
+    const model = value.slice(slash + 1);
+    entries.push(
+      slash > 0 && value.slice(0, slash) === "anthropic" && model
+        ? { tier, variable, model }
+        : { tier, variable, error: `${variable} must be anthropic/<model-id>` },
+    );
+  }
+  return entries;
+}
+
+export function renderDelegationSection(entries: CatalogEntry[]): string {
+  const lines = ["Claude Code delegation: choose a model tier for each `delegate` run."];
+  for (const entry of entries)
+    lines.push(
+      "error" in entry
+        ? `- ${entry.tier}: unavailable (${entry.error})`
+        : `- ${entry.tier}: --model ${entry.model}`,
+    );
+  if (!entries.length) lines.push("- No model tier is configured; do not delegate.");
+  lines.push(
+    "Tiers are independent of the assignment's difficulty, which is only the Manager's advice; hail-mary work uses max.",
+    "Modes: plan, review and security-audit are read-only; implement, docs and general edit files. Never use danger.",
+  );
+  return lines.join("\n");
+}

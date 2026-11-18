@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createAssignmentClient } from "./client.ts";
+import { delegationCatalog, renderDelegationSection } from "./delegation.ts";
 import { createCoordinator } from "./coordinator.ts";
 import { ExecutionResultSchema, parseAbilities, parseBinding } from "./contracts.ts";
 import { createNotifier } from "./notify.ts";
@@ -59,6 +60,11 @@ export default function worker(pi: ExtensionAPI) {
       }
       await coordinator.reconcile("idle");
     },
+  });
+  pi.on("before_agent_start", (event) => {
+    event.systemPromptOptions.sections["delegation-models"] = renderDelegationSection(
+      delegationCatalog(process.env),
+    );
   });
   pi.on("session_start", async (event, ctx) => {
     if (client || stopped) return;
