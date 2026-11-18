@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from bot_setup.configure import configure_source, configure_worker
-from skill_fixtures import manifest_text
+from skill_fixtures import manifest_text, write_delegate_templates
 
 
 class WorkerSetupTests(unittest.TestCase):
@@ -44,7 +44,7 @@ class WorkerSetupTests(unittest.TestCase):
         (self.profile / ".pi/web-search.json").write_text('{"fetchContent":{"userAgent":"fixture mobile browser"}}')
         (self.profile / "agents").mkdir()
         (self.profile / "agents/researcher.md").write_text("---\nname: researcher\n---\nResearch fixture.")
-        (self.profile / "agents/reviewer.md").write_text("---\nname: reviewer\n---\nReview fixture.")
+        write_delegate_templates(self.profile)
 
     def prepare(self):
         with patch("bot_setup.configure.run") as run:
@@ -66,11 +66,10 @@ class WorkerSetupTests(unittest.TestCase):
         self.assertNotIn("battutaWorkerAgents", settings)
         self.assertNotIn("battutaWorkerResearch", settings)
         researcher = (self.profile / ".pi/agents/researcher.md").read_text()
-        reviewer = (self.profile / ".pi/agents/reviewer.md").read_text()
         self.assertIn('skills: ["research"]', researcher)
         self.assertIn('extensions: ["pi-web-access"]', researcher)
-        self.assertIn("skills: false", reviewer)
-        self.assertIn("extensions: false", reviewer)
+        self.assertFalse((self.profile / ".pi/agents/reviewer.md").exists())
+        self.assertIn("npm:pi-harness-delegate@0.9.0", settings["packages"])
 
     def test_invalid_subagent_configuration_fails_before_install_or_writes(self):
         manifest = self.profile / "bot.toml"
@@ -80,7 +79,6 @@ class WorkerSetupTests(unittest.TestCase):
             ('agents/researcher.md', 'agents/missing.md'),
             ('inherit_parent_skills = ["research"]', 'inherit_parent_skills = ["missing"]'),
             ('extensions = ["pi-web-access"]', 'extensions = ["uninstalled"]'),
-            ('agents/reviewer.md', 'agents/researcher.md'),
         ]:
             with self.subTest(change=new):
                 manifest.write_text(original.replace(old, new))

@@ -12,14 +12,15 @@ capabilities = ["research"]
 pi_coding_agent_dir = "{instance}/.pi"
 
 [defaults]
-model = "anthropic/claude-haiku-5.5"
-thinking = "high"
+model = "anthropic/claude-haiku-5-5"
+thinking = "medium"
 
 [packages]
 pi = [
   "npm:pi-web-access@0.43.0",
   "npm:@amaster.ai/pi-browser-use@0.1.38",
   "npm:@tintinweb/pi-subagents@0.24.0",
+  "npm:pi-harness-delegate@0.9.0",
 ]
 node_projects = ["assignment-worker", "agent-mail"]
 
@@ -57,11 +58,6 @@ path = "agents/researcher.md"
 inherit_parent_skills = ["research"]
 extensions = ["pi-web-access"]
 
-[[subagents.agents]]
-path = "agents/reviewer.md"
-inherit_parent_skills = []
-extensions = []
-
 [[files]]
 operation = "copy"
 sources = [{ root = "profile", path = ".pi/mcp.json" }]
@@ -69,6 +65,27 @@ target = ".pi/mcp.json"
 destination = "private"
 policy = "merge"
 optional = true
+
+[[files]]
+operation = "copy"
+sources = [{ root = "profile", path = ".pi/delegate/templates/claude/implement.md" }]
+target = ".pi/delegate/templates/claude/implement.md"
+destination = "private"
+policy = "create-only"
+
+[[files]]
+operation = "copy"
+sources = [{ root = "profile", path = ".pi/delegate/templates/claude/review.md" }]
+target = ".pi/delegate/templates/claude/review.md"
+destination = "private"
+policy = "create-only"
+
+[[files]]
+operation = "copy"
+sources = [{ root = "profile", path = ".pi/delegate/templates/claude/plan.md" }]
+target = ".pi/delegate/templates/claude/plan.md"
+destination = "private"
+policy = "create-only"
 
 [skills]
 include = [
