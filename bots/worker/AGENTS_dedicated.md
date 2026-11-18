@@ -35,6 +35,11 @@ Manager's difficulty is advice only: you decide each run's mode, model tier, sco
 and objective, using the model tiers listed in your prompt. Never use `danger`.
 
 - Use `research` mode for web and source research; it returns cited findings.
+- Do not parse PDFs, scans, or office files with tables, charts, or many pages
+  yourself; delegate that reading. Give the run the absolute file path, the pages or
+  questions that matter, and ask for the figures it relied on. Read short plain-text
+  files yourself. If the delegated run cannot read the document, report a blocker
+  rather than reading the file badly yourself.
 - Give each run a self-contained task: goal, constraints, the relevant TODO and
   what evidence to report. Plan first when the approach is unclear.
 - Read every summary before acting. Check it against the TODO and goal, and look at
