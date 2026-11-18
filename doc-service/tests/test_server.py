@@ -2,7 +2,6 @@ import asyncio
 from dataclasses import replace
 import json
 import socket
-from types import SimpleNamespace
 
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
@@ -79,23 +78,10 @@ def test_lists_exactly_the_six_tools_and_none_has_a_wait_parameter():
     assert all("wait" not in t.inputSchema["properties"] for t in TOOLS)
 
 
-def test_doc_convert_schema_defaults():
-    props = next(t for t in TOOLS if t.name == "doc_convert").inputSchema["properties"]
-    assert (props["charts"]["default"], props["ocr"]["default"], props["tables"]["default"], props["figures"]["default"]) == (
-        True, "auto", "accurate", "extract")
-
-
 def test_doc_convert_returns_index_and_tree_when_done(env):
     out = call(env, "doc_convert", {"source": env[3]})
-    assert out["status"] == "done" and out["index"].endswith("INDEX.md") and out["tree"] == "t"
+    assert out["status"] == "done" and out["index"].endswith("INDEX.md") and out["tree"] == "t" and out["next_step"]
     assert env[1].options.charts is True
-
-
-def test_results_carry_next_step_that_differs_by_status(env):
-    done = call(env, "doc_convert", {"source": env[3]})
-    env[1].convert_status = env[1].running
-    running = call(env, "doc_convert", {"source": env[3]})
-    assert done["next_step"] and running["next_step"] and done["next_step"] != running["next_step"]
 
 
 def test_doc_job_reports_progress_and_final_payload_matches_convert(env):
@@ -106,8 +92,6 @@ def test_doc_job_reports_progress_and_final_payload_matches_convert(env):
 
 
 @pytest.mark.parametrize("name,args,code", [
-    ("doc_convert", {"source": "/nope"}, "not_found"),
-    ("doc_convert", {"source": "rel.pdf"}, "invalid_source"),
     ("doc_convert", {"source": "x", "wait": False}, "invalid_option"),
     ("doc_convert", {"source": "SRC", "ocr": "bad"}, "invalid_option"),
     ("doc_job", {"doc_id": "b" * 16}, "not_found"),

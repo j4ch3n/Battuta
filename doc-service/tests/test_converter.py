@@ -20,8 +20,8 @@ class FakeOcr:
 @pytest.mark.parametrize("kw,expect", [
     ({}, dict(do_ocr=True, force=False, do_table_structure=True, mode="accurate", charts=True, formulas=False, describe=False, images=True)),
     ({"ocr": "off", "tables": "off", "charts": False, "figures": "off"}, dict(do_ocr=False, do_table_structure=False, charts=False, images=False, describe=False)),
-    ({"ocr": "force", "tables": "fast", "formulas": True}, dict(do_ocr=True, force=True, mode="fast", formulas=True)),
-    ({"figures": "describe"}, dict(describe=True, images=True)),
+    ({"ocr": "force", "tables": "fast", "formulas": True, "figures": "describe"},
+     dict(do_ocr=True, force=True, mode="fast", formulas=True, describe=True, images=True)),
 ])
 def test_pipeline_options_mapping(kw, expect):
     p = build_pipeline_options(opts(**kw), None, ocr_factory=lambda kind, lang: FakeOcr())

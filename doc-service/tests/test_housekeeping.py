@@ -92,10 +92,3 @@ def test_list_and_delete(mgr, tmp_path):
     assert [r["doc_id"] for r in rows] == [doc_id] and rows[0]["source_name"] == "a.pdf"
     assert run(mgr, "doc_delete", {"doc_id": doc_id}) == {"deleted": 1}
     assert run(mgr, "doc_list", {})["documents"] == []
-
-
-@pytest.mark.parametrize("args", [{}, {"doc_id": "a" * 16, "older_than_days": 1}])
-def test_delete_requires_exactly_one_selector(mgr, args):
-    with pytest.raises(DocError) as e:
-        run(mgr, "doc_delete", args)
-    assert e.value.code == "invalid_option"

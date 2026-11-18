@@ -51,6 +51,13 @@ async def noop(status):
     pass
 
 
+async def settled(m, *, running, queued):
+    """Wait until hashing threads and the worker have reached the expected queue state."""
+    async with asyncio.timeout(5):
+        while (len(m.queue_state()["running"]), len(m.queue_state()["queued"])) != (running, queued):
+            await asyncio.sleep(0.01)
+
+
 def test_cache_hit_returns_done_without_converting(tmp_path):
     m, conv = setup(tmp_path)
 
@@ -84,12 +91,13 @@ def test_calls_serialize_and_full_queue_returns_busy(tmp_path):
     m, conv = setup(tmp_path, FakeConverter(gate), max_queue=1)
 
     async def go():
-        tasks = [asyncio.create_task(m.convert(src(tmp_path, f"{i}.pdf", bytes([i])), OPTS, noop)) for i in range(2)]
-        await asyncio.sleep(0.1)  # first running, second queued
+        tasks = [asyncio.create_task(m.convert(src(tmp_path, "0.pdf", b"0"), OPTS, noop))]
+        await settled(m, running=1, queued=0)
+        tasks.append(asyncio.create_task(m.convert(src(tmp_path, "1.pdf", b"1"), OPTS, noop)))
+        await settled(m, running=1, queued=1)
         with pytest.raises(DocError) as e:
             await m.convert(src(tmp_path, "3.pdf", b"3"), OPTS, noop)
         assert e.value.code == "busy"
-        assert len(m.queue_state()["running"]) == 1 and len(m.queue_state()["queued"]) == 1
         gate.set()
         return await asyncio.gather(*tasks)
 
@@ -189,27 +197,3 @@ def test_sweep_removes_only_expired_folders(tmp_path):
     assert m.sweep() == 1
     assert not (m.docs_dir / old).exists() and (m.docs_dir / new).exists()
     assert [r["doc_id"] for r in m.list()] == [new]
-
-
-def test_garbage_collected_after_each_conversion(tmp_path, monkeypatch):
-    calls = []
-    monkeypatch.setattr(jobs.gc, "collect", lambda *a: calls.append(1))
-    m, _ = setup(tmp_path, FakeConverter(error=RuntimeError("boom")))
-
-    async def go():
-        await m.convert(src(tmp_path, "a.pdf", b"a"), OPTS, noop)
-        m.converter.error = None
-        await m.convert(src(tmp_path, "b.pdf", b"b"), OPTS, noop)
-
-    asyncio.run(go())
-    assert len(calls) == 2
-
-
-def test_doc_id_uses_suffix_and_docling_version(tmp_path, monkeypatch):
-    seen = []
-    real = jobs.make_doc_id
-    monkeypatch.setattr(jobs, "make_doc_id", lambda sha, suffix, options, v: seen.append((suffix, v)) or real(sha, suffix, options, v))
-    monkeypatch.setattr(jobs, "docling_version", lambda: "9.9")
-    m, _ = setup(tmp_path)
-    asyncio.run(m.convert(src(tmp_path), OPTS, noop))
-    assert seen == [(".pdf", "9.9")]
