@@ -10,7 +10,7 @@ import click
 import pytest
 
 from battuta_packaging import bundle
-from skill_fixtures import manifest_text
+from skill_fixtures import manifest_text, write_delegate_templates
 
 
 @pytest.fixture
@@ -58,7 +58,7 @@ def source(tmp_path, monkeypatch):
             (path / ".pi/mcp.json").write_text("{}")
             (path / "agents").mkdir()
             (path / "agents/researcher.md").write_text("---\nname: researcher\n---\nResearch fixture")
-            (path / "agents/reviewer.md").write_text("---\nname: reviewer\n---\nReview fixture")
+            write_delegate_templates(path)
             (path / "agents/unselected.md").write_text("Not selected")
     skill = root / "skills-hub/research"
     skill.mkdir(parents=True)
@@ -115,11 +115,9 @@ def test_staged_archive_separates_documentation_and_bots(source, tmp_path):
             )
             assert "npm:@tintinweb/pi-subagents@0.24.0" in settings["packages"]
             researcher = (bot / ".pi/agents/researcher.md").read_text()
-            reviewer = (bot / ".pi/agents/reviewer.md").read_text()
             assert 'skills: ["research"]' in researcher
             assert 'extensions: ["pi-web-access"]' in researcher
-            assert "skills: false" in reviewer
-            assert "extensions: false" in reviewer
+            assert not (bot / ".pi/agents/reviewer.md").exists()
             assert not (bot / ".pi/agents/unselected.md").exists()
         assert any("pi-browser-use" in package for package in settings["packages"]) == (profile not in ("manager-bot", "worker-influencer"))
         if profile not in ("manager-bot", "worker-influencer"):

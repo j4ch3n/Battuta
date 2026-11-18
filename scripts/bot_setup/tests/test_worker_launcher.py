@@ -13,7 +13,7 @@ from bot_setup.browser import configure_browser
 from bot_setup.mcp import configure_mcp
 from bot_setup.extensions import prepare_source_extensions, profile_settings
 from bot_setup.manifest import load_profile
-from skill_fixtures import manifest_text
+from skill_fixtures import manifest_text, write_delegate_templates
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -43,6 +43,7 @@ class WorkerLauncherTests(unittest.TestCase):
             cli.write_text("fixture")
             (root / "bots/worker").mkdir(parents=True)
             (root / "bots/worker/bot.toml").write_text(manifest_text("worker", []))
+            write_delegate_templates(root / "bots/worker")
             (root / "bots/worker/abilities.json").write_text('{"research": {}}')
             configure_browser(root / "bots/worker", bot, home=self.home, bot="worker-1")
             binary = root / "bin"
@@ -65,7 +66,10 @@ class WorkerLauncherTests(unittest.TestCase):
             self.assertEqual(output["agentDir"], str(bot / ".pi"))
             self.assertEqual(output["private"], [])
             self.assertNotIn("--print", output["args"])
-            self.assertEqual(output["args"], [str(cli)])
+            self.assertEqual(output["args"][0], str(cli))
+            self.assertEqual(output["args"][1], "--model")
+            self.assertRegex(output["args"][2], r"^[^/\s]+/\S+$")
+            self.assertEqual(len(output["args"]), 3)
             env_file.write_text("SUPABASE_URL=http://127.0.0.1:54321\n")
             failed = subprocess.run(args, env=env, text=True, capture_output=True)
             self.assertNotEqual(failed.returncode, 0)
@@ -95,6 +99,7 @@ class WorkerLauncherTests(unittest.TestCase):
             prepare_source_extensions(root, profile, manifest.extensions)
             configure_mcp(profile, role="worker", supabase_url="http://127.0.0.1:54321")
             (profile / ".pi/web-search.json").write_text('{"fetchContent":{"userAgent":"fixture mobile browser"}}')
+            write_delegate_templates(profile)
             (profile / ".pi/auth.json").write_text("never-copy")
             cli = root / "assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
             cli.parent.mkdir(parents=True)
@@ -117,7 +122,7 @@ class WorkerLauncherTests(unittest.TestCase):
             self.assertEqual(lines[:3], [str(bot / ".pi"), str(profile), "worker-1"])
             self.assertEqual(unquote(lines[3]), str(self.home / ".battuta/projects"))
             settings = json.loads((bot / ".pi/settings.json").read_text())
-            self.assertEqual(settings["defaultThinkingLevel"], "high")
+            self.assertEqual(settings["defaultThinkingLevel"], manifest.defaults.thinking)
             self.assertNotIn("extensions", settings)
             self.assertEqual(settings["packages"], manifest.packages.pi)
             self.assertEqual((profile / ".pi/extensions/assignment-worker.ts").resolve(), source)
@@ -157,6 +162,7 @@ class WorkerLauncherTests(unittest.TestCase):
             cli.write_text("fixture")
             (root / "bots/worker").mkdir(parents=True)
             (root / "bots/worker/bot.toml").write_text(manifest_text("worker", []))
+            write_delegate_templates(root / "bots/worker")
             (root / "bots/worker/abilities.json").write_text('{"research": {}}')
             bot = self.home / ".battuta/pi-bots/worker-1"
             (bot / ".pi").mkdir(parents=True)

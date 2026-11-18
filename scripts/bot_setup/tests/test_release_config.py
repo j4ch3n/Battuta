@@ -1,13 +1,14 @@
 """Release configuration regenerates owned files, never private preferences."""
 
 import json
+import os
 from pathlib import Path
 
 import click
 import pytest
 
 from bot_setup import release
-from skill_fixtures import manifest_text
+from skill_fixtures import manifest_text, write_delegate_templates
 
 
 @pytest.fixture
@@ -21,6 +22,9 @@ def deployment(tmp_path, monkeypatch):
         (bot / "bot.toml").write_text(manifest_text(role.removesuffix("-bot"), []))
         if role == "worker":
             (bot / "abilities.json").write_text('{"research": {}}')
+            write_delegate_templates(bot)
+            (bot / ".pi/skills/research").mkdir()
+            (bot / ".pi/skills/research/SKILL.md").write_text("research skill")
         (bot / "AGENTS.md").write_text(role)
         (bot / ".pi/settings.json").write_text("{}")
         (bot / ".pi/web-search.json").write_text('{"fetchContent":{"userAgent":"fixture"}}')
@@ -83,6 +87,16 @@ def test_release_preserves_existing_files_and_reports_skips(deployment, capsys):
     assert not (home / ".pi").exists()
 
 
+def test_release_shares_research_skill_with_claude_code_once(deployment):
+    root, home, env_file = deployment
+    skill = Path(os.environ["CLAUDE_CONFIG_DIR"]) / "skills/research/SKILL.md"
+    release.configure_release(root, env_file=env_file, home=home)
+    assert skill.read_text() == "research skill"
+    skill.write_text("customized")
+    release.configure_release(root, env_file=env_file, home=home)
+    assert skill.read_text() == "customized"
+
+
 def test_release_generated_mcp_wins_over_shipped_worker_template(deployment):
     root, home, env_file = deployment
     (root / "bots/worker/.pi/mcp.json").write_text('{"mcpServers":{"stale":{}}}')
@@ -110,7 +124,7 @@ def test_release_merges_cos_telegram_handler_without_overwriting_existing_values
 def test_fresh_release_defaults_survive_browser_setup(deployment):
     root, home, env_file = deployment
     release.configure_release(root, env_file=env_file, home=home)
-    for bot, thinking in (("cos-bot", "low"), ("manager-bot", "medium"), ("worker-1", "high"), ("worker-2", "high")):
+    for bot, thinking in (("cos-bot", "low"), ("manager-bot", "medium"), ("worker-1", "medium"), ("worker-2", "medium")):
         settings = json.loads((home / ".battuta/pi-bots" / bot / ".pi/settings.json").read_text())
         assert settings["defaultThinkingLevel"] == thinking
 

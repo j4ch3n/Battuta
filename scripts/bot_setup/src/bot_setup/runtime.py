@@ -48,7 +48,6 @@ def initialize_settings_if_missing(agent_dir: Path, defaults: Defaults, *, initi
     return True
 
 
-def model_args(defaults: Defaults, env: dict[str, str]) -> list[str]:
-    """The model comes from env on every launch; settings.json is never the source."""
-    value = env.get(f"MODEL_FOR_{defaults.difficulty.upper()}_TASKS", "").strip()
-    return ["--model", value] if value else []
+def model_args(defaults: Defaults) -> list[str]:
+    """The manifest model is passed on every launch; settings.json is never the source."""
+    return ["--model", defaults.model]

@@ -5,6 +5,7 @@ import json
 
 import click
 import pytest
+from pydantic import ValidationError
 
 from bot_setup.manifest import parse_manifest, Defaults
 from bot_setup.runtime import resolve_agent_dir, initialize_settings_if_missing, model_args
@@ -51,7 +52,7 @@ def test_symlinked_ancestor_is_rejected(tmp_path):
 
 def test_missing_settings_created_privately_and_concurrently(tmp_path):
     directory = tmp_path / "bot/.pi"
-    defaults = Defaults(difficulty="medium", thinking="high")
+    defaults = Defaults(model="anthropic/claude-haiku-5-5", thinking="high")
     with ThreadPoolExecutor(max_workers=8) as executor:
         list(executor.map(lambda _: initialize_settings_if_missing(directory, defaults), range(16)))
     path = directory / "settings.json"
@@ -64,7 +65,7 @@ def test_missing_settings_created_privately_and_concurrently(tmp_path):
 def test_existing_settings_are_not_backfilled_or_reformatted(tmp_path, original):
     path = tmp_path / "settings.json"
     path.write_text(original)
-    initialize_settings_if_missing(tmp_path, Defaults(difficulty="easy", thinking="low"))
+    initialize_settings_if_missing(tmp_path, Defaults(model="anthropic/claude-haiku-5-5", thinking="low"))
     assert path.read_text() == original
 
 
@@ -78,7 +79,7 @@ def test_unsafe_existing_settings_fail_without_replacement(tmp_path, kind):
     else:
         path.mkdir()
     with pytest.raises(click.ClickException) as error:
-        initialize_settings_if_missing(tmp_path, Defaults(difficulty="easy", thinking="low"))
+        initialize_settings_if_missing(tmp_path, Defaults(model="anthropic/claude-haiku-5-5", thinking="low"))
     assert "private-sentinel" not in str(error.value)
     if kind == "malformed":
         assert path.read_text() == "private-sentinel"
@@ -89,12 +90,22 @@ def test_unsafe_existing_settings_fail_without_replacement(tmp_path, kind):
         assert path.is_dir()
 
 
-@pytest.mark.parametrize("difficulty", ["easy", "medium", "hard", "hail_mary"])
-def test_model_args_follow_env_for_difficulty(difficulty):
-    env = {f"MODEL_FOR_{name}_TASKS": f"p/{name}" for name in ("EASY", "MEDIUM", "HARD", "HAIL_MARY")}
-    assert model_args(Defaults(difficulty=difficulty, thinking="low"), env) == ["--model", f"p/{difficulty.upper()}"]
+def test_model_args_pass_manifest_model():
+    defaults = Defaults(model="anthropic/claude-sonnet-5-5", thinking="low")
+    assert model_args(defaults) == ["--model", "anthropic/claude-sonnet-5-5"]
 
 
-@pytest.mark.parametrize("env", [{}, {"MODEL_FOR_EASY_TASKS": "  "}])
-def test_model_args_empty_when_env_unset(env):
-    assert model_args(Defaults(difficulty="easy", thinking="low"), env) == []
+def test_model_args_ignore_model_env(monkeypatch):
+    monkeypatch.setenv("MODEL_FOR_EASY_TASKS", "openai/other")
+    assert model_args(Defaults(model="anthropic/claude-haiku-5-5", thinking="low")) == ["--model", "anthropic/claude-haiku-5-5"]
+
+
+@pytest.mark.parametrize("model", ["haiku", "anthropic/", "/x", "", "a b/c"])
+def test_defaults_model_must_be_provider_and_id(model):
+    with pytest.raises(ValidationError):
+        Defaults(model=model, thinking="low")
+
+
+def test_defaults_reject_difficulty():
+    with pytest.raises(ValidationError):
+        Defaults(difficulty="easy", model="anthropic/claude-haiku-5-5", thinking="low")

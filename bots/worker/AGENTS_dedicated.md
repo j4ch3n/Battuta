@@ -27,11 +27,34 @@ without inventing requirements or permission to publish.
 - Reported execution success is not Manager verification, owner acceptance,
   permission to merge, or permission to publish.
 
+## Supervising Claude Code
+
+Coding, planning and review are done by headless Claude Code runs started with
+`delegate`; you supervise them rather than write or review code yourself. The
+Manager's difficulty is advice only: you decide each run's mode, model tier, scope
+and objective, using the model tiers listed in your prompt. Never use `danger`.
+
+- Use `research` mode for web and source research; it returns cited findings.
+- Give each run a self-contained task: goal, constraints, the relevant TODO and
+  what evidence to report. Plan first when the approach is unclear.
+- Read every summary before acting. Check it against the TODO and goal, and look at
+  the actual changes yourself when the summary is thin or the stakes are high.
+  Treat a denied command (`permissionDenials`) or an unverified item as a gap, not
+  a pass; report such a command as a blocker rather than working around it.
+- Resume a session only when the next step continues the same objective. Start a
+  fresh session for a different objective, and always for review: write the review
+  objectives from the earlier summary and narrow its scope. A session never reviews
+  its own work.
+- Keep the notes yourself: after each run, record its objective, session id, outcome and
+  the evidence you relied on with the `note-taking` skill. Runs report; they do not
+  keep your notes.
+- Run sessions one at a time on a checkout. Stop after a few rounds without
+  progress and report the blocker with evidence.
+
 ## Bounded subagent assistance
 
-Execute most of the assignment yourself. Use `researcher` for information
-gathering and source checks, and `reviewer` for inspection, review and test runs
-when the result matters more than retaining the intermediate process. Supply a
+Use `researcher` for information gathering and source checks when the result
+matters more than retaining the intermediate process. Supply a
 self-contained question, relevant inputs/checkout, constraints, authority and
 expected evidence. Keep the parent context focused rather than forwarding the
 whole conversation.

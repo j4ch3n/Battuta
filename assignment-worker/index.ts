@@ -7,10 +7,10 @@ import { createClient } from "@supabase/supabase-js";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createAssignmentClient } from "./client.ts";
+import { delegationCatalog, renderDelegationSection } from "./delegation.ts";
 import { createCoordinator } from "./coordinator.ts";
 import { ExecutionResultSchema, parseAbilities, parseBinding } from "./contracts.ts";
 import { createNotifier } from "./notify.ts";
-import { modelForDifficulty } from "./models.ts";
 import { ensureAssignmentWorkspace } from "./workspace.ts";
 import type { AssignmentClient, Coordinator, Detail } from "./types.ts";
 
@@ -60,6 +60,13 @@ export default function worker(pi: ExtensionAPI) {
       }
       await coordinator.reconcile("idle");
     },
+  });
+  pi.on("before_agent_start", (event) => {
+    // Only bots that install the delegate tool may be told to use it.
+    if (!pi.getAllTools().some((tool) => tool.name === "delegate")) return;
+    event.systemPromptOptions.sections["delegation-models"] = renderDelegationSection(
+      delegationCatalog(process.env),
+    );
   });
   pi.on("session_start", async (event, ctx) => {
     if (client || stopped) return;
@@ -148,16 +155,6 @@ export default function worker(pi: ExtensionAPI) {
           });
           if (result.cancelled) throw new Error("Assignment conversation replacement cancelled");
           return binding;
-        },
-        async useModel(detail: Detail) {
-          const choice = modelForDifficulty(process.env, detail.assignment.difficulty);
-          if (!choice) return;
-          if ("error" in choice) throw new Error(choice.error);
-          const model = context?.modelRegistry.find(choice.provider, choice.id);
-          if (!model || !(await pi.setModel(model)))
-            throw new Error(
-              `${choice.variable} model ${choice.provider}/${choice.id} is unknown or has no credentials`,
-            );
         },
         runTodo(_binding, todo, detail, workspace) {
           if (stopped) throw new Error("Worker session was disposed");

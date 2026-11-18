@@ -7,6 +7,7 @@ import re
 
 import click
 
+from .claude_skills import install_claude_skills
 from .browser import browser_defaults, browser_settings, configure_browser
 from .env import read_env, required
 from .install import install_packages, run, warn_running_session
@@ -139,6 +140,7 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
     prepare_worker_agents(agents, bot_dir)
     prepare_files(root, profile, bot_dir, [rule for rule in manifest.files if rule.destination == "profile"])
     write_config(path, settings, ".settings-")
+    install_claude_skills(bot_dir, manifest, Path.home())
     configure_mcp(bot_dir, role="worker", memory_url=memory_url, supabase_url=supabase_url)
     if not shared_catalog:
         agent_env = {**os.environ, "PI_CODING_AGENT_DIR": str(bot_dir / ".pi")}

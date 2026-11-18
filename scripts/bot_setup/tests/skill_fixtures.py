@@ -10,6 +10,14 @@ def manifest_text(role: str, names: list[str]) -> str:
     return source.read_text().split("[skills]")[0] + "[skills]\ninclude = " + json.dumps(names)
 
 
+def write_delegate_templates(profile: Path) -> None:
+    """Fixture copies of the worker templates the real manifest ships into the private .pi."""
+    directory = profile / ".pi/delegate/templates/claude"
+    directory.mkdir(parents=True, exist_ok=True)
+    for name in ("implement", "research", "review", "plan"):
+        (directory / f"{name}.md").write_text(f"---\nname: {name}\n---\nfixture")
+
+
 def copy_telegram_template(bot: Path) -> None:
     (bot / ".pi").mkdir(exist_ok=True)
     (bot / ".pi/telegram.json").write_bytes((Path(__file__).parents[3] / "bots/cos-bot/.pi/telegram.json").read_bytes())

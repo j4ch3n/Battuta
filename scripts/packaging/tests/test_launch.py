@@ -12,7 +12,7 @@ from urllib.parse import unquote
 import pytest
 
 from battuta_packaging.bundle import ENTRY_OUTPUTS, PROFILES
-from skill_fixtures import manifest_text
+from skill_fixtures import manifest_text, write_delegate_templates
 
 
 @pytest.fixture
@@ -33,6 +33,8 @@ def installed(tmp_path):
         (bot / "bot.toml").write_text(manifest)
         if profile.startswith("worker"):
             (bot / "abilities.json").write_text('{"research": {}, "mobile-control": {}}')
+        if profile == "worker":
+            write_delegate_templates(bot)
         for extension in tomllib.loads((bot / "bot.toml").read_text())["extensions"]:
             package = bot / ".pi/extensions" / extension["name"]
             (package / "dist").mkdir(parents=True)
@@ -143,7 +145,7 @@ def test_nested_worker_runtime_directory_retains_logical_identity(installed):
     output = json.loads(result.stdout)
     assert output["env"]["AGENT_ID"] == "worker-1"
     assert output["env"]["PI_CODING_AGENT_DIR"] == str(private / "runtime/.pi")
-    assert json.loads((private / "runtime/.pi/settings.json").read_text())["defaultThinkingLevel"] == "high"
+    assert json.loads((private / "runtime/.pi/settings.json").read_text())["defaultThinkingLevel"] == tomllib.loads((root / "bots/worker/bot.toml").read_text())["defaults"]["thinking"]
 
 
 def test_maintenance_refuses_active_service(installed, monkeypatch):

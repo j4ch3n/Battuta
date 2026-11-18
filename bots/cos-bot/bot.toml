@@ -6,7 +6,7 @@ env_prefix = "COS"
 pi_coding_agent_dir = "cos-bot/.pi"
 
 [defaults]
-difficulty = "medium"
+model = "anthropic/claude-haiku-5-5"
 thinking = "low"
 
 [packages]
