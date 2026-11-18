@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import worker from "../index.ts";
+import { delegateClaudeForAssignment } from "../claude-run.ts";
 import { detail } from "./fixtures.ts";
+
+vi.mock("../claude-run.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../claude-run.ts")>()),
+  delegateClaudeForAssignment: vi.fn(),
+}));
 
 const backend = vi.hoisted(() => ({
   list: vi.fn(),
@@ -264,6 +272,7 @@ test("a bound native extension dispatches its TODO through Pi without a host sen
     "steer_subagent",
     "delegate",
     "delegate_modes",
+    "delegate_claude_assignment",
     "send_agent_message",
     "reply_agent_message",
   ]) {
@@ -315,4 +324,122 @@ test.each([
     await handlers.get("session_shutdown")!({}, ctx);
     vi.unstubAllEnvs();
   }
+});
+
+function loadWorker() {
+  const handlers = new Map<string, (...args: never[]) => unknown>();
+  const tools = new Map<string, { execute: (...args: unknown[]) => Promise<unknown> }>();
+  worker({
+    on: (name: string, fn: unknown) => handlers.set(name, fn as never),
+    registerTool: (tool: { name: string }) => tools.set(tool.name, tool as never),
+    registerCommand: vi.fn(),
+    appendEntry: vi.fn(),
+    sendMessage: vi.fn(),
+    sendUserMessage: vi.fn(),
+    setActiveTools: vi.fn(),
+  } as unknown as ExtensionAPI);
+  return { handlers, tools };
+}
+
+function sessionCtx(entries: unknown[]) {
+  return {
+    sessionManager: {
+      getEntries: () => entries,
+      getSessionFile: () => "/private/session.jsonl",
+    },
+  } as unknown as ExtensionContext;
+}
+
+test("the generic delegate tool is blocked for Claude but other harnesses still pass", () => {
+  const { handlers } = loadWorker();
+  const toolCall = handlers.get("tool_call") as (
+    event: unknown,
+  ) => { block?: boolean; reason?: string } | undefined;
+  const claude = toolCall({
+    type: "tool_call",
+    toolCallId: "1",
+    toolName: "delegate",
+    input: { harness: "claude", task: "x" },
+  });
+  expect(claude?.block).toBe(true);
+  expect(claude?.reason).toContain("delegate_claude_assignment");
+  expect(
+    toolCall({
+      type: "tool_call",
+      toolCallId: "2",
+      toolName: "delegate",
+      input: { harness: "codex", task: "x" },
+    }),
+  ).toBeUndefined();
+  expect(
+    toolCall({ type: "tool_call", toolCallId: "3", toolName: "read", input: { path: "x" } }),
+  ).toBeUndefined();
+});
+
+test("the Claude delegation tool runs for the bound assignment's project with the brief's worktree", async () => {
+  const { tools } = loadWorker();
+  const tool = tools.get("delegate_claude_assignment")!;
+  vi.mocked(delegateClaudeForAssignment).mockResolvedValue({
+    text: "ok",
+    isError: false,
+    sessionId: "session-9",
+    totalCostUsd: null,
+    numTurns: 1,
+    permissionDenials: [],
+    cwd: "/w",
+    source: "worktree",
+  });
+  const signal = new AbortController().signal;
+  const bound = sessionCtx([
+    {
+      type: "custom",
+      customType: "assignment-binding",
+      data: { project: "atlas", assignment_id: "1234abcd", claimed_at: "2026-11-05T12:00:00Z" },
+    },
+  ]);
+  const result = await tool.execute(
+    "call-1",
+    { task: "do it", tier: "economy", permission: "edit", worktree: "/w" },
+    signal,
+    undefined,
+    bound,
+  );
+  expect(delegateClaudeForAssignment).toHaveBeenCalledWith(
+    {
+      task: "do it",
+      tier: "economy",
+      permission: "edit",
+      worktree: "/w",
+      project: "atlas",
+      signal,
+    },
+    { projectsRoot: join(homedir(), ".battuta", "projects"), env: process.env },
+  );
+  expect(result).toEqual({
+    content: [{ type: "text", text: "ok" }],
+    details: {
+      cwd: "/w",
+      source: "worktree",
+      sessionId: "session-9",
+      totalCostUsd: null,
+      numTurns: 1,
+      permissionDenials: [],
+    },
+  });
+});
+
+test("the Claude delegation tool refuses in an unbound session without starting Claude", async () => {
+  const { tools } = loadWorker();
+  const tool = tools.get("delegate_claude_assignment")!;
+  vi.mocked(delegateClaudeForAssignment).mockClear();
+  await expect(
+    tool.execute(
+      "call-2",
+      { task: "x", tier: "economy", permission: "readonly" },
+      undefined,
+      undefined,
+      sessionCtx([]),
+    ),
+  ).rejects.toThrow("not bound to an assignment");
+  expect(delegateClaudeForAssignment).not.toHaveBeenCalled();
 });

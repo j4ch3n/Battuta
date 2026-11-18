@@ -7,12 +7,25 @@ import { createClient } from "@supabase/supabase-js";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createAssignmentClient } from "./client.ts";
-import { delegationCatalog, renderDelegationSection } from "./delegation.ts";
+import { claudeDelegationBlock, delegationCatalog, renderDelegationSection } from "./delegation.ts";
+import { DelegateClaudeParams, delegateClaudeForAssignment } from "./claude-run.ts";
 import { createCoordinator } from "./coordinator.ts";
 import { ExecutionResultSchema, parseAbilities, parseBinding } from "./contracts.ts";
 import { createNotifier } from "./notify.ts";
 import { ensureAssignmentWorkspace } from "./workspace.ts";
 import type { AssignmentClient, Coordinator, Detail } from "./types.ts";
+
+/** The project of this session's assignment binding; refuses when the session is not bound. */
+function boundProject(ctx: Pick<ExtensionContext, "sessionManager">): string {
+  const entry = [...ctx.sessionManager.getEntries()]
+    .reverse()
+    .find((entry) => entry.type === "custom" && entry.customType === "assignment-binding");
+  if (entry?.type !== "custom")
+    throw new Error(
+      "Delegation cannot start: this session is not bound to an assignment, so no project folder can be resolved. No default directory is used.",
+    );
+  return parseBinding(entry.data, ctx.sessionManager.getSessionFile() ?? "").project;
+}
 
 export default function worker(pi: ExtensionAPI) {
   let coordinator: Coordinator | undefined, client: AssignmentClient | undefined;
@@ -41,6 +54,35 @@ export default function worker(pi: ExtensionAPI) {
       };
     },
   });
+  pi.registerTool({
+    name: "delegate_claude_assignment",
+    label: "Delegate to Claude Code for assignment",
+    description:
+      "Run one headless Claude Code task for the bound assignment. Its working directory is the project's code folder, or the worktree the assignment brief supplies. Fails before starting Claude when that folder cannot be resolved.",
+    parameters: DelegateClaudeParams,
+    async execute(_id, params, signal, _onUpdate, ctx) {
+      const report = await delegateClaudeForAssignment(
+        { ...params, project: boundProject(ctx), signal },
+        { projectsRoot: join(homedir(), ".battuta", "projects"), env: process.env },
+      );
+      return {
+        content: [{ type: "text", text: report.text }],
+        details: {
+          cwd: report.cwd,
+          source: report.source,
+          sessionId: report.sessionId,
+          totalCostUsd: report.totalCostUsd,
+          numTurns: report.numTurns,
+          permissionDenials: report.permissionDenials,
+        },
+      };
+    },
+  });
+  pi.on("tool_call", (event) => {
+    if (event.toolName !== "delegate") return;
+    const reason = claudeDelegationBlock(event.input);
+    if (reason) return { block: true, reason };
+  });
   pi.registerCommand("worker-next", {
     description: "Reconcile worker availability without invoking a model",
     async handler(_args, ctx) {
@@ -62,8 +104,11 @@ export default function worker(pi: ExtensionAPI) {
     },
   });
   pi.on("before_agent_start", (event) => {
-    // Only bots that install the delegate tool may be told to use it.
-    if (!pi.getAllTools().some((tool) => tool.name === "delegate")) return;
+    // Only bots that have a delegation tool may be told to use one.
+    const delegation = pi
+      .getAllTools()
+      .some((tool) => tool.name === "delegate" || tool.name === "delegate_claude_assignment");
+    if (!delegation) return;
     event.systemPromptOptions.sections["delegation-models"] = renderDelegationSection(
       delegationCatalog(process.env),
     );
@@ -100,6 +145,7 @@ export default function worker(pi: ExtensionAPI) {
       // Only installed tools activate: `delegate` comes from the general worker's package, not the influencer's.
       "delegate",
       "delegate_modes",
+      "delegate_claude_assignment",
       "send_agent_message",
       "reply_agent_message",
       "mcp__assignments__list_assignments",

@@ -38,6 +38,22 @@ Code's user configuration (timeout 1020000 ms, above the service's 15-minute blo
 is not already registered; an existing entry is kept. The server is never added to a Pi
 `.pi/mcp.json`. See [document service setup](doc-service-setup.md).
 
+## Working directory for assignment runs
+
+A worker's Claude Code run for an assignment starts with `delegate_claude_assignment` (not the
+generic `delegate` tool, which is blocked for `harness` `claude`). Its working directory is:
+
+- the worktree the assignment brief supplies, when the worker passes it as `worktree`
+  (an absolute path, a real directory, a git worktree of the same repository as the project
+  code folder, listed by `git worktree list`, and not inside another project's folder); otherwise
+- the project's registered code folder, `~/.battuta/projects/<project>/code`, which must be a
+  real directory next to a `project.yaml`.
+
+So a run loads that folder's `CLAUDE.md`, `.claude/` settings, agents, skills and plugins. A
+run whose folder or worktree cannot be validated fails before Claude starts, with a message
+naming the project and the folder or worktree; no default directory is used. Manual `/delegate`
+use and scheduled runs are unchanged. Other harnesses keep using the generic `delegate` tool.
+
 ## Permissions
 
 Runs use the `edit` tier for implementing and `readonly` for planning and review. A
