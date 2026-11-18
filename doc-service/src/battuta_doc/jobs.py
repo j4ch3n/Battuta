@@ -146,6 +146,31 @@ class JobManager:
                 removed += 1
         return removed
 
+    def page_image(self, doc_id: str, page, scale=1.5) -> Path:
+        folder = self.folder(doc_id)
+        if not folder.exists() or self._read_status_file(doc_id).get("status") != "done":
+            raise DocError("not_found", "unknown or unfinished doc_id")
+        pdf = folder / "source.pdf"
+        if not pdf.exists():
+            raise DocError("unsupported_format", "page images are only available for PDF sources")
+        if not isinstance(page, int) or isinstance(page, bool) or page < 1:
+            raise DocError("invalid_option", "page must be an integer >= 1")
+        if not isinstance(scale, (int, float)) or not 0 < scale <= 3:
+            raise DocError("invalid_option", "scale must be between 0 and 3")
+        import pypdfium2
+
+        document = pypdfium2.PdfDocument(pdf)
+        try:
+            if page > len(document):
+                raise DocError("invalid_option", f"page {page} does not exist; available pages: 1-{len(document)}")
+            target = folder / "pages" / f"p{page:03d}.png"
+            if not target.exists():
+                target.parent.mkdir(exist_ok=True)
+                document[page - 1].render(scale=scale).to_pil().save(target)
+            return target
+        finally:
+            document.close()
+
     def queue_state(self) -> dict:
         live = [j for j in self._jobs.values() if j.status in ("queued", "running")]
         return {"running": [j.doc_id for j in live if j.status == "running"],
