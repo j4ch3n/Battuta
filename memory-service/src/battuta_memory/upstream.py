@@ -191,6 +191,16 @@ class UpstreamAdapter:
             WHERE {where} ORDER BY distance, m.content_hash LIMIT ?""", [vector, *params, vector, request.max_distance, request.limit])
         return [self.record(row) for row in rows]
 
+    async def vectors(self, refs):
+        # Active memories whose embedding is ready, keyed by content hash.
+        if not refs:
+            return {}
+        rows = await self._rows("""SELECT m.content_hash AS ref, e.content_embedding AS embedding
+            FROM memories m JOIN memory_embeddings e ON m.id=e.rowid
+            WHERE m.deleted_at IS NULL AND COALESCE(m.embedding_pending,0)=0
+            AND m.content_hash IN (SELECT value FROM json_each(?))""", (json.dumps(refs),))
+        return {row["ref"]: row["embedding"] for row in rows}
+
     async def get(self, ref, include_deleted=False):
         rows = await self._rows("SELECT * FROM memories WHERE content_hash=?" + ("" if include_deleted else " AND deleted_at IS NULL"), (ref,))
         return self.record(rows[0]) if rows else None
