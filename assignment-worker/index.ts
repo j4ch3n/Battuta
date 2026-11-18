@@ -10,7 +10,6 @@ import { createAssignmentClient } from "./client.ts";
 import { createCoordinator } from "./coordinator.ts";
 import { ExecutionResultSchema, parseAbilities, parseBinding } from "./contracts.ts";
 import { createNotifier } from "./notify.ts";
-import { modelForDifficulty } from "./models.ts";
 import { ensureAssignmentWorkspace } from "./workspace.ts";
 import type { AssignmentClient, Coordinator, Detail } from "./types.ts";
 
@@ -148,16 +147,6 @@ export default function worker(pi: ExtensionAPI) {
           });
           if (result.cancelled) throw new Error("Assignment conversation replacement cancelled");
           return binding;
-        },
-        async useModel(detail: Detail) {
-          const choice = modelForDifficulty(process.env, detail.assignment.difficulty);
-          if (!choice) return;
-          if ("error" in choice) throw new Error(choice.error);
-          const model = context?.modelRegistry.find(choice.provider, choice.id);
-          if (!model || !(await pi.setModel(model)))
-            throw new Error(
-              `${choice.variable} model ${choice.provider}/${choice.id} is unknown or has no credentials`,
-            );
         },
         runTodo(_binding, todo, detail, workspace) {
           if (stopped) throw new Error("Worker session was disposed");
