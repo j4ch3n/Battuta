@@ -23,8 +23,8 @@ def deployment(tmp_path, monkeypatch):
         if role == "worker":
             (bot / "abilities.json").write_text('{"research": {}}')
             write_delegate_templates(bot)
-            (bot / ".pi/skills/research").mkdir()
-            (bot / ".pi/skills/research/SKILL.md").write_text("research skill")
+            (bot / ".claude-skills/research").mkdir(parents=True)
+            (bot / ".claude-skills/research/SKILL.md").write_text("research skill")
         (bot / "AGENTS.md").write_text(role)
         (bot / ".pi/settings.json").write_text("{}")
         (bot / ".pi/web-search.json").write_text('{"fetchContent":{"userAgent":"fixture"}}')

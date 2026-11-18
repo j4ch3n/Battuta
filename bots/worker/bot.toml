@@ -94,7 +94,7 @@ target = ".pi/delegate/templates/claude/plan.md"
 destination = "private"
 policy = "create-only"
 
-# Skills shared with Claude Code sessions on the host; each must also be selected below.
+# Skills shared with Claude Code sessions on the host, copied from the catalog independently of the selection below.
 [claude]
 skills = ["research", "read-documents"]
 
@@ -106,7 +106,6 @@ include = [
   "draft-writing",
   "execute-assignment",
   "research",
-  "read-documents",
   "browser-evidence",
   "artifacts",
   "prd",

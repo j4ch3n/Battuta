@@ -25,8 +25,8 @@ uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root .
 
 ## Claude Code skills
 
-The worker manifest's `[claude] skills` list names skills (also selected for the bot) that
-setup copies into Claude Code's user directory, `~/.claude/skills/` (or `$CLAUDE_CONFIG_DIR`
+The worker manifest's `[claude] skills` list names skills that setup copies from the skill catalog (independent of the
+bot's own skill selection) into Claude Code's user directory, `~/.claude/skills/` (or `$CLAUDE_CONFIG_DIR`
 when set), so every delegated run on the host can use them. Files already present are left
 unchanged; to pick up a source change, move the host copy aside and rerun setup. Research
 runs use the `research` template, which names the `research` skill.
