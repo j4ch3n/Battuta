@@ -62,7 +62,7 @@ class Runtime(Section):
 
 
 class Defaults(Section):
-    difficulty: Literal["easy", "medium", "hard", "hail_mary"]
+    model: Annotated[str, StringConstraints(pattern=r"^[^/\s]+/\S+$")]
     thinking: Literal["off", "minimal", "low", "medium", "high", "xhigh"]
 
 

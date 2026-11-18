@@ -45,7 +45,7 @@ def run_source_worker(root: Path, *, bot_dir: Path, env_file: Path, node: Path) 
     # Project settings must not shadow interpolated private browser settings.
     os.chdir(profile)
     defaults = load_profile(profile / "bot.toml", "worker").defaults
-    os.execve(str(node), [str(node), str(cli), *model_args(defaults, env)], env)
+    os.execve(str(node), [str(node), str(cli), *model_args(defaults)], env)
 
 
 def run_source_bot(root: Path, *, bot: str, env_file: Path) -> None:
@@ -74,7 +74,7 @@ def run_source_bot(root: Path, *, bot: str, env_file: Path) -> None:
     else:
         env = {key: value for key, value in env.items() if "TELEGRAM" not in key and not key.startswith("PI_SCHEDULER")}
     cli = profile / "node_modules/.bin/pi"
-    args = [str(cli), "--approve", "--continue", "--session-dir", str(private / ".pi/mail-sessions"), *model_args(manifest.defaults, env)]
+    args = [str(cli), "--approve", "--continue", "--session-dir", str(private / ".pi/mail-sessions"), *model_args(manifest.defaults)]
     os.umask(0o077)
     os.chdir(profile)
     os.execve(str(cli), args, env)

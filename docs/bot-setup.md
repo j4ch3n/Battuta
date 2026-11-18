@@ -15,7 +15,7 @@ Pi consumes the prepared settings/resources, not the manifest itself.
 | `[[files]]`            | File preparation operations with explicit ownership policy                 |
 | `[setup]`              | Ordered, known Python setup steps, restricted by role                      |
 | `[runtime]`            | Private `pi_coding_agent_dir`, relative to the fixed private base          |
-| `[defaults]`           | Model difficulty tier and initial thinking preference                      |
+| `[defaults]`           | Pi model (`provider/model-id`) and initial thinking preference             |
 | `[[subagents.agents]]` | Profile-relative prompt, selected parent skills, and child extensions      |
 
 Node dependency versions remain in `package.json` and lockfiles. Secrets stay in
@@ -120,7 +120,7 @@ home. For example:
 pi_coding_agent_dir = "cos-bot/.pi"
 
 [defaults]
-difficulty = "medium"
+model = "anthropic/claude-haiku-5.5"
 thinking = "low"
 ```
 
@@ -140,21 +140,21 @@ defaults helper. Invalid JSON, non-regular files and symlinks fail rather than
 being repaired. Changing TOML does not update existing preferences; change them
 in Pi or edit the private settings explicitly. Other owned setup operations,
 such as maintaining private browser settings, still preserve preferences while
-updating their own fields. The model is not stored in settings: every launch passes `--model` from the
-`MODEL_FOR_<DIFFICULTY>_TASKS` variable (`provider/model-id`) of the manifest's
-`difficulty`, so the environment is the single source of truth. When that variable
-is unset or empty, no flag is passed and Pi uses its own default. Thinking is not forced.
+updating their own fields. The model is not stored in settings: every launch passes `--model` from the manifest's
+`[defaults] model` (`provider/model-id`), so the manifest is the single source of truth
+and Pi sessions do not depend on the `MODEL_FOR_*` variables. A value that is not
+`provider/model-id` fails manifest validation. Thinking is not forced.
 
 Current initial defaults:
 
-| Role    | Difficulty | Thinking |
-| ------- | ---------- | -------- |
-| CoS     | medium     | low      |
-| Manager | hard       | medium   |
-| Worker  | easy       | high     |
+| Role    | Model                         | Thinking |
+| ------- | ----------------------------- | -------- |
+| CoS     | `anthropic/claude-haiku-5.5`  | low      |
+| Manager | `anthropic/claude-sonnet-5.5` | medium   |
+| Worker  | `anthropic/claude-haiku-5.5`  | high     |
 
 Setup does not authenticate, check provider model availability or invoke a model;
-confirm the `MODEL_FOR_*_TASKS` identifiers match the operator's account.
+confirm each manifest model matches the operator's account.
 
 ## File rules
 

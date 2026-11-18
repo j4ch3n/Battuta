@@ -12,7 +12,7 @@ capabilities = ["mobile-control"]
 pi_coding_agent_dir = "{instance}/.pi"
 
 [defaults]
-difficulty = "easy"
+model = "anthropic/claude-haiku-5.5"
 thinking = "high"
 
 [packages]

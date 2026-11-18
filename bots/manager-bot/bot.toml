@@ -6,7 +6,7 @@ env_prefix = "MANAGER"
 pi_coding_agent_dir = "manager-bot/.pi"
 
 [defaults]
-difficulty = "hard"
+model = "anthropic/claude-sonnet-5.5"
 thinking = "medium"
 
 [packages]

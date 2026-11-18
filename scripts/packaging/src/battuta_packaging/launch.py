@@ -78,7 +78,7 @@ def run_bot(root: Path, *, bot: str, env_file: Path, node: Path, mode: str) -> N
     os.chdir(profile)
     # Pi's offline flag prevents startup package installs, not provider requests.
     args = [str(node), str(cli), "--approve", "--offline", "--session-dir", str(private / ".pi" / ("sessions" if role == "worker" else "mail-sessions"))]
-    args += model_args(manifest.defaults, env)
+    args += model_args(manifest.defaults)
     if role != "worker":
         args.append("--continue")
     os.execve(str(node), args, env)
