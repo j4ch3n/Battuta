@@ -1,6 +1,6 @@
 # Speech service installation
 
-The speech MCP service runs locally for CoS and Workers on Oracle Linux or Raspberry Pi OS ARM64.
+The speech MCP service runs locally for CoS and Workers on the main bundle (Oracle Linux ARM64). The influencer bundle does not include it.
 Install the `battuta-speech` and `battuta-packaging` release wheels as described
 in the release guide. Ask the administrator to provide FFmpeg with OGG/Opus
 support before setup; do not modify system packages during setup.

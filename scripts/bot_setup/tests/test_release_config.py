@@ -202,7 +202,8 @@ def test_influencer_release_configures_only_worker(deployment):
     assert {p.name for p in (home / ".battuta/pi-bots").iterdir()} == {"cos-bot", "worker-1"}
     assert (cos / "auth.json").read_text() == "existing"
     assert not (cos / "mcp.json").exists()
-    assert (home / ".battuta/pi-bots/worker-1/.pi/mcp.json").is_file()
+    servers = json.loads((home / ".battuta/pi-bots/worker-1/.pi/mcp.json").read_text())["mcpServers"]
+    assert servers["speech"] == {"enabled": False}
 
 
 @pytest.mark.parametrize("selection", ["", "BATTUTA_WORKER_1_TYPE=general\n", "BATTUTA_WORKER_1_TYPE=influencer\nBATTUTA_WORKER_2_TYPE=influencer\n"])

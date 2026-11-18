@@ -76,7 +76,7 @@ def configure_release(root: Path, *, env_file: Path, home: Path, deployment: str
             if not (private / ".pi/settings.json").exists():
                 browser_settings(profile, private, home=home, bot=bot)
             browsers[private] = (bot, profile)
-        payload = mcp_payload(role=role, supabase_url=values["SUPABASE_URL"], memory_url=url)
+        payload = mcp_payload(role=role, supabase_url=values["SUPABASE_URL"], memory_url=url, speech=deployment == "main")
         outputs.append((private / ".pi/mcp.json", payload))
         read_config(profile / ".pi/web-search.json")
         if role == "cos":

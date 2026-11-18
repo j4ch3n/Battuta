@@ -66,7 +66,7 @@ RestartSec=5
 [Install]
 WantedBy=default.target
 '''
-    components = ("memory", "artifacts", "speech", "doc") if deployment == "main" else ("artifacts", "speech")
+    components = ("memory", "artifacts", "speech", "doc") if deployment == "main" else ("artifacts",)
     for component in components:
         extra = "Environment=MCP_MEMORY_ONNX_ALLOW_DOWNLOAD=false\n" if component == "memory" else "NoNewPrivileges=true\nProtectSystem=strict\nProtectHome=read-only\n"
         preflight = f"ExecStartPre={executable} verify-speech\n" if component == "speech" else ""

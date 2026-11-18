@@ -10,7 +10,7 @@ from .wheel_metadata import REPO_URL
 
 BUNDLES = {
     "oracle-ampere": ("main", "main-release-instructions.txt.j2", ("battuta-project", "battuta-artifacts", "battuta-memory", "battuta-speech", "battuta-doc", "battuta-bot-setup", "battuta-packaging")),
-    "raspberry-pi": ("influencer", "influencer-release-instructions.txt.j2", ("battuta-project", "battuta-artifacts", "battuta-speech", "battuta-bot-setup", "battuta-packaging")),
+    "raspberry-pi": ("influencer", "influencer-release-instructions.txt.j2", ("battuta-project", "battuta-artifacts", "battuta-bot-setup", "battuta-packaging")),
 }
 
 
