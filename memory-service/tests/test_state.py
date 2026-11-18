@@ -120,6 +120,7 @@ class VectorTests(unittest.TestCase):
         state.reconcile_vectors(records, {"a": vec(1), "b": vec(1)})
         self.assertEqual(state.cue_targets(records, 10), ["a", "b"])
         self.assertEqual(state.cue_targets(records, 1), ["a"])
+        self.assertEqual(state.cue_targets(records + [rec("novector")], 10), ["a", "b"])
         state.replace_cues("a", [("situation", vec(2))])
         state.replace_cues("b", [])
         self.assertEqual(state.cue_targets(records, 10), [])

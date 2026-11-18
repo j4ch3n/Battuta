@@ -210,6 +210,21 @@ class ClusterRequest(Contract):
     max_size: int = Field(default=30, ge=2, le=200)
 
 
+class CueItem(Contract):
+    angle: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,39}$")
+    text: str = Field(min_length=1, max_length=1000)
+
+
+class SetCuesRequest(Contract):
+    ref: str = Field(pattern=r"^[0-9a-f]{64}$")
+    expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    cues: list[CueItem] = Field(max_length=100)
+
+
+class CueTargetsRequest(Contract):
+    limit: int = Field(default=20, ge=1, le=200)
+
+
 class ConsolidateGlobalRequest(Contract):
     run_id: str = Field(min_length=1, max_length=64)
 

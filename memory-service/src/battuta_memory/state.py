@@ -144,7 +144,8 @@ class StateStore:
 
     def cue_targets(self, records, limit):
         done = {ref for (ref,) in self.conn.execute("SELECT ref FROM memory_vectors WHERE kind IN ('cue','none')")}
-        return [r["ref"] for r in records if r["active"] and r["ref"] not in done][:limit]
+        own = {ref for (ref,) in self.conn.execute("SELECT ref FROM memory_vectors WHERE kind IN ('primary','hypothesis')")}
+        return [r["ref"] for r in records if r["active"] and r["ref"] in own and r["ref"] not in done][:limit]
 
     def replace_cues(self, ref, cues):
         with self.conn:

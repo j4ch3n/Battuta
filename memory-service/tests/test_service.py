@@ -6,9 +6,15 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from battuta_memory.config import MemoryConfig
-from battuta_memory.contracts import GetRequest, ListRequest, RecallRequest, InventoryRequest
+from sqlite_vec import serialize_float32
+from battuta_memory.contracts import GetRequest, ListRequest, RecallRequest, InventoryRequest, SetCuesRequest, CueTargetsRequest
 from battuta_memory.service import MemoryService
+from battuta_memory.state import StateStore
 from battuta_memory.upstream import UpstreamAdapter
+
+
+def vec(x):
+    return serialize_float32([float(x), 0.0, 0.0])
 
 
 class ServiceReads(unittest.IsolatedAsyncioTestCase):
@@ -23,13 +29,15 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
                 metadata TEXT, created_at REAL, updated_at REAL, parent_id TEXT, superseded_by TEXT, deleted_at REAL, version INTEGER, embedding_pending INTEGER);
             CREATE TABLE memory_embeddings(rowid INTEGER PRIMARY KEY, content_embedding BLOB);
         """)
-        self.conn.create_function("vec_distance_l2", 2, lambda a, b: abs(float(a) - float(b)))
         async def execute(fn): return fn()
         self.backend = UpstreamAdapter(SimpleNamespace(conn=self.conn, _execute_with_retry=execute))
-        self.backend.embed = lambda text: b"0"
+        self.embeddings = {}
+        self.backend.embed = lambda text: self.embeddings.get(text, vec(0))
         self.backend.embedding_fits = lambda text: True
         self.backend.truncate_for_embedding = lambda text: text
-        self.service = MemoryService(self.backend, MemoryConfig(data_dir=self.root))
+        self.state = StateStore.open(self.root / "state.db")
+        self.addCleanup(self.state.close)
+        self.service = MemoryService(self.backend, MemoryConfig(data_dir=self.root), self.state)
         self.add("a", "Atlas note", "proj:atlas,work", 1.5)
         self.add("b", "Global note", "proj:global,work", 1)
         self.add("c", "Beacon secret", "proj:beacon,work", 0)
@@ -38,7 +46,7 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
     def add(self, char, content, tags, distance, superseded=None):
         cursor = self.conn.execute("INSERT INTO memories(content_hash,content,tags,memory_type,metadata,created_at,updated_at,superseded_by,version,embedding_pending) VALUES(?,?,?,?,?,?,?,?,1,0)",
             (char * 64, content, tags, "observation", json.dumps({"sources": [{"agent_id": "cos", "session_id": "s", "entry_id": char}]}), 1, 1, superseded))
-        self.conn.execute("INSERT INTO memory_embeddings VALUES(?,?)", (cursor.lastrowid, str(distance).encode()))
+        self.conn.execute("INSERT INTO memory_embeddings VALUES(?,?)", (cursor.lastrowid, vec(distance)))
 
     async def test_scoped_recall_filters_before_limit(self):
         for n in range(30):
@@ -127,3 +135,64 @@ class ServiceReads(unittest.IsolatedAsyncioTestCase):
         self.conn.execute("UPDATE memories SET tags='proj:atlas,proj:beacon' WHERE content_hash=?", ("a" * 64,))
         changed = await self.service.get(GetRequest(ref="a" * 64))
         self.assertNotEqual(record["revision"], changed["revision"])
+
+    def vector_rows(self, ref=None):
+        sql = "SELECT ref,kind,angle FROM memory_vectors" + (" WHERE ref=?" if ref else "") + " ORDER BY ref,kind,angle"
+        return self.state.conn.execute(sql, (ref,) if ref else ()).fetchall()
+
+    async def test_reconcile_runs_before_semantic_search(self):
+        self.assertEqual(self.vector_rows(), [])
+        result = await self.service.recall(RecallRequest(semantic_query="note", limit=10, max_distance=2))
+        self.assertEqual(len(result["records"]), 3)
+        self.assertEqual({row[0] for row in self.vector_rows()}, {"a" * 64, "b" * 64, "c" * 64})
+
+    async def test_recall_matches_through_a_cue_and_returns_the_memory(self):
+        a = "a" * 64
+        await self.service.recall(RecallRequest(semantic_query="note", limit=10, max_distance=2))
+        self.embeddings["I am visiting the atlas office"] = vec(5)
+        self.embeddings["probe"] = vec(5)
+        request = RecallRequest(semantic_query="probe", limit=10, max_distance=0.5)
+        self.assertEqual((await self.service.recall(request))["records"], [])
+        await self.service.set_cues(SetCuesRequest(ref=a, cues=[{"angle": "situation", "text": "I am visiting the atlas office"}]))
+        result = await self.service.recall(request)
+        self.assertEqual([r["ref"] for r in result["records"]], [a])
+        self.assertNotIn("atlas office", json.dumps(result))
+
+    async def test_expired_and_retired_memories_are_not_returned(self):
+        b = "b" * 64
+        meta = {"sources": [{"agent_id": "cos", "session_id": "s", "entry_id": "b"}],
+            "memory_metadata": {"knowledge_type": "fact", "confidence": "confirmed", "expires_at": "2020-01-01T00:00:00Z"}}
+        self.conn.execute("UPDATE memories SET metadata=? WHERE content_hash=?", (json.dumps(meta), b))
+        request = dict(semantic_query="note", limit=10, max_distance=2)
+        live = lambda result: {r["ref"] for r in result["records"]}
+        self.assertNotIn(b, live(await self.service.recall(RecallRequest(**request))))
+        self.assertIn(b, live(await self.service.recall(RecallRequest(**request, include_expired=True))))
+        self.conn.execute("UPDATE memories SET deleted_at=2 WHERE content_hash=?", (b,))
+        await self.service.recover()
+        self.assertEqual(self.vector_rows(b), [])
+        self.assertNotIn(b, live(await self.service.recall(RecallRequest(**request, include_expired=True))))
+
+    async def test_set_cues_replaces_and_marks_processed(self):
+        a, b = "a" * 64, "b" * 64
+        targets = await self.service.cue_targets(CueTargetsRequest())
+        self.assertEqual({r["ref"] for r in targets["records"]}, {a, b, "c" * 64})
+        record = next(r for r in targets["records"] if r["ref"] == a)
+        cues = [{"angle": "task", "text": "one"}, {"angle": "update", "text": "two"}]
+        self.assertEqual(await self.service.set_cues(SetCuesRequest(ref=a, expected_revision=record["revision"], cues=cues)), {"ref": a, "cues": 2})
+        self.assertEqual([r[1:] for r in self.vector_rows(a)], [("cue", "task"), ("cue", "update"), ("primary", "primary")])
+        await self.service.set_cues(SetCuesRequest(ref=b, cues=[]))
+        remaining = await self.service.cue_targets(CueTargetsRequest())
+        self.assertEqual([r["ref"] for r in remaining["records"]], ["c" * 64])
+        await self.service.set_cues(SetCuesRequest(ref=a, cues=[cues[0]]))
+        self.assertEqual(len([r for r in self.vector_rows(a) if r[1] == "cue"]), 1)
+        with self.assertRaisesRegex(ValueError, "changed since inventory"):
+            await self.service.set_cues(SetCuesRequest(ref=a, expected_revision="f" * 64, cues=[]))
+        with self.assertRaisesRegex(ValueError, "inactive"):
+            await self.service.set_cues(SetCuesRequest(ref="d" * 64, cues=[]))
+        before = self.vector_rows(a)
+        def too_long(text):
+            raise ValueError("Memory exceeds embedding token limit; split or rephrase")
+        self.backend.embed = too_long
+        with self.assertRaisesRegex(ValueError, "embedding token limit"):
+            await self.service.set_cues(SetCuesRequest(ref=a, cues=cues))
+        self.assertEqual(self.vector_rows(a), before)
