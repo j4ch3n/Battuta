@@ -28,6 +28,7 @@ export class CaptureRuntime {
   constructor(
     readonly queue: CaptureQueue,
     private worker: Worker,
+    private batchTurns = 1,
   ) {}
   async initialize(session: string, entries: readonly unknown[]) {
     this.requests.delete(session);
@@ -56,6 +57,8 @@ export class CaptureRuntime {
       return;
     }
     await this.queue.track(session, entries, false);
+    // Below the batch size, messages wait in the durable queue until a later turn or lifecycle flush.
+    if (this.queue.pendingTurns(session) < this.batchTurns) return;
     await this.queue.flush(session);
     void this.recover().catch(() =>
       this.worker.notify("Memory capture pending; retained for retry"),

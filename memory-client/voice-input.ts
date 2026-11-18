@@ -27,6 +27,19 @@ export async function transcribeTelegramVoice(text: string): Promise<string | un
   return [...lines.slice(0, start), ...transcripts, ...attachments, ...lines.slice(end)].join("\n");
 }
 
+// Chat-only view of a stored prompt: drops the attachment listing and transcription failure notes.
+export function chatText(text: string): string {
+  const lines = text.split("\n");
+  const kept: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (ATTACHMENTS_HEADER.test(lines[i])) {
+      while (lines[i + 1]?.startsWith("- ")) i++;
+    } else if (!lines[i].startsWith("[voice message could not be transcribed:"))
+      kept.push(lines[i]);
+  }
+  return kept.join("\n");
+}
+
 function isAudioPath(path: string): boolean {
   return AUDIO_EXTENSIONS.has(extname(path).toLowerCase());
 }

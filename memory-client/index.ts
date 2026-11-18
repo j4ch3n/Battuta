@@ -83,28 +83,32 @@ export default function memoryClient(pi: ExtensionAPI) {
       const settings = await captureSettings(config.directory, config.role);
       if (!settings.enabled) throw new Error("Capture disabled");
       const client = new MemoryMcpClient(config.url, (signal) => loadProjectCatalog(signal));
-      runtime = new CaptureRuntime(await CaptureQueue.open(config.queue, config.role), {
-        prepare: (_job, signal) => loadProjectCatalog(signal),
-        extract: async (job, signal) => {
-          const candidates = await prepareCorrectionCandidates(
-            job.project_catalog!,
-            job.segment.messages.map((m) => m.text).join(" "),
-            client,
-            signal,
-          );
-          return extractMemories(
-            job,
-            context,
-            signal,
-            config.role,
-            (usage) => pi.appendEntry("memory-capture-usage", { usage }),
-            candidates,
-          );
+      runtime = new CaptureRuntime(
+        await CaptureQueue.open(config.queue, config.role),
+        {
+          prepare: (_job, signal) => loadProjectCatalog(signal),
+          extract: async (job, signal) => {
+            const candidates = await prepareCorrectionCandidates(
+              job.project_catalog!,
+              job.segment.messages.map((m) => m.text).join(" "),
+              client,
+              signal,
+            );
+            return extractMemories(
+              job,
+              context,
+              signal,
+              config.role,
+              (usage) => pi.appendEntry("memory-capture-usage", { usage }),
+              candidates,
+            );
+          },
+          upload: (batch, signal, catalog) => client.capture(batch, signal, catalog),
+          now: () => Date.now(),
+          notify: (message) => context.ui.setStatus("memory-capture", message),
         },
-        upload: (batch, signal, catalog) => client.capture(batch, signal, catalog),
-        now: () => Date.now(),
-        notify: (message) => context.ui.setStatus("memory-capture", message),
-      });
+        settings.batchMessages,
+      );
     }
     return runtime;
   }
@@ -137,9 +141,7 @@ export default function memoryClient(pi: ExtensionAPI) {
     active.get(session)?.controller.abort();
     active.delete(session);
     const entries = ctx.sessionManager.getBranch();
-    const capture =
-      event.messageType === "user" ||
-      (event.messageType === "custom" && event.message.customType === "agent-mail");
+    const capture = event.messageType === "user";
     await safe(ctx, async () =>
       (await getRuntime(ctx)).startRequest(session, entries, { capture }),
     );

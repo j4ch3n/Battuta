@@ -123,6 +123,12 @@ export class CaptureQueue {
   pending(session: string) {
     return structuredClone(this.state.pending[session] ?? []);
   }
+  pendingTurns(session: string) {
+    return (this.state.pending[session] ?? []).reduce(
+      (n, s) => n + s.messages.filter((m) => m.speaker === "owner").length,
+      0,
+    );
+  }
   jobs() {
     return structuredClone(this.state.jobs);
   }

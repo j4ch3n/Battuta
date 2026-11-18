@@ -1,4 +1,5 @@
 import { redact } from "./privacy.ts";
+import { chatText } from "./voice-input.ts";
 
 export interface SourceMessage {
   entry_id: string;
@@ -37,42 +38,13 @@ export function collectMessages(entries: readonly unknown[]): SourceMessage[] {
       Number.isFinite(Date.parse(e.timestamp))
         ? e.timestamp
         : null;
-    let original_mail: SourceMessage["original_mail"];
-    let mail: Record<string, unknown> | undefined;
     if (e.type === "message") {
       const m = object(e.message);
       if (m?.role === "user" || m?.role === "assistant") {
-        content = text(m.content);
+        content = chatText(text(m.content));
         speaker = m.role === "user" ? "owner" : "assistant";
         if (!mentioned_at && typeof m.timestamp === "number" && Number.isFinite(m.timestamp))
           mentioned_at = new Date(m.timestamp).toISOString();
-      } else if (m?.role === "custom" && m.customType === "agent-mail") mail = m;
-    } else if (e.type === "custom_message" && e.customType === "agent-mail") {
-      mail = e;
-    }
-    if (mail) {
-      content = `[inter-bot mail] ${text(mail.content)}`;
-      speaker = "agent";
-      try {
-        const envelope = object(JSON.parse(text(mail.content)));
-        const ref = object(envelope?.message_ref);
-        if (
-          typeof ref?.conversation_id === "string" &&
-          typeof ref.id === "string" &&
-          typeof envelope?.sender === "string"
-        )
-          original_mail = {
-            message_ref: { conversation_id: ref.conversation_id, id: ref.id },
-            sender: envelope.sender,
-          };
-        if (
-          typeof envelope?.created_at === "string" &&
-          /(?:Z|[+-]\d\d:\d\d)$/.test(envelope.created_at) &&
-          Number.isFinite(Date.parse(envelope.created_at))
-        )
-          mentioned_at = envelope.created_at;
-      } catch {
-        /* Legacy mail text remains attributed as an agent report. */
       }
     }
     return content.trim() && speaker
@@ -82,7 +54,6 @@ export function collectMessages(entries: readonly unknown[]): SourceMessage[] {
             text: redact(content),
             speaker,
             mentioned_at,
-            ...(original_mail ? { original_mail } : {}),
             ...(typeof e.source_timezone === "string"
               ? { source_timezone: e.source_timezone }
               : {}),

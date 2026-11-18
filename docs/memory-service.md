@@ -153,9 +153,11 @@ Bot `.pi/settings.json` accepts:
 ```
 
 `enabled` controls collection/extraction/uploads, including retries. Disabled
-capture leaves existing files untouched and does not disable recall. Legacy
-`batchMessages` values remain accepted/validated but no longer delay settled-turn
-capture. Settings load when the adapter initializes; restart after changes.
+capture leaves existing files untouched and does not disable recall. `batchMessages`
+is the number of owner/assistant pairs per capture batch (default 6); session switch,
+fork, compaction and shutdown flush the remainder. Only owner and assistant chat is
+captured, never tool, recall or agent-mail messages, and voice input uses the
+transcript only. Settings load when the adapter initializes; restart after changes.
 Non-CoS roles cannot enable the extension. Failures produce content-free status;
 queued capture is best-effort understanding, not proof a particular fact was saved.
 
