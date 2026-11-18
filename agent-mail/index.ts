@@ -14,6 +14,7 @@ import {
   referenceKey,
   replyRequest,
   BotName,
+  SendArguments,
   sendRequest,
   StoredMessage,
   validate,
@@ -22,6 +23,7 @@ import {
   type MessageReference,
 } from "./schemas.ts";
 
+import { checkSendRoute } from "./routing.ts";
 import { invokeMail, UncertainWriteError } from "./transport.ts";
 
 const required = (key: string) => {
@@ -207,6 +209,22 @@ export default function (pi: ExtensionAPI) {
     const request =
       name === "send_agent_message" ? sendRequest(agent, args) : replyRequest(agent, args);
     if (!db) throw new Error("Agent mail is disconnected");
+    const client = db;
+    if (name === "send_agent_message") {
+      const { recipient, assignment_id } = validate(SendArguments, args);
+      await checkSendRoute({
+        sender: role,
+        recipient,
+        assignmentId: assignment_id,
+        claimant: async (id) => {
+          const response = await client.rpc("agent_mail_assignment_claimant", {
+            p_assignment_id: id,
+          });
+          if (response.error) throw new Error(response.error.message);
+          return (response.data as string | null) ?? null;
+        },
+      });
+    }
     const cache = new Map<string, Message>();
     const load = async (ref: MessageReference): Promise<Message> => {
       const key = referenceKey(ref);

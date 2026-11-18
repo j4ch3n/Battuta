@@ -112,6 +112,28 @@ const intent = (
   reply_expectation: expectation,
 });
 
+// Assignment tables are not directly writable by the service role, so rows stay in the throwaway test stack.
+async function claimedAssignment(claimedBy: string) {
+  const project = `mail-routing-${randomUUID()}`;
+  const created = ok(
+    await db.rpc("assignment_create", {
+      p_project: project,
+      p_goal: "Routing check",
+      p_initial_todos: ["Work"],
+    }),
+  ) as { assignment: { id: string } };
+  const id = created.assignment.id;
+  ok(
+    await db.rpc("assignment_claim", {
+      p_project: project,
+      p_assignment_id: id,
+      p_claimed_by: claimedBy,
+      p_abilities: ["research"],
+    }),
+  );
+  return id;
+}
+
 test("final tool validation rejects oversized post-hook briefs before transport and retains bounded memory references", async () => {
   process.env.SUPABASE_URL = url;
   process.env.SUPABASE_SECRET_KEY = secret;
@@ -480,11 +502,13 @@ test.each([
     process.env.SUPABASE_SECRET_KEY = secret;
     const lead = session("manager"),
       worker = session("worker-1", randomUUID(), [], false);
+    const assignmentId = await claimedAssignment("worker-1");
     try {
       await lead.start();
       await worker.start();
       const sent = await lead.execute("send_agent_message", {
         ...intent("Change course", "worker-1"),
+        assignment_id: assignmentId,
         ...(delivery ? { delivery } : {}),
       });
       const ref = sent.details.message_ref;
@@ -499,3 +523,64 @@ test.each([
     }
   },
 );
+
+test("mail routing: workers reach only manager and workers are mailed only about assignments they claimed", async () => {
+  process.env.SUPABASE_URL = url;
+  process.env.SUPABASE_SECRET_KEY = secret;
+  const assignmentId = await claimedAssignment("worker-1");
+  const manager = session("manager"),
+    worker = session("worker-1"),
+    conversations: string[] = [];
+  const stored = async (conversation: string) =>
+    ok(await db.from("agent_messages").select("recipient").eq("conversation_id", conversation));
+  try {
+    await manager.start();
+    await worker.start();
+    conversations.push(manager.id, worker.id);
+
+    await assert.rejects(
+      manager.execute("send_agent_message", intent("Do the phone task", "worker-1")),
+      /assignment/,
+    );
+    await assert.rejects(
+      manager.execute("send_agent_message", {
+        ...intent("Do the phone task", "worker-2"),
+        assignment_id: assignmentId,
+      }),
+      /not claimed by worker-2/,
+    );
+    await assert.rejects(
+      manager.execute("send_agent_message", {
+        ...intent("Do the phone task", "worker-1"),
+        assignment_id: "unknown",
+      }),
+      /not claimed by worker-1/,
+    );
+    assert.deepEqual(await stored(manager.id), []);
+
+    const followUp = await manager.execute("send_agent_message", {
+      ...intent("Use the staging account", "worker-1"),
+      assignment_id: assignmentId,
+      delivery: "steer",
+    });
+    assert.equal((await row(followUp.details.message_ref)).recipient, "worker-1");
+
+    await assert.rejects(
+      worker.execute("send_agent_message", intent("Question", "cos")),
+      /manager/,
+    );
+    await assert.rejects(
+      worker.execute("send_agent_message", intent("Question", "worker-2")),
+      /manager/,
+    );
+    assert.deepEqual(await stored(worker.id), []);
+    const toManager = await worker.execute("send_agent_message", intent("Question", "manager"));
+    assert.equal((await row(toManager.details.message_ref)).recipient, "manager");
+    const toCos = await manager.execute("send_agent_message", intent("Status", "cos"));
+    assert.equal((await row(toCos.details.message_ref)).recipient, "cos");
+  } finally {
+    await manager.stop();
+    await worker.stop();
+    await cleanup(conversations);
+  }
+});

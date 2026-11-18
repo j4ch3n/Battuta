@@ -64,6 +64,7 @@ steps = ["telegram", "mcp", "browser", "dream"]
 
 [skills]
 include = [
+  "agent-mail",
   "browser-evidence",
   "communicate-with-manager",
   "manage-google",
