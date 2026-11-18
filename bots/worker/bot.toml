@@ -75,6 +75,13 @@ policy = "create-only"
 
 [[files]]
 operation = "copy"
+sources = [{ root = "profile", path = ".pi/delegate/templates/claude/research.md" }]
+target = ".pi/delegate/templates/claude/research.md"
+destination = "private"
+policy = "create-only"
+
+[[files]]
+operation = "copy"
 sources = [{ root = "profile", path = ".pi/delegate/templates/claude/review.md" }]
 target = ".pi/delegate/templates/claude/review.md"
 destination = "private"
@@ -86,6 +93,10 @@ sources = [{ root = "profile", path = ".pi/delegate/templates/claude/plan.md" }]
 target = ".pi/delegate/templates/claude/plan.md"
 destination = "private"
 policy = "create-only"
+
+# Skills shared with Claude Code sessions on the host; each must also be selected below.
+[claude]
+skills = ["research"]
 
 [skills]
 include = [

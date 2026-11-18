@@ -36,7 +36,7 @@ export function renderDelegationSection(entries: CatalogEntry[]): string {
   if (!entries.length) lines.push("- No model tier is configured; do not delegate.");
   lines.push(
     "Tiers are independent of the assignment's difficulty, which is only the Manager's advice; hail-mary work uses max.",
-    "Modes: plan, review and security-audit are read-only; implement, docs and general edit files. Never use danger.",
+    "Modes: plan, research, review and security-audit are read-only; implement, docs and general edit files. Never use danger.",
   );
   return lines.join("\n");
 }

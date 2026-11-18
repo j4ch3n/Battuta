@@ -1,5 +1,6 @@
 """Worker instances copy prepared public configuration, never private state."""
 import json
+import os
 from pathlib import Path
 import tempfile
 import shutil
@@ -70,6 +71,7 @@ class WorkerSetupTests(unittest.TestCase):
         self.assertIn('extensions: ["pi-web-access"]', researcher)
         self.assertFalse((self.profile / ".pi/agents/reviewer.md").exists())
         self.assertIn("npm:pi-harness-delegate@0.9.0", settings["packages"])
+        self.assertTrue((Path(os.environ["CLAUDE_CONFIG_DIR"]) / "skills/research/SKILL.md").is_file())
 
     def test_invalid_subagent_configuration_fails_before_install_or_writes(self):
         manifest = self.profile / "bot.toml"

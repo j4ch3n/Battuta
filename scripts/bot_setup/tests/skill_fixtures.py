@@ -14,7 +14,7 @@ def write_delegate_templates(profile: Path) -> None:
     """Fixture copies of the worker templates the real manifest ships into the private .pi."""
     directory = profile / ".pi/delegate/templates/claude"
     directory.mkdir(parents=True, exist_ok=True)
-    for name in ("implement", "review", "plan"):
+    for name in ("implement", "research", "review", "plan"):
         (directory / f"{name}.md").write_text(f"---\nname: {name}\n---\nfixture")
 
 

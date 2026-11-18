@@ -34,6 +34,7 @@ Coding, planning and review are done by headless Claude Code runs started with
 Manager's difficulty is advice only: you decide each run's mode, model tier, scope
 and objective, using the model tiers listed in your prompt. Never use `danger`.
 
+- Use `research` mode for web and source research; it returns cited findings.
 - Give each run a self-contained task: goal, constraints, the relevant TODO and
   what evidence to report. Plan first when the approach is unclear.
 - Read every summary before acting. Check it against the TODO and goal, and look at

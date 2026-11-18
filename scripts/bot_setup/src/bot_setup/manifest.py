@@ -23,6 +23,10 @@ class Skills(Section):
         return names
 
 
+class Claude(Section):
+    skills: list[Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")]]
+
+
 class Identity(Section):
     role: Literal["cos", "manager", "worker"]
     env_prefix: Annotated[str, StringConstraints(pattern=r"^[A-Z][A-Z0-9_]*$")]
@@ -108,6 +112,7 @@ class BotManifest(Section):
     subagents: Subagents | None = None
     extensions: list[Extension] = Field(default_factory=list)
     worker: Worker | None = None
+    claude: Claude | None = None
 
     @field_validator("extensions")
     @classmethod

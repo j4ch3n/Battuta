@@ -15,6 +15,7 @@ Pi consumes the prepared settings/resources, not the manifest itself.
 | `[[files]]`            | File preparation operations with explicit ownership policy                 |
 | `[setup]`              | Ordered, known Python setup steps, restricted by role                      |
 | `[runtime]`            | Private `pi_coding_agent_dir`, relative to the fixed private base          |
+| `[claude]`             | Bot skills copied to Claude Code's user skills directory (workers)         |
 | `[defaults]`           | Pi model (`provider/model-id`) and initial thinking preference             |
 | `[[subagents.agents]]` | Profile-relative prompt, selected parent skills, and child extensions      |
 

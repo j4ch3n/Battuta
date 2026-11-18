@@ -15,13 +15,21 @@ See [workers](workers.md) for how a worker uses it.
 ## Source installation
 
 Run the normal worker setup; it installs the pinned package and creates the `implement`,
-`review` and `plan` templates under the worker's private
+`research`, `review` and `plan` templates under the worker's private
 `.pi/delegate/templates/claude/` when missing. Existing templates are left unchanged;
 to pick up a source change, move the private file aside and rerun setup.
 
 ```sh
 uv run --project scripts/bot_setup --locked battuta-bot-setup configure --root . --role worker
 ```
+
+## Claude Code skills
+
+The worker manifest's `[claude] skills` list names skills (also selected for the bot) that
+setup copies into Claude Code's user directory, `~/.claude/skills/` (or `$CLAUDE_CONFIG_DIR`
+when set), so every delegated run on the host can use them. Files already present are left
+unchanged; to pick up a source change, move the host copy aside and rerun setup. Research
+runs use the `research` template, which names the `research` skill.
 
 ## Permissions
 
@@ -40,6 +48,8 @@ test -f bots/worker/.pi/npm/node_modules/pi-harness-delegate/package.json
 test -f "$HOME/.battuta/pi-bots/worker-1/.pi/delegate/templates/claude/implement.md"
 test -f "$HOME/.battuta/pi-bots/worker-1/.pi/delegate/templates/claude/review.md"
 test -f "$HOME/.battuta/pi-bots/worker-1/.pi/delegate/templates/claude/plan.md"
+test -f "$HOME/.battuta/pi-bots/worker-1/.pi/delegate/templates/claude/research.md"
+test -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/research/SKILL.md"
 ```
 
 Missing output means setup is incomplete; stop rather than starting workers. For releases,
