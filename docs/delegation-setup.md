@@ -31,6 +31,13 @@ when set), so every delegated run on the host can use them. Files already presen
 unchanged; to pick up a source change, move the host copy aside and rerun setup. Research
 runs use the `research` template, which names the `research` skill.
 
+## Document service
+
+Main-bundle worker configuration also registers the shared `battuta-doc` MCP server in Claude
+Code's user configuration (timeout 1020000 ms, above the service's 15-minute blocking cap) when it
+is not already registered; an existing entry is kept. The server is never added to a Pi
+`.pi/mcp.json`. See [document service setup](doc-service-setup.md).
+
 ## Permissions
 
 Runs use the `edit` tier for implementing and `readonly` for planning and review. A
