@@ -4,6 +4,7 @@ import click
 import json
 import shlex
 
+from . import worktrees
 from .explain import explain_project
 from .linear import LinearClient, require_linear_token
 from .models import LinearConfig, LinearResult, ProjectList
@@ -88,6 +89,47 @@ def explain(token: str, project_name: str):
         remote = LinearClient(token).get_project(project.config.linear.project_id)
         explanation = explanation.model_copy(update={"linear_project_url": remote.url})
     click.echo(render("explain.md.j2", explanation))
+
+
+@main.group()
+def worktree():
+    """Create, list, and delete git worktrees under a project's managed folder."""
+
+
+@worktree.command("create")
+@click.argument("project_name")
+@click.argument("name")
+@click.option("--branch", help="New branch for the worktree (default: agent/<name>).")
+@click.option("--base", help="Commit or branch to start from (default: the checkout's HEAD).")
+def worktree_create(project_name: str, name: str, branch: str | None, base: str | None):
+    """Create <name> as a new-branch worktree of the project's checkout."""
+    path, branch = worktrees.create(ProjectRegistry().load(project_name), name, branch=branch, base=base)
+    click.echo(f"Created worktree: {path}\nBranch: {branch}")
+
+
+@worktree.command("list")
+@click.argument("project_name")
+@click.option("--json", "as_json", is_flag=True, help="Return the worktrees as JSON.")
+def worktree_list(project_name: str, as_json: bool):
+    """List the project's worktrees with branch and uncommitted-change state."""
+    found = worktrees.listing(ProjectRegistry().load(project_name))
+    if as_json:
+        click.echo(json.dumps({"worktrees": found}, ensure_ascii=False))
+        return
+    for entry in found:
+        click.echo("\t".join([entry["name"], entry["path"], entry["branch"], *(["dirty"] if entry["dirty"] else [])]))
+    if not found:
+        click.echo(f"No worktrees for project: {project_name}")
+
+
+@worktree.command("delete")
+@click.argument("project_name")
+@click.argument("name")
+@click.option("--force", is_flag=True, help="Discard uncommitted changes.")
+def worktree_delete(project_name: str, name: str, force: bool):
+    """Remove the worktree folder; its branch is kept."""
+    path = worktrees.delete(ProjectRegistry().load(project_name), name, force=force)
+    click.echo(f"Deleted worktree: {path}")
 
 
 @main.group()

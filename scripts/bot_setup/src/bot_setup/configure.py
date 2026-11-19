@@ -16,9 +16,8 @@ from .manifest import load_profile
 from .json_config import read_config, write_config
 from .mcp import assignment_server, configure_mcp, validate_memory_url
 from .release import validate_private_home
-from .subagents import prepare_worker_agents, prepare_worker_skill, render_worker_agents
 from .telegram import prepare_telegram_config
-from .skills import load_selection, link_selected_skills
+from .skills import load_selection, link_selected_skills, prepare_worker_skill
 from .workers import copy_worker_profile
 from .runtime import initialize_settings_if_missing, resolve_agent_dir
 from .extensions import prepare_source_extensions, profile_settings, source_extension_links
@@ -120,7 +119,6 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
     assignment_server(supabase_url)
     memory_url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
     names = load_selection(profile / "bot.toml", root / "skills-hub")
-    agents = render_worker_agents(profile, manifest)
     source_extension_links(root, bot_dir, manifest.extensions)
     path = bot_dir / ".pi/settings.json"
     settings = profile_settings(manifest, browser=profile.name != "worker-influencer")
@@ -137,7 +135,6 @@ def configure_worker(root: Path, *, bot_dir: Path | None = None, env_file: Path 
     ]
     settings["skills"] = selected
     bot_dir.mkdir(parents=True, exist_ok=True)
-    prepare_worker_agents(agents, bot_dir)
     prepare_files(root, profile, bot_dir, [rule for rule in manifest.files if rule.destination == "profile"])
     write_config(path, settings, ".settings-")
     install_claude_skills(root / "skills-hub", manifest, Path.home())

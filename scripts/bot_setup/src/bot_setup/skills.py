@@ -77,3 +77,40 @@ def link_selected_skills(bot_dir: Path, catalog: Path, names: list[str]) -> None
     for name, target in targets.items():
         if not (skills / name).is_symlink():
             (skills / name).symlink_to(target, target_is_directory=True)
+
+
+def prepare_worker_skill(source: Path, bot_dir: Path) -> None:
+    """Create missing skill files without overwriting existing files."""
+    names = ["SKILL.md", *[
+        str(path.relative_to(source)) for path in sorted(source.rglob("*"))
+        if path.is_file() and path != source / "SKILL.md"
+    ]]
+    _prepare_files(
+        {name: (source / name).read_bytes() for name in names}, bot_dir / ".pi/skills" / source.name,
+    )
+
+
+def _prepare_files(contents: dict[str, bytes], destination: Path) -> None:
+    for parent in (destination, *destination.parents):
+        if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
+            raise click.ClickException(f"Refusing custom skill directory: {parent}")
+    pending = {}
+    for name, content in contents.items():
+        target = destination / name
+        for parent in target.parents:
+            if parent == destination:
+                break
+            if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
+                raise click.ClickException(f"Refusing custom skill directory: {parent}")
+        if target.is_symlink() or (target.exists() and not target.is_file()):
+            raise click.ClickException(f"Refusing custom skill path: {target}")
+        if not target.exists():
+            pending[name] = content
+    destination.mkdir(parents=True, exist_ok=True)
+    for name, content in pending.items():
+        (destination / name).parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with (destination / name).open("xb") as file:
+                file.write(content)
+        except FileExistsError:
+            pass

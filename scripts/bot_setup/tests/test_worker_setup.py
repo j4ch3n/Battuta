@@ -43,8 +43,6 @@ class WorkerSetupTests(unittest.TestCase):
             path.write_text("export default () => {};")
         (self.profile / ".pi").mkdir()
         (self.profile / ".pi/web-search.json").write_text('{"fetchContent":{"userAgent":"fixture mobile browser"}}')
-        (self.profile / "agents").mkdir()
-        (self.profile / "agents/researcher.md").write_text("---\nname: researcher\n---\nResearch fixture.")
         write_delegate_templates(self.profile)
 
     def prepare(self):
@@ -55,7 +53,6 @@ class WorkerSetupTests(unittest.TestCase):
     def test_source_preparation_registers_shared_native_resources_without_starting_pi(self):
         run = self.prepare()
         self.assertTrue(run.called)
-        self.assertTrue(any(call.args[0] == str(self.runtime / "node_modules/.bin/pi") and call.args[-1] == "npm:@tintinweb/pi-subagents@0.24.0" for call in run.call_args_list))
         settings = json.loads((self.profile / ".pi/settings.json").read_text())
         self.assertNotIn("extensions", settings)
         self.assertEqual((self.profile / ".pi/extensions/assignment-worker.ts").resolve(), self.runtime / "index.ts")
@@ -63,68 +60,12 @@ class WorkerSetupTests(unittest.TestCase):
         self.assertTrue(all(value.startswith("skills/") for value in settings["skills"]))
         self.assertFalse((self.profile / ".pi/skills/execute-assignment").is_symlink())
         self.assertTrue((self.profile / ".pi/skills/execute-assignment/SKILL.md").is_file())
-        self.assertIn("npm:@tintinweb/pi-subagents@0.24.0", settings["packages"])
+        self.assertFalse(any("pi-subagents" in str(package) for package in settings["packages"]))
         self.assertNotIn("battutaWorkerAgents", settings)
         self.assertNotIn("battutaWorkerResearch", settings)
-        researcher = (self.profile / ".pi/agents/researcher.md").read_text()
-        self.assertIn('skills: ["research"]', researcher)
-        self.assertIn('extensions: ["pi-web-access"]', researcher)
-        self.assertFalse((self.profile / ".pi/agents/reviewer.md").exists())
+        self.assertFalse((self.profile / ".pi/agents").exists())
         self.assertIn({"source": "npm:pi-harness-delegate@0.9.0", "extensions": []}, settings["packages"])
         self.assertTrue((Path(os.environ["CLAUDE_CONFIG_DIR"]) / "skills/research/SKILL.md").is_file())
-
-    def test_invalid_subagent_configuration_fails_before_install_or_writes(self):
-        manifest = self.profile / "bot.toml"
-        original = manifest.read_text()
-        for old, new in [
-            ('agents/researcher.md', '../outside.md'),
-            ('agents/researcher.md', 'agents/missing.md'),
-            ('inherit_parent_skills = ["research"]', 'inherit_parent_skills = ["missing"]'),
-            ('extensions = ["pi-web-access"]', 'extensions = ["uninstalled"]'),
-        ]:
-            with self.subTest(change=new):
-                manifest.write_text(original.replace(old, new))
-                with patch("bot_setup.configure.run") as run, self.assertRaises(Exception):
-                    configure_source(self.root, role="worker", env_file=self.env)
-                run.assert_not_called()
-                self.assertFalse((self.profile / "AGENTS.md").exists())
-        manifest.write_text(original)
-
-    def test_conflicting_prompt_frontmatter_fails_before_writes(self):
-        prompt = self.profile / "agents/researcher.md"
-        prompt.write_text("---\nname: researcher\nskills: other\n---\nFixture")
-        with patch("bot_setup.configure.run") as run, self.assertRaises(Exception):
-            configure_source(self.root, role="worker", env_file=self.env)
-        run.assert_not_called()
-        self.assertFalse((self.profile / "AGENTS.md").exists())
-
-    def test_prompt_paths_are_profile_relative_and_symlinks_are_rejected(self):
-        manifest = self.profile / "bot.toml"
-        manifest.write_text(manifest.read_text().replace("agents/researcher.md", "prompts/custom.md"))
-        prompt = self.profile / "prompts/custom.md"
-        prompt.parent.mkdir()
-        prompt.write_text("---\nname: researcher\n---\nCustom location")
-        self.prepare()
-        assert "Custom location" in (self.profile / ".pi/agents/custom.md").read_text()
-        prompt.unlink()
-        prompt.symlink_to(self.profile / "agents/researcher.md")
-        with patch("bot_setup.configure.run") as run, self.assertRaises(Exception):
-            configure_source(self.root, role="worker", env_file=self.env)
-        run.assert_not_called()
-
-    def test_agent_setup_preserves_existing_definitions_and_private_state(self):
-        self.prepare()
-        configure_worker(self.root, bot_dir=self.bot)
-        custom = self.bot / ".pi/agents/custom.md"
-        custom.write_text("Custom definition")
-        (self.profile / "agents/researcher.md").write_text("---\nname: researcher\n---\nUpdated researcher")
-        self.prepare()
-        configure_worker(self.root, bot_dir=self.bot)
-        self.assertIn("Research fixture", (self.bot / ".pi/agents/researcher.md").read_text())
-        self.assertEqual(custom.read_text(), "Custom definition")
-        (self.bot / ".pi/agents/researcher.md").write_text("Private customization")
-        configure_worker(self.root, bot_dir=self.bot)
-        self.assertEqual((self.bot / ".pi/agents/researcher.md").read_text(), "Private customization")
 
     def test_research_preload_has_real_files_and_references(self):
         research = self.root / "skills-hub/research"

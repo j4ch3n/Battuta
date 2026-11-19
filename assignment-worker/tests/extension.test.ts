@@ -258,15 +258,7 @@ test("a bound native extension dispatches its TODO through Pi without a host sen
   );
   expect(setActiveTools).toHaveBeenCalled();
   expect(setActiveTools.mock.calls[0][0]).toContain("report_execution_result");
-  for (const tool of [
-    "Agent",
-    "get_subagent_result",
-    "steer_subagent",
-    "delegate",
-    "delegate_modes",
-    "send_agent_message",
-    "reply_agent_message",
-  ]) {
+  for (const tool of ["delegate", "delegate_modes", "send_agent_message", "reply_agent_message"]) {
     expect(setActiveTools.mock.calls[0][0]).toContain(tool);
   }
   expect(setActiveTools.mock.calls[0][0]).not.toContain("mcp__assignments__claim_assignment");

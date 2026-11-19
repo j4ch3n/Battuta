@@ -11,6 +11,7 @@ import { createAssignmentClient } from "./client.ts";
 import { delegationCatalog, renderDelegationSection } from "./delegation.ts";
 import { createCoordinator } from "./coordinator.ts";
 import { ExecutionResultSchema, currentBinding, parseAbilities } from "./contracts.ts";
+import { guardWorktreeCommand } from "./worktree-guard.ts";
 import { registerProjectDelegate } from "./project-delegate.ts";
 import { createNotifier } from "./notify.ts";
 import { ensureAssignmentWorkspace } from "./workspace.ts";
@@ -59,6 +60,13 @@ export default async function worker(pi: ExtensionAPI) {
       await coordinator.reconcile("idle");
     },
   });
+  pi.on("tool_call", (event, ctx) => {
+    if (event.toolName !== "bash" || typeof event.input.command !== "string") return;
+    const guard = guardWorktreeCommand(event.input.command, currentBinding(ctx)?.project);
+    if (!guard) return;
+    if ("block" in guard) return { block: true, reason: guard.block };
+    event.input.command = guard.rewrite;
+  });
   pi.on("before_agent_start", (event) => {
     // Only bots that install the delegate tool may be told to use it.
     if (!pi.getAllTools().some((tool) => tool.name === "delegate")) return;
@@ -82,9 +90,6 @@ export default async function worker(pi: ExtensionAPI) {
     context = ctx;
     pi.setActiveTools([
       "codemode",
-      "Agent",
-      "get_subagent_result",
-      "steer_subagent",
       "web_search",
       "web_fetch",
       "read",
