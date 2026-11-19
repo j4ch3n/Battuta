@@ -8,8 +8,22 @@ const execFileAsync = promisify(execFile);
 /** Runs `git` in a directory and returns stdout; rejects when git fails. */
 export type GitRunner = (args: string[], cwd: string) => Promise<string>;
 
+/**
+ * The worker's environment without any `GIT_*` variable. Those (GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE,
+ * GIT_COMMON_DIR, ...) can redirect the checks to another repository, so the git checks never inherit them.
+ */
+export function sanitizedGitEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith("GIT_")));
+}
+
 export const runGit: GitRunner = async (args, cwd) =>
-  (await execFileAsync("git", args, { cwd, timeout: 10_000 })).stdout;
+  (
+    await execFileAsync("git", args, {
+      cwd,
+      timeout: 10_000,
+      env: sanitizedGitEnv(process.env),
+    })
+  ).stdout;
 
 export interface DelegationCwd {
   cwd: string;

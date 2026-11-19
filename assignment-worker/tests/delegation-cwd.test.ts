@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, expect, test } from "vitest";
-import { resolveDelegationCwd } from "../delegation-cwd.ts";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { resolveDelegationCwd, sanitizedGitEnv } from "../delegation-cwd.ts";
 import { createProjectsFixture, type ProjectsFixture } from "./project-fixture.ts";
 
 let fixture: ProjectsFixture;
@@ -10,6 +10,7 @@ beforeEach(async () => {
   fixture = await createProjectsFixture();
 });
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await fixture.dispose();
 });
 
@@ -127,4 +128,22 @@ test("a code folder that is not a git checkout cannot validate a worktree", asyn
   await expect(resolve("bravo", fixture.bravoWorktree)).rejects.toThrow(
     'code folder of project "bravo" is not a git checkout',
   );
+});
+
+test("the git checks ignore GIT_* variables that redirect them to another repository", async () => {
+  const bravoGit = join(fixture.bravoCode, ".git");
+  vi.stubEnv("GIT_DIR", bravoGit);
+  vi.stubEnv("GIT_COMMON_DIR", bravoGit);
+  vi.stubEnv("GIT_WORK_TREE", fixture.bravoCode);
+  vi.stubEnv("GIT_INDEX_FILE", join(bravoGit, "index"));
+  expect(await resolve("atlas", fixture.atlasWorktree)).toEqual({
+    cwd: fixture.atlasWorktree,
+    source: "worktree",
+  });
+});
+
+test("sanitizedGitEnv removes every GIT_ variable and keeps the rest", () => {
+  expect(
+    sanitizedGitEnv({ PATH: "/bin", HOME: "/home/w", GIT_DIR: "/x", GIT_COMMON_DIR: "/y" }),
+  ).toEqual({ PATH: "/bin", HOME: "/home/w" });
 });

@@ -49,14 +49,28 @@ generic `delegate` tool, which is blocked for `harness` `claude`). Its working d
 - the project's registered code folder, `~/.battuta/projects/<project>/code`, which must be a
   real directory next to a `project.yaml`.
 
-So a run loads that folder's `CLAUDE.md`, `.claude/` settings, agents, skills and plugins. A
-run whose folder or worktree cannot be validated fails before Claude starts, with a message
+So a run loads that folder's `CLAUDE.md`, `.claude/` settings, agents, skills and plugins.
+Claude Code also loads the folder's `AGENTS.md`, but only as a fallback when the folder has no
+`CLAUDE.md` (observed with Claude Code 2.1.327). A project that has a `CLAUDE.md` does not also
+get its `AGENTS.md` loaded unless `CLAUDE.md` imports it. The user-level `~/.claude` configuration
+(or `$CLAUDE_CONFIG_DIR`) is shared by every run on the host; it is not isolated per project.
+
+Only project-managed folders are searched for project configuration. The ancestors of the project
+folder, such as the home directory and `~/.battuta`, are not scanned for `CLAUDE.md` or `.claude/`,
+and this design adds no such check.
+
+The Claude routing block is a routing rule, not an enforcement boundary. The worker's `bash` tool can
+still run `claude` directly in any directory; the tool hook blocks only the generic `delegate` and
+the deprecated `claude_delegate` alias for Claude. See [workers](workers.md) for the trust boundary.
+
+A run whose folder or worktree cannot be validated fails before Claude starts, with a message
 naming the project and the folder or worktree; no default directory is used. Manual `/delegate`
 use and scheduled runs are unchanged. Other harnesses keep using the generic `delegate` tool.
 
 ## Permissions
 
-Runs use the `edit` tier for implementing and `readonly` for planning and review. A
+Runs use the `edit` tier for implementing and `readonly` for planning and review. `edit` maps to
+Claude Code's `acceptEdits` mode, which is pending owner confirmation. A
 shell command Claude Code does not pre-approve (for example `npm`) is denied and the run
 continues; the worker sees it in the run's permission denials and reports a blocker.
 Project-level Claude settings are ignored for an untrusted workspace, so to pre-approve

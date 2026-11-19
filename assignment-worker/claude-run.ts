@@ -36,6 +36,9 @@ const PERMISSION_MODE: Record<ClaudePermission, string> = { readonly: "plan", ed
 /** Same default timeout as pi-harness-delegate (10 minutes). */
 export const CLAUDE_RUN_TIMEOUT_MS = 600_000;
 
+/** Collected stdout above this size stops the run with an error instead of growing without limit. */
+export const MAX_CLAUDE_STDOUT_BYTES = 16 * 1024 * 1024;
+
 export interface ClaudeProcessRequest {
   args: string[];
   cwd: string;
@@ -63,6 +66,7 @@ export const spawnClaude: ClaudeProcessRunner = (request) =>
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
+    let stdoutBytes = 0;
     let stderr = "";
     let settled = false;
     const finish = (action: () => void) => {
@@ -81,7 +85,21 @@ export const spawnClaude: ClaudeProcessRunner = (request) =>
       finish(() => reject(new Error(`claude timed out after ${request.timeoutMs}ms`)));
     }, request.timeoutMs);
     timer.unref?.();
-    proc.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
+    proc.stdout.on("data", (chunk: Buffer) => {
+      stdoutBytes += chunk.length;
+      if (stdoutBytes > MAX_CLAUDE_STDOUT_BYTES) {
+        proc.kill("SIGKILL");
+        finish(() =>
+          reject(
+            new Error(
+              `claude stdout exceeded ${MAX_CLAUDE_STDOUT_BYTES} bytes; the run was stopped`,
+            ),
+          ),
+        );
+        return;
+      }
+      stdout += chunk.toString();
+    });
     proc.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
     proc.on("error", (error) =>
       finish(() => reject(new Error(`failed to start claude: ${error.message}`))),
@@ -214,6 +232,10 @@ export async function delegateClaudeForAssignment(
     const detail = outcome.stderr.trim() || `exit code ${outcome.code}`;
     throw new Error(`claude finished without a result in ${location.cwd}: ${detail}`);
   }
+  if (outcome.code !== 0)
+    throw new Error(
+      `claude exited with code ${outcome.code} in ${location.cwd} (session ${result.sessionId ?? "unknown"}): ${outcome.stderr.trim() || result.text}`,
+    );
   if (result.isError)
     throw new Error(
       `claude reported an error in ${location.cwd} (session ${result.sessionId ?? "unknown"}): ${result.text}`,

@@ -7,7 +7,12 @@ import { createClient } from "@supabase/supabase-js";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createAssignmentClient } from "./client.ts";
-import { claudeDelegationBlock, delegationCatalog, renderDelegationSection } from "./delegation.ts";
+import {
+  claudeDelegationBlock,
+  claudeDelegationRedirect,
+  delegationCatalog,
+  renderDelegationSection,
+} from "./delegation.ts";
 import { DelegateClaudeParams, delegateClaudeForAssignment } from "./claude-run.ts";
 import { createCoordinator } from "./coordinator.ts";
 import { ExecutionResultSchema, parseAbilities, parseBinding } from "./contracts.ts";
@@ -54,31 +59,10 @@ export default function worker(pi: ExtensionAPI) {
       };
     },
   });
-  pi.registerTool({
-    name: "delegate_claude_assignment",
-    label: "Delegate to Claude Code for assignment",
-    description:
-      "Run one headless Claude Code task for the bound assignment. Its working directory is the project's code folder, or the worktree the assignment brief supplies. Fails before starting Claude when that folder cannot be resolved.",
-    parameters: DelegateClaudeParams,
-    async execute(_id, params, signal, _onUpdate, ctx) {
-      const report = await delegateClaudeForAssignment(
-        { ...params, project: boundProject(ctx), signal },
-        { projectsRoot: join(homedir(), ".battuta", "projects"), env: process.env },
-      );
-      return {
-        content: [{ type: "text", text: report.text }],
-        details: {
-          cwd: report.cwd,
-          source: report.source,
-          sessionId: report.sessionId,
-          totalCostUsd: report.totalCostUsd,
-          numTurns: report.numTurns,
-          permissionDenials: report.permissionDenials,
-        },
-      };
-    },
-  });
   pi.on("tool_call", (event) => {
+    // The deprecated `claude_delegate` alias always runs Claude, so it is blocked outright.
+    if (event.toolName === "claude_delegate")
+      return { block: true, reason: claudeDelegationRedirect };
     if (event.toolName !== "delegate") return;
     const reason = claudeDelegationBlock(event.input);
     if (reason) return { block: true, reason };
@@ -104,7 +88,7 @@ export default function worker(pi: ExtensionAPI) {
     },
   });
   pi.on("before_agent_start", (event) => {
-    // Only bots that have a delegation tool may be told to use one.
+    // Only bots that have a delegation tool may be told to use one (the Claude tool exists only beside `delegate`).
     const delegation = pi
       .getAllTools()
       .some((tool) => tool.name === "delegate" || tool.name === "delegate_claude_assignment");
@@ -127,6 +111,33 @@ export default function worker(pi: ExtensionAPI) {
     }
     const capabilities = [...parseAbilities(values)];
     context = ctx;
+    // Only bots with the generic delegate package get the Claude tool; the influencer installs no package.
+    const delegation = pi.getAllTools().some((tool) => tool.name === "delegate");
+    if (delegation)
+      pi.registerTool({
+        name: "delegate_claude_assignment",
+        label: "Delegate to Claude Code for assignment",
+        description:
+          "Run one headless Claude Code task for the bound assignment. Its working directory is the project's code folder, or the worktree the assignment brief supplies. Fails before starting Claude when that folder cannot be resolved.",
+        parameters: DelegateClaudeParams,
+        async execute(_id, params, signal, _onUpdate, toolCtx) {
+          const report = await delegateClaudeForAssignment(
+            { ...params, project: boundProject(toolCtx), signal },
+            { projectsRoot: join(homedir(), ".battuta", "projects"), env: process.env },
+          );
+          return {
+            content: [{ type: "text", text: report.text }],
+            details: {
+              cwd: report.cwd,
+              source: report.source,
+              sessionId: report.sessionId,
+              totalCostUsd: report.totalCostUsd,
+              numTurns: report.numTurns,
+              permissionDenials: report.permissionDenials,
+            },
+          };
+        },
+      });
     pi.setActiveTools([
       "codemode",
       "Agent",
@@ -145,7 +156,7 @@ export default function worker(pi: ExtensionAPI) {
       // Only installed tools activate: `delegate` comes from the general worker's package, not the influencer's.
       "delegate",
       "delegate_modes",
-      "delegate_claude_assignment",
+      ...(delegation ? ["delegate_claude_assignment"] : []),
       "send_agent_message",
       "reply_agent_message",
       "mcp__assignments__list_assignments",

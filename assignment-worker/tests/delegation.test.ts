@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import {
   claudeDelegationBlock,
+  claudeDelegationRedirect,
   delegationCatalog,
   renderDelegationSection,
 } from "../delegation.ts";
@@ -75,3 +76,17 @@ test.each([
     expect(claudeDelegationBlock(input)).toContain("delegate_claude_assignment");
   },
 );
+
+test("the delegation section keeps the mode guidance for the non-Claude harnesses", () => {
+  const section = renderDelegationSection(
+    delegationCatalog({ MODEL_FOR_EASY_TASKS: "anthropic/model-easy" }),
+  );
+  expect(section).toContain(
+    "Modes: plan, research, review and security-audit are read-only; implement, docs and general edit files. Never use danger.",
+  );
+  expect(section).toContain("readonly (plan mode) or edit (acceptEdits); never danger.");
+});
+
+test("a blocked generic call gets the shared redirect message", () => {
+  expect(claudeDelegationBlock({ harness: "claude" })).toBe(claudeDelegationRedirect);
+});

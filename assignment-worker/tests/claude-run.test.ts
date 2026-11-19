@@ -4,8 +4,10 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import {
   buildClaudeArgs,
   delegateClaudeForAssignment,
+  MAX_CLAUDE_STDOUT_BYTES,
   modelForTier,
   parseClaudeResult,
+  spawnClaude,
   type ClaudeProcessRunner,
   type ClaudeDelegationInput,
 } from "../claude-run.ts";
@@ -152,6 +154,27 @@ test("a run that emits no result reports its stderr and never reports success", 
   await expect(
     delegateClaudeForAssignment(input(), { projectsRoot: fixture.projectsRoot, env, runner }),
   ).rejects.toThrow(`claude finished without a result in ${fixture.atlasCode}: auth failed`);
+});
+
+test("a non-zero exit is a failure even when a result event was parsed", async () => {
+  const runner = vi.fn<ClaudeProcessRunner>(() =>
+    Promise.resolve({ stdout: `${resultLine}\n`, stderr: "boom", code: 2 }),
+  );
+  await expect(
+    delegateClaudeForAssignment(input(), { projectsRoot: fixture.projectsRoot, env, runner }),
+  ).rejects.toThrow(`claude exited with code 2 in ${fixture.atlasCode} (session session-1): boom`);
+});
+
+test("stdout above the collection cap stops the run with a clear error", async () => {
+  const bin = await fs.mkdtemp(join(fixture.home, "big-bin-"));
+  const script = join(bin, "claude");
+  await fs.writeFile(script, `#!/bin/sh\nhead -c ${MAX_CLAUDE_STDOUT_BYTES + 1024} /dev/zero\n`, {
+    mode: 0o755,
+  });
+  vi.stubEnv("PATH", `${bin}:${process.env.PATH ?? ""}`);
+  await expect(
+    spawnClaude({ args: [], cwd: fixture.atlasCode, timeoutMs: 60_000 }),
+  ).rejects.toThrow(`claude stdout exceeded ${MAX_CLAUDE_STDOUT_BYTES} bytes; the run was stopped`);
 });
 
 test("a run that reports is_error is surfaced as an error with its session", async () => {
