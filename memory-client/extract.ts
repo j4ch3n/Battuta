@@ -7,6 +7,7 @@ import { validateMemoryProjects, normalizedProjects } from "./projects.ts";
 import { abortable } from "./abortable.ts";
 import { memoryMetadataSchema, memoryRefSchema, type MemoryRecord } from "./records.ts";
 import { redact } from "./privacy.ts";
+import { parseModelJson } from "./model-json.ts";
 
 const itemSchema = z
   .object({
@@ -74,7 +75,7 @@ export async function extractMemories(
   signal.throwIfAborted();
   if (response.stopReason !== "stop") throw new Error("Extraction did not finish");
   const parsed = schema.parse(
-    JSON.parse(response.content.map((p) => (p.type === "text" ? p.text : "")).join("")),
+    parseModelJson(response.content.map((p) => (p.type === "text" ? p.text : "")).join("")),
   );
   const sourceIds = new Set(job.segment.messages.map((m) => m.entry_id));
   const project_rejections: NonNullable<CaptureJob["project_rejections"]> = [];
