@@ -1,6 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { expect, test, vi } from "vitest";
-import { DreamModelError, dreamCompletion } from "../dream-model.ts";
+import { DREAM_SESSION_ID, DreamModelError, dreamCompletion } from "../dream-model.ts";
+import { CAPTURE_SESSION_ID } from "../extract.ts";
 
 test("uses the configured Pi model and records usage without a conversation turn", async () => {
   const usage: unknown[] = [];
@@ -72,4 +73,19 @@ test("keeps the raw provider message and does not cap output tokens", async () =
   });
   expect((complete.mock.calls[0] as unknown[])[2]).not.toHaveProperty("maxTokens");
   expect(new DreamModelError("unexpected value", "x").stopReason).toBe("unknown");
+});
+
+test("each call runs in the dream's own provider session, apart from capture", async () => {
+  const complete = vi.fn(() =>
+    Promise.resolve({ stopReason: "stop", content: [{ type: "text", text: "ok" }], usage: {} }),
+  );
+  const ctx = { model: {}, modelRegistry: { complete } } as unknown as ExtensionContext;
+  const run = dreamCompletion(ctx);
+  await run("prompt", "evidence", new AbortController().signal);
+  await run("prompt", "evidence", new AbortController().signal);
+  const ids = complete.mock.calls
+    .map((call) => (call as unknown[])[2])
+    .map((o) => (o as { sessionId: string }).sessionId);
+  expect(ids).toEqual([DREAM_SESSION_ID, DREAM_SESSION_ID]);
+  expect(DREAM_SESSION_ID).not.toBe(CAPTURE_SESSION_ID);
 });
