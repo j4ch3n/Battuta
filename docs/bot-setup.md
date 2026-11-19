@@ -121,8 +121,8 @@ home. For example:
 pi_coding_agent_dir = "cos-bot/.pi"
 
 [defaults]
-model = "anthropic/claude-haiku-5-5"
-thinking = "low"
+model = "claude-directsdk/claude-haiku-5-5"
+thinking = "medium"
 ```
 
 Launchers export the resolved absolute directory as `PI_CODING_AGENT_DIR`.
@@ -148,11 +148,14 @@ and Pi sessions do not depend on the `MODEL_FOR_*` variables. A value that is no
 
 Current initial defaults:
 
-| Role    | Model                         | Thinking |
-| ------- | ----------------------------- | -------- |
-| CoS     | `anthropic/claude-haiku-5-5`  | low      |
-| Manager | `anthropic/claude-sonnet-5-5` | medium   |
-| Worker  | `anthropic/claude-haiku-5-5`  | medium   |
+| Role    | Model                               | Thinking |
+| ------- | ----------------------------------- | -------- |
+| CoS     | `claude-directsdk/claude-haiku-5-5` | medium   |
+| Manager | `claude-directsdk/claude-opus-5-5`  | medium   |
+| Worker  | `claude-directsdk/claude-haiku-5-5` | medium   |
+
+The `claude-directsdk` provider comes from the pinned `pi-claude-directsdk` package; see
+[Claude DirectSDK setup](claude-directsdk-setup.md).
 
 Setup does not authenticate, check provider model availability or invoke a model;
 confirm each manifest model matches the operator's account.

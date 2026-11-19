@@ -6,11 +6,12 @@ env_prefix = "COS"
 pi_coding_agent_dir = "cos-bot/.pi"
 
 [defaults]
-model = "anthropic/claude-haiku-5-5"
-thinking = "low"
+model = "claude-directsdk/claude-haiku-5-5"
+thinking = "medium"
 
 [packages]
 pi = [
+  "npm:pi-claude-directsdk@1.0.2",
   "npm:@llblab/pi-telegram@0.59.2",
   "npm:pi-web-access@0.43.0",
   "npm:@jl1990/pi-scheduler@0.5.1",

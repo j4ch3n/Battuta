@@ -2,6 +2,7 @@
 
 import json
 import os
+import tomllib
 from pathlib import Path
 
 import click
@@ -135,9 +136,10 @@ def test_release_merges_cos_telegram_handler_without_overwriting_existing_values
 def test_fresh_release_defaults_survive_browser_setup(deployment):
     root, home, env_file = deployment
     release.configure_release(root, env_file=env_file, home=home)
-    for bot, thinking in (("cos-bot", "low"), ("manager-bot", "medium"), ("worker-1", "medium"), ("worker-2", "medium")):
+    for bot, profile in (("cos-bot", "cos-bot"), ("manager-bot", "manager-bot"), ("worker-1", "worker"), ("worker-2", "worker")):
+        manifest = tomllib.loads((Path(__file__).parents[3] / "bots" / profile / "bot.toml").read_text())
         settings = json.loads((home / ".battuta/pi-bots" / bot / ".pi/settings.json").read_text())
-        assert settings["defaultThinkingLevel"] == thinking
+        assert settings["defaultThinkingLevel"] == manifest["defaults"]["thinking"]
 
 
 def test_repeated_release_leaves_created_files_unchanged(deployment, capsys):
