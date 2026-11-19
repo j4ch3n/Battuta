@@ -2,5 +2,4 @@
 AGENTS.md
 .pi/*
 !.pi/web-search.json
-!.pi/mcp.json
 !.pi/delegate/
