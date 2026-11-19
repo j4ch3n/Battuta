@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { extractMemories } from "../extract.ts";
+import { CAPTURE_SESSION_ID, extractMemories } from "../extract.ts";
 import type { CaptureJob } from "../capture-queue.ts";
 
 const job: CaptureJob = {
@@ -196,4 +196,21 @@ test("project correction and embedding rephrase never regenerate accepted entrie
   await expect(
     extractMemories(retry, context('{"items":[]}'), new AbortController().signal),
   ).rejects.toThrow("omitted");
+});
+
+test("extraction runs in the capture provider session", async () => {
+  const complete = vi.fn((..._args: unknown[]) =>
+    Promise.resolve({
+      stopReason: "stop",
+      content: [{ type: "text", text: JSON.stringify({ items: [] }) }],
+      usage: {},
+    }),
+  );
+  const ctx = { model: { id: "test" }, modelRegistry: { complete } } as unknown as ExtensionContext;
+  await extractMemories(job, ctx, new AbortController().signal);
+  expect(complete).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.anything(),
+    expect.objectContaining({ sessionId: CAPTURE_SESSION_ID }),
+  );
 });

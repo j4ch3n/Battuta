@@ -341,6 +341,16 @@ test.each([
   expect(() => validateHypotheses(value, 2)).toThrow(error);
 });
 
+test("validateHypotheses drops undeclared fields instead of failing the stage", () => {
+  const value = {
+    extra: 1,
+    hypotheses: [hypothesis("a", [1]), { hypotheses: null, ...hypothesis("b", [2]) }],
+  };
+  const result = validateHypotheses(value, 2);
+  expect(result).toHaveLength(2);
+  expect(Object.keys(result[1]).sort()).toEqual(["clusters", "content", "keywords", "rationale"]);
+});
+
 test("cue stage writes cues after hypotheses and before the profile refresh", async () => {
   const backend = new Backend([
     mem(1, "Atlas uses PostgreSQL"),
