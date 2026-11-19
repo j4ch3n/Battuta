@@ -50,14 +50,20 @@ generic `delegate` tool, which is blocked for `harness` `claude`). Its working d
   real directory next to a `project.yaml`.
 
 So a run loads that folder's `CLAUDE.md`, `.claude/` settings, agents, skills and plugins.
-Claude Code also loads the folder's `AGENTS.md`, but only as a fallback when the folder has no
-`CLAUDE.md` (observed with Claude Code 2.1.327). A project that has a `CLAUDE.md` does not also
+Claude Code also loads the folder's `AGENTS.md`, but only as a fallback when neither the folder nor
+any directory above it has a `CLAUDE.md` or `CLAUDE.local.md` (the folder case observed with Claude
+Code 2.1.327; the ancestor rule is from the official documentation). A project that has a `CLAUDE.md` does not also
 get its `AGENTS.md` loaded unless `CLAUDE.md` imports it. The user-level `~/.claude` configuration
 (or `$CLAUDE_CONFIG_DIR`) is shared by every run on the host; it is not isolated per project.
 
-Only project-managed folders are searched for project configuration. The ancestors of the project
-folder, such as the home directory and `~/.battuta`, are not scanned for `CLAUDE.md` or `.claude/`,
-and this design adds no such check.
+Battuta does not itself scan or block the ancestor folders of a run's working directory. Claude Code
+does: it loads `CLAUDE.md` and `CLAUDE.local.md` from the working directory and every directory above
+it at launch ([Claude Code memory documentation](https://code.claude.com/docs/en/memory); a live probe
+on Claude Code 2.1.327 read a parent's `CLAUDE.md` from a child working directory). For a project code
+folder, the ancestors are `~/.battuta/projects/<project>`, `~/.battuta/projects`, `~/.battuta`, the home
+directory and above. On 2026-11-19 none of them contained a `CLAUDE.md` (checked read-only; `/etc/claude-code`
+has none either). Adding one there would be loaded by every project's runs and would break project
+isolation, so project instructions belong in the project's code folder only.
 
 The Claude routing block is a routing rule, not an enforcement boundary. The worker's `bash` tool can
 still run `claude` directly in any directory; the tool hook blocks only the generic `delegate` and
@@ -76,6 +82,20 @@ continues; the worker sees it in the run's permission denials and reports a bloc
 Project-level Claude settings are ignored for an untrusted workspace, so to pre-approve
 commands the host operator must add them to the user-level Claude Code settings or trust
 the worker workspace deliberately. `danger` is never used by workers.
+
+## Known limitations
+
+- The `edit` tier (`acceptEdits`) is pending owner confirmation; see Permissions above.
+- A non-zero Claude exit after a parsed result is treated as a failure and the report is dropped
+  (cost, permission denials, working directory). Files may already have changed in edit mode, so
+  check the checkout before retrying; the error includes the session id.
+- The output-overflow stop kills only the Claude process, not its children, so tool processes it
+  started may keep running.
+- The spawned Claude process inherits the worker's environment, including any `GIT_*` variables such
+  as `GIT_DIR` or `GIT_WORK_TREE`. Only Battuta's own working-directory git checks use a sanitized
+  environment.
+- The Claude tool is registered only when the `delegate` tool is already present at session start.
+  This was verified for Pi 1.5.2; no test runs real Pi, so a loader change would not be caught.
 
 ## Installation checks: no model calls
 
