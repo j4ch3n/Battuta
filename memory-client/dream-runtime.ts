@@ -12,6 +12,7 @@ import { redact } from "./privacy.ts";
 import { eligibleRecords, memoryMetadataSchema, memoryRecordSchema } from "./records.ts";
 import type { MemoryRecord } from "./records.ts";
 import { digest } from "./canonical.ts";
+import { parseModelJson } from "./model-json.ts";
 import { DREAM_HOUR, DREAM_MINUTE } from "./dream-schedule.ts";
 import { DreamDiagnosticError, dreamDiagnostic, type DreamDiagnostic } from "./dream-errors.ts";
 
@@ -64,22 +65,19 @@ const editSchema = z.object({
   insert: z.array(insertSchema),
   summary: safeText(1000),
 });
-const hypothesesOutputSchema = z
-  .object({
-    hypotheses: z
-      .array(
-        z
-          .object({
-            content: safeText(1000),
-            keywords: insertSchema.shape.keywords,
-            rationale: safeText(1000),
-            clusters: z.array(z.number().int()).min(1).max(50),
-          })
-          .strict(),
-      )
-      .max(10),
-  })
-  .strict();
+// Extra model fields are dropped: only the named fields are ever stored.
+const hypothesesOutputSchema = z.object({
+  hypotheses: z
+    .array(
+      z.object({
+        content: safeText(1000),
+        keywords: insertSchema.shape.keywords,
+        rationale: safeText(1000),
+        clusters: z.array(z.number().int()).min(1).max(50),
+      }),
+    )
+    .max(10),
+});
 const checkpointSchema = z.object({
   version: z.literal(5),
   run_id: z.string().datetime(),
@@ -220,7 +218,7 @@ async function structured<T>(
       signal,
     );
     try {
-      return validate(JSON.parse(response) as unknown);
+      return validate(parseModelJson(response));
     } catch (error) {
       diagnostic = dreamDiagnostic(error, stage);
       if (attempt) throw new DreamDiagnosticError(diagnostic);
