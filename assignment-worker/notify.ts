@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Content, validate, type MessageReference } from "@battuta/agent-mail/schemas";
-import { validateContent, type MessageContent } from "@battuta/agent-mail/content";
+import { MAX_BODY_LENGTH, validateContent, type MessageContent } from "@battuta/agent-mail/content";
 import { sendProgrammaticMail, UncertainWriteError } from "@battuta/agent-mail/transport";
 import type { Detail, ExecutionSessions, MailDelivery } from "./types.ts";
 
@@ -19,9 +19,7 @@ export function buildManagerContent(detail: Detail): MessageContent {
   const unfinished = todos.filter((todo) => !["done", "cancelled"].includes(todo.status));
   if (!blocked && (!todos.length || unfinished.length))
     throw new Error("Recorded completion must have a nonempty terminal TODO set");
-  const evidence = [...new Set(todos.flatMap((todo) => todo.evidence))]
-    .filter((locator) => locator.length <= 2000)
-    .slice(0, 10);
+  const evidence = [...new Set(todos.flatMap((todo) => todo.evidence))].slice(0, 10);
   const lines = [
     `assignment_id: ${a.id}. Claim version: ${a.claimed_at ?? "not recorded"}. Outcomes and evidence are worker-reported, not Manager verification or owner acceptance; read each TODO's full outcome and evidence in the assignment with the exact project name.`,
     ...(blocked
@@ -41,8 +39,8 @@ export function buildManagerContent(detail: Detail): MessageContent {
   const content: MessageContent = {
     project: a.project,
     objective: brief(`Assignment ${a.id} ${blocked ? "blocked" : "completed"}: ${a.goal}`, 800),
-    // Counted in code points: 2000 points stay inside the schema's 4000 UTF-16 units.
-    body: brief(lines.join("\n"), 2000),
+    // brief counts code points; each is at most two UTF-16 units.
+    body: brief(lines.join("\n"), MAX_BODY_LENGTH / 2),
     result: {
       state: blocked ? "blocked" : "complete",
       checks: [],

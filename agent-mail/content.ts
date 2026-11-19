@@ -1,7 +1,9 @@
 // One content contract for both roles. Supabase stores JSON without knowing it.
 import { Type, type Static, type TProperties, type TSchema } from "typebox";
 
-const text = (description: string, maxLength = 4000) =>
+// UTF-16 code units, as the schema's maxLength counts them.
+export const MAX_BODY_LENGTH = 4000;
+const text = (description: string, maxLength = MAX_BODY_LENGTH) =>
   Type.String({ minLength: 1, maxLength, pattern: "\\S", description });
 const object = <P extends TProperties>(properties: P, description?: string) =>
   Type.Object(properties, { additionalProperties: false, ...(description ? { description } : {}) });
@@ -22,7 +24,10 @@ const content = object(
       2000,
     ),
     body: optional(
-      text("Supporting evidence, background, risks, or recommendation. Omit when not needed."),
+      text(
+        "Supporting evidence, background, risks, or recommendation. Omit when not needed.",
+        MAX_BODY_LENGTH,
+      ),
     ),
     requirements: optional(
       array(

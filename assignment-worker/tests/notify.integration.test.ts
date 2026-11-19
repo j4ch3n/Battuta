@@ -2,7 +2,7 @@ import { expect, test, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildManagerContent, createNotifier } from "../notify.ts";
 import { Content, validate } from "@battuta/agent-mail/schemas";
-import { validateContent, MAX_CONTENT_BYTES } from "@battuta/agent-mail/content";
+import { validateContent, MAX_BODY_LENGTH, MAX_CONTENT_BYTES } from "@battuta/agent-mail/content";
 import { detail } from "./fixtures.ts";
 import type { Detail } from "../types.ts";
 
@@ -113,7 +113,7 @@ test("large/control/unicode evidence stays within mail limits without inventing 
   expect(() => validate(Content, content)).not.toThrow();
   expect(() => validateContent(content)).not.toThrow();
   expect(Buffer.byteLength(JSON.stringify(content))).toBeLessThanOrEqual(MAX_CONTENT_BYTES);
-  expect(Array.from(content.body ?? "").length).toBeLessThanOrEqual(2000);
+  expect(content.body?.length).toBeLessThanOrEqual(MAX_BODY_LENGTH);
 });
 
 test("intent precedes sending and duplicate/concurrent callbacks return one reference", async () => {
