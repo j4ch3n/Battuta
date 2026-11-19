@@ -7,7 +7,6 @@ import click
 
 from .browser import browser_settings, configure_browser
 from .json_config import read_config, write_config
-from .subagents import prepare_worker_agents
 from .manifest import load_manifest
 from .runtime import initialize_settings_if_missing
 from .files import prepare_files
@@ -103,12 +102,6 @@ def copy_worker_profile(profile: Path, bot_dir: Path) -> None:
     mcp.update(destination["mcp.json"])
     mcp["mcpServers"] = {**destination_servers, **source_servers}
     mcp["mcpServers"]["memory"] = {"enabled": False}
-    # Validate every input before creating or changing any instance files.
-    manifest = load_manifest(profile / "bot.toml")
-    if manifest.subagents is None:
-        raise click.ClickException("Worker manifest requires subagents")
-    agents = {Path(agent.path).name: (profile / ".pi/agents" / Path(agent.path).name).read_bytes() for agent in manifest.subagents.agents}
-    prepare_worker_agents(agents, bot_dir)
     bot_dir.mkdir(parents=True, exist_ok=True)
     if not (bot_dir / ".pi/settings.json").exists():
         manifest = load_manifest(profile / "bot.toml")

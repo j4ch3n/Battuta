@@ -6,18 +6,17 @@ Pi consumes the prepared settings/resources, not the manifest itself.
 
 ## Sections
 
-| Section                | Responsibility                                                             |
-| ---------------------- | -------------------------------------------------------------------------- |
-| `[bot]`                | Role and environment-variable prefix                                       |
-| `[skills]`             | Ordered `include` selection from the runtime skill catalog                 |
-| `[packages]`           | Pinned Pi package sources and repository-relative Node projects to install |
-| `[[extensions]]`       | Named repository-owned extension entry points                              |
-| `[[files]]`            | File preparation operations with explicit ownership policy                 |
-| `[setup]`              | Ordered, known Python setup steps, restricted by role                      |
-| `[runtime]`            | Private `pi_coding_agent_dir`, relative to the fixed private base          |
-| `[claude]`             | Catalog skills copied to Claude Code's user skills directory (workers)     |
-| `[defaults]`           | Pi model (`provider/model-id`) and initial thinking preference             |
-| `[[subagents.agents]]` | Profile-relative prompt, selected parent skills, and child extensions      |
+| Section          | Responsibility                                                             |
+| ---------------- | -------------------------------------------------------------------------- |
+| `[bot]`          | Role and environment-variable prefix                                       |
+| `[skills]`       | Ordered `include` selection from the runtime skill catalog                 |
+| `[packages]`     | Pinned Pi package sources and repository-relative Node projects to install |
+| `[[extensions]]` | Named repository-owned extension entry points                              |
+| `[[files]]`      | File preparation operations with explicit ownership policy                 |
+| `[setup]`        | Ordered, known Python setup steps, restricted by role                      |
+| `[runtime]`      | Private `pi_coding_agent_dir`, relative to the fixed private base          |
+| `[claude]`       | Catalog skills copied to Claude Code's user skills directory (workers)     |
+| `[defaults]`     | Pi model (`provider/model-id`) and initial thinking preference             |
 
 Node dependency versions remain in `package.json` and lockfiles. Secrets stay in
 environment files and private state, never TOML. Browser/MCP configuration and
@@ -84,34 +83,11 @@ There is no count or separate instance map.
 The effective set is the deduplicated union of base and selected type capabilities.
 Types do not inherit other types. The `influencer` type selects the separate
 `worker-influencer` profile with `mobile-control` and Pi-Droid instead of the
-general worker's `research` capability and subagents. All names must exist in
+general worker's `research` capability. All names must exist in
 the canonical assignment ability catalog. Unknown types, unknown names and malformed
 configuration stop launch. Source and release launchers supply the resolved set as
 code-owned JSON; changing it requires restarting the worker. Models do not choose,
 register or discover worker capabilities.
-
-## Worker subagents
-
-The worker manifest declares each native subagent:
-
-```toml
-[[subagents.agents]]
-path = "agents/researcher.md"
-inherit_parent_skills = ["research"]
-extensions = ["pi-web-access"]
-```
-
-Paths are relative to the worker profile. Inherited skills must also be selected
-by the parent worker; extension names must be backed by a package in `[packages]`.
-Setup renders native `skills` and `extensions` frontmatter into generated agent
-definitions, so source prompt files must not declare those keys themselves.
-The agent's `tools` restriction remains in the prompt. The researcher requests
-web-access tools.
-
-Source setup materializes inherited skill files for native subagent discovery;
-release bundles include the selected skills and render the same agent definitions.
-Generated files are refreshed only when still owned by setup; custom private
-agent definitions are preserved.
 
 ## Private runtime settings
 

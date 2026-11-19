@@ -78,16 +78,6 @@ class Defaults(Section):
     thinking: Literal["off", "minimal", "low", "medium", "high", "xhigh"]
 
 
-class Subagent(Section):
-    path: str
-    inherit_parent_skills: list[str]
-    extensions: list[str]
-
-
-class Subagents(Section):
-    agents: list[Subagent]
-
-
 class Extension(Section):
     name: Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")]
     source: str
@@ -117,7 +107,6 @@ class BotManifest(Section):
     setup: Setup | None = None
     runtime: Runtime | None = None
     defaults: Defaults | None = None
-    subagents: Subagents | None = None
     extensions: list[Extension] = Field(default_factory=list)
     worker: Worker | None = None
     claude: Claude | None = None

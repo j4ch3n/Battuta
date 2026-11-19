@@ -77,6 +77,18 @@ workspace and `Code` for the checkout. In `explain`, `Project Root` is the
 checkout; use `Managed Project Directory` for project documents and `Summary`
 for the overview.
 
+## Worktrees
+
+Create worktrees with `battuta-project worktree`, never `git worktree add|remove`. Worktrees live in the project's managed folder, outside the checkout, so the checkout's git status stays clean. A plain `git worktree add|remove|list` is rewritten to these commands; any other `git worktree` use is refused.
+
+```sh
+battuta-project worktree create atlas fix-login [--branch <branch>] [--base <commit-or-branch>]
+battuta-project worktree list atlas [--json]
+battuta-project worktree delete atlas fix-login [--force]
+```
+
+`create` prints the worktree path and its new branch (default `agent/<name>`, from the checkout's current HEAD unless `--base` is given). Names are lowercase kebab-case. `list` shows each worktree's name, path, branch, and `dirty` when it has uncommitted changes. `delete` removes the folder but keeps the branch, and refuses uncommitted changes unless `--force` discards them. Pass the printed path as `worktree` when delegating.
+
 ## Remove a project
 
 ```sh
@@ -171,6 +183,7 @@ Use `--help` at any command level to check arguments and available subcommands:
 battuta-project --help
 battuta-project list --help
 battuta-project init --help
+battuta-project worktree --help
 battuta-project linear --help
 battuta-project linear create --help
 ```

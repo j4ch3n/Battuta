@@ -56,10 +56,7 @@ def source(tmp_path, monkeypatch):
             (path / ".pi/telegram.json").write_text("{}")
         if profile == "worker":
             (path / ".pi/mcp.json").write_text("{}")
-            (path / "agents").mkdir()
-            (path / "agents/researcher.md").write_text("---\nname: researcher\n---\nResearch fixture")
             write_delegate_templates(path)
-            (path / "agents/unselected.md").write_text("Not selected")
     skill = root / "skills-hub/research"
     skill.mkdir(parents=True)
     for name in ("SKILL.md", "LICENSE", "tools.md"):
@@ -109,18 +106,12 @@ def test_staged_archive_separates_documentation_and_bots(source, tmp_path):
         assert "skills-hub" not in json.dumps(settings)
         assert not (bot / ".pi/skills/research").is_symlink()
         assert (bot / ".pi/skills/research/SKILL.md").read_text() == "SKILL.md"
-        if profile == "manager-bot":
-            assert not any("pi-subagents" in package for package in settings["packages"])
+        assert not any("pi-subagents" in package for package in settings["packages"])
         if profile == "worker":
             assert json.loads((bot / "abilities.json").read_text()) == json.loads(
                 (source / "supabase/functions/assignments/abilities.json").read_text()
             )
-            assert "npm:@tintinweb/pi-subagents@0.24.0" in settings["packages"]
-            researcher = (bot / ".pi/agents/researcher.md").read_text()
-            assert 'skills: ["research"]' in researcher
-            assert 'extensions: ["pi-web-access"]' in researcher
-            assert not (bot / ".pi/agents/reviewer.md").exists()
-            assert not (bot / ".pi/agents/unselected.md").exists()
+            assert not (bot / ".pi/agents").exists()
         assert any("pi-browser-use" in package for package in settings["packages"]) == (profile not in ("manager-bot", "worker-influencer"))
         if profile not in ("manager-bot", "worker-influencer"):
             assert settings["pi-browser-use"]["headless"] is True

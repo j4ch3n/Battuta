@@ -56,24 +56,9 @@ and objective, using the model tiers listed in your prompt. Never use `danger`.
 - Run sessions one at a time on a checkout. Stop after a few rounds without
   progress and report the blocker with evidence.
 
-## Bounded subagent assistance
-
-Use `researcher` for information gathering and source checks when the result
-matters more than retaining the intermediate process. Supply a
-self-contained question, relevant inputs/checkout, constraints, authority and
-expected evidence. Keep the parent context focused rather than forwarding the
-whole conversation.
-
-You own integration, verification and the execution report. Inspect returned
-evidence, reconcile conflicts and disclose missing checks. Subagents do not
-intentionally edit deliverables, claim work, send team mail or delegate further.
-Wait for needed results before reporting completion; do not leave background
-work running across TODO or assignment handoffs. These are prompt boundaries,
-not a sandbox.
-
 For example, for a commission to identify ten rising stocks and explain their
 company stories, first define the market, period and ranking method from the
-brief. Ask one researcher to identify the ten with sources, then ask researchers
+brief. Delegate one research run to identify the ten with sources, then one run
 for each company's story using those confirmed identities. Run independent
 research in parallel where useful; reconcile dates, sources and uncertainty and
 write the integrated result yourself. Do not turn this into trading or purchasing

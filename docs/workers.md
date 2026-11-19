@@ -124,8 +124,7 @@ registration, including native MCP/codemode discovery. Workers keep
 [agent mail](agent-mail.md)); `delegate` is active where its package is installed and runs in the assignment project's folder or worktree (see [delegation setup](delegation-setup.md)). Shell and the backend
 secret still make this a trusted process, **not a security sandbox**. No Telegram,
 worker inbox, nested assignment creation, owner-profile preload, or memory capture runs.
-The worker may use the native subagent extension for bounded research and review;
-its custom types load no assignment lifecycle extension. The worker retains
+The worker's custom types load no assignment lifecycle extension. The worker retains
 responsibility for integration and its execution report. Prompt boundaries are
 not sandbox guarantees.
 

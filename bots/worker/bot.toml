@@ -20,7 +20,6 @@ pi = [
   "npm:pi-claude-directsdk@1.0.2",
   "npm:pi-web-access@0.43.0",
   "npm:@amaster.ai/pi-browser-use@0.1.38",
-  "npm:@tintinweb/pi-subagents@0.24.0",
   "npm:pi-harness-delegate@0.9.0",
 ]
 pi_library = ["npm:pi-harness-delegate@0.9.0"]
@@ -54,11 +53,6 @@ optional = true
 
 [setup]
 steps = ["worker-profile"]
-
-[[subagents.agents]]
-path = "agents/researcher.md"
-inherit_parent_skills = ["research"]
-extensions = ["pi-web-access"]
 
 [[files]]
 operation = "copy"

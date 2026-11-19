@@ -70,7 +70,7 @@ PY
 Expected: the success line only; any assertion/missing file fails setup. Release
 setup creates missing private MCP files and leaves existing files untouched. Review
 skipped configuration before starting bots. Restart bots separately only when authorized. Neither source nor release
-configuration starts worker sessions or changes bounded-subagent isolation defaults.
+configuration starts worker sessions.
 
 Deploy the matching migration and clients together: note tools now accept only
 project/assignment ID and return guidance containing the caller's full note path. Refresh generated

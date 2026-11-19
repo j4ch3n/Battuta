@@ -12,7 +12,6 @@ from bot_setup.claude_skills import CLAUDE_SKILLS
 from bot_setup.skills import load_selection
 from bot_setup.files import prepare_files
 from bot_setup.manifest import load_profile
-from bot_setup.subagents import render_worker_agents
 from bot_setup.extensions import profile_settings, source_extension_links
 
 PROFILES = ("cos-bot", "manager-bot", "worker", "worker-influencer")
@@ -74,7 +73,6 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
                 path = owner / name
                 if path.is_symlink() or not path.is_file():
                     raise click.ClickException(f"Missing regular extension package file: {path}")
-    worker_agents = render_worker_agents(source / "bots/worker", manifests["worker"])
     claude_skills = {profile: manifest.claude.skills if manifest.claude else [] for profile, manifest in manifests.items()}
     for names in [*selections.values(), *claude_skills.values()]:
         for name in names:
@@ -145,11 +143,6 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
             metadata["pi"] = {"extensions": ["dist/index.js"]}
             write_json(package / "package.json", metadata)
         write_json(bot / ".pi/extension-build.json", [entry.model_dump() for entry in manifests[profile].extensions])
-        if profile == "worker":
-            agents = bot / ".pi/agents"
-            agents.mkdir()
-            for name, content in worker_agents.items():
-                (agents / name).write_bytes(content)
         settings = profile_settings(manifests[profile], browser=profile not in ("manager-bot", "worker-influencer"))
         write_json(bot / ".pi/settings.json", settings)
         for rule in manifests[profile].files:

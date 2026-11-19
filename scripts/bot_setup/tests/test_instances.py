@@ -14,18 +14,16 @@ from bot_setup.manifest import load_profile
 from skill_fixtures import manifest_text
 
 
-def test_actual_worker_profiles_route_without_subagents():
+def test_actual_worker_profiles_route_by_capability():
     root = Path(__file__).resolve().parents[3]
     general = load_profile(root / "bots/worker/bot.toml", "worker")
     influencer = load_profile(root / "bots/worker-influencer/bot.toml", "worker")
     assert general.worker.types["general"].capabilities == ["research"]
     assert influencer.worker.types["influencer"].capabilities == ["mobile-control"]
-    assert any("pi-subagents" in package for package in general.packages.pi)
-    assert not any("pi-subagents" in package for package in influencer.packages.pi)
+    assert not any("pi-subagents" in package for package in [*general.packages.pi, *influencer.packages.pi])
     assert any("pi-droid" in package for package in influencer.packages.pi)
     assert not any("pi-browser-use" in package for package in influencer.packages.pi)
     assert "browser-evidence" not in influencer.skills.include
-    assert influencer.subagents.agents == []
 
 
 @pytest.mark.parametrize("values,expected", [

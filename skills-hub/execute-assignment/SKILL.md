@@ -26,8 +26,8 @@ go decision is evidence, not new execution, merge, or publication authority.
 Extension code owns claims, ordered progress, completion, and mandatory Manager
 mail. This skill creates neither a bound task nor access to tools; it does not
 permit direct execution-state writes, owner contact, or new assignments.
-Bounded assistance from available subagents stays within the commission; the
-bound executor retains responsibility for evidence, integration and reporting.
+Work run through `delegate` stays within the commission; the bound executor
+retains responsibility for evidence, integration and reporting.
 
 ## Orient to the commission
 
@@ -58,7 +58,8 @@ not model actions.
    and verify the checkout belongs to the intended repository. A worktree can
    legitimately differ from the registered checkout. Preserve existing changes;
    do not switch branches, replace the commissioned checkout, or reset work just
-   to match metadata.
+   to match metadata. When you need a worktree of your own, create it with
+   `battuta-project worktree create`, not `git worktree`.
 4. Read the supplied PRD/version and other relevant input paths. For a referenced
    Linear ticket, read its description, acceptance, and consequential discussion
    using existing authorized tools when available. Otherwise read Manager's

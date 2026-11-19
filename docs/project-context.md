@@ -9,11 +9,13 @@ child; there is no configurable project root or global current-project file.
     project.yaml
     SUMMARY.md
     code/
+    worktrees/
+      <name>/
 ```
 
 A regular `project.yaml` in an immediate, nonhidden, nonsymlink directory marks a
 registered project. The directory name is the exact project identity; its managed
-root is that directory and its checkout is always `code/`. YAML does not duplicate
+root is that directory and its checkout is always `code/`. `battuta-project worktree` keeps git worktrees of that checkout under `worktrees/<name>`, on new branches (default `agent/<name>`), outside the checkout; workers' plain `git worktree` commands are rewritten to it by the worker extension. YAML does not duplicate
 the project name or checkout path.
 
 ```yaml
