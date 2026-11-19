@@ -1,10 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Content, validate, type MessageReference } from "@battuta/agent-mail/schemas";
-import {
-  validateContent,
-  MAX_CONTENT_BYTES,
-  type MessageContent,
-} from "@battuta/agent-mail/content";
+import { validateContent, type MessageContent } from "@battuta/agent-mail/content";
 import { sendProgrammaticMail, UncertainWriteError } from "@battuta/agent-mail/transport";
 import type { Detail, ExecutionSessions, MailDelivery } from "./types.ts";
 
@@ -23,92 +19,38 @@ export function buildManagerContent(detail: Detail): MessageContent {
   const unfinished = todos.filter((todo) => !["done", "cancelled"].includes(todo.status));
   if (!blocked && (!todos.length || unfinished.length))
     throw new Error("Recorded completion must have a nonempty terminal TODO set");
-  const assignmentRef = {
-    locator: `assignment:${a.id}`,
-    note: "Use assignment MCP to read every ordered TODO outcome and full evidence with the exact project name.",
-  };
-  const references = [assignmentRef];
-  const seen = new Set<string>();
-  for (const todo of todos)
-    for (const locator of todo.evidence) {
-      if (
-        references.length >= 10 ||
-        seen.has(locator) ||
-        locator.length > 2000 ||
-        Buffer.byteLength(JSON.stringify(locator)) > 2048
-      )
-        continue;
-      seen.add(locator);
-      references.push({
-        locator,
-        note: `Evidence reported for TODO ${todo.position}; not independent Manager verification.`,
-      });
-    }
-  const content: MessageContent = {
-    schema_version: 1,
-    summary: brief(`Assignment ${a.id} ${blocked ? "blocked" : "completed"}: ${a.goal}`, 800),
-    context: [
-      brief(`Project: ${a.project}; assignment_id: ${a.id}`, 600),
-      `Claim version: ${a.claimed_at ?? "not recorded"}. TODO positions: ${brief(todos.map((todo) => String(todo.position)).join(", "), 300)}`,
-      "Recorded worker outcomes are not Manager verification or owner acceptance. Full summaries/evidence, including omitted detail, remain in the authoritative assignment.",
-    ],
-    findings: [],
-    options: [],
-    recommendation: null,
-    request: null,
-    result: {
-      state: blocked ? "blocked" : "complete",
-      accomplished: done.length
-        ? done.slice(0, 10).map((todo) => brief(`TODO ${todo.position}: ${todo.outcome}`))
-        : blocked
-          ? []
-          : [
-              "Recorded assignment closed with every TODO cancelled; no completed implementation is claimed.",
-            ],
-      remaining: blocked
-        ? [
-            brief(`Blocker: ${a.blocker ?? "Inspect the authoritative assignment"}`),
-            ...unfinished
-              .slice(0, 8)
-              .map((todo) => brief(`TODO ${todo.position} (${todo.status}): ${todo.description}`)),
-          ]
-        : [],
-      checks: blocked
+  const evidence = [...new Set(todos.flatMap((todo) => todo.evidence))]
+    .filter((locator) => locator.length <= 2000)
+    .slice(0, 10);
+  const lines = [
+    `assignment_id: ${a.id}. Claim version: ${a.claimed_at ?? "not recorded"}. Outcomes and evidence are worker-reported, not Manager verification or owner acceptance; read each TODO's full outcome and evidence in the assignment with the exact project name.`,
+    ...(blocked
+      ? unfinished
+          .slice(0, 8)
+          .map((todo) => brief(`TODO ${todo.position} (${todo.status}): ${todo.description}`))
+      : []),
+    ...(done.length
+      ? done.slice(0, 10).map((todo) => brief(`TODO ${todo.position}: ${todo.outcome}`))
+      : blocked
         ? []
         : [
-            {
-              expectation: "Recorded assignment is done and every TODO is done or cancelled.",
-              required: true,
-              result: "passed",
-              explanation:
-                "Checked the authoritative assignment status and every returned TODO status; this does not independently verify implementation or product acceptance.",
-              evidence: [assignmentRef],
-            },
-          ],
+            "Recorded assignment closed with every TODO cancelled; no completed implementation is claimed.",
+          ]),
+    ...(evidence.length ? [`Evidence: ${evidence.map((e) => brief(e, 200)).join("; ")}`] : []),
+  ];
+  const content: MessageContent = {
+    project: a.project,
+    objective: brief(`Assignment ${a.id} ${blocked ? "blocked" : "completed"}: ${a.goal}`, 800),
+    // Counted in code points: 2000 points stay inside the schema's 4000 UTF-16 units.
+    body: brief(lines.join("\n"), 2000),
+    result: {
+      state: blocked ? "blocked" : "complete",
+      checks: [],
+      ...(blocked
+        ? { blocker: brief(a.blocker ?? "Inspect the authoritative assignment", 300) }
+        : {}),
     },
-    uncertainties: [
-      {
-        description:
-          "Outcomes and evidence are worker-reported; no independent verification is implied.",
-        impact:
-          "Manager must assess the commission and evidence before reporting verified delivery or acceptance.",
-      },
-    ],
-    references,
-    related_messages: [],
   };
-  if (Buffer.byteLength(JSON.stringify(content)) > MAX_CONTENT_BYTES) {
-    content.result!.accomplished = done.length
-      ? [`${done.length} TODOs recorded done; read full outcomes in the assignment.`]
-      : [];
-    content.result!.remaining = blocked
-      ? [brief(`Blocker: ${a.blocker ?? "Inspect assignment"}`, 100)]
-      : [];
-    content.references = [assignmentRef];
-    content.context.push(
-      "Mail size limits require a summary; detailed evidence was omitted, not independently reverified.",
-    );
-  }
   validate(Content, content);
   validateContent(content);
   return content;

@@ -16,29 +16,13 @@ Tool: `reply_agent_message`. This fictional probe request has one requirement: `
   "parent": { "conversation_id": "550e8400-e29b-41d4-a716-446655440000", "id": "c9e13a5b6d84" },
   "message_type": "chat",
   "content": {
-    "schema_version": 1,
-    "summary": "The timeout probe is running; its required conclusion is not verified yet.",
-    "context": ["Project: atlas; assignment_id: a3f91c2e. TODO position 1 is in_progress.", "Investigation only; no implementation or release claim."],
-    "findings": [],
-    "options": [],
-    "recommendation": null,
-    "request": null,
+    "project": "atlas",
+    "objective": "The timeout probe is running; its required conclusion is not verified yet.",
+    "body": "assignment_id: a3f91c2e. TODO position 1 is in_progress. Investigation only; no implementation or release claim. Next: obtain the worker probe results and review them against milestone acceptance.",
     "result": {
       "state": "in_progress",
-      "accomplished": ["Commissioned the worker assignment for the representative-input probe."],
-      "remaining": ["Obtain worker probe results and review them against milestone acceptance."],
-      "checks": [
-        {
-          "expectation": "Report whether the import timeout fits milestone 1.",
-          "required": true,
-          "result": "not_verified",
-          "explanation": "The representative-input result is pending.",
-          "evidence": []
-        }
-      ]
+      "checks": [{ "req": 1, "result": "not_verified" }]
     },
-    "uncertainties": [],
-    "references": [],
     "related_messages": [
       { "conversation_id": "550e8400-e29b-41d4-a716-446655440000", "id": "c9e13a5b6d84" }
     ]
@@ -56,39 +40,19 @@ Tool: `send_agent_message`. A progress reply consumed the single direct reply, s
   "recipient": "cos",
   "message_type": "chat",
   "content": {
-    "schema_version": 1,
-    "summary": "The representative-input timeout probe passed for the current first milestone.",
-    "context": [
-      "Project: atlas; assignment_id: a3f91c2e. Worker execution recorded TODO position 1 and the assessment assignment done; Manager inspected the probe evidence. This is not owner acceptance.",
-      "Only the requested timeout assessment is complete; implementation remains separate."
-    ],
-    "findings": [],
-    "options": [],
-    "recommendation": null,
-    "request": null,
+    "project": "atlas",
+    "objective": "The representative-input timeout probe passed for the current first milestone.",
+    "body": "assignment_id: a3f91c2e. Worker execution recorded TODO position 1 and the assessment assignment done; Manager inspected the probe evidence. This is not owner acceptance. The hypothetical required input completes within the configured timeout; larger inputs are outside this check. Only the requested timeout assessment is complete; implementation remains separate.",
     "result": {
       "state": "complete",
-      "accomplished": [
-        "Reviewed the worker-run representative-input probe against the current acceptance boundary."
-      ],
-      "remaining": [],
       "checks": [
         {
-          "expectation": "Report whether the import timeout fits milestone 1.",
-          "required": true,
+          "req": 1,
           "result": "passed",
-          "explanation": "The hypothetical required input completes within the configured timeout; larger inputs are outside this check.",
-          "evidence": [
-            {
-              "locator": "specs/import-feasibility/spec-v2.md#timeout-probe",
-              "note": "Hypothetical measured probe and configured execution limit."
-            }
-          ]
+          "evidence": "specs/import-feasibility/spec-v2.md#timeout-probe"
         }
       ]
     },
-    "uncertainties": [],
-    "references": [],
     "related_messages": [
       { "conversation_id": "550e8400-e29b-41d4-a716-446655440000", "id": "c9e13a5b6d84" }
     ]
@@ -99,4 +63,4 @@ Tool: `send_agent_message`. A progress reply consumed the single direct reply, s
 
 ## Adaptation and next step
 
-For a completed action, cover every original requirement verbatim with a passing evidence-backed required check, accomplishments, and no remaining action work. Use `blocked` with the actual blocker or `in_progress` when required evidence is missing. A negative feasibility conclusion can still complete an assessment if its required deliverable was a supported answer, not successful implementation.
+For a completed action, cover every original requirement by position with a passed, evidence-backed check. Use `blocked` with the actual `blocker` or `in_progress` when required evidence is missing. A negative feasibility conclusion can still complete an assessment if its required deliverable was a supported answer, not successful implementation.

@@ -11,58 +11,10 @@ Tool: `send_agent_message`. This fictional measured failure illustrates evidence
   "recipient": "cos",
   "message_type": "chat",
   "content": {
-    "schema_version": 1,
-    "summary": "New probe evidence invalidates the required input-size assumption; reassess that scope boundary.",
-    "context": [
-      "The current spec selects one-project import with a final result.",
-      "The affected execution path is paused; unrelated authorized work is unchanged."
-    ],
-    "findings": [
-      {
-        "statement": "The newly tested required input exceeded the configured execution timeout.",
-        "basis": "observed",
-        "evidence": [
-          {
-            "locator": "specs/import-feasibility/spec-v2.md#timeout-probe",
-            "note": "Hypothetical failing representative-input result, new since the prior assessment."
-          }
-        ]
-      }
-    ],
-    "options": [
-      {
-        "description": "Reduce the supported first-milestone input size.",
-        "benefits": ["Keeps the execution boundary smaller."],
-        "drawbacks": ["Excludes the larger-input user scenario."]
-      },
-      {
-        "description": "Retain the input requirement and assess background execution.",
-        "benefits": ["Preserves the larger-input scenario."],
-        "drawbacks": ["Adds processing and status behavior to the milestone."]
-      }
-    ],
-    "recommendation": "Evaluate whether the smaller-input milestone is still useful before expanding processing scope.",
-    "request": {
-      "action": "Evaluate the input-size tradeoff and create a new full version if the open spec's boundary changes.",
-      "requirements": [
-        "Resolve the larger-input acceptance boundary using the new probe evidence."
-      ],
-      "expected_response": "Provide the explicit new version or a bounded research request; terminal go/no-go belongs in metadata with rationale."
-    },
-    "result": null,
-    "uncertainties": [
-      {
-        "description": "Background execution has not been assessed.",
-        "impact": "It is an alternative for research, not a verified solution."
-      }
-    ],
-    "references": [
-      {
-        "locator": "specs/project-import/spec-v2.md",
-        "note": "Illustrative current acceptance boundary and product decision history."
-      }
-    ],
-    "related_messages": []
+    "project": "atlas",
+    "objective": "New probe evidence invalidates the required input-size assumption; evaluate the input-size tradeoff and create a new full spec version if the open spec's boundary changes.",
+    "body": "Observed: the newly tested required input exceeded the configured execution timeout (specs/import-feasibility/spec-v2.md#timeout-probe, hypothetical; new since the prior assessment). The affected execution path is paused; unrelated authorized work is unchanged. Option A: reduce the supported first-milestone input size, which keeps the boundary smaller but excludes the larger-input scenario. Option B: keep the requirement and assess background execution, which preserves the scenario but adds processing and status behavior; it has not been assessed and is not a verified solution. Recommendation: evaluate whether the smaller-input milestone is still useful before expanding processing scope. Provide the new version or a bounded research request; terminal go/no-go belongs in metadata with rationale.",
+    "requirements": ["Resolve the larger-input acceptance boundary using the new probe evidence."]
   },
   "reply_expectation": { "window": "medium" }
 }

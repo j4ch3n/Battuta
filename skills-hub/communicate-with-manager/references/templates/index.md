@@ -17,8 +17,8 @@ adapt its JSON rather than sending fictional evidence unchanged.
 
 ## Before sending
 
-Use the `project-management` skill when resolving current artifact locations. Lead with the action needed; retain detailed evidence in referenced artifacts. Include every content field, using `[]`/`null` for unused sections. A non-null `request` needs a reply expectation. The response window is not an implementation deadline.
+Use the `project-management` skill when resolving current artifact locations. Lead with the action needed in `objective`; retain detailed evidence in referenced artifacts. Omit optional fields you do not use. `requirements` mark a message that asks for action and need a reply expectation. The response window is not an implementation deadline.
 
-For replies, copy the actual incoming `message_ref` into `parent`; sample UUIDs/IDs are illustrative. One direct reply is allowed per message. After a progress reply, later mail is a new send with `related_messages`.
+For replies, copy the actual incoming `message_ref` into `parent`; sample UUIDs/IDs are illustrative. One direct reply is allowed per message. After a progress reply, later mail is a new send with `related_messages`. A `complete` result covers each request requirement by its position in a passed, evidence-backed check.
 
 CoS saves complete spec versions and records go/no-go with rationale using the authoring and decision tools available to CoS. Use the `project-management` skill for managed document authoring and product decisions. A recorded decision alone does not require mail. Outstanding requests still need answers, and affected active work needs actionable context.

@@ -11,31 +11,12 @@ Tool: `send_agent_message`. Replace the example spec location and earlier messag
   "recipient": "manager",
   "message_type": "chat",
   "content": {
-    "schema_version": 1,
-    "summary": "Reassess import execution limits for the newly required larger input.",
-    "context": [
-      "The first milestone still covers one project and a final success or failure result.",
-      "The required input size changed; bulk import, retries, and live progress remain deferred.",
-      "Reassessment only; do not implement or introduce infrastructure."
-    ],
-    "findings": [],
-    "options": [],
-    "recommendation": null,
-    "request": {
-      "action": "Check only the changed input-size assumption against the current execution path.",
-      "requirements": [
-        "Identify whether the changed input requirement fits existing execution limits, with evidence.",
-        "Recommend the smallest scope adjustment or bounded probe if it does not."
-      ],
-      "expected_response": "Return the changed feasibility conclusion, evidence, and remaining uncertainty."
-    },
-    "result": null,
-    "uncertainties": [],
-    "references": [
-      {
-        "locator": "specs/project-import/spec-v2.md",
-        "note": "Illustrative revised input-size requirement; use the saved current version."
-      }
+    "project": "atlas",
+    "objective": "Reassess import execution limits for the newly required larger input. Check only the changed input-size assumption against the current execution path.",
+    "body": "The first milestone still covers one project and a final success or failure result. The required input size changed; bulk import, retries, and live progress remain deferred. Reassessment only; do not implement or introduce infrastructure. Revised requirement: specs/project-import/spec-v2.md (illustrative; use the saved current version). Return the changed feasibility conclusion, evidence, and remaining uncertainty.",
+    "requirements": [
+      "Identify whether the changed input requirement fits existing execution limits, with evidence.",
+      "Recommend the smallest scope adjustment or bounded probe if it does not."
     ],
     "related_messages": [
       {

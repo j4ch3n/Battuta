@@ -7,66 +7,30 @@ const object = <P extends TProperties>(properties: P, description?: string) =>
   Type.Object(properties, { additionalProperties: false, ...(description ? { description } : {}) });
 const array = <T extends TSchema>(item: T, description: string, maxItems = 30) =>
   Type.Array(item, { maxItems, description });
-const nullable = <T extends TSchema>(item: T) => Type.Union([item, Type.Null()]);
 
-const reference = object({
-  locator: text(
-    "Real evidence location: URL, repository path, commit hash, or identifiable decision record.",
-    2000,
-  ),
-  note: text("What this source establishes.", 1000),
-});
-const references = () =>
-  array(reference, "Supporting evidence. Use [] when no evidence is available.", 10);
 const messageReference = object({
   conversation_id: Type.String({ format: "uuid" }),
   id: Type.String({ pattern: "^[a-f0-9]{12}$" }),
 });
+const optional = <T extends TSchema>(item: T) => Type.Optional(item);
 const content = object(
   {
-    schema_version: Type.Literal(1),
-    summary: text("Lead with the main finding, request, decision, or outcome.", 2000),
-    context: array(
-      text("Background, intended behavior, scope boundaries, constraints, or authorization."),
-      "Relevant context; no ticket or title is required.",
+    project: text("Project name this message is about.", 200),
+    ticket: optional(text("Ticket identifier, when one exists.", 100)),
+    objective: text(
+      "The ask, or the outcome being reported, in one or two sentences. Lead with it.",
+      2000,
     ),
-    findings: array(
-      object({
-        statement: text("What is known. Do not present inference as confirmation."),
-        basis: Type.Union(
-          [Type.Literal("observed"), Type.Literal("confirmed"), Type.Literal("inferred")],
-          { description: "Distinguish observations, confirmed information, and inference." },
-        ),
-        evidence: references(),
-      }),
-      "Established findings and their sources.",
+    body: optional(
+      text("Supporting evidence, background, risks, or recommendation. Omit when not needed."),
     ),
-    options: array(
-      object({
-        description: text("A concrete alternative."),
-        benefits: array(text("Benefit of this alternative."), "Benefits."),
-        drawbacks: array(text("Drawback or consequence of this alternative."), "Drawbacks."),
-      }),
-      "Alternatives worth comparing. Use [] when comparison is unnecessary.",
-      5,
-    ),
-    recommendation: nullable(
-      text("Preferred next step and rationale; null when no recommendation is needed."),
-    ),
-    request: nullable(
-      object(
-        {
-          action: text("Specific action or focused question for the recipient."),
-          requirements: array(
-            text("Observable requirement. Preserve this wording in result.checks.expectation."),
-            "Requirements the action must satisfy. These are not permission to expand scope.",
-          ),
-          expected_response: text("What the recipient should report back."),
-        },
-        "Use null when no action or answer is requested. A request requires a reply expectation.",
+    requirements: optional(
+      array(
+        text("Observable requirement the recipient must satisfy."),
+        "Present when this message asks for action or an answer; it needs a reply expectation. Numbered from 1 by position.",
       ),
     ),
-    result: nullable(
+    result: optional(
       object(
         {
           state: Type.Union(
@@ -76,50 +40,38 @@ const content = object(
                 "State of the requested action, not automatically product acceptance or release.",
             },
           ),
-          accomplished: array(
-            text("Work or investigation actually accomplished."),
-            "Verified accomplishments.",
-          ),
-          remaining: array(
-            text("Remaining work or blocker."),
-            "Remaining work. Must be empty for complete.",
-          ),
           checks: array(
             object({
-              expectation: text(
-                "Expectation checked. Copy the original request requirement exactly when reporting its coverage.",
-              ),
-              required: Type.Boolean({
-                description: "Whether this check is required for completion.",
+              req: Type.Integer({
+                minimum: 1,
+                description: "Position (from 1) of the request requirement this check covers.",
               }),
               result: Type.Union(
                 [Type.Literal("passed"), Type.Literal("failed"), Type.Literal("not_verified")],
                 { description: "Actual verification result." },
               ),
-              explanation: text("What was checked and any limits of the verification."),
-              evidence: references(),
+              evidence: optional(
+                text(
+                  "Real evidence: URL, repository path, commit hash, or record. Required to pass.",
+                ),
+              ),
             }),
-            "Requirement coverage, tests, and review evidence.",
+            "Coverage of the original request's requirements.",
           ),
+          blocker: optional(text("What blocks the work. Required when blocked.")),
         },
-        "Use null when this message is not reporting an outcome.",
+        "Present when this message reports an outcome.",
       ),
     ),
-    uncertainties: array(
-      object({
-        description: text("Assumption, unanswered question, risk, or blocker."),
-        impact: text("How this uncertainty affects the work or decision."),
-      }),
-      "Unresolved information and its impact.",
-    ),
-    references: references(),
-    related_messages: array(
-      messageReference,
-      "Earlier exchanges this builds on. Include the original request when reporting its result; this does not replace the reply parent.",
-      10,
+    related_messages: optional(
+      array(
+        messageReference,
+        "Earlier exchanges this builds on. Include the original request when reporting its result; this does not replace the reply parent.",
+        10,
+      ),
     ),
   },
-  "One shared content contract for CoS and Manager. Include every field; use [] or null for unused sections.",
+  "One shared content contract for every bot. Omit unused optional fields.",
 );
 
 export const MessageContentSchema = content;
@@ -135,45 +87,36 @@ export function validateContent(content: MessageContent) {
   }
   const result = content.result;
   if (!result) return;
-  if (result.state === "blocked" && !result.remaining.length && !content.uncertainties.length) {
-    throw new Error("result.state blocked requires a blocker in remaining or uncertainties");
+  if (result.state === "blocked" && !result.blocker) {
+    throw new Error("result.state blocked requires result.blocker");
   }
   if (result.state !== "complete") return;
-  if (!result.accomplished.length || result.remaining.length) {
-    throw new Error("result.state complete requires accomplishments and no remaining work");
-  }
-  const required = result.checks.filter((check) => check.required);
-  if (
-    !required.length ||
-    required.some((check) => check.result !== "passed" || !check.evidence.length)
-  ) {
+  if (result.checks.some((check) => check.result !== "passed" || !check.evidence)) {
     throw new Error(
-      "result.state complete requires passing, evidence-backed required checks; otherwise report in_progress or blocked",
+      "result.state complete requires every check passed with evidence; otherwise report in_progress or blocked",
     );
   }
 }
 
 export function validateExpectation(content: MessageContent, expectsReply: boolean) {
   validateContent(content);
-  if (content.request !== null && !expectsReply)
-    throw new Error("content.request requires a non-null reply_expectation");
+  if (content.requirements && !expectsReply)
+    throw new Error("content.requirements requires a non-null reply_expectation");
 }
 
 export function validateCoverage(content: MessageContent, requests: MessageContent[]) {
   if (content.result?.state !== "complete") return;
   for (const request of requests) {
-    for (const requirement of request.request?.requirements ?? []) {
+    (request.requirements ?? []).forEach((requirement, index) => {
       if (
-        !content.result.checks.some(
-          (check) =>
-            check.expectation === requirement &&
-            check.required &&
-            check.result === "passed" &&
-            check.evidence.length,
+        !content.result!.checks.some(
+          (check) => check.req === index + 1 && check.result === "passed" && check.evidence,
         )
       ) {
-        throw new Error(`result.checks must cover the request requirement exactly: ${requirement}`);
+        throw new Error(
+          `result.checks must cover request requirement ${index + 1} with a passed, evidenced check: ${requirement}`,
+        );
       }
-    }
+    });
   }
 }
