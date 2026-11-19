@@ -20,7 +20,7 @@ Agent mail is for internal coordination; use the connected Telegram tool when a 
 
 ## Send a request
 
-Use `send_agent_message` for a new exchange. Choose the recipient, explain the action and expected answer, and include the context needed to act. The tool describes the content fields; unused lists are empty and unused sections are null.
+Use `send_agent_message` for a new exchange. Choose the recipient, explain the action and expected answer, and include the context needed to act. The tool describes the content fields: `project` and `objective` are required, and unused optional fields are omitted.
 
 For example, the Chief of Staff can ask the Manager to inspect delivery behavior:
 
@@ -29,21 +29,10 @@ For example, the Chief of Staff can ask the Manager to inspect delivery behavior
   "recipient": "manager",
   "message_type": "chat",
   "content": {
-    "schema_version": 1,
-    "summary": "Explain when incoming mail is marked read.",
-    "context": ["We need to distinguish receipt from acceptance into the agent conversation."],
-    "findings": [],
-    "options": [],
-    "recommendation": null,
-    "request": {
-      "action": "Inspect incoming mail delivery.",
-      "requirements": ["Explain when a message is marked read."],
-      "expected_response": "Report the finding with supporting evidence."
-    },
-    "result": null,
-    "uncertainties": [],
-    "references": [],
-    "related_messages": []
+    "project": "battuta",
+    "objective": "Explain when incoming mail is marked read, distinguishing receipt from acceptance into the agent conversation.",
+    "body": "Inspect incoming mail delivery and report the finding with supporting evidence.",
+    "requirements": ["Explain when a message is marked read."]
   },
   "reply_expectation": { "window": "medium" }
 }
@@ -65,28 +54,13 @@ The Manager could answer the request above with the following call. The parent s
   },
   "message_type": "chat",
   "content": {
-    "schema_version": 1,
-    "summary": "Mail is marked read after Pi accepts it, rather than on socket receipt.",
-    "context": [],
-    "findings": [
-      {
-        "statement": "The message_start handler acknowledges acceptance of agent mail.",
-        "basis": "observed",
-        "evidence": [
-          {
-            "locator": "agent-mail/index.ts",
-            "note": "The acceptance handler invokes the read acknowledgement."
-          }
-        ]
-      }
-    ],
-    "options": [],
-    "recommendation": null,
-    "request": null,
-    "result": null,
-    "uncertainties": [],
-    "references": [],
-    "related_messages": []
+    "project": "battuta",
+    "objective": "Mail is marked read after Pi accepts it, rather than on socket receipt.",
+    "body": "Observed: the message_start handler acknowledges acceptance of agent mail (agent-mail/index.ts, the acceptance handler invokes the read acknowledgement).",
+    "result": {
+      "state": "complete",
+      "checks": [{ "req": 1, "result": "passed", "evidence": "agent-mail/index.ts" }]
+    }
   },
   "reply_expectation": null
 }

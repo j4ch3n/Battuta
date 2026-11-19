@@ -23,7 +23,7 @@ test("programmatic worker report reaches Manager through the existing mail contr
       recipientRole: "manager",
       conversationId,
       content: content("Assignment blocked", {
-        result: { state: "blocked", accomplished: [], remaining: ["Missing input"], checks: [] },
+        result: { state: "blocked", checks: [], blocker: "Missing input" },
       }),
     });
     const stored = await row(ref);

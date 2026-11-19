@@ -64,7 +64,7 @@ test("invalid role, identity, or content never reaches the transport", async () 
     { recipientRole: "bad name" },
     { recipientRole: input.senderRole },
     { conversationId: "bad" },
-    { content: { ...input.content, summary: " " } },
+    { content: { ...input.content, objective: " " } },
   ]) {
     await expect(
       sendProgrammaticMail(client(invoke), { ...input, ...patch }),

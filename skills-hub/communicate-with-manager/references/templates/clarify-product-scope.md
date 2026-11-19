@@ -14,25 +14,9 @@ Tool: `reply_agent_message`. Replace `parent` with the actual incoming `message_
   },
   "message_type": "chat",
   "content": {
-    "schema_version": 1,
-    "summary": "The current acceptance boundary requires manual retry; automatic retry is deferred.",
-    "context": [
-      "The spec now requires an explicit user action before retrying a failed import.",
-      "This answers the retry-behavior question; it does not authorize implementation."
-    ],
-    "findings": [],
-    "options": [],
-    "recommendation": null,
-    "request": null,
-    "result": null,
-    "uncertainties": [],
-    "references": [
-      {
-        "locator": "specs/project-import/spec-v2.md#functional-requirements",
-        "note": "Illustrative revised retry requirement; use the actual saved spec location."
-      }
-    ],
-    "related_messages": []
+    "project": "atlas",
+    "objective": "The current acceptance boundary requires manual retry; automatic retry is deferred.",
+    "body": "The spec now requires an explicit user action before retrying a failed import. This answers the retry-behavior question; it does not authorize implementation. Saved at specs/project-import/spec-v2.md#functional-requirements (illustrative; use the actual saved spec location)."
   },
   "reply_expectation": null
 }

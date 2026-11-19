@@ -23,23 +23,17 @@ const intent = {
 
 test("final send and reply validation accepts bounded memory briefs and rejects oversized post-hook content", () => {
   const prepared = requestContent("Compare calendar tooling");
-  prepared.context.push(
-    "memory-context:ready; confirmed owner constraint: minimize ongoing maintenance",
-  );
-  prepared.references.push({
-    locator: `memory:${"a".repeat(64)}`,
-    note: "Selected scoped constraint",
-  });
+  prepared.body = `memory-context:ready; confirmed owner constraint: minimize ongoing maintenance; memory:${"a".repeat(64)}`;
   const send = { ...intent, content: prepared, reply_expectation: { window: "medium" } };
-  assert.equal(sendRequest(agent, send).content.references[0].locator, `memory:${"a".repeat(64)}`);
+  assert.equal(sendRequest(agent, send).content.body, prepared.body);
   const reply = {
     parent: { conversation_id: randomUUID(), id: "a7c91e3b4d62" },
     message_type: "chat",
     content: prepared,
     reply_expectation: { window: "medium" },
   };
-  assert.equal(replyRequest(agent, reply).content.context[0], prepared.context[0]);
-  prepared.context.push("x".repeat(4001));
+  assert.equal(replyRequest(agent, reply).content.body, prepared.body);
+  prepared.body = "x".repeat(4001);
   assert.throws(() => sendRequest(agent, send));
   assert.throws(() => replyRequest(agent, reply));
 });
@@ -77,12 +71,13 @@ test("strict LLM schemas reject malformed, coerced, omitted and injected fields"
     { ...intent, content: { content: " \n" } },
     { ...intent, content: { content: "x".repeat(16001) } },
     { ...intent, content: { content: "Valid", extra: true } },
-    { ...intent, content: { ...intent.content, summary: " \n" } },
-    { ...intent, content: { ...intent.content, summary: "x".repeat(2001) } },
+    { ...intent, content: { ...intent.content, objective: " \n" } },
+    { ...intent, content: { ...intent.content, objective: "x".repeat(2001) } },
+    { ...intent, content: { ...intent.content, project: "" } },
     { ...intent, content: { ...intent.content, subject: "Invented title" } },
     { ...intent, content: { ...intent.content, kind: "technical_request" } },
-    { ...intent, content: { ...intent.content, schema_version: 2 } },
-    { ...intent, content: { ...intent.content, request: { action: "Investigate" } } },
+    { ...intent, content: { ...intent.content, requirements: [" "] } },
+    { ...intent, content: { ...intent.content, result: { state: "complete" } } },
     { recipient: "manager", message_type: "chat", content: { content: "missing expectation" } },
   ])
     assert.throws(() => sendRequest(agent, bad));
@@ -153,22 +148,24 @@ test("one role-independent schema requires explicit requests and evidence-backed
     sendRequest({ ...agent, role: "manager" }, { ...intent, recipient: "cos", content: done }),
   );
   validateCoverage(done, [ask.content]);
+  assert.throws(() =>
+    validateCoverage({ ...done, result: { state: "complete", checks: [] } }, [ask.content]),
+  );
   assert.throws(
-    () => validateCoverage(done, [requestContent("Assess", ["A missing expectation"])]),
+    () =>
+      validateCoverage(done, [
+        requestContent("Assess", ["Use existing infrastructure", "A missing expectation"]),
+      ]),
     /missing expectation/,
   );
   for (const bad of [
-    content("Blocked", {
-      result: { state: "blocked", accomplished: [], remaining: [], checks: [] },
-    }),
-    { ...done, result: { ...done.result!, remaining: ["Review pending"] } },
-    { ...done, result: { ...done.result!, checks: [] } },
+    content("Blocked", { result: { state: "blocked", checks: [] } }),
     {
       ...done,
       result: { ...done.result!, checks: [{ ...done.result!.checks[0], result: "failed" }] },
     },
-    { ...done, result: { ...done.result!, checks: [{ ...done.result!.checks[0], evidence: [] }] } },
-    content("Oversized", { context: Array(30).fill("x".repeat(4000)) }),
+    { ...done, result: { ...done.result!, checks: [{ req: 1, result: "passed" }] } },
+    content("Oversized", { body: "x".repeat(4001) }),
   ])
     assert.throws(() => sendRequest(agent, { ...intent, content: bad }));
 });

@@ -14,94 +14,17 @@ Tool: `reply_agent_message`. This is a **fictional completed assessment**, paire
   },
   "message_type": "chat",
   "content": {
-    "schema_version": 1,
-    "summary": "Prefer single-project import as milestone 1; execution feasibility still needs a focused probe.",
-    "context": [
-      "The scope assessment is complete. This does not claim the feature is feasible, implemented, or authorized for execution."
-    ],
-    "findings": [
-      {
-        "statement": "The reviewed proposal combines single import, bulk processing, retry policy, and live progress.",
-        "basis": "observed",
-        "evidence": [
-          {
-            "locator": "specs/import-feasibility/spec-v1.md#scope-review",
-            "note": "Hypothetical inspected proposal inventory and dependency review."
-          }
-        ]
-      },
-      {
-        "statement": "A single-project outcome provides a smaller acceptance boundary while preserving the core user achievement.",
-        "basis": "inferred",
-        "evidence": []
-      }
-    ],
-    "options": [
-      {
-        "description": "Milestone 1: import one project and show a final result.",
-        "benefits": ["Provides an independently testable user outcome."],
-        "drawbacks": ["Users import individually and handle failures manually; no live progress."]
-      },
-      {
-        "description": "Deliver single import, bulk processing, automatic retries, and live progress together.",
-        "benefits": ["Provides the full proposed workflow."],
-        "drawbacks": ["Adds interacting behaviors to verify before the first usable outcome."]
-      }
-    ],
-    "recommendation": "Select the smaller milestone provisionally; verify execution limits before implementation. Treat deferred capabilities as later proposals, not commitments.",
-    "request": null,
+    "project": "atlas",
+    "objective": "Prefer single-project import as milestone 1; execution feasibility still needs a focused probe.",
+    "body": "Observed: the proposal combines single import, bulk processing, retry policy, and live progress (specs/import-feasibility/spec-v1.md#scope-review, hypothetical). Inferred: a single-project outcome gives a smaller acceptance boundary while keeping the core achievement. Milestone 1 is independently testable but users import individually, handle failures manually, and get no live progress; the full proposal gives the whole workflow but adds interacting behaviors to verify first. Recommendation: select the smaller milestone provisionally and treat deferred capabilities as later proposals, not commitments. Unknown: execution limits are unmeasured for the required input size, so a bounded probe is needed before implementation. This assessment does not claim the feature is feasible, implemented, or authorized.",
     "result": {
       "state": "complete",
-      "accomplished": [
-        "Compared scope alternatives and documented a milestone recommendation with evidence limits."
-      ],
-      "remaining": [],
       "checks": [
-        {
-          "expectation": "Compare a smaller milestone with the full proposal.",
-          "required": true,
-          "result": "passed",
-          "explanation": "Compared single-project import with the complete proposed workflow.",
-          "evidence": [
-            {
-              "locator": "specs/import-feasibility/spec-v1.md#scope-review",
-              "note": "Hypothetical comparison of scope alternatives."
-            }
-          ]
-        },
-        {
-          "expectation": "Identify the achievement, deferred scope, and consequences of deferral.",
-          "required": true,
-          "result": "passed",
-          "explanation": "Identified the final import outcome, deferred features, and manual handling consequences.",
-          "evidence": [
-            {
-              "locator": "specs/import-feasibility/spec-v1.md#scope-review",
-              "note": "Hypothetical achievement and deferral analysis."
-            }
-          ]
-        },
-        {
-          "expectation": "Separate evidence-backed findings from assumptions and unresolved feasibility questions.",
-          "required": true,
-          "result": "passed",
-          "explanation": "Separated the proposal inventory, inferred milestone value, and unverified execution limits.",
-          "evidence": [
-            {
-              "locator": "specs/import-feasibility/spec-v1.md#scope-review",
-              "note": "Hypothetical evidence and uncertainty register."
-            }
-          ]
-        }
+        { "req": 1, "result": "passed", "evidence": "specs/import-feasibility/spec-v1.md#scope-review" },
+        { "req": 2, "result": "passed", "evidence": "specs/import-feasibility/spec-v1.md#scope-review" },
+        { "req": 3, "result": "passed", "evidence": "specs/import-feasibility/spec-v1.md#scope-review" }
       ]
     },
-    "uncertainties": [
-      {
-        "description": "Execution limits have not been measured against the required input size.",
-        "impact": "Implementation feasibility remains unknown; a bounded execution probe is needed."
-      }
-    ],
-    "references": [],
     "related_messages": [
       { "conversation_id": "550e8400-e29b-41d4-a716-446655440000", "id": "a7c91e3b4d62" }
     ]
@@ -112,4 +35,4 @@ Tool: `reply_agent_message`. This is a **fictional completed assessment**, paire
 
 ## Adaptation and next step
 
-Copy the actual CoS request requirements verbatim into required checks. If a required assessment action is unfinished or lacks evidence, report `in_progress`/`blocked` instead. Uncertainty about future implementation can remain after an assessment whose explicit deliverable was identifying that uncertainty. CoS decides and records the scope; no separate decision acknowledgment is needed.
+Cover each requirement of the CoS request by its position, with real evidence. If a required assessment action is unfinished or lacks evidence, report `in_progress` or `blocked` instead. Uncertainty about future implementation can remain after an assessment whose explicit deliverable was identifying that uncertainty. CoS decides and records the scope; no separate decision acknowledgment is needed.
