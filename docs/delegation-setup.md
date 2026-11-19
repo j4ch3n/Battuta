@@ -40,68 +40,45 @@ is not already registered; an existing entry is kept. The server is never added 
 
 ## Working directory for assignment runs
 
-A worker's Claude Code run for an assignment starts with `delegate_claude_assignment` (not the
-generic `delegate` tool, which is blocked for `harness` `claude`). Its working directory is:
+The worker manifest lists `pi-harness-delegate` under `[packages] pi_library`: Pi installs it but does not
+load its own extension. The worker extension loads it instead and runs its `delegate` tool with the
+assignment's project as the working directory, for every harness. A run starts in:
 
-- the worktree the assignment brief supplies, when the worker passes it as `worktree`
-  (an absolute path, a real directory, a git worktree of the same repository as the project
-  code folder, listed by `git worktree list`, and not inside another project's folder); otherwise
-- the project's registered code folder, `~/.battuta/projects/<project>/code`, which must be a
-  real directory next to a `project.yaml`.
+- the worktree the assignment brief supplies, passed as the tool's optional `worktree` (an absolute path
+  that `git worktree list` shows for the project's code folder); otherwise
+- the project's registered code folder, `~/.battuta/projects/<project>/code`, which must be a real
+  directory next to a `project.yaml`.
 
-So a run loads that folder's `CLAUDE.md`, `.claude/` settings, agents, skills and plugins.
-Claude Code also loads the folder's `AGENTS.md`, but only as a fallback when neither the folder nor
-any directory above it has a `CLAUDE.md` or `CLAUDE.local.md` (the folder case observed with Claude
-Code 2.1.327; the ancestor rule is from the official documentation). A project that has a `CLAUDE.md` does not also
-get its `AGENTS.md` loaded unless `CLAUDE.md` imports it. The user-level `~/.claude` configuration
-(or `$CLAUDE_CONFIG_DIR`) is shared by every run on the host; it is not isolated per project.
+Everything else in the package behaves as documented: modes and templates (including the worker's own,
+where `{{cwd}}` is that folder), run records, transcripts and budgets. `/delegate` typed by a person
+still runs in the worker's own directory. A session that is not bound to an assignment, or a project or
+worktree that cannot be validated, fails before anything starts; no default directory is used. A bot
+without the package, such as the influencer, has no `delegate` tool.
 
-Battuta does not itself scan or block the ancestor folders of a run's working directory. Claude Code
-does: it loads `CLAUDE.md` and `CLAUDE.local.md` from the working directory and every directory above
-it at launch ([Claude Code memory documentation](https://code.claude.com/docs/en/memory); a live probe
-on Claude Code 2.1.327 read a parent's `CLAUDE.md` from a child working directory). For a project code
-folder, the ancestors are `~/.battuta/projects/<project>`, `~/.battuta/projects`, `~/.battuta`, the home
-directory and above. On 2026-11-19 none of them contained a `CLAUDE.md` (checked read-only; `/etc/claude-code`
-has none either). Adding one there would be loaded by every project's runs and would break project
-isolation, so project instructions belong in the project's code folder only.
+The harness loads the folder's own configuration: Claude Code reads its `CLAUDE.md` (or `AGENTS.md` when
+neither the folder nor any directory above it has a `CLAUDE.md`), `.claude/` settings, hooks and agents. That
+configuration runs with the worker's privileges, so register only projects the host operator trusts.
+Claude Code also reads `CLAUDE.md` from every directory above the working directory, so none should
+exist in `~/.battuta/projects`, `~/.battuta` or the home directory: it would apply to every project.
 
-The Claude routing block is a routing rule, not an enforcement boundary. The worker's `bash` tool can
-still run `claude` directly in any directory; the tool hook blocks only the generic `delegate` and
-the deprecated `claude_delegate` alias for Claude. See [workers](workers.md) for the trust boundary.
-
-A run whose folder or worktree cannot be validated fails before Claude starts, with a message
-naming the project and the folder or worktree; no default directory is used. Manual `/delegate`
-use and scheduled runs are unchanged. Other harnesses keep using the generic `delegate` tool.
+The worker extension imports the package's entry point from `<agentDir>/npm/node_modules/` and wraps the
+`delegate` and deprecated `claude_delegate` tools by name. Recheck both after changing the package pin.
 
 ## Permissions
 
-Runs use the `edit` tier for implementing and `readonly` for planning and review. `edit` maps to
-Claude Code's `acceptEdits` mode, which is pending owner confirmation. A
+Runs use the `edit` tier for implementing and `readonly` for planning and review. A
 shell command Claude Code does not pre-approve (for example `npm`) is denied and the run
 continues; the worker sees it in the run's permission denials and reports a blocker.
 Project-level Claude settings are ignored for an untrusted workspace, so to pre-approve
 commands the host operator must add them to the user-level Claude Code settings or trust
 the worker workspace deliberately. `danger` is never used by workers.
 
-## Known limitations
-
-- The `edit` tier (`acceptEdits`) is pending owner confirmation; see Permissions above.
-- A non-zero Claude exit after a parsed result is treated as a failure and the report is dropped
-  (cost, permission denials, working directory). Files may already have changed in edit mode, so
-  check the checkout before retrying; the error includes the session id.
-- The output-overflow stop kills only the Claude process, not its children, so tool processes it
-  started may keep running.
-- The spawned Claude process inherits the worker's environment, including any `GIT_*` variables such
-  as `GIT_DIR` or `GIT_WORK_TREE`. Only Battuta's own working-directory git checks use a sanitized
-  environment.
-- The Claude tool is registered only when the `delegate` tool is already present at session start.
-  This was verified for Pi 1.5.2; no test runs real Pi, so a loader change would not be caught.
-
 ## Installation checks: no model calls
 
 ```sh
 command -v claude && claude --version
 test -f bots/worker/.pi/npm/node_modules/pi-harness-delegate/package.json
+grep -q '"extensions": \[\]' bots/worker/.pi/settings.json
 test -f "$HOME/.battuta/pi-bots/worker-1/.pi/delegate/templates/claude/implement.md"
 test -f "$HOME/.battuta/pi-bots/worker-1/.pi/delegate/templates/claude/review.md"
 test -f "$HOME/.battuta/pi-bots/worker-1/.pi/delegate/templates/claude/plan.md"

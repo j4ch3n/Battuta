@@ -34,7 +34,15 @@ class Identity(Section):
 
 class Packages(Section):
     pi: list[str] = Field(default_factory=list)
+    # Installed Pi packages whose own extension Pi must not load; a Battuta extension imports them instead.
+    pi_library: list[str] = Field(default_factory=list)
     node_projects: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def library_is_installed(self):
+        if not set(self.pi_library) <= set(self.pi):
+            raise ValueError("pi_library entries must also be listed in pi")
+        return self
 
 
 class FileSource(Section):

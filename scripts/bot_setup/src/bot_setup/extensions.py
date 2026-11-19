@@ -14,7 +14,10 @@ def profile_settings(manifest: BotManifest, *, browser: bool = False) -> dict:
     if manifest.bot is None:
         raise click.ClickException("Bot identity is required for profile settings")
     settings = {
-        "packages": manifest.packages.pi.copy(),
+        "packages": [
+            {"source": package, "extensions": []} if package in manifest.packages.pi_library else package
+            for package in manifest.packages.pi
+        ],
         "battutaMemoryCapture": {"enabled": manifest.bot.role == "cos", "batchMessages": 6},
     }
     if browser:

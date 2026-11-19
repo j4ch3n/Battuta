@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
-import { isAbsolute, join, resolve, sep } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -24,11 +24,6 @@ export const runGit: GitRunner = async (args, cwd) =>
       env: sanitizedGitEnv(process.env),
     })
   ).stdout;
-
-export interface DelegationCwd {
-  cwd: string;
-  source: "code-folder" | "worktree";
-}
 
 const PREFIX = "Delegation cannot start";
 
@@ -74,58 +69,20 @@ export async function resolveCodeFolder(projectsRoot: string, project: string): 
   return code;
 }
 
-async function gitLine(args: string[], cwd: string, git: GitRunner): Promise<string> {
-  return (await git(args, cwd)).trim();
-}
-
 /**
- * Validates an explicitly supplied worktree for `project`. It must be an absolute real directory, the
- * top of a git checkout, a checkout of the same repository as the project's code folder, and listed by
- * `git worktree list` there. A worktree inside another registered project's folder is refused.
+ * Validates a worktree supplied for `project`: an absolute path that resolves to a checkout listed by
+ * `git worktree list` in the project's code folder, which also makes it a checkout of the same repository.
  */
 async function validateWorktree(
   worktree: string,
   project: string,
   codeFolder: string,
-  projectsRoot: string,
   git: GitRunner,
 ): Promise<string> {
-  if (!isAbsolute(worktree) || /\p{Cc}/u.test(worktree))
-    refuse(`worktree "${worktree}" must be an absolute path`);
-  if (resolve(worktree) !== worktree)
-    refuse(`worktree "${worktree}" must not contain "." or ".." segments or a trailing separator`);
-  const info = await lstatOrNull(worktree);
-  if (!info) refuse(`worktree "${worktree}" for project "${project}" does not exist`);
-  if (info.isSymbolicLink()) refuse(`worktree "${worktree}" must not be a symbolic link`);
-  if (!info.isDirectory()) refuse(`worktree "${worktree}" is not a directory`);
-  const real = await fs.realpath(worktree);
-  if (real !== worktree)
-    refuse(`worktree "${worktree}" must be given by its real path (it resolves to ${real})`);
-
-  for (const entry of await fs.readdir(projectsRoot, { withFileTypes: true })) {
-    if (entry.name === project || !entry.isDirectory()) continue;
-    const other = join(projectsRoot, entry.name);
-    if (worktree === other || worktree.startsWith(other + sep))
-      refuse(
-        `worktree "${worktree}" lies inside project "${entry.name}" and cannot run for "${project}"`,
-      );
-  }
-
-  const codeCommon = await gitLine(
-    ["rev-parse", "--path-format=absolute", "--git-common-dir"],
-    codeFolder,
-    git,
-  ).catch(() => refuse(`code folder of project "${project}" is not a git checkout`));
-  const top = await gitLine(["rev-parse", "--show-toplevel"], worktree, git).catch(() => "");
-  if (top !== real) refuse(`worktree "${worktree}" is not the top of a git checkout`);
-  const worktreeCommon = await gitLine(
-    ["rev-parse", "--path-format=absolute", "--git-common-dir"],
-    worktree,
-    git,
-  ).catch(() => "");
-  if (!worktreeCommon || (await fs.realpath(worktreeCommon)) !== (await fs.realpath(codeCommon)))
-    refuse(`worktree "${worktree}" belongs to a different repository than project "${project}"`);
-
+  if (!isAbsolute(worktree)) refuse(`worktree "${worktree}" must be an absolute path`);
+  const real = await fs
+    .realpath(worktree)
+    .catch(() => refuse(`worktree "${worktree}" for project "${project}" does not exist`));
   const listing = await git(["worktree", "list", "--porcelain"], codeFolder).catch(() =>
     refuse(`git worktree list failed for project "${project}" code folder`),
   );
@@ -134,29 +91,21 @@ async function validateWorktree(
     .filter((line) => line.startsWith("worktree "))
     .map((line) => line.slice("worktree ".length));
   if (!listed.includes(real))
-    refuse(`worktree "${worktree}" is not listed by git worktree list for project "${project}"`);
+    refuse(`worktree "${worktree}" is not a git worktree of project "${project}"`);
   return real;
 }
 
 /**
- * The working directory for a worker-started Claude Code run: the supplied worktree when one is given
- * and valid, otherwise the project's code folder. Throws before anything is spawned; never falls back.
+ * The working directory for a worker-started delegate run: the supplied worktree when one is given and
+ * valid, otherwise the project's code folder. Throws before anything starts; never falls back.
  */
 export async function resolveDelegationCwd(input: {
   project: string;
   worktree?: string;
   projectsRoot: string;
   git?: GitRunner;
-}): Promise<DelegationCwd> {
-  const git = input.git ?? runGit;
+}): Promise<string> {
   const codeFolder = await resolveCodeFolder(input.projectsRoot, input.project);
-  if (input.worktree === undefined) return { cwd: codeFolder, source: "code-folder" };
-  const cwd = await validateWorktree(
-    input.worktree,
-    input.project,
-    codeFolder,
-    input.projectsRoot,
-    git,
-  );
-  return { cwd, source: "worktree" };
+  if (input.worktree === undefined) return codeFolder;
+  return validateWorktree(input.worktree, input.project, codeFolder, input.git ?? runGit);
 }

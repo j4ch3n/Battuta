@@ -1,38 +1,22 @@
-import type {
-  ExtensionAPI,
-  ExtensionCommandContext,
-  ExtensionContext,
+import {
+  getAgentDir,
+  type ExtensionAPI,
+  type ExtensionCommandContext,
+  type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { createClient } from "@supabase/supabase-js";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createAssignmentClient } from "./client.ts";
-import {
-  claudeDelegationBlock,
-  claudeDelegationRedirect,
-  delegationCatalog,
-  renderDelegationSection,
-} from "./delegation.ts";
-import { DelegateClaudeParams, delegateClaudeForAssignment } from "./claude-run.ts";
+import { delegationCatalog, renderDelegationSection } from "./delegation.ts";
 import { createCoordinator } from "./coordinator.ts";
-import { ExecutionResultSchema, parseAbilities, parseBinding } from "./contracts.ts";
+import { ExecutionResultSchema, currentBinding, parseAbilities } from "./contracts.ts";
+import { registerProjectDelegate } from "./project-delegate.ts";
 import { createNotifier } from "./notify.ts";
 import { ensureAssignmentWorkspace } from "./workspace.ts";
 import type { AssignmentClient, Coordinator, Detail } from "./types.ts";
 
-/** The project of this session's assignment binding; refuses when the session is not bound. */
-function boundProject(ctx: Pick<ExtensionContext, "sessionManager">): string {
-  const entry = [...ctx.sessionManager.getEntries()]
-    .reverse()
-    .find((entry) => entry.type === "custom" && entry.customType === "assignment-binding");
-  if (entry?.type !== "custom")
-    throw new Error(
-      "Delegation cannot start: this session is not bound to an assignment, so no project folder can be resolved. No default directory is used.",
-    );
-  return parseBinding(entry.data, ctx.sessionManager.getSessionFile() ?? "").project;
-}
-
-export default function worker(pi: ExtensionAPI) {
+export default async function worker(pi: ExtensionAPI) {
   let coordinator: Coordinator | undefined, client: AssignmentClient | undefined;
   let db: ReturnType<typeof createClient> | undefined,
     timer: ReturnType<typeof setInterval> | undefined;
@@ -59,40 +43,25 @@ export default function worker(pi: ExtensionAPI) {
       };
     },
   });
-  pi.on("tool_call", (event) => {
-    // The deprecated `claude_delegate` alias always runs Claude, so it is blocked outright.
-    if (event.toolName === "claude_delegate")
-      return { block: true, reason: claudeDelegationRedirect };
-    if (event.toolName !== "delegate") return;
-    const reason = claudeDelegationBlock(event.input);
-    if (reason) return { block: true, reason };
-  });
   pi.registerCommand("worker-next", {
     description: "Reconcile worker availability without invoking a model",
     async handler(_args, ctx) {
       if (stopped || !coordinator || !ctx.isIdle() || ctx.hasPendingMessages()) return;
       command = ctx;
       if (!restored) {
-        const entry = [...ctx.sessionManager.getEntries()]
-          .reverse()
-          .find((entry) => entry.type === "custom" && entry.customType === "assignment-binding");
-        if (entry?.type === "custom") {
-          const binding = parseBinding(entry.data, ctx.sessionManager.getSessionFile() ?? "");
-          restored = true;
+        const binding = currentBinding(ctx);
+        restored = true;
+        if (binding) {
           await coordinator.restoreBinding(binding);
           return;
         }
-        restored = true;
       }
       await coordinator.reconcile("idle");
     },
   });
   pi.on("before_agent_start", (event) => {
-    // Only bots that have a delegation tool may be told to use one (the Claude tool exists only beside `delegate`).
-    const delegation = pi
-      .getAllTools()
-      .some((tool) => tool.name === "delegate" || tool.name === "delegate_claude_assignment");
-    if (!delegation) return;
+    // Only bots that install the delegate tool may be told to use it.
+    if (!pi.getAllTools().some((tool) => tool.name === "delegate")) return;
     event.systemPromptOptions.sections["delegation-models"] = renderDelegationSection(
       delegationCatalog(process.env),
     );
@@ -111,33 +80,6 @@ export default function worker(pi: ExtensionAPI) {
     }
     const capabilities = [...parseAbilities(values)];
     context = ctx;
-    // Only bots with the generic delegate package get the Claude tool; the influencer installs no package.
-    const delegation = pi.getAllTools().some((tool) => tool.name === "delegate");
-    if (delegation)
-      pi.registerTool({
-        name: "delegate_claude_assignment",
-        label: "Delegate to Claude Code for assignment",
-        description:
-          "Run one headless Claude Code task for the bound assignment. Its working directory is the project's code folder, or the worktree the assignment brief supplies. Fails before starting Claude when that folder cannot be resolved.",
-        parameters: DelegateClaudeParams,
-        async execute(_id, params, signal, _onUpdate, toolCtx) {
-          const report = await delegateClaudeForAssignment(
-            { ...params, project: boundProject(toolCtx), signal },
-            { projectsRoot: join(homedir(), ".battuta", "projects"), env: process.env },
-          );
-          return {
-            content: [{ type: "text", text: report.text }],
-            details: {
-              cwd: report.cwd,
-              source: report.source,
-              sessionId: report.sessionId,
-              totalCostUsd: report.totalCostUsd,
-              numTurns: report.numTurns,
-              permissionDenials: report.permissionDenials,
-            },
-          };
-        },
-      });
     pi.setActiveTools([
       "codemode",
       "Agent",
@@ -156,7 +98,6 @@ export default function worker(pi: ExtensionAPI) {
       // Only installed tools activate: `delegate` comes from the general worker's package, not the influencer's.
       "delegate",
       "delegate_modes",
-      ...(delegation ? ["delegate_claude_assignment"] : []),
       "send_agent_message",
       "reply_agent_message",
       "mcp__assignments__list_assignments",
@@ -272,5 +213,10 @@ export default function worker(pi: ExtensionAPI) {
     await coordinator?.stop();
     await db?.removeAllChannels();
     await client?.close();
+  });
+  // Last: everything above registers synchronously, and loading the delegate package awaits.
+  await registerProjectDelegate(pi, {
+    agentDir: getAgentDir(),
+    projectsRoot: join(homedir(), ".battuta", "projects"),
   });
 }

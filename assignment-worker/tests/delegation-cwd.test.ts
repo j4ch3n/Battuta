@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -18,37 +17,20 @@ const resolve = (project: string, worktree?: string) =>
   resolveDelegationCwd({ project, worktree, projectsRoot: fixture.projectsRoot });
 
 test("without a worktree the cwd is the project's code folder", async () => {
-  expect(await resolve("atlas")).toEqual({
-    cwd: join(fixture.projectsRoot, "atlas", "code"),
-    source: "code-folder",
-  });
+  expect(await resolve("atlas")).toBe(join(fixture.projectsRoot, "atlas", "code"));
 });
 
-test("a valid worktree of the project's repository replaces the code folder as cwd", async () => {
-  expect(await resolve("atlas", fixture.atlasWorktree)).toEqual({
-    cwd: fixture.atlasWorktree,
-    source: "worktree",
-  });
+test("a worktree of the project's repository replaces the code folder as cwd", async () => {
+  expect(await resolve("atlas", fixture.atlasWorktree)).toBe(fixture.atlasWorktree);
 });
 
 test("the code folder of each project is resolved from that project only", async () => {
-  expect((await resolve("bravo")).cwd).toBe(join(fixture.projectsRoot, "bravo", "code"));
+  expect(await resolve("bravo")).toBe(join(fixture.projectsRoot, "bravo", "code"));
 });
 
 test("a worktree of another project's repository is rejected", async () => {
   await expect(resolve("atlas", fixture.bravoWorktree)).rejects.toThrow(
-    `worktree "${fixture.bravoWorktree}" belongs to a different repository than project "atlas"`,
-  );
-});
-
-test("a worktree placed inside another project's folder is rejected", async () => {
-  const inside = join(fixture.projectsRoot, "bravo", "side-atlas");
-  await fs.rm(inside, { recursive: true, force: true });
-  execFileSync("git", ["worktree", "add", "-q", "-b", "side-atlas", inside], {
-    cwd: fixture.atlasCode,
-  });
-  await expect(resolve("atlas", inside)).rejects.toThrow(
-    `worktree "${inside}" lies inside project "bravo" and cannot run for "atlas"`,
+    `worktree "${fixture.bravoWorktree}" is not a git worktree of project "atlas"`,
   );
 });
 
@@ -88,11 +70,8 @@ test.each(["", "..", "../atlas", "atlas/../bravo", "/", "/x/../y"])(
 test.each([
   ["a relative path", "relative/worktree"],
   ["an empty string", ""],
-  ["a path with traversal", "/x/../y"],
-  ["a path with a trailing separator", "/tmp/worktree/"],
-  ["a path with a control character", `${"/tmp/x"}\n`],
-])("an invalid worktree (%s) fails before any cwd is returned", async (_label, worktree) => {
-  await expect(resolve("atlas", worktree)).rejects.toThrow("Delegation cannot start");
+])("a worktree given as %s is refused before any cwd is returned", async (_label, worktree) => {
+  await expect(resolve("atlas", worktree)).rejects.toThrow("must be an absolute path");
 });
 
 test("a worktree that does not exist fails clearly", async () => {
@@ -102,31 +81,29 @@ test("a worktree that does not exist fails clearly", async () => {
   );
 });
 
-test("a plain directory that is not a git checkout is refused", async () => {
-  const plain = join(fixture.home, "plain");
-  await fs.mkdir(plain);
-  await expect(resolve("atlas", plain)).rejects.toThrow("is not the top of a git checkout");
-});
-
-test("a subdirectory of a worktree is not accepted as the worktree", async () => {
-  const sub = join(fixture.atlasWorktree, "README.md");
-  await expect(resolve("atlas", sub)).rejects.toThrow("is not a directory");
-  const dir = join(fixture.atlasWorktree, "nested");
-  await fs.mkdir(dir);
-  await expect(resolve("atlas", dir)).rejects.toThrow("is not the top of a git checkout");
-});
-
-test("a symlink to a valid worktree is refused", async () => {
-  const link = join(fixture.home, "link-to-worktree");
-  await fs.symlink(fixture.atlasWorktree, link);
-  await expect(resolve("atlas", link)).rejects.toThrow("must not be a symbolic link");
+test.each([
+  [
+    "a plain directory",
+    async () => (await fs.mkdir(join(fixture.home, "plain")), join(fixture.home, "plain")),
+  ],
+  [
+    "a subdirectory of a worktree",
+    async () => (
+      await fs.mkdir(join(fixture.atlasWorktree, "nested")),
+      join(fixture.atlasWorktree, "nested")
+    ),
+  ],
+])("%s is not accepted as a worktree", async (_label, make) => {
+  const path = await make();
+  await expect(resolve("atlas", path)).rejects.toThrow(
+    `worktree "${path}" is not a git worktree of project "atlas"`,
+  );
 });
 
 test("a code folder that is not a git checkout cannot validate a worktree", async () => {
-  const code = join(fixture.projectsRoot, "bravo", "code");
-  await fs.rm(join(code, ".git"), { recursive: true, force: true });
+  await fs.rm(join(fixture.bravoCode, ".git"), { recursive: true, force: true });
   await expect(resolve("bravo", fixture.bravoWorktree)).rejects.toThrow(
-    'code folder of project "bravo" is not a git checkout',
+    'git worktree list failed for project "bravo"',
   );
 });
 
@@ -136,10 +113,7 @@ test("the git checks ignore GIT_* variables that redirect them to another reposi
   vi.stubEnv("GIT_COMMON_DIR", bravoGit);
   vi.stubEnv("GIT_WORK_TREE", fixture.bravoCode);
   vi.stubEnv("GIT_INDEX_FILE", join(bravoGit, "index"));
-  expect(await resolve("atlas", fixture.atlasWorktree)).toEqual({
-    cwd: fixture.atlasWorktree,
-    source: "worktree",
-  });
+  expect(await resolve("atlas", fixture.atlasWorktree)).toBe(fixture.atlasWorktree);
 });
 
 test("sanitizedGitEnv removes every GIT_ variable and keeps the rest", () => {

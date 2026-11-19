@@ -124,7 +124,7 @@ class WorkerLauncherTests(unittest.TestCase):
             settings = json.loads((bot / ".pi/settings.json").read_text())
             self.assertEqual(settings["defaultThinkingLevel"], manifest.defaults.thinking)
             self.assertNotIn("extensions", settings)
-            self.assertEqual(settings["packages"], manifest.packages.pi)
+            self.assertEqual([entry["source"] if isinstance(entry, dict) else entry for entry in settings["packages"]], manifest.packages.pi)
             self.assertEqual((profile / ".pi/extensions/assignment-worker.ts").resolve(), source)
             self.assertFalse((bot / "AGENTS.md").exists())
             self.assertEqual((bot / ".pi/mcp.json").read_bytes(), (profile / ".pi/mcp.json").read_bytes())
