@@ -70,7 +70,7 @@ class WorkerSetupTests(unittest.TestCase):
         self.assertIn('skills: ["research"]', researcher)
         self.assertIn('extensions: ["pi-web-access"]', researcher)
         self.assertFalse((self.profile / ".pi/agents/reviewer.md").exists())
-        self.assertIn("npm:pi-harness-delegate@0.9.0", settings["packages"])
+        self.assertIn({"source": "npm:pi-harness-delegate@0.9.0", "extensions": []}, settings["packages"])
         self.assertTrue((Path(os.environ["CLAUDE_CONFIG_DIR"]) / "skills/research/SKILL.md").is_file())
 
     def test_invalid_subagent_configuration_fails_before_install_or_writes(self):
@@ -178,7 +178,7 @@ class WorkerSetupTests(unittest.TestCase):
             self.assertEqual(settings["pi-browser-use"]["userDataDir"], str(bot / ".pi/browser-research"))
             self.assertTrue(all(Path(value).exists() for value in settings["extensions"]))
             self.assertTrue(all((Path(value) / "SKILL.md").is_file() for value in settings["skills"]))
-            self.assertTrue(all(value.startswith("npm:") for value in settings["packages"]))
+            self.assertTrue(all(entry["source"].startswith("npm:") if isinstance(entry, dict) else entry.startswith("npm:") for entry in settings["packages"]))
             self.assertEqual(json.loads((bot / ".pi/web-search.json").read_text()), {"fetchContent": {"userAgent": "fixture mobile browser"}})
             self.assertFalse((bot / ".pi/auth.json").exists())
             self.assertFalse((bot / ".pi/models.json").exists())
@@ -257,7 +257,7 @@ class WorkerSetupTests(unittest.TestCase):
         configure_worker(second, bot_dir=self.bot)
         configured = json.loads(settings_path.read_text())
         for key in ("packages", "skills"):
-            paths = [path for path in configured[key] if path != "/private/custom.ts"]
+            paths = [path["source"] if isinstance(path, dict) else path for path in configured[key] if path != "/private/custom.ts"]
             self.assertTrue(paths)
             self.assertTrue(all(path.startswith("npm:") or Path(path).is_relative_to(second) for path in paths), paths)
         self.assertIn("/private/custom.ts", configured["extensions"])

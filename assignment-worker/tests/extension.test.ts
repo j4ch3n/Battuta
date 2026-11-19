@@ -67,7 +67,7 @@ test.each(["worker-1", "worker-2"])(
       { execute: (id: string, args: { abilities: string[] }) => Promise<unknown> }
     >();
     let next: (_args: string, ctx: ExtensionContext) => Promise<void>;
-    worker({
+    await worker({
       on: (name: string, fn: unknown) => handlers.set(name, fn as never),
       registerTool: (tool: { name: string; execute: never }) => tools.set(tool.name, tool),
       sendMessage,
@@ -147,7 +147,7 @@ test.each([undefined, "", " "])(
     vi.useFakeTimers();
     vi.stubEnv("AGENT_ID", name);
     const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
-    worker({
+    await worker({
       on: (event: string, handler: never) => handlers.set(event, handler),
       registerTool: vi.fn(),
       registerCommand: vi.fn(),
@@ -170,7 +170,7 @@ test.each([undefined, "", " "])(
 async function promptSections(toolNames: string[]) {
   vi.stubEnv("MODEL_FOR_EASY_TASKS", "anthropic/claude-easy-test");
   const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => unknown>();
-  worker({
+  await worker({
     on: (event: string, handler: never) => handlers.set(event, handler),
     registerTool: vi.fn(),
     registerCommand: vi.fn(),
@@ -210,7 +210,7 @@ test("a bound native extension dispatches its TODO through Pi without a host sen
   >();
   const setActiveTools = vi.fn();
   let next: (_args: string, ctx: ExtensionContext) => Promise<void>;
-  worker({
+  await worker({
     on: (name: string, fn: unknown) => handlers.set(name, fn as never),
     registerTool: (tool: { name: string; execute: never }) => tools.set(tool.name, tool),
     registerCommand: (_name: string, options: { handler: typeof next }) => {
@@ -287,7 +287,7 @@ test.each([
   vi.stubEnv("BATTUTA_WORKER_CAPABILITIES", value);
   const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
   const sendMessage = vi.fn();
-  worker({
+  await worker({
     on: (name: string, fn: unknown) => handlers.set(name, fn as never),
     registerTool: vi.fn(),
     registerCommand: vi.fn(),

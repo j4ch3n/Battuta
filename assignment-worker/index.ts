@@ -1,7 +1,8 @@
-import type {
-  ExtensionAPI,
-  ExtensionCommandContext,
-  ExtensionContext,
+import {
+  getAgentDir,
+  type ExtensionAPI,
+  type ExtensionCommandContext,
+  type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { createClient } from "@supabase/supabase-js";
 import { homedir } from "node:os";
@@ -9,12 +10,13 @@ import { join } from "node:path";
 import { createAssignmentClient } from "./client.ts";
 import { delegationCatalog, renderDelegationSection } from "./delegation.ts";
 import { createCoordinator } from "./coordinator.ts";
-import { ExecutionResultSchema, parseAbilities, parseBinding } from "./contracts.ts";
+import { ExecutionResultSchema, currentBinding, parseAbilities } from "./contracts.ts";
+import { registerProjectDelegate } from "./project-delegate.ts";
 import { createNotifier } from "./notify.ts";
 import { ensureAssignmentWorkspace } from "./workspace.ts";
 import type { AssignmentClient, Coordinator, Detail } from "./types.ts";
 
-export default function worker(pi: ExtensionAPI) {
+export default async function worker(pi: ExtensionAPI) {
   let coordinator: Coordinator | undefined, client: AssignmentClient | undefined;
   let db: ReturnType<typeof createClient> | undefined,
     timer: ReturnType<typeof setInterval> | undefined;
@@ -47,16 +49,12 @@ export default function worker(pi: ExtensionAPI) {
       if (stopped || !coordinator || !ctx.isIdle() || ctx.hasPendingMessages()) return;
       command = ctx;
       if (!restored) {
-        const entry = [...ctx.sessionManager.getEntries()]
-          .reverse()
-          .find((entry) => entry.type === "custom" && entry.customType === "assignment-binding");
-        if (entry?.type === "custom") {
-          const binding = parseBinding(entry.data, ctx.sessionManager.getSessionFile() ?? "");
-          restored = true;
+        const binding = currentBinding(ctx);
+        restored = true;
+        if (binding) {
           await coordinator.restoreBinding(binding);
           return;
         }
-        restored = true;
       }
       await coordinator.reconcile("idle");
     },
@@ -215,5 +213,10 @@ export default function worker(pi: ExtensionAPI) {
     await coordinator?.stop();
     await db?.removeAllChannels();
     await client?.close();
+  });
+  // Last: everything above registers synchronously, and loading the delegate package awaits.
+  await registerProjectDelegate(pi, {
+    agentDir: getAgentDir(),
+    projectsRoot: join(homedir(), ".battuta", "projects"),
   });
 }

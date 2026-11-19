@@ -53,7 +53,9 @@ dependencies. No raw extension source or development symlinks ship.
 Pi discovers these project-local extensions directly. Neither generated settings
 nor launch arguments register them again. MCP and codemode use Pi's built-in
 extensions rather than paths into `node_modules`. Third-party Pi packages remain
-declared in `[packages].pi` and installed through Pi.
+declared in `[packages].pi` and installed through Pi. A package also listed in
+`[packages].pi_library` is installed but written to settings without loading its own
+extension, so a repository extension can import and wrap it.
 
 Setup generates each profile's `.pi/settings.json` from its manifest and role
 defaults. These files and development extension links are Git-ignored, not

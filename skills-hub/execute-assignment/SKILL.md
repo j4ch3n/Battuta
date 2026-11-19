@@ -128,6 +128,9 @@ claim tokens are supplied automatically; do not include them in this report.
 
 Use Manager's supplied worktree after checking its repository identity, read the
 named PRD and ticket evidence, and report the requested change with actual checks.
+`delegate` runs in the assignment project's code folder; when the brief names a worktree,
+pass its absolute path as `worktree`. A refused run is a blocker to report, not a reason
+to delegate from another directory.
 **Why:** orientation prevents cross-project mistakes without replacing the
 commission or expanding authority.
 

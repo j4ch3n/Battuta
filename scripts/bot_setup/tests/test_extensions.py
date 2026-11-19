@@ -104,6 +104,23 @@ def test_duplicate_names_are_rejected():
         )
 
 
+def test_library_packages_are_installed_but_their_own_extensions_are_not_loaded():
+    manifest = parse_manifest(
+        '[bot]\nrole="worker"\nenv_prefix="BOT"\n[skills]\ninclude=[]\n'
+        '[packages]\npi=["npm:plain@1","npm:library@2"]\npi_library=["npm:library@2"]\n',
+        Path("bot.toml"),
+    )
+    assert profile_settings(manifest)["packages"] == ["npm:plain@1", {"source": "npm:library@2", "extensions": []}]
+
+
+def test_library_package_must_be_installed():
+    with pytest.raises(click.ClickException):
+        parse_manifest(
+            '[skills]\ninclude=[]\n[packages]\npi=["npm:plain@1"]\npi_library=["npm:other@1"]\n',
+            Path("bot.toml"),
+        )
+
+
 @pytest.mark.parametrize("role", ["cos", "manager", "worker"])
 def test_generated_settings_use_only_manifest_and_role_defaults(role):
     manifest = parse_manifest(

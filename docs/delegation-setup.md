@@ -38,6 +38,32 @@ Code's user configuration (timeout 1020000 ms, above the service's 15-minute blo
 is not already registered; an existing entry is kept. The server is never added to a Pi
 `.pi/mcp.json`. See [document service setup](doc-service-setup.md).
 
+## Working directory for assignment runs
+
+The worker manifest lists `pi-harness-delegate` under `[packages] pi_library`: Pi installs it but does not
+load its own extension. The worker extension loads it instead and runs its `delegate` tool with the
+assignment's project as the working directory, for every harness. A run starts in:
+
+- the worktree the assignment brief supplies, passed as the tool's optional `worktree` (an absolute path
+  that `git worktree list` shows for the project's code folder); otherwise
+- the project's registered code folder, `~/.battuta/projects/<project>/code`, which must be a real
+  directory next to a `project.yaml`.
+
+Everything else in the package behaves as documented: modes and templates (including the worker's own,
+where `{{cwd}}` is that folder), run records, transcripts and budgets. `/delegate` typed by a person
+still runs in the worker's own directory. A session that is not bound to an assignment, or a project or
+worktree that cannot be validated, fails before anything starts; no default directory is used. A bot
+without the package, such as the influencer, has no `delegate` tool.
+
+The harness loads the folder's own configuration: Claude Code reads its `CLAUDE.md` (or `AGENTS.md` when
+neither the folder nor any directory above it has a `CLAUDE.md`), `.claude/` settings, hooks and agents. That
+configuration runs with the worker's privileges, so register only projects the host operator trusts.
+Claude Code also reads `CLAUDE.md` from every directory above the working directory, so none should
+exist in `~/.battuta/projects`, `~/.battuta` or the home directory: it would apply to every project.
+
+The worker extension imports the package's entry point from `<agentDir>/npm/node_modules/` and wraps the
+`delegate` and deprecated `claude_delegate` tools by name. Recheck both after changing the package pin.
+
 ## Permissions
 
 Runs use the `edit` tier for implementing and `readonly` for planning and review. A
@@ -52,6 +78,7 @@ the worker workspace deliberately. `danger` is never used by workers.
 ```sh
 command -v claude && claude --version
 test -f bots/worker/.pi/npm/node_modules/pi-harness-delegate/package.json
+grep -q '"extensions": \[\]' bots/worker/.pi/settings.json
 test -f "$HOME/.battuta/pi-bots/worker-1/.pi/delegate/templates/claude/implement.md"
 test -f "$HOME/.battuta/pi-bots/worker-1/.pi/delegate/templates/claude/review.md"
 test -f "$HOME/.battuta/pi-bots/worker-1/.pi/delegate/templates/claude/plan.md"

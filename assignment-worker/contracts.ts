@@ -1,3 +1,4 @@
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type, type Static, type TSchema } from "typebox";
 import { Format } from "typebox/format";
 import { Value } from "typebox/value";
@@ -20,6 +21,15 @@ const SavedBindingSchema = Type.Object(
 export function parseBinding(value: unknown, sessionFile: string) {
   const saved = parseValue(SavedBindingSchema, value);
   return { ...saved, claimed_by: saved.claimed_by ?? null, session_file: sessionFile };
+}
+/** The latest assignment binding recorded in the session, or undefined when it is not bound. */
+export function currentBinding(ctx: Pick<ExtensionContext, "sessionManager">) {
+  const entry = [...ctx.sessionManager.getEntries()]
+    .reverse()
+    .find((entry) => entry.type === "custom" && entry.customType === "assignment-binding");
+  return entry?.type === "custom"
+    ? parseBinding(entry.data, ctx.sessionManager.getSessionFile() ?? "")
+    : undefined;
 }
 const assignmentStatus = Type.Union([
   Type.Literal("active"),
