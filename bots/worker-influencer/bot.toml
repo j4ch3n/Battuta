@@ -12,11 +12,12 @@ capabilities = ["mobile-control"]
 pi_coding_agent_dir = "{instance}/.pi"
 
 [defaults]
-model = "anthropic/claude-haiku-5-5"
-thinking = "high"
+model = "claude-directsdk/claude-haiku-5-5"
+thinking = "low"
 
 [packages]
 pi = [
+  "npm:pi-claude-directsdk@1.0.2",
   "npm:pi-web-access@0.43.0",
   "npm:pi-droid@0.2.0",
 ]
