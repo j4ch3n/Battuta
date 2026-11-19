@@ -62,6 +62,32 @@ When a worker is blocked or unable, replan one level up with the blocker as
 context; do not skip levels. Reviews of diffs, tests and results are
 assignments too, and use the same reasoning.
 
+## State the work type and review focus
+
+Every assignment names one work type: plan, research, implement or review. The
+worker runs it through its own tools and does not execute it directly. Write the
+objective and acceptance so a separate reviewer can pass or fail each one.
+
+A review assignment names exactly one focus and its pass condition. Other focuses
+are separate assignments, and the author never reviews its own work.
+
+| Focus | Question | Reviewer needs |
+| --- | --- | --- |
+| Spec compliance | Does it do what the brief and PRD asked, nothing missing or extra? | Brief, PRD, acceptance, diff |
+| Correctness and quality | Is it correct, tested and maintainable? | Diff and tests |
+| Verification | Does it run and pass the stated checks? | The checks to run and expected results |
+| Risk and integration | Does the whole milestone fit the system and break nothing else? | Full milestone, neighbouring code |
+
+Scale review to risk: verification alone for trivial work; spec compliance plus
+correctness for normal work; add risk and integration for hard or cross-boundary
+work. End each milestone with its reviews as assignments that depend on the work
+they judge. Read the returned evidence yourself; do not repeat the review.
+
+A failed review becomes a new implement assignment, one difficulty level up with
+the findings as context, then a fresh review of the same focus. Do not reopen the
+old assignment. After a few cycles without progress, escalate to CoS with a
+recommendation.
+
 ## How and why
 
 Plan the next useful milestone from current evidence. When discovery is needed,

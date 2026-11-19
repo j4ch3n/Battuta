@@ -26,8 +26,8 @@ go decision is evidence, not new execution, merge, or publication authority.
 Extension code owns claims, ordered progress, completion, and mandatory Manager
 mail. This skill creates neither a bound task nor access to tools; it does not
 permit direct execution-state writes, owner contact, or new assignments.
-Work run through `delegate` stays within the commission; the bound executor
-retains responsibility for evidence, integration and reporting.
+Work is run through `delegate` and stays within the commission; the bound executor
+supervises it and retains responsibility for evidence, integration and reporting.
 
 ## Orient to the commission
 
@@ -75,15 +75,24 @@ not model actions.
 
 ## Execute, verify, and report
 
-1. Inspect relevant code, documents, and sources beyond suggested keywords when
-   evidence requires it. Use research for external investigation, draft-writing
-   for text drafts, and artifacts for commissioned HTML/visual deliverables and
-   explicitly authorized publication.
-2. Produce the smallest complete deliverable within the brief. For executable
-   changes, write a meaningful failing test first, implement the change, and run
-   relevant regression checks. Verify against the commissioned acceptance;
-   distinguish observed results, inference, missing evidence, and unavailable
-   checks. A blocked check is not a pass.
+1. Turn the TODO into a self-contained `delegate` objective: goal, constraints,
+   exclusions, input paths, acceptance, and the evidence to report. Pick the mode
+   by work type: `plan` when the approach is unclear, `research` for external
+   investigation, `implement` for edits and their checks, `review` for judging
+   finished work. Orientation reading is for writing a good objective, not for
+   doing the work yourself. Use draft-writing for text drafts and artifacts for
+   commissioned HTML/visual deliverables and explicitly authorized publication
+   when the assignment names them; without the `delegate` tool, do the work
+   directly.
+2. Read each run's summary against the TODO and acceptance, and inspect the
+   actual changes when the summary is thin or the stakes are high. Executable
+   changes should be test-first and checked for regressions; make sure the
+   objective asks for that. When the TODO is a review, run one `review` per
+   focus the brief names, each in a fresh session, and do not review work from the
+   session that wrote it. Send failed findings to a new `implement` run, then
+   re-review that focus. Verify against the commissioned acceptance; distinguish
+   observed results, inference, missing evidence, and unavailable checks. A
+   blocked check is not a pass.
 3. Use the `note-taking` skill to prepare or locate notes and follow the tool's
    guidance. Preserve existing material and record concise findings, actual
    verification, and real evidence references, not a tool-call diary. Do not
