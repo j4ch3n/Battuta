@@ -9,6 +9,8 @@ import { memoryMetadataSchema, memoryRefSchema, type MemoryRecord } from "./reco
 import { redact } from "./privacy.ts";
 import { parseModelJson } from "./model-json.ts";
 
+export const CAPTURE_SESSION_ID = "battuta-memory-capture";
+
 const itemSchema = z
   .object({
     content: z.string().trim().min(1).max(1000),
@@ -67,7 +69,7 @@ export async function extractMemories(
           },
         ],
       },
-      { signal },
+      { signal, sessionId: CAPTURE_SESSION_ID },
     ),
     signal,
   );
