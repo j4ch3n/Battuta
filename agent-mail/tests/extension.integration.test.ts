@@ -144,22 +144,15 @@ test("final tool validation rejects oversized post-hook briefs before transport 
       window: "medium",
     });
     validate(SendArguments, args);
-    args.content.context.push("x".repeat(4001));
+    args.content.body = "x".repeat(4001);
     await assert.rejects(cos.execute("send_agent_message", args));
     assert.deepEqual(
       ok(await db.from("agent_messages").select("id").eq("conversation_id", cos.id)),
       [],
     );
-    args.content.context = ["memory-context:ready; owner-confirmed low-maintenance constraint"];
-    args.content.references.push({
-      locator: `memory:${"a".repeat(64)}`,
-      note: "Selected task context",
-    });
+    args.content.body = `memory-context:ready; owner-confirmed low-maintenance constraint; memory:${"a".repeat(64)}`;
     const sent = await cos.execute("send_agent_message", args);
-    assert.deepEqual(
-      (await row(sent.details.message_ref)).content.references,
-      args.content.references,
-    );
+    assert.equal((await row(sent.details.message_ref)).content.body, args.content.body);
   } finally {
     await cos.stop();
     await cleanup([cos.id]);
@@ -327,12 +320,7 @@ test("complete reports cover original requirements, including after an initial p
       parent: ref,
       message_type: "chat",
       content: content("Implementation started", {
-        result: {
-          state: "in_progress",
-          accomplished: ["Reviewed the existing flow"],
-          remaining: ["Implement and verify"],
-          checks: [],
-        },
+        result: { state: "in_progress", checks: [] },
       }),
       reply_expectation: null,
     });

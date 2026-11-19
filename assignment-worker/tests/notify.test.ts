@@ -4,7 +4,7 @@ import { createNotifier } from "../notify.ts";
 import { detail } from "./fixtures.ts";
 
 vi.mock("@battuta/agent-mail/content", () => ({
-  MAX_CONTENT_BYTES: 65536,
+  MAX_BODY_LENGTH: 4000,
   validateContent: vi.fn(),
 }));
 vi.mock("@battuta/agent-mail/schemas", () => ({

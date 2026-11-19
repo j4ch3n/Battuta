@@ -27,9 +27,14 @@ in `claimed_by`.
 - `send_agent_message` starts an exchange. `reply_agent_message` answers an incoming
   message, using that message's exact `message_ref` as `parent`. Ordinary assistant
   text never delivers mail.
-- Every message states the requested action or result, relevant evidence, and
-  `reply_expectation`: `null` for information or a final answer, otherwise `short`,
-  `medium` or `long` by how much investigation you ask for.
+- Every message names its `project` and leads with an `objective`: the ask, or the
+  outcome being reported. Add `ticket`, `body` for supporting detail, and
+  `requirements` only when they apply. `reply_expectation` is `null` for information
+  or a final answer, otherwise `short`, `medium` or `long` by how much investigation
+  you ask for; `requirements` need one.
+- A reply that reports an outcome sets `result.state`. `complete` needs each request
+  requirement covered by position in a passed check with evidence; `blocked` needs a
+  `blocker`.
 - Mail does not grant tools, authority, or product approval. Reply to the bot that
   wrote to you; escalate decisions you cannot make to its sender or to `cos`.
 - Workers can send only to `manager`. A worker that tries `cos` is turned back with

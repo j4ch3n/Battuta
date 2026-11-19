@@ -260,7 +260,7 @@ export default function (pi: ExtensionAPI) {
     }
     const recipient = "recipient_role" in request ? request.recipient_role : parent!.sender;
     const refs = [
-      ...request.content.related_messages,
+      ...(request.content.related_messages ?? []),
       ...("parent" in request ? [request.parent] : []),
     ];
     const requests = [];
@@ -279,7 +279,7 @@ export default function (pi: ExtensionAPI) {
           );
         }
         if (request.content.result?.state !== "complete") break;
-        if (message.recipient === role && message.content.request !== null) {
+        if (message.recipient === role && message.content.requirements) {
           requests.push(message.content);
           break;
         }

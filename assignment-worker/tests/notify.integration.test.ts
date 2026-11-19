@@ -2,7 +2,7 @@ import { expect, test, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildManagerContent, createNotifier } from "../notify.ts";
 import { Content, validate } from "@battuta/agent-mail/schemas";
-import { validateContent, MAX_CONTENT_BYTES } from "@battuta/agent-mail/content";
+import { validateContent, MAX_BODY_LENGTH, MAX_CONTENT_BYTES } from "@battuta/agent-mail/content";
 import { detail } from "./fixtures.ts";
 import type { Detail } from "../types.ts";
 
@@ -31,7 +31,7 @@ test.each(["empty", "unfinished", "cancelled"])(
     else {
       const content = buildManagerContent(d);
       expect(() => validateContent(content)).not.toThrow();
-      expect(content.result?.accomplished.join(" ")).toContain("no completed implementation");
+      expect(content.body).toContain("no completed implementation");
     }
   },
 );
@@ -90,20 +90,12 @@ test.each([false, true])("builds truthful bounded outcome content (blocked=%s)",
   expect(() => validate(Content, content)).not.toThrow();
   expect(() => validateContent(content)).not.toThrow();
   expect(content.result?.state).toBe(blocked ? "blocked" : "complete");
-  if (blocked) expect(content.result?.checks).toEqual([]);
-  else {
-    expect(content.result?.checks).toHaveLength(1);
-    expect(content.result?.checks[0]).toMatchObject({
-      required: true,
-      result: "passed",
-      evidence: [{ locator: `assignment:${d.assignment.id}` }],
-    });
-  }
-  expect(content.result?.remaining.length).toBe(blocked ? 2 : 0);
-  expect(content.references.some((ref) => ref.locator === "tests/proof.ts")).toBe(true);
-  expect(content.context.join(" ")).toContain(d.assignment.id);
-  expect(content.context.join(" ")).toContain("atlas");
-  expect(content.request).toBeNull();
+  expect(content.result?.checks).toEqual([]);
+  expect(content.result?.blocker).toBe(blocked ? "Missing input" : undefined);
+  expect(content.body).toContain("tests/proof.ts");
+  expect(content.body).toContain(d.assignment.id);
+  expect(content.project).toBe("atlas");
+  expect(content.requirements).toBeUndefined();
 });
 
 test("large/control/unicode evidence stays within mail limits without inventing truncated locators", () => {
@@ -121,12 +113,7 @@ test("large/control/unicode evidence stays within mail limits without inventing 
   expect(() => validate(Content, content)).not.toThrow();
   expect(() => validateContent(content)).not.toThrow();
   expect(Buffer.byteLength(JSON.stringify(content))).toBeLessThanOrEqual(MAX_CONTENT_BYTES);
-  for (const ref of content.references)
-    expect(
-      ref.locator.startsWith("assignment:") ||
-        d.todos.some((todo) => todo.evidence.includes(ref.locator)),
-    ).toBe(true);
-  expect(content.context.join(" ")).toMatch(/full|omitted|summari/i);
+  expect(content.body?.length).toBeLessThanOrEqual(MAX_BODY_LENGTH);
 });
 
 test("intent precedes sending and duplicate/concurrent callbacks return one reference", async () => {
