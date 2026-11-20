@@ -36,8 +36,10 @@ The worker delegates planning, implementing and reviewing to headless Claude Cod
 (`economy`, `balanced` or `max`), scope and objective. A session-start prompt section lists
 the tiers from `MODEL_FOR_EASY_TASKS`, `MODEL_FOR_MEDIUM_TASKS` and `MODEL_FOR_HARD_TASKS`
 (`anthropic/<model-id>`); hail-mary work also uses `max`. A tier whose variable is unset
-or not Anthropic is shown as unavailable. The worker reads each run's summary, resumes a
-session only when the objective continues, and starts a fresh session for review.
+or not Anthropic is shown as unavailable. Runs start in the background, one at a time, and the
+worker answers their questions and receives their results as messages while it keeps handling
+mail ([delegation setup](delegation-setup.md#how-runs-execute)). It resumes a session only when
+the objective continues, and starts a fresh session for review.
 
 ## Native Pi lifecycle
 

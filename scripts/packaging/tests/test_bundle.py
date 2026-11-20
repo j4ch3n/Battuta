@@ -71,6 +71,11 @@ def source(tmp_path, monkeypatch):
         for profile in bundle.PROFILES:
             entries = json.loads((destination / "bots" / profile / ".pi/extension-build.json").read_text())
             outputs.extend(f"bots/{profile}/.pi/extensions/{entry['name']}/dist/index.js" for entry in entries)
+            outputs.extend(
+                f"bots/{profile}/.pi/extensions/assignment-worker/dist/claude-proxy.js"
+                for entry in entries
+                if entry["name"] == "assignment-worker"
+            )
         for relative in outputs:
             path = destination / relative
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -175,6 +180,22 @@ def test_memory_release_retains_workspace_overrides(source, tmp_path):
     assert paths
     for path in paths:
         assert json.loads(path.read_text())["pnpm"]["overrides"] == {"example": "1.2.3"}
+
+
+@pytest.mark.parametrize("profile", ["worker", "worker-influencer"])
+def test_worker_releases_ship_the_claude_proxy(source, tmp_path, profile):
+    target = tmp_path / "release"
+    bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
+    assert (target / f"bots/{profile}/.pi/extensions/assignment-worker/dist/claude-proxy.js").is_file()
+
+
+def test_missing_worker_proxy_is_rejected(source, tmp_path):
+    target = tmp_path / "release"
+    bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
+    (target / "bots/worker/.pi/extensions/assignment-worker/dist/claude-proxy.js").unlink()
+    with pytest.raises(click.ClickException) as error:
+        bundle.validate_bundle(target)
+    assert "claude-proxy.js" in str(error.value.__cause__)
 
 
 def test_missing_built_extension_is_rejected(source, tmp_path):

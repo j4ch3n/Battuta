@@ -36,6 +36,10 @@ vi.mock("@supabase/supabase-js", () => ({
     removeAllChannels: backend.remove,
   }),
 }));
+const delegate = vi.hoisted(() => ({ active: false }));
+vi.mock("../project-delegate.ts", () => ({
+  registerProjectDelegate: vi.fn(() => Promise.resolve({ isRunActive: () => delegate.active })),
+}));
 vi.mock("../workspace.ts", () => ({
   ensureAssignmentWorkspace: vi.fn(() =>
     Promise.resolve({
@@ -307,4 +311,65 @@ test.each([
     await handlers.get("session_shutdown")!({}, ctx);
     vi.unstubAllEnvs();
   }
+});
+
+async function bootWorker() {
+  backend.list.mockResolvedValue({ ok: true, assignments: [] });
+  const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
+  const tools = new Map<string, { execute: (id: string, args: unknown) => Promise<unknown> }>();
+  const setActiveTools = vi.fn();
+  let next: (_args: string, ctx: ExtensionContext) => Promise<void> = () => Promise.resolve();
+  await worker({
+    on: (name: string, fn: unknown) => handlers.set(name, fn as never),
+    registerTool: (tool: { name: string; execute: never }) => tools.set(tool.name, tool),
+    sendMessage: vi.fn(),
+    appendEntry: vi.fn(),
+    registerCommand: (_name: string, options: { handler: typeof next }) => {
+      next = options.handler;
+    },
+    sendUserMessage: vi.fn(),
+    setActiveTools,
+  } as unknown as ExtensionAPI);
+  const ctx = {
+    isIdle: () => true,
+    hasPendingMessages: () => false,
+    cwd: "/private/worker",
+    newSession: vi.fn(() => Promise.resolve({ cancelled: false })),
+    sessionManager: { getEntries: () => [], getSessionId: () => crypto.randomUUID() },
+  } as unknown as ExtensionContext;
+  vi.stubEnv("SUPABASE_URL", "http://127.0.0.1:54321");
+  vi.stubEnv("SUPABASE_SECRET_KEY", "local-test-key");
+  await handlers.get("session_start")!({ reason: "startup" }, ctx);
+  return { handlers, tools, setActiveTools, next: () => next("", ctx), ctx };
+}
+
+test("worker-next does nothing while a delegate run is active", async () => {
+  const { next, handlers, ctx } = await bootWorker();
+  delegate.active = true;
+  await next();
+  expect(backend.list).not.toHaveBeenCalled();
+  delegate.active = false;
+  await next();
+  expect(backend.list).toHaveBeenCalledTimes(1);
+  await handlers.get("session_shutdown")!({}, ctx);
+});
+
+test("report_execution_result refuses while a delegate run is active", async () => {
+  const { tools, handlers, ctx } = await bootWorker();
+  delegate.active = true;
+  await expect(
+    tools
+      .get("report_execution_result")!
+      .execute("id", { outcome: "completed", summary: "x", evidence: [] }),
+  ).rejects.toThrow("a Claude run is still active; wait for its finished message or stop it");
+  delegate.active = false;
+  await handlers.get("session_shutdown")!({}, ctx);
+});
+
+test("the delegate control tools are in the active tool list", async () => {
+  const { setActiveTools, handlers, ctx } = await bootWorker();
+  expect(setActiveTools.mock.calls[0][0]).toEqual(
+    expect.arrayContaining(["delegate", "delegate_reply", "delegate_status", "delegate_stop"]),
+  );
+  await handlers.get("session_shutdown")!({}, ctx);
 });

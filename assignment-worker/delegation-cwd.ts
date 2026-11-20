@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
 
@@ -70,19 +71,21 @@ export async function resolveCodeFolder(projectsRoot: string, project: string): 
 }
 
 /**
- * Validates a worktree supplied for `project`: an absolute path that resolves to a checkout listed by
- * `git worktree list` in the project's code folder, which also makes it a checkout of the same repository.
+ * Validates a `cwd` supplied for `project`: an absolute path that resolves to the assignment's work folder, or to
+ * a checkout listed by `git worktree list` in the project's code folder (which includes the code folder itself).
  */
-async function validateWorktree(
-  worktree: string,
+async function validateCwd(
+  cwd: string,
   project: string,
   codeFolder: string,
+  workFolder: string,
   git: GitRunner,
 ): Promise<string> {
-  if (!isAbsolute(worktree)) refuse(`worktree "${worktree}" must be an absolute path`);
+  if (!isAbsolute(cwd)) refuse(`cwd "${cwd}" must be an absolute path`);
   const real = await fs
-    .realpath(worktree)
-    .catch(() => refuse(`worktree "${worktree}" for project "${project}" does not exist`));
+    .realpath(cwd)
+    .catch(() => refuse(`cwd "${cwd}" for project "${project}" does not exist`));
+  if (real === (await fs.realpath(workFolder).catch(() => undefined))) return real;
   const listing = await git(["worktree", "list", "--porcelain"], codeFolder).catch(() =>
     refuse(`git worktree list failed for project "${project}" code folder`),
   );
@@ -91,21 +94,70 @@ async function validateWorktree(
     .filter((line) => line.startsWith("worktree "))
     .map((line) => line.slice("worktree ".length));
   if (!listed.includes(real))
-    refuse(`worktree "${worktree}" is not a git worktree of project "${project}"`);
+    refuse(
+      `cwd "${cwd}" is not the code folder, a worktree, or the assignment work folder of project "${project}"`,
+    );
   return real;
 }
 
 /**
- * The working directory for a worker-started delegate run: the supplied worktree when one is given and
- * valid, otherwise the project's code folder. Throws before anything starts; never falls back.
+ * The working directory for a worker-started delegate run: the supplied `cwd` when it is the assignment's work
+ * folder or a worktree of the project, otherwise the project's code folder. Throws before anything starts; never
+ * falls back. The code and work folders are returned for the run's pre-approved directories.
  */
 export async function resolveDelegationCwd(input: {
   project: string;
-  worktree?: string;
+  assignmentId: string;
+  cwd?: string;
   projectsRoot: string;
   git?: GitRunner;
-}): Promise<string> {
+}): Promise<{ cwd: string; codeFolder: string; workFolder: string }> {
+  // The same assignment id rule as workspace.ts, so the work folder is a direct child of `work/`.
+  if (!/^[0-9a-f]{8}$/.test(input.assignmentId))
+    refuse(`assignment id "${input.assignmentId}" is not valid`);
   const codeFolder = await resolveCodeFolder(input.projectsRoot, input.project);
-  if (input.worktree === undefined) return codeFolder;
-  return validateWorktree(input.worktree, input.project, codeFolder, input.git ?? runGit);
+  const workFolder = join(input.projectsRoot, input.project, "work", input.assignmentId);
+  const cwd =
+    input.cwd === undefined
+      ? codeFolder
+      : await validateCwd(input.cwd, input.project, codeFolder, workFolder, input.git ?? runGit);
+  return { cwd, codeFolder, workFolder };
+}
+
+/** Temp and cache folders Claude Code and the tools it runs commonly write to, on Linux hosts and macOS. */
+export const FIXED_DIRS = (home: string, uid: number): string[] => [
+  tmpdir(),
+  "/tmp",
+  "/var/tmp",
+  "/dev/shm",
+  `/run/user/${uid}`,
+  join(home, ".cache"),
+  join(home, ".local", "share"),
+  join(home, ".npm"),
+  "/private/tmp",
+  "/var/folders",
+  join(home, "Library", "Caches"),
+];
+
+/**
+ * The extra directories a run may use without asking: the project's code and work folders and the fixed temp
+ * and cache folders, resolved through symlinks. Missing entries, duplicates and the run's own cwd are left out.
+ */
+export async function preapprovedDirs(input: {
+  codeFolder: string;
+  workFolder: string;
+  cwd: string;
+  home?: string;
+  uid?: number;
+  candidates?: string[];
+}): Promise<string[]> {
+  const candidates =
+    input.candidates ?? FIXED_DIRS(input.home ?? homedir(), input.uid ?? process.getuid!());
+  const cwd = await fs.realpath(input.cwd);
+  const dirs: string[] = [];
+  for (const dir of [input.codeFolder, input.workFolder, ...candidates]) {
+    const real = await fs.realpath(dir).catch(() => undefined);
+    if (real && real !== cwd && !dirs.includes(real)) dirs.push(real);
+  }
+  return dirs;
 }

@@ -14,8 +14,15 @@ for (const profile of ["cos-bot", "manager-bot", "worker", "worker-influencer"])
   const map = JSON.parse(
     await readFile(join(destination, "bots", profile, ".pi/extension-build.json"), "utf8"),
   );
-  for (const { name, source: entry } of map)
+  for (const { name, source: entry } of map) {
     builds.push({ entry, output: `bots/${profile}/.pi/extensions/${name}/dist/index.js` });
+    // The worker extension runs delegated Claude sessions through this proxy, started from beside its bundle.
+    if (name === "assignment-worker")
+      builds.push({
+        entry: "assignment-worker/claude-proxy.ts",
+        output: `bots/${profile}/.pi/extensions/${name}/dist/claude-proxy.js`,
+      });
+  }
 }
 for (const { entry, output } of builds) {
   const outfile = join(destination, output);

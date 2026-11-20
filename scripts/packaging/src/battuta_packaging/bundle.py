@@ -178,7 +178,9 @@ def validate_bundle(root: Path) -> dict:
             manifest = load_profile(bot / "bot.toml", "worker" if profile.startswith("worker") else profile.removesuffix("-bot"))
             for extension in manifest.extensions:
                 package = bot / ".pi/extensions" / extension.name
-                for name in ("dist/index.js", "package.json", "pnpm-lock.yaml"):
+                # The worker extension starts its Claude proxy from beside its own bundle.
+                outputs = ("dist/claude-proxy.js",) if extension.name == "assignment-worker" else ()
+                for name in ("dist/index.js", *outputs, "package.json", "pnpm-lock.yaml"):
                     path = package / name
                     if path.is_symlink() or not path.is_file():
                         raise ValueError(f"extension: {path}")

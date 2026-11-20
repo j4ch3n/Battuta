@@ -42,6 +42,8 @@ def installed(tmp_path):
             package = bot / ".pi/extensions" / extension["name"]
             (package / "dist").mkdir(parents=True)
             (package / "dist/index.js").write_text("export default () => {}")
+            if extension["name"] == "assignment-worker":
+                (package / "dist/claude-proxy.js").write_text("")
             (package / "package.json").write_text("{}")
             (package / "pnpm-lock.yaml").write_text("")
         (bot / "AGENTS.md").write_text("instructions")

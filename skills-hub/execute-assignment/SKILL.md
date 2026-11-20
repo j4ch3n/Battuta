@@ -84,6 +84,20 @@ not model actions.
    commissioned HTML/visual deliverables and explicitly authorized publication
    when the assignment names them; without the `delegate` tool, do the work
    directly.
+   - Set `cwd` to the commissioned worktree or this assignment's work folder, or
+     omit it for the project code folder.
+   - `delegate` starts the run in the background and returns at once. Only one
+     run can be active at a time.
+   - While it runs, keep handling mail and follow-ups. Check progress with
+     `delegate_status` and pass it on to Manager when it matters.
+   - Claude's questions and permission requests arrive as messages. Answer each
+     with `delegate_reply` and its `requestId`. Ask Manager first when the answer
+     needs authority you do not have, and deny anything outside the commission.
+   - To send guidance, such as a Manager follow-up that changes the objective,
+     use `delegate_reply` without a `requestId`.
+   - Stop a run that is going wrong with `delegate_stop`.
+   - The run's result arrives as a finished message. Do not submit
+     `report_execution_result` while a run is active.
 2. Read each run's summary against the TODO and acceptance, and inspect the
    actual changes when the summary is thin or the stakes are high. Executable
    changes should be test-first and checked for regressions; make sure the
@@ -138,11 +152,32 @@ claim tokens are supplied automatically; do not include them in this report.
 
 Use Manager's supplied worktree after checking its repository identity, read the
 named PRD and ticket evidence, and report the requested change with actual checks.
-`delegate` runs in the assignment project's code folder; when the brief names a worktree,
-pass its absolute path as `worktree`. A refused run is a blocker to report, not a reason
-to delegate from another directory.
+A refused `cwd` is a blocker to report, not a reason to delegate from another
+directory.
 **Why:** orientation prevents cross-project mistakes without replacing the
 commission or expanding authority.
+
+Start a new Claude session (omit `sessionId`):
+
+- for the first run of a piece of work;
+- for every `review`, one fresh session per focus, never the session that wrote
+  the work;
+- for a different objective, even within the same TODO;
+- when a session went off track or its context is cluttered;
+- always at the start of a new assignment, because sessions from other
+  assignments are refused.
+
+Reuse a session (pass its `sessionId`, from the run's started or finished message
+or `delegate_status`):
+
+- to continue the same objective, such as `implement` after its own `plan`;
+- to continue a run that ended with open questions, now that you have the
+  answers;
+- to resume a run reported as interrupted after a restart.
+
+A resumed run stays in its original folder, so do not pass a different `cwd`.
+**Why:** a session carries its context forward. That helps the same objective
+and biases a review or a new objective.
 
 Avoid switching to the registered default checkout, adopting unrelated ticket
 scope, or sending “done”/duplicate mail instead of `report_execution_result`.
