@@ -160,3 +160,34 @@ test("a present package logs nothing", async () => {
   const { log } = await install();
   expect(log).not.toHaveBeenCalled();
 });
+
+test("a missing jiti logs at error level and registers nothing, so the rest of the extension still loads", async () => {
+  vi.resetModules();
+  // jiti is unavailable: loading it fails before any package file is read.
+  vi.doMock("jiti", () => ({
+    createJiti: () => {
+      throw new Error("jiti is unavailable");
+    },
+  }));
+  try {
+    const { registerProjectDelegate: loadDelegate } = await import("../project-delegate.ts");
+    const tools = new Map<string, unknown>();
+    const commands: string[] = [];
+    const log = vi.fn();
+    const pi = {
+      registerTool: (tool: { name: string }) => tools.set(tool.name, tool),
+      registerCommand: (name: string) => commands.push(name),
+    } as unknown as ExtensionAPI;
+    await expect(
+      loadDelegate(pi, { profileDir, projectsRoot: fixture.projectsRoot, log }),
+    ).resolves.toBeUndefined();
+    expect(tools.size).toBe(0);
+    expect(commands).toEqual([]);
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log.mock.calls[0][0]).toContain("jiti is unavailable");
+    expect(log.mock.calls[0][0]).toContain("NOT registered");
+  } finally {
+    vi.doUnmock("jiti");
+    vi.resetModules();
+  }
+});

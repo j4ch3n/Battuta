@@ -3,7 +3,6 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { createJiti } from "jiti";
 import { Type } from "typebox";
 import { currentBinding } from "./contracts.ts";
 import { resolveDelegationCwd } from "./delegation-cwd.ts";
@@ -97,11 +96,23 @@ export async function registerProjectDelegate(
     return;
   }
   // Node cannot import a .ts file under node_modules natively, so load it with jiti as pi loads extensions.
-  // fsCache is off so that nothing is written into the installed profile.
-  const jiti = createJiti(import.meta.url, { alias: hostAliases(), fsCache: false });
-  const install = await jiti.import<(pi: ExtensionAPI) => void | Promise<void>>(entry, {
-    default: true,
-  });
+  // jiti is imported here, not at module top, so a missing or broken copy disables delegation only: the rest of
+  // the worker extension (report_execution_result, the coordinator) still loads. fsCache is off so that nothing
+  // is written into the installed profile.
+  let install: (pi: ExtensionAPI) => void | Promise<void>;
+  try {
+    const { createJiti } = await import("jiti");
+    const jiti = createJiti(import.meta.url, { alias: hostAliases(), fsCache: false });
+    install = await jiti.import<(pi: ExtensionAPI) => void | Promise<void>>(entry, {
+      default: true,
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    log(
+      `pi-harness-delegate could not be loaded from ${entry} (${reason}): delegate and delegate_modes are NOT registered, so no delegated run can start.`,
+    );
+    return;
+  }
   await install(
     new Proxy(pi, {
       get(target, property) {
