@@ -44,8 +44,11 @@ export interface ChannelClient {
 }
 
 /** Newline-delimited JSON lines from a socket; lines that are not JSON objects are dropped. */
-function readLines(socket: Socket, handler: (value: Record<string, unknown>) => void) {
-  createInterface({ input: socket }).on("line", (line) => {
+export function readLines(socket: Socket, handler: (value: Record<string, unknown>) => void) {
+  const lines = createInterface({ input: socket });
+  // readline re-emits the socket's errors; the socket's own handler already closes it.
+  lines.on("error", () => {});
+  lines.on("line", (line) => {
     try {
       const value: unknown = JSON.parse(line);
       if (typeof value === "object" && value !== null && !Array.isArray(value))

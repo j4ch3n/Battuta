@@ -1,9 +1,11 @@
 import { promises as fs } from "node:fs";
 import { connect } from "node:net";
+import { PassThrough } from "node:stream";
 import { afterEach, expect, test, vi } from "vitest";
 import {
   connectChannel,
   openChannel,
+  readLines,
   type ChannelServer,
   type ProxyMessage,
 } from "../delegate-channel.ts";
@@ -106,4 +108,13 @@ test("malformed lines and a connection that never says hello are ignored", async
   await settle();
   expect(messages).toEqual([]);
   raw.destroy();
+});
+
+// Linux reports a peer that closes with unread data as ECONNRESET on the socket; the line reader must not
+// re-throw it, or the worker or proxy process crashes.
+test("a read error on the socket does not escape the line reader", () => {
+  const socket = new PassThrough();
+  socket.on("error", () => {});
+  readLines(socket as never, () => {});
+  expect(() => socket.emit("error", new Error("read ECONNRESET"))).not.toThrow();
 });
