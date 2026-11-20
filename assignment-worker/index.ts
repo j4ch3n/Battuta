@@ -24,6 +24,9 @@ export default async function worker(pi: ExtensionAPI) {
   let context: ExtensionContext | undefined, command: ExtensionCommandContext | undefined;
   let stopped = false,
     restored = false;
+  // Set once the delegate package loads (last, below); a run in progress keeps the worker busy.
+  const delegation: { runs?: { isRunActive(): boolean } } = {};
+  const RUN_ACTIVE = "a Claude run is still active; wait for its finished message or stop it";
   const diagnostic = (event: string) => console.error(`[assignment-worker] ${event}`);
   const wake = () => {
     if (!stopped && context?.isIdle() && !context.hasPendingMessages())
@@ -37,6 +40,7 @@ export default async function worker(pi: ExtensionAPI) {
     parameters: ExecutionResultParameters,
     async execute(_id, value) {
       if (!coordinator || stopped) throw new Error("Worker execution is not available");
+      if (delegation.runs?.isRunActive()) throw new Error(RUN_ACTIVE);
       const result = await coordinator.acceptReport(value);
       return {
         content: [{ type: "text", text: "Report accepted; awaiting final turn settlement." }],
@@ -48,6 +52,8 @@ export default async function worker(pi: ExtensionAPI) {
     description: "Reconcile worker availability without invoking a model",
     async handler(_args, ctx) {
       if (stopped || !coordinator || !ctx.isIdle() || ctx.hasPendingMessages()) return;
+      // An idle worker supervising a Claude run is not available: reconciling could replace its session.
+      if (delegation.runs?.isRunActive()) return;
       command = ctx;
       if (!restored) {
         const binding = currentBinding(ctx);
@@ -104,6 +110,9 @@ export default async function worker(pi: ExtensionAPI) {
       // Only installed tools activate: `delegate` comes from the general worker's package, not the influencer's.
       "delegate",
       "delegate_modes",
+      "delegate_reply",
+      "delegate_status",
+      "delegate_stop",
       "send_agent_message",
       "reply_agent_message",
       "mcp__assignments__list_assignments",
@@ -221,7 +230,7 @@ export default async function worker(pi: ExtensionAPI) {
     await client?.close();
   });
   // Last: everything above registers synchronously, and loading the delegate package awaits.
-  await registerProjectDelegate(pi, {
+  delegation.runs = await registerProjectDelegate(pi, {
     // dist/index.js sits in <profile>/.pi/extensions/assignment-worker/dist, so the profile's .pi directory is three levels up.
     profileDir: join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."),
     projectsRoot: join(homedir(), ".battuta", "projects"),
