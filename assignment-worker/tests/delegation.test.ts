@@ -1,5 +1,9 @@
 import { expect, test } from "vitest";
-import { delegationCatalog, renderDelegationSection } from "../delegation.ts";
+import {
+  delegationCatalog,
+  delegationPromptSection,
+  renderDelegationSection,
+} from "../delegation.ts";
 
 test.each([
   ["MODEL_FOR_EASY_TASKS", "economy"],
@@ -44,4 +48,13 @@ test("section lists usable models, flags unusable variables and omits absent tie
   expect(section).toContain("MODEL_FOR_MEDIUM_TASKS");
   expect(section).not.toContain("model-medium");
   expect(section).not.toContain("MODEL_FOR_HARD_TASKS");
+});
+
+test("the delegation prompt section is present only when the delegate tool is registered", () => {
+  const env = { MODEL_FOR_EASY_TASKS: "anthropic/claude-haiku-5-5" };
+  const section = delegationPromptSection(["read", "delegate", "delegate_modes"], env);
+  expect(section).toBe(renderDelegationSection(delegationCatalog(env)));
+  expect(section).toContain("- economy: --model claude-haiku-5-5");
+  expect(delegationPromptSection(["read", "bash", "delegate_modes"], env)).toBeUndefined();
+  expect(delegationPromptSection([], env)).toBeUndefined();
 });
