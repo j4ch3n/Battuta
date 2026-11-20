@@ -42,17 +42,34 @@ is not already registered; an existing entry is kept. The server is never added 
 
 The worker manifest lists `pi-harness-delegate` under `[packages] pi_library`: Pi installs it but does not
 load its own extension. The worker extension loads it instead and runs its `delegate` tool with the
-assignment's project as the working directory, for every harness. A run starts in:
+assignment's project as the working directory, for every harness. The tool's optional `cwd` (an absolute
+path) selects one of:
 
-- the worktree the assignment brief supplies, passed as the tool's optional `worktree` (an absolute path
-  that `git worktree list` shows for the project's code folder); otherwise
 - the project's registered code folder, `~/.battuta/projects/<project>/code`, which must be a real
-  directory next to a `project.yaml`.
+  directory next to a `project.yaml` (the default when `cwd` is omitted);
+- a worktree that `git worktree list` shows for that code folder;
+- the bound assignment's work folder, `~/.battuta/projects/<project>/work/<assignment_id>`.
+
+Any other folder is refused before anything starts. A resumed session (`sessionId`) must belong to the
+bound assignment and runs in the folder where it started.
+
+Every run also gets these directories pre-approved, so edits and path-checked commands in them need no
+permission request. Entries are resolved to real paths, and entries missing on the host are skipped, so
+one list serves Linux hosts and macOS development hosts. `XDG_*` variables are not read.
+
+| Directory                                          | Why                                                                        |
+| -------------------------------------------------- | -------------------------------------------------------------------------- |
+| The project code folder                            | A worktree's git data lives there, so commits from a worktree write to it. |
+| The assignment work folder                         | Deliverables the assignment produces, whatever the run's folder.           |
+| `os.tmpdir()`, `/tmp`, `/var/tmp`                  | Temporary files from test runners, build tools and Claude Code.            |
+| `/dev/shm`, `/run/user/<uid>`                      | Linux shared memory and per-user runtime files (sockets, locks).           |
+| `~/.cache`, `~/.local/share`, `~/.npm`             | Linux tool caches and stores (`uv`, `pip`, Playwright, `pnpm`, `npm`).     |
+| `/private/tmp`, `/var/folders`, `~/Library/Caches` | The macOS equivalents, for development hosts.                              |
 
 Everything else in the package behaves as documented: modes and templates (including the worker's own,
 where `{{cwd}}` is that folder), run records, transcripts and budgets. `/delegate` typed by a person
 still runs in the worker's own directory. A session that is not bound to an assignment, or a project or
-worktree that cannot be validated, fails before anything starts; no default directory is used. A bot
+folder that cannot be validated, fails before anything starts; no default directory is used. A bot
 without the package, such as the influencer, has no `delegate` tool.
 
 The harness loads the folder's own configuration: Claude Code reads its `CLAUDE.md` (or `AGENTS.md` when
@@ -66,11 +83,27 @@ and wraps the `delegate` and deprecated `claude_delegate` tools by name. If the 
 load, the worker logs an error naming the path and registers no delegation tools. Recheck both after changing the
 package pin.
 
+## How runs execute
+
+The worker starts Claude Code through a small proxy shipped beside its extension
+(`dist/claude-proxy.js` in a release, `assignment-worker/claude-proxy.ts` from source), which the
+package runs in place of the `claude` executable. The proxy takes the same arguments and prints the same
+stream output, and connects back to its own worker. A `delegate` call returns once the run has started.
+The worker keeps working while the run continues, and receives its questions, permission requests and
+result as messages. Each worker runs at most one Claude run at a time. `/delegate` typed by a person has
+no worker to answer it, so any request that needs approval is denied at once, as with `claude -p`.
+
 ## Permissions
 
-Runs use the `edit` tier for implementing and `readonly` for planning and review. A
-shell command Claude Code does not pre-approve (for example `npm`) is denied and the run
-continues; the worker sees it in the run's permission denials and reports a blocker.
+Runs use the `edit` tier for implementing and `readonly` for planning and review.
+
+- A readonly run never edits files, whatever the worker answers.
+- A request that is not pre-approved goes to the worker. Examples are a shell command that Claude Code
+  does not allow, a folder outside the pre-approved list, web access, or a question from Claude.
+- An unanswered request is denied after 10 minutes, and the run continues with its best judgment.
+- Extra directories that a model passes in `addDirs` outside the run's folder are refused at once,
+  because no one is there to confirm them.
+
 Project-level Claude settings are ignored for an untrusted workspace, so to pre-approve
 commands the host operator must add them to the user-level Claude Code settings or trust
 the worker workspace deliberately. `danger` is never used by workers.
@@ -89,7 +122,12 @@ test -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/research/SKILL.md"
 ```
 
 Missing output means setup is incomplete; stop rather than starting workers. For releases,
-inspect the equivalent files inside the installation.
+inspect the equivalent files inside the installation, plus the worker's Claude proxy, from the
+installation root:
+
+```sh
+test -f bots/worker/.pi/extensions/assignment-worker/dist/claude-proxy.js
+```
 
 ## Separate manual functional check
 
