@@ -40,3 +40,13 @@ export function renderDelegationSection(entries: CatalogEntry[]): string {
   );
   return lines.join("\n");
 }
+
+/** The delegation prompt section; absent unless the `delegate` tool is registered, so bots without it are never told to use it. */
+export function delegationPromptSection(
+  toolNames: readonly string[],
+  env: Record<string, string | undefined>,
+): string | undefined {
+  return toolNames.includes("delegate")
+    ? renderDelegationSection(delegationCatalog(env))
+    : undefined;
+}

@@ -5,19 +5,21 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { registerProjectDelegate } from "../project-delegate.ts";
 import { createProjectsFixture, type ProjectsFixture } from "./project-fixture.ts";
 
-// A package-local stand-in for pi-harness-delegate's entry point: it registers the tools the real one does
-// and reports the cwd and parameters each run tool receives.
+// A package-local stand-in for pi-harness-delegate's entry point: it is TypeScript with a runtime import of a
+// pi peer (as the real package has), registers the tools the real one does, and reports the cwd and parameters
+// each run tool receives.
 const FAKE_PACKAGE = `
-export default function (pi) {
+import { visibleWidth } from "@earendil-works/pi-tui";
+export default function (pi: any) {
   for (const name of ["delegate", "claude_delegate", "delegate_modes"])
     pi.registerTool({
       name,
       label: name,
       description: name + " tool.",
       parameters: { type: "object", properties: { task: { type: "string" } }, required: ["task"] },
-      execute: async (_id, params, _signal, _update, ctx) => ({
+      execute: async (_id: string, params: object, _signal: unknown, _update: unknown, ctx: any) => ({
         content: [{ type: "text", text: "ok" }],
-        details: { cwd: ctx.cwd, params, hasUI: ctx.hasUI },
+        details: { cwd: ctx.cwd, params, hasUI: ctx.hasUI, peerWidth: visibleWidth("abc") },
       }),
     });
   pi.registerCommand("delegate", { description: "status", handler: async () => {} });
@@ -25,11 +27,11 @@ export default function (pi) {
 `;
 
 let fixture: ProjectsFixture;
-let agentDir: string;
+let profileDir: string;
 beforeEach(async () => {
   fixture = await createProjectsFixture();
-  agentDir = join(fixture.home, "agent");
-  const dir = join(agentDir, "npm/node_modules/pi-harness-delegate/extensions");
+  profileDir = join(fixture.home, "profile");
+  const dir = join(profileDir, "npm/node_modules/pi-harness-delegate/extensions");
   await fs.mkdir(dir, { recursive: true });
   await fs.writeFile(join(dir, "index.ts"), FAKE_PACKAGE);
 });
@@ -40,18 +42,18 @@ type Registered = {
   parameters: { properties: Record<string, unknown>; required: string[] };
   execute: (
     ...args: unknown[]
-  ) => Promise<{ details: { cwd: string; params: object; hasUI: boolean } }>;
+  ) => Promise<{ details: { cwd: string; params: object; hasUI: boolean; peerWidth?: number } }>;
 };
 
-async function install() {
+async function install(log = vi.fn()) {
   const tools = new Map<string, Registered>();
   const commands: string[] = [];
   const pi = {
     registerTool: (tool: { name: string } & Registered) => tools.set(tool.name, tool),
     registerCommand: (name: string) => commands.push(name),
   } as unknown as ExtensionAPI;
-  await registerProjectDelegate(pi, { agentDir, projectsRoot: fixture.projectsRoot });
-  return { tools, commands };
+  await registerProjectDelegate(pi, { profileDir, projectsRoot: fixture.projectsRoot, log });
+  return { tools, commands, log };
 }
 
 function session(project?: string) {
@@ -135,9 +137,26 @@ test("tools that start no run and the package's commands are registered untouche
   expect(commands).toEqual(["delegate"]);
 });
 
-test("a bot without the package registers nothing and does not fail", async () => {
-  await fs.rm(join(agentDir, "npm"), { recursive: true });
-  const { tools, commands } = await install();
+test("the package's runtime peer imports resolve to pi's own copies, so its tools run", async () => {
+  const { tools } = await install();
+  const { details } = await run(tools.get("delegate"), { task: "x" }, session("atlas"));
+  expect(details.peerWidth).toBe(3);
+});
+
+test("a missing package logs at error level, names the path and registers nothing", async () => {
+  await fs.rm(join(profileDir, "npm"), { recursive: true });
+  const log = vi.fn();
+  const { tools, commands } = await install(log);
   expect(tools.size).toBe(0);
   expect(commands).toEqual([]);
+  expect(log).toHaveBeenCalledTimes(1);
+  expect(log.mock.calls[0][0]).toContain(
+    join(profileDir, "npm/node_modules/pi-harness-delegate/extensions/index.ts"),
+  );
+  expect(log.mock.calls[0][0]).toContain("NOT registered");
+});
+
+test("a present package logs nothing", async () => {
+  const { log } = await install();
+  expect(log).not.toHaveBeenCalled();
 });

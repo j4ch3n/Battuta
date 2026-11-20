@@ -1,13 +1,38 @@
 import { promises as fs } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { createJiti } from "jiti";
 import { Type } from "typebox";
 import { currentBinding } from "./contracts.ts";
 import { resolveDelegationCwd } from "./delegation-cwd.ts";
 
 type Tool = Parameters<ExtensionAPI["registerTool"]>[0];
 
-const PACKAGE_ENTRY = "npm/node_modules/pi-harness-delegate/extensions/index.ts";
+/** The package as pi installs it inside a bot profile: `<profile>/npm/node_modules/pi-harness-delegate`. */
+const PACKAGE_ENTRY = join("npm", "node_modules", "pi-harness-delegate", "extensions", "index.ts");
+
+/**
+ * The packages the delegate package imports at runtime. They resolve from pi-coding-agent's own installation,
+ * so the package uses the same copies pi does, wherever the bot profile is installed.
+ */
+function hostAliases(): Record<string, string> {
+  const piUrl = import.meta.resolve("@earendil-works/pi-coding-agent");
+  const fromPi = createRequire(new URL("../package.json", piUrl));
+  return {
+    "@earendil-works/pi-coding-agent": fileURLToPath(piUrl),
+    "@earendil-works/pi-tui": fromPi.resolve("@earendil-works/pi-tui"),
+    typebox: fromPi.resolve("typebox"),
+  };
+}
+
+async function exists(path: string): Promise<boolean> {
+  return fs.stat(path).then(
+    () => true,
+    () => false,
+  );
+}
 
 /** The tools of pi-harness-delegate that start a run; `claude_delegate` is its deprecated alias. */
 const RUN_TOOLS = new Set(["delegate", "claude_delegate"]);
@@ -57,19 +82,26 @@ function inProject(tool: Tool, projectsRoot: string): Tool {
  */
 export async function registerProjectDelegate(
   pi: ExtensionAPI,
-  { agentDir, projectsRoot }: { agentDir: string; projectsRoot: string },
+  {
+    profileDir,
+    projectsRoot,
+    log = console.error,
+  }: { profileDir: string; projectsRoot: string; log?: (message: string) => void },
 ): Promise<void> {
-  const entry = join(agentDir, PACKAGE_ENTRY);
-  if (
-    !(await fs.stat(entry).then(
-      () => true,
-      () => false,
-    ))
-  )
+  const entry = join(profileDir, PACKAGE_ENTRY);
+  if (!(await exists(entry))) {
+    // Error level, and the worker keeps running without delegation: a missing package must never pass silently.
+    log(
+      `pi-harness-delegate is not installed at ${entry}: delegate and delegate_modes are NOT registered, so no delegated run can start.`,
+    );
     return;
-  const { default: install } = (await import(entry)) as {
-    default: (pi: ExtensionAPI) => void | Promise<void>;
-  };
+  }
+  // Node cannot import a .ts file under node_modules natively, so load it with jiti as pi loads extensions.
+  // fsCache is off so that nothing is written into the installed profile.
+  const jiti = createJiti(import.meta.url, { alias: hostAliases(), fsCache: false });
+  const install = await jiti.import<(pi: ExtensionAPI) => void | Promise<void>>(entry, {
+    default: true,
+  });
   await install(
     new Proxy(pi, {
       get(target, property) {
