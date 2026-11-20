@@ -10,6 +10,8 @@ export interface ProjectsFixture {
   atlasWorktree: string;
   bravoCode: string;
   bravoWorktree: string;
+  /** `atlas/work/0123abcd`, the work folder of assignment 0123abcd. */
+  atlasWork: string;
   dispose(): Promise<void>;
 }
 
@@ -44,8 +46,11 @@ export async function createProjectsFixture(): Promise<ProjectsFixture> {
     paths[`${name}Code`] = await fs.realpath(code);
     paths[`${name}Worktree`] = await fs.realpath(worktree);
   }
+  const atlasWork = join(projectsRoot, "atlas", "work", "0123abcd");
+  await fs.mkdir(atlasWork, { recursive: true });
   return {
     home,
+    atlasWork,
     projectsRoot,
     atlasCode: paths.atlasCode,
     atlasWorktree: paths.atlasWorktree,

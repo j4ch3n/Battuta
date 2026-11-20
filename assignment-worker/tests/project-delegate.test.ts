@@ -104,7 +104,7 @@ test("a worktree of another project is refused and the package is never run", as
   const { tools } = await install();
   await expect(
     run(tools.get("delegate"), { task: "x", worktree: fixture.bravoWorktree }, session("atlas")),
-  ).rejects.toThrow("is not a git worktree of project");
+  ).rejects.toThrow("is not the code folder, a worktree, or the assignment work folder of project");
 });
 
 test("a session that is not bound to an assignment cannot delegate", async () => {

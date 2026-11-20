@@ -1,7 +1,12 @@
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { resolveDelegationCwd, sanitizedGitEnv } from "../delegation-cwd.ts";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import {
+  FIXED_DIRS,
+  preapprovedDirs,
+  resolveDelegationCwd,
+  sanitizedGitEnv,
+} from "../delegation-cwd.ts";
 import { createProjectsFixture, type ProjectsFixture } from "./project-fixture.ts";
 
 let fixture: ProjectsFixture;
@@ -13,10 +18,18 @@ afterEach(async () => {
   await fixture.dispose();
 });
 
-const resolve = (project: string, worktree?: string) =>
-  resolveDelegationCwd({ project, worktree, projectsRoot: fixture.projectsRoot });
+const ASSIGNMENT = "0123abcd";
+const resolve = async (project: string, cwd?: string) =>
+  (
+    await resolveDelegationCwd({
+      project,
+      assignmentId: ASSIGNMENT,
+      cwd,
+      projectsRoot: fixture.projectsRoot,
+    })
+  ).cwd;
 
-test("without a worktree the cwd is the project's code folder", async () => {
+test("without cwd the run uses the project's code folder", async () => {
   expect(await resolve("atlas")).toBe(join(fixture.projectsRoot, "atlas", "code"));
 });
 
@@ -30,7 +43,7 @@ test("the code folder of each project is resolved from that project only", async
 
 test("a worktree of another project's repository is rejected", async () => {
   await expect(resolve("atlas", fixture.bravoWorktree)).rejects.toThrow(
-    `worktree "${fixture.bravoWorktree}" is not a git worktree of project "atlas"`,
+    `cwd "${fixture.bravoWorktree}" is not the code folder, a worktree, or the assignment work folder of project "atlas"`,
   );
 });
 
@@ -70,14 +83,14 @@ test.each(["", "..", "../atlas", "atlas/../bravo", "/", "/x/../y"])(
 test.each([
   ["a relative path", "relative/worktree"],
   ["an empty string", ""],
-])("a worktree given as %s is refused before any cwd is returned", async (_label, worktree) => {
+])("a cwd given as %s is refused before any cwd is returned", async (_label, worktree) => {
   await expect(resolve("atlas", worktree)).rejects.toThrow("must be an absolute path");
 });
 
-test("a worktree that does not exist fails clearly", async () => {
+test("a cwd that does not exist fails clearly", async () => {
   const missing = join(fixture.home, "worktrees", "missing");
   await expect(resolve("atlas", missing)).rejects.toThrow(
-    `worktree "${missing}" for project "atlas" does not exist`,
+    `cwd "${missing}" for project "atlas" does not exist`,
   );
 });
 
@@ -93,10 +106,10 @@ test.each([
       join(fixture.atlasWorktree, "nested")
     ),
   ],
-])("%s is not accepted as a worktree", async (_label, make) => {
+])("%s is not accepted as cwd", async (_label, make) => {
   const path = await make();
   await expect(resolve("atlas", path)).rejects.toThrow(
-    `worktree "${path}" is not a git worktree of project "atlas"`,
+    `cwd "${path}" is not the code folder, a worktree, or the assignment work folder of project "atlas"`,
   );
 });
 
@@ -120,4 +133,116 @@ test("sanitizedGitEnv removes every GIT_ variable and keeps the rest", () => {
   expect(
     sanitizedGitEnv({ PATH: "/bin", HOME: "/home/w", GIT_DIR: "/x", GIT_COMMON_DIR: "/y" }),
   ).toEqual({ PATH: "/bin", HOME: "/home/w" });
+});
+
+test("the bound assignment's work folder is accepted as cwd", async () => {
+  expect(await resolve("atlas", fixture.atlasWork)).toBe(fixture.atlasWork);
+});
+
+test("another assignment's work folder is refused", async () => {
+  const other = join(fixture.projectsRoot, "atlas", "work", "89abcdef");
+  await fs.mkdir(other, { recursive: true });
+  await expect(resolve("atlas", other)).rejects.toThrow(
+    "is not the code folder, a worktree, or the assignment work folder",
+  );
+});
+
+test("a symlink to another project's code folder is refused", async () => {
+  const link = join(fixture.home, "link-to-bravo");
+  await fs.symlink(fixture.bravoCode, link);
+  await expect(resolve("atlas", link)).rejects.toThrow(
+    "is not the code folder, a worktree, or the assignment work folder",
+  );
+});
+
+test("without cwd the run uses the code folder and still returns the work folder", async () => {
+  expect(
+    await resolveDelegationCwd({
+      project: "atlas",
+      assignmentId: ASSIGNMENT,
+      projectsRoot: fixture.projectsRoot,
+    }),
+  ).toEqual({
+    cwd: fixture.atlasCode,
+    codeFolder: fixture.atlasCode,
+    workFolder: fixture.atlasWork,
+  });
+});
+
+test.each(["", "0123ABCD", "../x", "0123abcd0"])(
+  "an assignment id %j that is not 8 lowercase hex digits is refused",
+  async (assignmentId) => {
+    await expect(
+      resolveDelegationCwd({ project: "atlas", assignmentId, projectsRoot: fixture.projectsRoot }),
+    ).rejects.toThrow("Delegation cannot start");
+  },
+);
+
+describe("preapprovedDirs", () => {
+  const dirs = async (cwd: string, candidates: string[]) =>
+    preapprovedDirs({
+      codeFolder: fixture.atlasCode,
+      workFolder: fixture.atlasWork,
+      cwd,
+      candidates,
+    });
+
+  test("the code and work folders are always included unless one is the cwd", async () => {
+    expect(
+      await preapprovedDirs({
+        codeFolder: fixture.atlasCode,
+        workFolder: fixture.atlasWork,
+        cwd: fixture.atlasWorktree,
+        candidates: [],
+      }),
+    ).toEqual([fixture.atlasCode, fixture.atlasWork]);
+    expect(
+      await preapprovedDirs({
+        codeFolder: fixture.atlasCode,
+        workFolder: fixture.atlasWork,
+        cwd: fixture.atlasCode,
+        candidates: [],
+      }),
+    ).toEqual([fixture.atlasWork]);
+  });
+
+  test("a missing candidate is skipped", async () => {
+    expect(await dirs(fixture.atlasWorktree, [join(fixture.home, "missing")])).not.toContain(
+      join(fixture.home, "missing"),
+    );
+  });
+
+  test("a symlinked candidate and its target appear once", async () => {
+    const target = join(fixture.home, "cache");
+    await fs.mkdir(target);
+    await fs.symlink(target, join(fixture.home, "cache-link"));
+    const result = await dirs(fixture.atlasWorktree, [target, join(fixture.home, "cache-link")]);
+    expect(result.filter((dir) => dir === target)).toHaveLength(1);
+    expect(result).not.toContain(join(fixture.home, "cache-link"));
+  });
+
+  test("the result never contains the cwd", async () => {
+    const result = await dirs(fixture.atlasWorktree, [
+      fixture.atlasWorktree,
+      join(fixture.atlasWorktree, "."),
+    ]);
+    expect(result).not.toContain(fixture.atlasWorktree);
+  });
+
+  test("the fixed list covers the Linux and macOS temp and cache folders", () => {
+    expect(FIXED_DIRS("/home/w", 1000)).toEqual(
+      expect.arrayContaining([
+        "/tmp",
+        "/var/tmp",
+        "/dev/shm",
+        "/run/user/1000",
+        "/home/w/.cache",
+        "/home/w/.local/share",
+        "/home/w/.npm",
+        "/private/tmp",
+        "/var/folders",
+        "/home/w/Library/Caches",
+      ]),
+    );
+  });
 });

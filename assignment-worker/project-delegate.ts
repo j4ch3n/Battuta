@@ -36,13 +36,13 @@ async function exists(path: string): Promise<boolean> {
 /** The tools of pi-harness-delegate that start a run; `claude_delegate` is its deprecated alias. */
 const RUN_TOOLS = new Set(["delegate", "claude_delegate"]);
 
-function boundProject(ctx: Pick<ExtensionContext, "sessionManager">): string {
+function boundAssignment(ctx: Pick<ExtensionContext, "sessionManager">) {
   const binding = currentBinding(ctx);
   if (!binding)
     throw new Error(
       "Delegation cannot start: this session is not bound to an assignment, so no project folder can be resolved. No default directory is used.",
     );
-  return binding.project;
+  return binding;
 }
 
 /** A run tool that executes with the assignment's project folder (or `worktree`) as the extension's cwd. */
@@ -63,9 +63,11 @@ function inProject(tool: Tool, projectsRoot: string): Tool {
     },
     async execute(id, params, signal, onUpdate, ctx) {
       const { worktree, ...rest } = params as { worktree?: string };
-      const cwd = await resolveDelegationCwd({
-        project: boundProject(ctx),
-        worktree,
+      const binding = boundAssignment(ctx);
+      const { cwd } = await resolveDelegationCwd({
+        project: binding.project,
+        assignmentId: binding.assignment_id,
+        cwd: worktree,
         projectsRoot,
       });
       const projectCtx = Object.create(ctx, { cwd: { value: cwd } }) as typeof ctx;
