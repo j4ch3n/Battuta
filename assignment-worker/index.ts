@@ -222,7 +222,7 @@ export default async function worker(pi: ExtensionAPI) {
   });
   // Last: everything above registers synchronously, and loading the delegate package awaits.
   await registerProjectDelegate(pi, {
-    // dist/index.js sits in <profile>/.pi/extensions/assignment-worker/dist, so the profile is three levels up.
+    // dist/index.js sits in <profile>/.pi/extensions/assignment-worker/dist, so the profile's .pi directory is three levels up.
     profileDir: join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."),
     projectsRoot: join(homedir(), ".battuta", "projects"),
     log: diagnostic,

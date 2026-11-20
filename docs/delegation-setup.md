@@ -61,11 +61,10 @@ configuration runs with the worker's privileges, so register only projects the h
 Claude Code also reads `CLAUDE.md` from every directory above the working directory, so none should
 exist in `~/.battuta/projects`, `~/.battuta` or the home directory: it would apply to every project.
 
-The worker extension loads the package's entry point from its bot profile, `<profile>/npm/node_modules/pi-harness-delegate/`,
-where the profile is the `.pi` directory three levels above the extension's own `dist/index.js`. It loads the
-`.ts` entry with jiti, as pi loads extensions, because Node refuses to type-strip TypeScript under `node_modules`. If the
-package is missing, the worker logs an error naming the path and registers no delegation tools. It wraps the
-`delegate` and deprecated `claude_delegate` tools by name. Recheck both after changing the package pin.
+The worker extension loads the package installed in its own bot profile (`.pi/npm/node_modules/pi-harness-delegate/`)
+and wraps the `delegate` and deprecated `claude_delegate` tools by name. If the package is missing or fails to
+load, the worker logs an error naming the path and registers no delegation tools. Recheck both after changing the
+package pin.
 
 ## Permissions
 
