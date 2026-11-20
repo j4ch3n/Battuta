@@ -1,6 +1,18 @@
 import { randomUUID } from "node:crypto";
-import type { CanUseTool, PermissionResult, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import type { ProxyMessage, WorkerMessage } from "./delegate-channel.ts";
+import { pathToFileURL } from "node:url";
+import {
+  query as sdkQuery,
+  type CanUseTool,
+  type PermissionMode,
+  type PermissionResult,
+  type SDKUserMessage,
+} from "@anthropic-ai/claude-agent-sdk";
+import {
+  connectChannel,
+  type ChannelClient,
+  type ProxyMessage,
+  type WorkerMessage,
+} from "./delegate-channel.ts";
 
 /** Tools a readonly (`plan`) run may never use, whatever the worker answers. */
 export const READONLY_DENIED_TOOLS = ["Edit", "Write", "NotebookEdit", "ExitPlanMode"] as const;
@@ -183,3 +195,142 @@ export function createPermissionGate(options: {
     },
   };
 }
+
+export interface ProxyArgs {
+  prompt: string;
+  permissionMode: string;
+  resume?: string;
+  persistSession: boolean;
+  model?: string;
+  maxBudgetUsd?: number;
+  addDirs: string[];
+}
+
+/** The fixed `stream-json` flags `claude -p` gets from the package; the proxy always streams them. */
+const STREAMING_FLAGS = new Set(["--verbose", "--include-partial-messages"]);
+
+/** Parses exactly the arguments pi-harness-delegate's claude `buildArgs` emits; throws on anything else. */
+export function parseClaudeArgs(argv: string[]): ProxyArgs {
+  const unsupported = (arg: string | undefined): never => {
+    throw new Error(`unsupported claude argument: ${arg ?? "(missing value)"}`);
+  };
+  const parsed: Partial<ProxyArgs> & { addDirs: string[]; persistSession: boolean } = {
+    addDirs: [],
+    persistSession: true,
+  };
+  for (let index = 0; index < argv.length; index++) {
+    const arg = argv[index];
+    const value = () => argv[++index] ?? unsupported(undefined);
+    if (STREAMING_FLAGS.has(arg)) continue;
+    else if (arg === "-p") parsed.prompt = value();
+    else if (arg === "--output-format") {
+      if (value() !== "stream-json") unsupported(arg);
+    } else if (arg === "--permission-mode") parsed.permissionMode = value();
+    else if (arg === "--resume") parsed.resume = value();
+    else if (arg === "--no-session-persistence") parsed.persistSession = false;
+    else if (arg === "--model") parsed.model = value();
+    else if (arg === "--add-dir") parsed.addDirs.push(value());
+    else if (arg === "--max-budget-usd") {
+      const budget = Number(value());
+      if (!Number.isFinite(budget)) unsupported(arg);
+      parsed.maxBudgetUsd = budget;
+    } else unsupported(arg);
+  }
+  if (parsed.prompt === undefined || parsed.permissionMode === undefined) unsupported("-p");
+  return parsed as ProxyArgs;
+}
+
+function delegateDirs(env: NodeJS.ProcessEnv): string[] {
+  if (!env.BATTUTA_DELEGATE_DIRS) return [];
+  const dirs: unknown = JSON.parse(env.BATTUTA_DELEGATE_DIRS);
+  if (!Array.isArray(dirs) || !dirs.every((dir) => typeof dir === "string"))
+    throw new Error("BATTUTA_DELEGATE_DIRS must be a JSON array of paths");
+  return dirs;
+}
+
+/**
+ * Runs one delegated Claude session in place of `claude -p`: the same arguments in, the same `stream-json`
+ * lines out, while questions and permission requests go to the supervising worker over its socket and the
+ * worker's answers, guidance and stop come back. Returns the exit code.
+ */
+export async function runProxy(options: {
+  argv: string[];
+  env: NodeJS.ProcessEnv;
+  cwd: string;
+  query: typeof sdkQuery;
+  write(line: string): void;
+  error(line: string): void;
+}): Promise<number> {
+  let channel: ChannelClient | undefined;
+  try {
+    const args = parseClaudeArgs(options.argv);
+    const dirs = delegateDirs(options.env);
+    const { BATTUTA_DELEGATE_SOCKET: socket, BATTUTA_DELEGATE_TOKEN: token } = options.env;
+    if (socket && token) channel = await connectChannel(socket, token);
+    const input = createSessionInput(args.prompt);
+    const gate = createPermissionGate({
+      readonly: args.permissionMode === "plan",
+      forward: channel && ((message) => channel!.send(message)),
+      onPendingChange: (count) => input.setPending(count),
+    });
+    const run = options.query({
+      prompt: input.stream,
+      options: {
+        cwd: options.cwd,
+        permissionMode: args.permissionMode as PermissionMode,
+        model: args.model,
+        maxBudgetUsd: args.maxBudgetUsd,
+        resume: args.resume,
+        persistSession: args.persistSession,
+        additionalDirectories: [...args.addDirs, ...dirs],
+        includePartialMessages: true,
+        pathToClaudeCodeExecutable: "claude",
+        canUseTool: gate.canUseTool,
+      },
+    });
+    let finished = false;
+    let lost = false;
+    const end = (reason: string) => {
+      gate.denyAll(reason);
+      input.close();
+      void run.interrupt().catch(() => undefined);
+    };
+    input.onClosed(() => channel?.send({ type: "closed" }));
+    channel?.onMessage((message) => {
+      if (message.type === "answer") gate.answer(message);
+      else if (message.type === "guide") input.send(message.text);
+      else if (message.type === "stop") end("stopped by the worker");
+    });
+    channel?.onClose(() => {
+      if (finished) return;
+      lost = true;
+      end("the supervising worker disconnected");
+    });
+    let started = false;
+    for await (const message of run) {
+      options.write(JSON.stringify(message));
+      if (!started && message.type === "system" && message.subtype === "init") {
+        started = true;
+        channel?.send({ type: "started", sessionId: message.session_id });
+      }
+      if (message.type === "result") input.observeResult(message);
+    }
+    finished = true;
+    return lost ? 1 : 0;
+  } catch (error) {
+    options.error(error instanceof Error ? error.message : String(error));
+    return 1;
+  } finally {
+    channel?.close();
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
+  process.exitCode = await runProxy({
+    argv: process.argv.slice(2),
+    env: process.env,
+    cwd: process.cwd(),
+    query: sdkQuery,
+    write: (line) => process.stdout.write(`${line}\n`),
+    error: (line) => process.stderr.write(`${line}\n`),
+  });

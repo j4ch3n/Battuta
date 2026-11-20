@@ -2,11 +2,13 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   createPermissionGate,
   createSessionInput,
+  parseClaudeArgs,
+  runProxy,
   READONLY_DENIED_TOOLS,
   UNANSWERED_DENIAL,
 } from "../claude-proxy.ts";
-import type { ProxyMessage } from "../delegate-channel.ts";
-import type { CanUseTool } from "@anthropic-ai/claude-agent-sdk";
+import { openChannel, type ChannelServer, type ProxyMessage } from "../delegate-channel.ts";
+import type { CanUseTool, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -219,5 +221,282 @@ describe("createPermissionGate", () => {
     const { id } = forwarded[0] as { id: string };
     permissions.answer({ type: "answer", id, allow: true, text: "" });
     expect(onPendingChange.mock.calls).toEqual([[1], [0]]);
+  });
+});
+
+const BUILT_ARGS = [
+  "-p",
+  "do the task",
+  "--output-format",
+  "stream-json",
+  "--verbose",
+  "--include-partial-messages",
+  "--permission-mode",
+  "acceptEdits",
+  "--model",
+  "claude-haiku-5-5",
+  "--max-budget-usd",
+  "2",
+  "--add-dir",
+  "/srv/a",
+  "--add-dir",
+  "/srv/b",
+];
+
+describe("parseClaudeArgs", () => {
+  test("the arguments claude.ts buildArgs emits map to proxy options", () => {
+    expect(parseClaudeArgs(BUILT_ARGS)).toEqual({
+      prompt: "do the task",
+      permissionMode: "acceptEdits",
+      persistSession: true,
+      model: "claude-haiku-5-5",
+      maxBudgetUsd: 2,
+      addDirs: ["/srv/a", "/srv/b"],
+    });
+  });
+
+  test.each([
+    [["--resume", "s-1"], { resume: "s-1", persistSession: true }],
+    [["--no-session-persistence"], { persistSession: false }],
+  ])("%j is honored", (extra, expected) => {
+    expect(parseClaudeArgs(["-p", "x", "--permission-mode", "plan", ...extra])).toMatchObject(
+      expected,
+    );
+  });
+
+  test.each([
+    [["-p", "x", "--permission-mode", "plan", "--dangerously-skip-permissions"]],
+    [["-p", "x", "--permission-mode", "plan", "--output-format", "json"]],
+    [["-p", "x", "--permission-mode", "plan", "--model"]],
+    [["--permission-mode", "plan"]],
+    [["-p", "x", "--permission-mode", "plan", "--max-budget-usd", "lots"]],
+  ])("%j is refused", (argv) => {
+    expect(() => parseClaudeArgs(argv)).toThrow("unsupported claude argument");
+  });
+});
+
+/** A stand-in for the SDK's `query()`: replays scripted messages, which may wait on the session's input. */
+function fakeQuery(
+  script: (options: {
+    input: AsyncIterator<SDKUserMessage>;
+    canUseTool: CanUseTool;
+  }) => AsyncGenerator<Record<string, unknown>>,
+) {
+  const calls: Record<string, unknown>[] = [];
+  const interrupt = vi.fn();
+  const query = ((params: {
+    prompt: AsyncIterable<SDKUserMessage>;
+    options: Record<string, unknown>;
+  }) => {
+    calls.push(params.options);
+    const generator = script({
+      input: params.prompt[Symbol.asyncIterator](),
+      canUseTool: params.options.canUseTool as CanUseTool,
+    });
+    return Object.assign(generator, {
+      interrupt: async () => {
+        interrupt();
+        await generator.return(undefined);
+      },
+    });
+  }) as unknown as typeof import("@anthropic-ai/claude-agent-sdk").query;
+  return { query, calls, interrupt };
+}
+
+const init = (sessionId = "s-1") => ({ type: "system", subtype: "init", session_id: sessionId });
+const result = (uuid: string | undefined, extra: object = {}) => ({
+  type: "result",
+  subtype: "success",
+  session_id: "s-1",
+  result: "done",
+  user_message_uuid: uuid,
+  user_message_uuids: uuid ? [uuid] : [],
+  ...extra,
+});
+
+describe("runProxy", () => {
+  let server: ChannelServer | undefined;
+  afterEach(async () => {
+    await server?.close();
+    server = undefined;
+  });
+
+  async function worker() {
+    const messages: ProxyMessage[] = [];
+    const disconnected = vi.fn();
+    server = await openChannel({
+      onMessage: (message) => messages.push(message),
+      onDisconnect: disconnected,
+    });
+    server.expect("token-1");
+    const env = { BATTUTA_DELEGATE_SOCKET: server.path, BATTUTA_DELEGATE_TOKEN: "token-1" };
+    return { server, messages, env, disconnected };
+  }
+
+  async function run(
+    query: typeof import("@anthropic-ai/claude-agent-sdk").query,
+    env: NodeJS.ProcessEnv = {},
+    argv = BUILT_ARGS,
+  ) {
+    const lines: string[] = [];
+    const errors: string[] = [];
+    const code = await runProxy({
+      argv,
+      env,
+      cwd: "/srv/work",
+      query,
+      write: (line) => lines.push(line),
+      error: (line) => errors.push(line),
+    });
+    return { code, lines, errors };
+  }
+
+  const answerOnce = async function* ({ input }: { input: AsyncIterator<SDKUserMessage> }) {
+    const first = (await input.next()).value as SDKUserMessage;
+    yield init();
+    yield result(first.uuid);
+  };
+
+  test("query receives the run options and the claude executable on PATH", async () => {
+    const { query, calls } = fakeQuery(answerOnce);
+    await run(query, {}, [...BUILT_ARGS, "--resume", "s-0"]);
+    expect(calls[0]).toMatchObject({
+      cwd: "/srv/work",
+      permissionMode: "acceptEdits",
+      model: "claude-haiku-5-5",
+      maxBudgetUsd: 2,
+      resume: "s-0",
+      persistSession: true,
+      includePartialMessages: true,
+      pathToClaudeCodeExecutable: "claude",
+    });
+  });
+
+  test("additionalDirectories is the --add-dir values plus BATTUTA_DELEGATE_DIRS", async () => {
+    const { query, calls } = fakeQuery(answerOnce);
+    await run(query, { BATTUTA_DELEGATE_DIRS: JSON.stringify(["/tmp", "/srv/code"]) });
+    expect(calls[0].additionalDirectories).toEqual(["/srv/a", "/srv/b", "/tmp", "/srv/code"]);
+  });
+
+  test("each SDK message is written as one JSON line", async () => {
+    const { query } = fakeQuery(answerOnce);
+    const { code, lines } = await run(query);
+    expect(code).toBe(0);
+    expect(lines.map((line) => JSON.parse(line) as unknown)).toEqual([
+      init(),
+      expect.objectContaining({ type: "result", result: "done" }),
+    ]);
+    expect(lines.every((line) => !line.includes("\n"))).toBe(true);
+  });
+
+  test("started is sent once with the session id from the first system/init", async () => {
+    const { messages, env } = await worker();
+    const { query } = fakeQuery(async function* ({ input }) {
+      const first = (await input.next()).value as SDKUserMessage;
+      yield init("s-9");
+      yield init("s-9");
+      yield result(first.uuid);
+    });
+    await run(query, env);
+    await vi.waitFor(() => expect(messages.some((m) => m.type === "started")).toBe(true));
+    expect(messages.filter((message) => message.type === "started")).toEqual([
+      { type: "started", sessionId: "s-9" },
+    ]);
+  });
+
+  test("a question reaches the worker and its answer reaches Claude", async () => {
+    const { server, messages, env } = await worker();
+    let answer: unknown;
+    const { query } = fakeQuery(async function* ({ input, canUseTool }) {
+      const first = (await input.next()).value as SDKUserMessage;
+      yield init();
+      answer = await canUseTool(
+        "AskUserQuestion",
+        { questions: [{ question: "Which folder?" }] },
+        opts(),
+      );
+      yield result(first.uuid);
+    });
+    const running = run(query, env);
+    await vi.waitFor(() => expect(messages.some((m) => m.type === "request")).toBe(true));
+    const request = messages.find((m) => m.type === "request") as { id: string };
+    server.send({ type: "answer", id: request.id, allow: true, text: "the work folder" });
+    expect((await running).code).toBe(0);
+    expect(answer).toMatchObject({
+      behavior: "allow",
+      updatedInput: { answers: { "Which folder?": "the work folder" } },
+    });
+  });
+
+  test("guide messages become user messages answered before the input closes", async () => {
+    const { server, messages, env } = await worker();
+    const seen: string[] = [];
+    const { query } = fakeQuery(async function* ({ input }) {
+      const first = (await input.next()).value as SDKUserMessage;
+      seen.push(first.message.content as string);
+      yield init();
+      await vi.waitFor(() => expect(messages.some((m) => m.type === "started")).toBe(true));
+      server.send({ type: "guide", text: "also update the docs" });
+      const second = (await input.next()).value as SDKUserMessage;
+      seen.push(second.message.content as string);
+      yield result(first.uuid);
+      yield result(second.uuid);
+      expect((await input.next()).done).toBe(true);
+    });
+    expect((await run(query, env)).code).toBe(0);
+    expect(seen).toEqual(["do the task", "also update the docs"]);
+    await vi.waitFor(() => expect(messages.at(-1)).toEqual({ type: "closed" }));
+  });
+
+  test("stop interrupts the run and denies pending requests", async () => {
+    const { server, messages, env } = await worker();
+    let denied: unknown;
+    const { query, interrupt } = fakeQuery(async function* ({ input, canUseTool }) {
+      await input.next();
+      yield init();
+      denied = await canUseTool("Bash", { command: "npm test" }, opts());
+      yield init();
+    });
+    const running = run(query, env);
+    await vi.waitFor(() => expect(messages.some((m) => m.type === "request")).toBe(true));
+    server.send({ type: "stop" });
+    await running;
+    expect(interrupt).toHaveBeenCalled();
+    expect(denied).toEqual({ behavior: "deny", message: "stopped by the worker" });
+  });
+
+  test("a dropped socket interrupts the query and returns non-zero", async () => {
+    const { server, env } = await worker();
+    const { query, interrupt } = fakeQuery(async function* ({ input }) {
+      await input.next();
+      yield init();
+      await server.close();
+      await input.next();
+    });
+    const { code } = await run(query, env);
+    expect(interrupt).toHaveBeenCalled();
+    expect(code).not.toBe(0);
+  });
+
+  test("without BATTUTA_DELEGATE_SOCKET every request is denied and the run completes", async () => {
+    let decision: unknown;
+    const { query } = fakeQuery(async function* ({ input, canUseTool }) {
+      const first = (await input.next()).value as SDKUserMessage;
+      decision = await canUseTool("AskUserQuestion", { questions: [] }, opts());
+      yield result(first.uuid);
+    });
+    expect((await run(query)).code).toBe(0);
+    expect(decision).toMatchObject({ behavior: "deny" });
+  });
+
+  test("a query error is written to stderr and returns 1", async () => {
+    // eslint-disable-next-line require-yield
+    const { query } = fakeQuery(async function* () {
+      await Promise.resolve();
+      throw new Error("claude exited with code 1");
+    });
+    const { code, errors } = await run(query);
+    expect(code).toBe(1);
+    expect(errors.join("\n")).toContain("claude exited with code 1");
   });
 });
