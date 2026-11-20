@@ -611,3 +611,18 @@ describe("session records", () => {
     expect(sendMessage).not.toHaveBeenCalled();
   });
 });
+
+test("a run ended by delegate_stop is reported as stopped, not failed", async () => {
+  const { tools, sendMessage } = await install();
+  const { heldRun, received } = await startHeld(tools);
+  const stopping = tools
+    .get("delegate_stop")!
+    .execute("id", {}, undefined, vi.fn(), session("atlas"));
+  await vi.waitFor(() => expect(received).toEqual([{ type: "stop" }]));
+  heldRun.reject(new Error("claude reported an error and produced no output"));
+  await stopping;
+  await vi.waitFor(() => expect(sendMessage).toHaveBeenCalled());
+  const content = (sendMessage.mock.calls[0][0] as { content: string }).content;
+  expect(content).toContain("stopped");
+  expect(content).not.toContain("failed");
+});

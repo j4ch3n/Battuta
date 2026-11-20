@@ -56,6 +56,7 @@ interface Run {
   pending: Map<string, Request>;
   progress?: string;
   inputClosed: boolean;
+  stopped: boolean;
   settled: Promise<unknown>;
   onStarted(): void;
 }
@@ -176,6 +177,7 @@ export async function createDelegateRuns(
         controller: new AbortController(),
         pending: new Map(),
         inputClosed: false,
+        stopped: false,
         settled: Promise.resolve(),
         onStarted,
       };
@@ -204,7 +206,9 @@ export async function createDelegateRuns(
       void outcome.then((settled) => {
         cleanup(run);
         const session = run.sessionId ? ` (session ${run.sessionId})` : "";
-        if (settled.ok)
+        // A stopped run usually exits with an error; it is not a failure of the work.
+        if (run.stopped) notify("delegate-run", `Claude run stopped${session}.`, true);
+        else if (settled.ok)
           notify(
             "delegate-run",
             `Claude run finished${session}:\n\n${textOf(settled.result)}`,
@@ -256,6 +260,7 @@ export async function createDelegateRuns(
     async stop() {
       const run = current;
       if (!run) return NO_RUN;
+      run.stopped = true;
       channel.send({ type: "stop" });
       const grace = sleep(stopGraceMs);
       const winner = await Promise.race([run.settled.then(() => "settled" as const), grace.done]);
