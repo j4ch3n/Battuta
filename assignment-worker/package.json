@@ -21,7 +21,7 @@
   },
   "scripts": {
     "check": "tsc --noEmit",
-    "test": "vitest run --project unit && vitest run --project integration tests/mail-package.integration.test.ts tests/notify.integration.test.ts",
+    "test": "vitest run --project unit && vitest run --project integration tests/mail-package.integration.test.ts tests/notify.integration.test.ts tests/delegate-package.integration.test.ts",
     "test:coverage": "vitest run --project unit --coverage",
     "test:integration": "vitest run --project integration"
   }
