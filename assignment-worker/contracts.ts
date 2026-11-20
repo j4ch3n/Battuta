@@ -177,6 +177,36 @@ export const ExecutionResultSchema = Type.Union([
   ),
 ]);
 export type ExecutionResult = Static<typeof ExecutionResultSchema>;
+// Model-facing parameters for report_execution_result. Flat on purpose: the Claude
+// bridge (pi-claude-directsdk) strips top-level anyOf/oneOf/allOf and would send the
+// model an empty schema. The union above is still enforced by parseExecutionResult.
+const nonBlank = { minLength: 1, pattern: "\\S" } as const;
+export const ExecutionResultParameters = Type.Object(
+  {
+    outcome: Type.Unsafe<"completed" | "blocked">({
+      type: "string",
+      enum: ["completed", "blocked"],
+      description:
+        'Use "completed" only when the TODO goal is done and verified. Use "blocked" when it cannot be finished; then also send blocker.',
+    }),
+    summary: Type.String({
+      ...nonBlank,
+      description: "What was done, or what stopped the TODO. One or two sentences.",
+    }),
+    evidence: Type.Array(Type.String(nonBlank), {
+      description:
+        "Concrete proof for the outcome: commands run, paths, URLs or output. Use [] when there is none.",
+    }),
+    blocker: Type.Optional(
+      Type.String({
+        ...nonBlank,
+        description:
+          'Required when outcome is "blocked": the specific missing input, decision or access. Omit when outcome is "completed".',
+      }),
+    ),
+  },
+  { additionalProperties: false },
+);
 const CapabilityConfigurationSchema = Type.Object(
   {
     abilities: Type.Array(Type.String(), {
@@ -198,7 +228,33 @@ export function parseValue<T extends TSchema>(schema: T, value: unknown): Static
   if (!Value.Check(schema, value)) throw new Error("Invalid assignment value");
   return value;
 }
+const reportFields = new Set(["outcome", "summary", "evidence", "blocker"]);
+const blank = (value: unknown) => typeof value !== "string" || !/\S/.test(value);
+// Field-specific wording so the model knows exactly what to resend.
+function reportProblem(value: unknown): string | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return "Report must be an object with outcome, summary, evidence and, when blocked, blocker.";
+  const fields = value as Record<string, unknown>;
+  const extra = Object.keys(fields).find((key) => !reportFields.has(key));
+  if (extra !== undefined)
+    return `Unknown report field "${extra}". Send only outcome, summary, evidence and, when blocked, blocker.`;
+  if (fields.outcome === undefined) return 'outcome is required: send "completed" or "blocked".';
+  if (fields.outcome !== "completed" && fields.outcome !== "blocked")
+    return `outcome must be "completed" or "blocked"; got ${JSON.stringify(fields.outcome)}.`;
+  if (blank(fields.summary))
+    return "summary is required: send a non-empty string saying what was done, or what stopped the TODO.";
+  if (!Array.isArray(fields.evidence) || fields.evidence.some((item: unknown) => blank(item)))
+    return "evidence is required: send an array of non-empty strings, or [] when there is none.";
+  if (fields.outcome === "blocked") {
+    if (blank(fields.blocker))
+      return 'blocker is required when outcome is "blocked": send a non-empty string naming the missing input, decision or access.';
+  } else if ("blocker" in fields)
+    return 'blocker is only allowed when outcome is "blocked": remove blocker from this completed report.';
+  return undefined;
+}
 export function parseExecutionResult(value: unknown): ExecutionResult {
+  const problem = reportProblem(value);
+  if (problem) throw new Error(problem);
   const result = parseValue(ExecutionResultSchema, value);
   const values = [
     result.summary,

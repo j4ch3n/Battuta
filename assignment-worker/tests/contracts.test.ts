@@ -58,3 +58,61 @@ test("session ability registration validates the empty catalog and malformed pro
   for (const value of [["mobile_use"], ["constructor"], null, "[]", [null], [["nested"]]])
     expect(() => parseAbilities(value)).toThrow();
 });
+
+test("a completed report needs outcome, summary and evidence and nothing else", () => {
+  expect(
+    parseExecutionResult({
+      outcome: "completed",
+      summary: "Verified",
+      evidence: ["pnpm test: 180 passed"],
+    }),
+  ).toEqual({ outcome: "completed", summary: "Verified", evidence: ["pnpm test: 180 passed"] });
+});
+
+test("a blocked report with a blocker is accepted", () => {
+  expect(
+    parseExecutionResult({
+      outcome: "blocked",
+      summary: "Cannot reach the API",
+      evidence: [],
+      blocker: "Missing API key",
+    }),
+  ).toEqual({
+    outcome: "blocked",
+    summary: "Cannot reach the API",
+    evidence: [],
+    blocker: "Missing API key",
+  });
+});
+
+test.each([
+  [
+    "blocked without blocker",
+    { outcome: "blocked", summary: "Stopped", evidence: [] },
+    /blocker is required when outcome is "blocked"/,
+  ],
+  ["missing summary", { outcome: "completed", evidence: [] }, /summary is required/],
+  [
+    "wrong outcome",
+    { outcome: "done", summary: "Done", evidence: [] },
+    /outcome must be "completed" or "blocked"; got "done"/,
+  ],
+  ["missing outcome", { summary: "Done", evidence: [] }, /outcome is required/],
+  [
+    "blocker on a completed report",
+    { outcome: "completed", summary: "Done", evidence: [], blocker: "none" },
+    /blocker is only allowed when outcome is "blocked"/,
+  ],
+  [
+    "unknown field",
+    { outcome: "completed", summary: "Done", evidence: [], assignment_id: "1234abcd" },
+    /Unknown report field "assignment_id"/,
+  ],
+  [
+    "evidence not an array",
+    { outcome: "completed", summary: "Done", evidence: "proof" },
+    /evidence is required/,
+  ],
+])("%s is rejected with a field-specific message", (_name, value, message) => {
+  expect(() => parseExecutionResult(value)).toThrow(message);
+});
