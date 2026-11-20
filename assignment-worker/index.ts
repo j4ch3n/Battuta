@@ -1,14 +1,14 @@
 import {
-  getAgentDir,
   type ExtensionAPI,
   type ExtensionCommandContext,
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { createClient } from "@supabase/supabase-js";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createAssignmentClient } from "./client.ts";
-import { delegationCatalog, renderDelegationSection } from "./delegation.ts";
+import { delegationPromptSection } from "./delegation.ts";
 import { createCoordinator } from "./coordinator.ts";
 import { ExecutionResultParameters, currentBinding, parseAbilities } from "./contracts.ts";
 import { guardWorktreeCommand } from "./worktree-guard.ts";
@@ -69,10 +69,11 @@ export default async function worker(pi: ExtensionAPI) {
   });
   pi.on("before_agent_start", (event) => {
     // Only bots that install the delegate tool may be told to use it.
-    if (!pi.getAllTools().some((tool) => tool.name === "delegate")) return;
-    event.systemPromptOptions.sections["delegation-models"] = renderDelegationSection(
-      delegationCatalog(process.env),
+    const section = delegationPromptSection(
+      pi.getAllTools().map((tool) => tool.name),
+      process.env,
     );
+    if (section) event.systemPromptOptions.sections["delegation-models"] = section;
   });
   pi.on("session_start", async (event, ctx) => {
     if (client || stopped) return;
@@ -221,7 +222,9 @@ export default async function worker(pi: ExtensionAPI) {
   });
   // Last: everything above registers synchronously, and loading the delegate package awaits.
   await registerProjectDelegate(pi, {
-    agentDir: getAgentDir(),
+    // dist/index.js sits in <profile>/.pi/extensions/assignment-worker/dist, so the profile's .pi directory is three levels up.
+    profileDir: join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."),
     projectsRoot: join(homedir(), ".battuta", "projects"),
+    log: diagnostic,
   });
 }
