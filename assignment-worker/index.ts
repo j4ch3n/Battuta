@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { createAssignmentClient } from "./client.ts";
 import { delegationPromptSection } from "./delegation.ts";
 import { createCoordinator } from "./coordinator.ts";
-import { ExecutionResultSchema, currentBinding, parseAbilities } from "./contracts.ts";
+import { ExecutionResultParameters, currentBinding, parseAbilities } from "./contracts.ts";
 import { guardWorktreeCommand } from "./worktree-guard.ts";
 import { registerProjectDelegate } from "./project-delegate.ts";
 import { createNotifier } from "./notify.ts";
@@ -34,7 +34,7 @@ export default async function worker(pi: ExtensionAPI) {
     label: "Report execution result",
     description:
       "Submit this bound TODO's completed or blocked outcome; awaits final turn settlement and persistence.",
-    parameters: ExecutionResultSchema,
+    parameters: ExecutionResultParameters,
     async execute(_id, value) {
       if (!coordinator || stopped) throw new Error("Worker execution is not available");
       const result = await coordinator.acceptReport(value);

@@ -593,3 +593,30 @@ test("first TODO starts without any model selection step", async () => {
   expect(h.state.assignment.status).not.toBe("blocked");
   expect(h.turns).toHaveLength(1);
 });
+
+test.each([1, 3])("a %i-TODO run settles done when each TODO's report is valid", async (count) => {
+  const h = harness(count);
+  await h.begin();
+  for (let position = 1; position <= count; position++) {
+    expect(h.state.todos[position - 1].status).toBe("in_progress");
+    await h.complete();
+  }
+  expect(h.state.todos.map((todo) => todo.status)).toEqual(Array(count).fill("done"));
+  expect(h.state.assignment.status).toBe("done");
+  expect(h.turns.map((turn) => turn.position)).toEqual(
+    Array.from({ length: count }, (_, i) => i + 1),
+  );
+  expect(h.notifications.map((d) => d.assignment.status)).toEqual(["done"]);
+});
+
+test("an invalid flat report is rejected with a field-specific message and the run still settles after a valid retry", async () => {
+  const h = harness(1);
+  await h.begin();
+  await expect(
+    h.coordinator.acceptReport({ outcome: "blocked", summary: "Missing input", evidence: [] }),
+  ).rejects.toThrow(/blocker is required when outcome is "blocked"/);
+  // The model corrects the report within the same turn; settle happens at turn end.
+  await h.complete();
+  expect(h.state.assignment.status).toBe("done");
+  expect(h.notifications.map((d) => d.assignment.status)).toEqual(["done"]);
+});
