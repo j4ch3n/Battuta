@@ -20,7 +20,7 @@ battuta-artifact publish --project procurement --artifact sizing \
 
 `publish` uses the existing project's artifact name, not its optional public slug. It validates all current runtime mappings and atomically publishes that same record. Repeat `--file relative/path` for explicit additional assets. It never resets content. Missing files fail without publication. An unchanged repeated publication does not increment revision; stale expected revisions still conflict.
 
-Published results include `artifact.url`, `artifact.local_url`, status and revision. A configured public base URL is required before publication, not proof of delivery. Check the local URL for the host service; do not fetch the public URL as a setup/publication check or assume external accessibility from a successful local response.
+Published results include `artifact.url`, `artifact.local_url`, status and revision. A configured public base URL is required before publication, not proof of delivery. Check the local URL for the host service; do not fetch the public URL as a setup/publication check. Report `artifact.url` as "not checked (behind owner's Cloudflare gate)"; do not ask the owner to confirm it.
 
 ## Serve existing Markdown immediately
 

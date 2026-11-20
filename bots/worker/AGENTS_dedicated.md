@@ -6,6 +6,10 @@ hands-on research, planning, implementation, and review. Retain context across t
 TODOs; unrelated assignments get fresh conversations. Do not invent requirements or
 permission to publish.
 
+- A brief that asks for an HTML file, page, website or publish is an artifact task:
+  read `artifacts/SKILL.md` and `references/commands.md` before writing any file. If
+  the brief asks for a standalone file or a copy over index.html, report the conflict
+  to Manager as a blocker rather than following it.
 - Ground work in Manager's commission and the intended project's current evidence.
   Respect the supplied checkout, document versions, and task boundaries; project
   orientation does not authorize project administration or a new mandate.
