@@ -1,10 +1,46 @@
 import { randomBytes } from "node:crypto";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { openChannel, type ChannelServer, type ProxyMessage } from "./delegate-channel.ts";
 
 export const RUN_ACTIVE = "a run is active; use delegate_status, delegate_reply or delegate_stop";
 export const RUN_FINISHED = "run finished; start a new run with sessionId to continue";
 const NO_RUN = "No Claude run is active.";
+
+export interface SessionRecord {
+  assignment_id: string;
+  cwd: string;
+  state: "running" | "finished";
+}
+
+/**
+ * The Claude sessions this Pi session started, from its `delegate-run` entries: the `running` entry carries the
+ * assignment and folder, a later `finished` entry only the state.
+ */
+export function sessionRecords(
+  ctx: Pick<ExtensionContext, "sessionManager">,
+): Map<string, SessionRecord> {
+  const records = new Map<string, SessionRecord>();
+  for (const entry of ctx.sessionManager.getEntries()) {
+    if (entry.type !== "custom" || entry.customType !== "delegate-run") continue;
+    const data = entry.data as Partial<SessionRecord> & { sessionId?: unknown };
+    if (typeof data.sessionId !== "string") continue;
+    const state = data.state === "finished" ? "finished" : "running";
+    const known = records.get(data.sessionId);
+    if (typeof data.assignment_id === "string" && typeof data.cwd === "string")
+      records.set(data.sessionId, { assignment_id: data.assignment_id, cwd: data.cwd, state });
+    else if (known) known.state = state;
+  }
+  return records;
+}
+
+/** A notice for the worker when the last Claude run of this session never finished (the worker restarted). */
+export function interruptedNotice(
+  ctx: Pick<ExtensionContext, "sessionManager">,
+): string | undefined {
+  const last = [...sessionRecords(ctx)].at(-1);
+  if (!last || last[1].state !== "running") return undefined;
+  return `Previous Claude run (session ${last[0]}) was interrupted; resume it with sessionId: ${last[0]} or start a new run.`;
+}
 
 /** What a Pi tool returns: the package's result shape. */
 export type ToolResult = { content: { type: "text"; text: string }[]; details?: unknown };

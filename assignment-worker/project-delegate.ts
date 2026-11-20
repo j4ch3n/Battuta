@@ -6,7 +6,13 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { Type } from "typebox";
 import { currentBinding } from "./contracts.ts";
 import { preapprovedDirs, resolveDelegationCwd } from "./delegation-cwd.ts";
-import { createDelegateRuns, type DelegateRuns, type ToolResult } from "./delegate-runs.ts";
+import {
+  createDelegateRuns,
+  interruptedNotice,
+  sessionRecords,
+  type DelegateRuns,
+  type ToolResult,
+} from "./delegate-runs.ts";
 
 type Tool = Parameters<ExtensionAPI["registerTool"]>[0];
 
@@ -65,14 +71,27 @@ function inProject(tool: Tool, projectsRoot: string, runs: () => DelegateRuns | 
     async execute(id, params, _signal, _onUpdate, ctx) {
       const active = runs();
       if (!active) throw new Error("Delegation cannot start: the worker session has not started.");
-      const { cwd: requested, ...rest } = params as { cwd?: string };
+      const { cwd: requested, ...rest } = params as { cwd?: string; sessionId?: string };
       const binding = boundAssignment(ctx);
+      // A resumed session belongs to this assignment and continues in the folder it started in.
+      const resumed =
+        rest.sessionId === undefined ? undefined : sessionRecords(ctx).get(rest.sessionId);
+      if (rest.sessionId !== undefined && !resumed)
+        throw new Error(
+          `Delegation cannot start: session ${rest.sessionId} was not started for this assignment.`,
+        );
+      if (resumed && resumed.assignment_id !== binding.assignment_id)
+        throw new Error("Delegation cannot start: session belongs to another assignment.");
       const { cwd, codeFolder, workFolder } = await resolveDelegationCwd({
         project: binding.project,
         assignmentId: binding.assignment_id,
-        cwd: requested,
+        cwd: requested ?? resumed?.cwd,
         projectsRoot,
       });
+      if (resumed && cwd !== resumed.cwd)
+        throw new Error(
+          `Delegation cannot start: session ${rest.sessionId} ran in ${resumed.cwd}; a resumed run stays in its original folder.`,
+        );
       const dirs = await preapprovedDirs({ codeFolder, workFolder, cwd });
       // No UI for the package: its confirmations (outside addDirs, danger) refuse at once instead of waiting.
       const projectCtx = Object.create(ctx, {
@@ -226,8 +245,14 @@ export async function registerProjectDelegate(
   routeThroughProxy(claude, proxyPath ?? (await defaultProxyPath()));
   // Runs and their socket belong to one Pi session: Pi reloads extensions when it replaces the session.
   let runs: DelegateRuns | undefined;
-  pi.on("session_start", async () => {
+  pi.on("session_start", async (_event, ctx) => {
     runs ??= await createDelegateRuns(pi);
+    const notice = interruptedNotice(ctx);
+    if (notice)
+      pi.sendMessage(
+        { customType: "delegate-run", content: notice, display: true },
+        { triggerTurn: false },
+      );
   });
   pi.on("session_shutdown", async () => {
     await runs?.close();

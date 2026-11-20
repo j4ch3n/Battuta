@@ -1,8 +1,9 @@
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { connectChannel, type WorkerMessage } from "../delegate-channel.ts";
+import { sessionRecords } from "../delegate-runs.ts";
 import { registerProjectDelegate } from "../project-delegate.ts";
 import { createProjectsFixture, type ProjectsFixture } from "./project-fixture.ts";
 
@@ -493,4 +494,120 @@ test("delegate, delegate_reply, delegate_status and delegate_stop are registered
   expect([...tools.keys()]).toEqual(
     expect.arrayContaining(["delegate", "delegate_reply", "delegate_status", "delegate_stop"]),
   );
+});
+
+const record = (data: object) => ({ type: "custom", customType: "delegate-run", data });
+
+describe("session records", () => {
+  test("sessionRecords keeps the last state of each recorded session", () => {
+    const records = sessionRecords(
+      session("atlas", [
+        record({ sessionId: "s-1", assignment_id: "0123abcd", cwd: "/a", state: "running" }),
+        record({ sessionId: "s-1", state: "finished" }),
+        record({ sessionId: "s-2", assignment_id: "0123abcd", cwd: "/b", state: "running" }),
+      ]),
+    );
+    expect(records.get("s-1")).toEqual({ assignment_id: "0123abcd", cwd: "/a", state: "finished" });
+    expect(records.get("s-2")).toEqual({ assignment_id: "0123abcd", cwd: "/b", state: "running" });
+  });
+
+  test("a sessionId recorded for this assignment resumes in its recorded cwd", async () => {
+    const { tools } = await install();
+    const ctx = session("atlas", [
+      record({
+        sessionId: "s-old",
+        assignment_id: "0123abcd",
+        cwd: fixture.atlasWorktree,
+        state: "running",
+      }),
+      record({ sessionId: "s-old", state: "finished" }),
+    ]);
+    const { details } = await run(
+      tools.get("delegate"),
+      { task: "continue", sessionId: "s-old" },
+      ctx,
+    );
+    expect(details.cwd).toBe(fixture.atlasWorktree);
+    expect(details.params).toEqual({ task: "continue", sessionId: "s-old" });
+  });
+
+  test("a sessionId from another assignment is refused with the fixed text", async () => {
+    const { tools } = await install();
+    const ctx = session("atlas", [
+      record({
+        sessionId: "s-other",
+        assignment_id: "89abcdef",
+        cwd: fixture.atlasCode,
+        state: "finished",
+      }),
+    ]);
+    await expect(
+      run(tools.get("delegate"), { task: "x", sessionId: "s-other" }, ctx),
+    ).rejects.toThrow("session belongs to another assignment");
+  });
+
+  test("an unknown sessionId is refused", async () => {
+    const { tools } = await install();
+    await expect(
+      run(tools.get("delegate"), { task: "x", sessionId: "s-unknown" }, session("atlas")),
+    ).rejects.toThrow("session s-unknown was not started for this assignment");
+  });
+
+  test("a resume that asks for a different cwd is refused", async () => {
+    const { tools } = await install();
+    const ctx = session("atlas", [
+      record({
+        sessionId: "s-old",
+        assignment_id: "0123abcd",
+        cwd: fixture.atlasWorktree,
+        state: "finished",
+      }),
+    ]);
+    await expect(
+      run(tools.get("delegate"), { task: "x", sessionId: "s-old", cwd: fixture.atlasWork }, ctx),
+    ).rejects.toThrow("a resumed run stays in its original folder");
+  });
+
+  test("a run without sessionId never passes sessionId to the package", async () => {
+    const { tools } = await install();
+    const { details } = await run(tools.get("delegate"), { task: "x" }, session("atlas"));
+    expect(details.params).not.toHaveProperty("sessionId");
+  });
+
+  test("on session_start a running record without finished sends the interrupted notice without starting a turn", async () => {
+    const { sendMessage, emit } = await install();
+    await emit(
+      "session_start",
+      session("atlas", [
+        record({
+          sessionId: "s-cut",
+          assignment_id: "0123abcd",
+          cwd: fixture.atlasCode,
+          state: "running",
+        }),
+      ]),
+      { reason: "startup" },
+    );
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage.mock.calls[0][0]).toMatchObject({ customType: "delegate-run" });
+    expect((sendMessage.mock.calls[0][0] as { content: string }).content).toContain("s-cut");
+    expect(sendMessage.mock.calls[0][1]).toEqual({ triggerTurn: false });
+  });
+
+  test("a finished last record sends no notice", async () => {
+    const { sendMessage, emit } = await install();
+    await emit(
+      "session_start",
+      session("atlas", [
+        record({
+          sessionId: "s-ok",
+          assignment_id: "0123abcd",
+          cwd: fixture.atlasCode,
+          state: "running",
+        }),
+        record({ sessionId: "s-ok", state: "finished" }),
+      ]),
+    );
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
 });
