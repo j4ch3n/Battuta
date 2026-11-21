@@ -1,4 +1,5 @@
 import os
+import re
 import sqlite3
 import tempfile
 import unittest
@@ -95,6 +96,7 @@ class HttpTests(HttpFixture):
         self.assertEqual(response.headers["content-type"], "text/html; charset=utf-8")
         self.assertEqual(response.headers["cache-control"], "no-store")
         self.assertIn(heading, response.text)
+        self.assertIn('<link rel="stylesheet" href="/artifacts/catalog.css"', response.text)
         self.assertNotIn("<script", response.text)
         for text in absent:
             self.assertNotIn(text, response.text)
@@ -118,6 +120,15 @@ class HttpTests(HttpFixture):
                 with self.subTest(slug=slug, path=path):
                     self.assert_error_page(client.get(f"/artifacts/a/{slug}/{path}"), "Hidden file warning",
                                            "SECRET", path)
+
+    def test_front_page_title_has_no_divider(self):
+        client = self.client()
+        self.assertNotIn("<hr", client.get("/artifacts/").text)
+        css = client.get("/artifacts/catalog.css")
+        self.assertEqual(css.status_code, 200)
+        hero = re.search(r"^\.hero \{(.*?)\}", css.text, re.DOTALL | re.MULTILINE)
+        self.assertIsNotNone(hero)
+        self.assertNotIn("border-block-end", hero.group(1))
 
     def test_missing_file_and_post_registration_symlinks_are_not_served(self):
         client = self.client()

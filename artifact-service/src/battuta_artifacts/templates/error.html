@@ -4,25 +4,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ heading }}</title>
-    <style>
-      body {
-        font-family: system-ui, sans-serif;
-        line-height: 1.6;
-        max-width: 60rem;
-        margin: 2rem auto;
-        padding: 0 1rem;
-        overflow-wrap: anywhere;
-      }
-      h1 {
-        font-size: 1.5rem;
-      }
-    </style>
+    <link rel="stylesheet" href="/artifacts/catalog.css" />
   </head>
   <body>
-    <nav><a href="/artifacts/">All artifacts</a></nav>
-    <main>
-      <h1>{{ heading }}</h1>
-      <p>{{ message }}</p>
+    <header class="page-width hero">
+      <div class="hero-heading">
+        <h1>{{ heading }}</h1>
+      </div>
+      <p class="hero-description">{{ message }}</p>
+    </header>
+    <main class="page-width library">
+      <a href="/artifacts/">All artifacts</a>
     </main>
   </body>
 </html>
