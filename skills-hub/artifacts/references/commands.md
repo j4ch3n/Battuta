@@ -20,7 +20,7 @@ battuta-artifact publish --project procurement --artifact sizing \
 
 `publish` uses the existing project's artifact name, not its optional public slug. It validates all current runtime mappings and atomically publishes that same record. Repeat `--file relative/path` for explicit additional assets. It never resets content. Missing files fail without publication. An unchanged repeated publication does not increment revision; stale expected revisions still conflict.
 
-Published results include `artifact.url`, `artifact.local_url`, status and revision. A configured public base URL is required before publication, not proof of delivery. Check the local URL for the host service; do not fetch the public URL as a setup/publication check or assume external accessibility from a successful local response.
+Published results include `artifact.url`, `artifact.local_url`, status and revision. A configured public base URL is required before publication, not proof of delivery. Check the local URL for the host service; do not fetch the public URL as a setup/publication check. Report `artifact.url` as "not checked (behind owner's Cloudflare gate)"; do not ask the owner to confirm it.
 
 ## Serve existing Markdown immediately
 
@@ -43,7 +43,9 @@ battuta-artifact replace-files procurement-sizing --root "<returned-directory>" 
 
 These commands use the **public slug**. Local inspection includes drafts. `update` changes supplied metadata only. `replace-files` replaces the complete file configuration, including unchanged desired assets and extension CSS; omitted files lose HTTP access. Project artifacts retain their managed directory and `index.html` entry. No file operation changes draft/publication status.
 
-With `--root`, entry/assets are exact relative files; the entry is included automatically. Without `--root`, provide an absolute `--entry` and no additional files. Entry extensions are `.html`, `.htm`, `.md` or `.markdown`; paths reject traversal, symlinks, directories and globs. Original-file edits need no command and are live once published. Metadata/file replacement increments revision; use `show`'s revision for guarded changes and inspect again on conflict.
+With `--root`, entry/assets are exact relative files; the entry is included automatically. Without `--root`, provide an absolute `--entry` and no additional files. Entry extensions are `.html`, `.htm`, `.md` or `.markdown`; paths reject traversal, directories and globs; a symlink is accepted only as a leaf file whose target is a regular file inside the owning project's code checkout, and is rejected otherwise (including directory symlinks, symlinked parent folders and artifacts without a project). Original-file edits need no command and are live once published. Metadata/file replacement increments revision; use `show`'s revision for guarded changes and inspect again on conflict.
+
+Hidden paths (any dot-prefixed component, including link targets) are never served or published; unknown or hidden paths return 404 pages.
 
 ## Withdraw and recover
 

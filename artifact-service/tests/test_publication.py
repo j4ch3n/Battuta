@@ -44,8 +44,8 @@ class PublicationTests(BundleFixture):
             self.assertNotIn('VRAM', client.get('/artifacts/').text)
             with patch('battuta_artifacts.app.open_source', side_effect=AssertionError('Draft files must not open')):
                 for path in ['', *item['files']]:
-                    self.assertEqual(client.get('/artifacts/a/sizing/' + path).json(),
-                                     client.get('/artifacts/a/unknown/').json())
+                    draft, unknown = client.get('/artifacts/a/sizing/' + path), client.get('/artifacts/a/unknown/')
+                    self.assertEqual((draft.status_code, draft.text), (unknown.status_code, unknown.text))
             self.assertEqual(json.loads(self.command('show', 'sizing').output)['artifact']['status'], 'draft')
             self.assertEqual(json.loads(self.command('list').output)['artifacts'][0]['status'], 'draft')
             directory = self.project / 'artifacts/sizing'

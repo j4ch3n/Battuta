@@ -6,6 +6,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+from hermetic_git import git_env, run_git
+
 ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -32,9 +34,9 @@ os.execv(sys.executable, [sys.executable, "-m", "bot_setup.cli", *sys.argv[6:]])
     following = binary / "lint-staged"
     following.write_text("#!/bin/sh\ntouch next-task\n")
     following.chmod(0o700)
-    env = {**os.environ, "PATH": f"{binary}:{os.environ['PATH']}"}
+    env = git_env(PATH=f"{binary}:{os.environ['PATH']}")
     def git(*args):
-        subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)
+        run_git(*args, cwd=tmp_path, check=True, capture_output=True)
     def run(*command):
         return subprocess.run(command, cwd=tmp_path, env=env, capture_output=True, text=True)
     git("init", "-q")

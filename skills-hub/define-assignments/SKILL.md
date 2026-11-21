@@ -106,6 +106,14 @@ especially the relevant PRD/version, with enough context to interpret them. Reso
 consequential product gaps with CoS before handing affected execution to a worker.
 Do not require workers to discover project context or infer the requested outcome.
 
+If any deliverable is an artifact (an HTML page, report, deck, website, or anything
+to be published or shared), the brief must name the `artifacts` skill and its steps:
+init with a vendor, author in the returned draft, artifact-review, publish only if the
+owner has authorised that artifact, then verify local_url. It must not ask for a
+standalone or self-contained HTML file as the deliverable, and must not copy a file
+over a generated index.html. Verification items must say: verify local_url; report
+the public URL as "not checked (behind owner's Cloudflare gate)".
+
 Allow multiple open assignments, but sequence conflicting workspace changes through immutable dependencies. Workers claim whole assignments and execute their TODOs sequentially; do not plan per-TODO ownership or a TODO graph. Manager remains available for asynchronous results and evidence assessment. Keep product scope/authority decisions with CoS; use explicit blocked-work recovery rather than routine execution-status edits.
 
 For example, assign “add validated import retry with focused checks” with the

@@ -7,6 +7,8 @@ import subprocess
 
 import pytest
 
+from hermetic_git import run_git
+
 ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -21,9 +23,9 @@ def test_uv_uses_own_environment_despite_root_environment(tmp_path, project):
 @pytest.mark.parametrize("project", ["bot_setup", "packaging"])
 def test_local_ignore_rules_work_without_root_gitignore(tmp_path, project):
     shutil.copyfile(ROOT / "scripts" / project / ".gitignore", tmp_path / ".gitignore")
-    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    run_git("init", "-q", cwd=tmp_path, check=True)
     generated = [".venv/private", "__pycache__/module.pyc", ".pytest_cache/state", "dist/file.whl", ".coverage"]
     sources = ["pyproject.toml", "uv.lock", "src/module.py", "tests/test_module.py"]
-    result = subprocess.run(["git", "check-ignore", "--stdin"], cwd=tmp_path, input="\n".join(generated + sources), capture_output=True, text=True)
+    result = run_git("check-ignore", "--stdin", cwd=tmp_path, input="\n".join(generated + sources), capture_output=True, text=True)
     assert result.returncode == 0
     assert set(result.stdout.splitlines()) == set(generated)

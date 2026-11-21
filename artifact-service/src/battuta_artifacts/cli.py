@@ -135,7 +135,8 @@ def publish(ctx, project, artifact, files, expected_revision, json_output):
     current = store.project_artifact(project, artifact)
     store._expect(current, expected_revision)
     paths = [path for path in current["files"] if path != current["entry_path"]]
-    mapping = assemble_files(Path(current["source_root"]), current["entry_path"], tuple(dict.fromkeys([*paths, *files])))
+    mapping = assemble_files(Path(current["source_root"]), current["entry_path"], tuple(dict.fromkeys([*paths, *files])),
+                             project=project)
     item = store.publish(current["slug"], files=mapping["files"], expected_revision=current["revision"])
     output(ctx, json_output, artifact=presented(item))
 
@@ -193,7 +194,7 @@ def replace_files(ctx, slug, root, entry, files, expected_revision, json_output)
     store = registry()
     current = store.get(slug)
     presented(current)
-    mapping = assemble_files(root, entry, files)
+    mapping = assemble_files(root, entry, files, project=current["project"])
     if current["project"] is not None and (mapping["source_root"] != current["source_root"] or mapping["entry_path"] != "index.html"):
         raise ArtifactError("Project presentations retain their managed directory and index.html entry.")
     store._expect(current, expected_revision)

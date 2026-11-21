@@ -15,6 +15,7 @@
   just HTML. Publication needs authority, not merely a ready draft.
 
 Return the draft path, narrative/source decisions, checks and blockers to Manager.
-After authorized publication inspect returned status/revision and local URL. A local
-response does not prove external reachability or owner acceptance. Published edits
-are live; recheck the changed version, not an older render.
+After authorized publication inspect returned status/revision and verify with
+`local_url` only; do not fetch the public URL. Report it as "not checked (behind
+owner's Cloudflare gate)" unless the owner asks; never ask the owner to confirm it.
+Published edits are live; recheck the changed version, not an older render.

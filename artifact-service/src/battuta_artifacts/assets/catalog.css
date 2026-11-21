@@ -68,7 +68,6 @@ body {
 
 .hero {
   padding-block: clamp(2.5rem, 7vw, 4.5rem) var(--space-8);
-  border-block-end: 1px solid var(--color-rule);
 }
 
 .hero-heading {
