@@ -43,7 +43,7 @@ battuta-artifact replace-files procurement-sizing --root "<returned-directory>" 
 
 These commands use the **public slug**. Local inspection includes drafts. `update` changes supplied metadata only. `replace-files` replaces the complete file configuration, including unchanged desired assets and extension CSS; omitted files lose HTTP access. Project artifacts retain their managed directory and `index.html` entry. No file operation changes draft/publication status.
 
-With `--root`, entry/assets are exact relative files; the entry is included automatically. Without `--root`, provide an absolute `--entry` and no additional files. Entry extensions are `.html`, `.htm`, `.md` or `.markdown`; paths reject traversal, symlinks, directories and globs. Original-file edits need no command and are live once published. Metadata/file replacement increments revision; use `show`'s revision for guarded changes and inspect again on conflict.
+With `--root`, entry/assets are exact relative files; the entry is included automatically. Without `--root`, provide an absolute `--entry` and no additional files. Entry extensions are `.html`, `.htm`, `.md` or `.markdown`; paths reject traversal, directories and globs; a symlink is accepted only as a leaf file whose target is a regular file inside the owning project's code checkout, and is rejected otherwise (including directory symlinks, symlinked parent folders and artifacts without a project). Original-file edits need no command and are live once published. Metadata/file replacement increments revision; use `show`'s revision for guarded changes and inspect again on conflict.
 
 ## Withdraw and recover
 

@@ -36,7 +36,7 @@ def media_type(path: str) -> str:
             ".htm": "text/html"}.get(suffix) or mimetypes.guess_type(path)[0] or "application/octet-stream"
 
 
-def assemble_files(root: Path | None, entry: str, files: tuple[str, ...]) -> dict:
+def assemble_files(root: Path | None, entry: str, files: tuple[str, ...], *, project: str | None = None) -> dict:
     if root is None:
         entry_file = Path(entry).expanduser()
         if not entry_file.is_absolute() or files:
@@ -54,12 +54,13 @@ def assemble_files(root: Path | None, entry: str, files: tuple[str, ...]) -> dic
     paths = [entry, *files]
     if len(set(paths)) != len(paths):
         raise ArtifactError("Duplicate file paths; the entry is already included automatically.")
-    from .files import open_source
+    from .files import allowed_link_root, open_source
 
+    link_root = allowed_link_root(project)
     for path in paths:
         relative_path(path)
         try:
-            with open_source(str(root), path):
+            with open_source(str(root), path, link_root=link_root):
                 pass
         except OSError as exc:
             raise ArtifactError(f"File is unavailable: {path}") from exc

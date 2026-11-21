@@ -171,7 +171,7 @@ def initialize(store, *, project: str, name: str, slug: str, title: str, descrip
                     finally:
                         os.close(parent_fd)
                 served = tuple(entry.path for entry in bundle.files if entry.serve and entry.path != bundle.entry)
-                mapping = assemble_files(directory, bundle.entry, served)
+                mapping = assemble_files(directory, bundle.entry, served, project=project)
                 item = store.register(**metadata.model_dump(), **mapping, status="draft", template=None,
                                        project=project, name=name)
             finally:

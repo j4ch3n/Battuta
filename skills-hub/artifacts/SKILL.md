@@ -66,6 +66,10 @@ private JSON companion synchronized manually after edits.
 Use `replace-files` with the complete desired runtime set when adding/removing
 assets. Never recursively share a folder, private notes, credentials or unrelated
 sources. Published originals change live immediately; review edits accordingly.
+To keep a project repository file git-tracked, link it into the bundle as a leaf
+symlink whose target is a regular file inside the owning project's code checkout.
+Other symlinks, directory symlinks, symlinked parent folders, FIFOs, devices and
+dangling links are rejected at publish and serve.
 
 ## Existing Markdown and withdrawal
 

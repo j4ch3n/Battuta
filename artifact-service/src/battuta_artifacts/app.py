@@ -13,7 +13,7 @@ from starlette.responses import FileResponse
 from sse_starlette import EventSourceResponse
 
 from .config import database_path
-from .files import SourceResponse, open_source
+from .files import SourceResponse, allowed_link_root, open_source
 from .events import CatalogEvents
 from .markdown import render_markdown
 from .registry import ArtifactError, Registry
@@ -127,7 +127,7 @@ def create_app(path: Path | None = None) -> FastAPI:
                 raise HTTPException(404, "Artifact resource not found")
             if not path and "/" in selected:
                 return RedirectResponse(f"/artifacts/a/{slug}/{quote(selected)}", headers={"Cache-Control": "no-store"})
-            source = open_source(item["source_root"], selected)
+            source = open_source(item["source_root"], selected, link_root=allowed_link_root(item["project"]))
             if Path(selected).suffix.lower() in (".md", ".markdown"):
                 with source:
                     try:
