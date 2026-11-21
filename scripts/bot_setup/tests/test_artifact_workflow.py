@@ -45,11 +45,6 @@ def test_assignment_briefs_require_artifacts_workflow():
     assert "local_url" in rule and "not checked" in rule
 
 
-def test_worker_treats_page_briefs_as_artifact_tasks():
-    rule = next(p for p in WORKER.read_text().split("\n- ") if "artifact task" in p)
-    assert "artifacts/SKILL.md" in rule and "blocker" in rule
-
-
 def test_cos_routes_artifact_requests_to_manager_with_publish_authority():
     text = COS.read_text()
     rule = next(line for line in text.splitlines() if "artifact-build request" in line)

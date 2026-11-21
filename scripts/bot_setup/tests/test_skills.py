@@ -4,10 +4,10 @@ import json
 
 import click
 import pytest
-import subprocess
 from pathlib import Path
 
 from bot_setup.instructions import configure_instructions
+from hermetic_git import run_git
 from skill_fixtures import skill_catalog, manifest_text
 
 
@@ -58,8 +58,8 @@ def test_custom_workspace_manifest_controls_local_discovery(tmp_path):
 def test_generated_discovery_paths_are_git_ignored(tmp_path, role):
     root = Path(__file__).resolve().parents[3]
     (tmp_path / ".gitignore").write_text((root / f"bots/{role}-bot/.gitignore").read_text())
-    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-    result = subprocess.run(["git", "check-ignore", "--stdin"], cwd=tmp_path, input=".pi/skills/memory\n.pi/skills/custom\n.pi/mail-sessions/example.jsonl\n.pi/sessions/example.jsonl\n.pi/settings.json\nbot.toml\n", text=True, capture_output=True)
+    run_git("init", "-q", cwd=tmp_path, check=True)
+    result = run_git("check-ignore", "--stdin", cwd=tmp_path, input=".pi/skills/memory\n.pi/skills/custom\n.pi/mail-sessions/example.jsonl\n.pi/sessions/example.jsonl\n.pi/settings.json\nbot.toml\n", text=True, capture_output=True)
     assert set(result.stdout.splitlines()) == {".pi/skills/memory", ".pi/skills/custom", ".pi/mail-sessions/example.jsonl", ".pi/sessions/example.jsonl", ".pi/settings.json"}
 
 
