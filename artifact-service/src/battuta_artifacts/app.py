@@ -13,7 +13,7 @@ from starlette.responses import FileResponse
 from sse_starlette import EventSourceResponse
 
 from .config import database_path
-from .files import SourceResponse, allowed_link_root, open_source
+from .files import HiddenPathError, SourceResponse, allowed_link_root, open_source
 from .events import CatalogEvents
 from .markdown import render_markdown
 from .registry import ArtifactError, Registry
@@ -115,16 +115,28 @@ def create_app(path: Path | None = None) -> FastAPI:
     async def catalog_events():
         return EventSourceResponse(events.stream(), ping=15, send_timeout=30, headers={"Cache-Control": "no-store"})
 
+    def error_page(heading: str, message: str):
+        return HTMLResponse(templates.get_template("error.html").render(heading=heading, message=message),
+                            status_code=404, headers={"Cache-Control": "no-store"})
+
+    def not_found():
+        return error_page("Artifact file not found", "This artifact does not include that file.")
+
+    def hidden():
+        return error_page("Hidden file warning", "Hidden files are never served from artifacts.")
+
     @app.get("/artifacts/a/{slug}/")
     @app.get("/artifacts/a/{slug}/{path:path}")
     def artifact(slug: str, path: str = ""):
+        if any(part.startswith(".") for part in path.split("/")):
+            return hidden()
         try:
             item = registry.get(slug)
             if item["status"] != "published":
-                raise HTTPException(404, "Artifact resource not found")
+                return not_found()
             selected = path or item["entry_path"]
             if selected not in item["files"]:
-                raise HTTPException(404, "Artifact resource not found")
+                return not_found()
             if not path and "/" in selected:
                 return RedirectResponse(f"/artifacts/a/{slug}/{quote(selected)}", headers={"Cache-Control": "no-store"})
             source = open_source(item["source_root"], selected, link_root=allowed_link_root(item["project"]))
@@ -137,7 +149,9 @@ def create_app(path: Path | None = None) -> FastAPI:
                 return HTMLResponse(templates.get_template("markdown.html").render(title=item["title"], content=rendered),
                                     headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
             return SourceResponse(source, item["files"][selected])
-        except (ArtifactError, OSError) as exc:
-            raise HTTPException(404, "Artifact resource not found") from exc
+        except HiddenPathError:
+            return hidden()
+        except (ArtifactError, OSError):
+            return not_found()
 
     return app

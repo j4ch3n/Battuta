@@ -54,7 +54,7 @@ def assemble_files(root: Path | None, entry: str, files: tuple[str, ...], *, pro
     paths = [entry, *files]
     if len(set(paths)) != len(paths):
         raise ArtifactError("Duplicate file paths; the entry is already included automatically.")
-    from .files import allowed_link_root, open_source
+    from .files import HiddenPathError, allowed_link_root, open_source
 
     link_root = allowed_link_root(project)
     for path in paths:
@@ -62,6 +62,8 @@ def assemble_files(root: Path | None, entry: str, files: tuple[str, ...], *, pro
         try:
             with open_source(str(root), path, link_root=link_root):
                 pass
+        except HiddenPathError as exc:
+            raise ArtifactError(f"File is unavailable: {path} (hidden target)") from exc
         except OSError as exc:
             raise ArtifactError(f"File is unavailable: {path}") from exc
     return {"source_root": str(root), "entry_path": entry,

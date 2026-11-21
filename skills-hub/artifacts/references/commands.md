@@ -45,6 +45,8 @@ These commands use the **public slug**. Local inspection includes drafts. `updat
 
 With `--root`, entry/assets are exact relative files; the entry is included automatically. Without `--root`, provide an absolute `--entry` and no additional files. Entry extensions are `.html`, `.htm`, `.md` or `.markdown`; paths reject traversal, directories and globs; a symlink is accepted only as a leaf file whose target is a regular file inside the owning project's code checkout, and is rejected otherwise (including directory symlinks, symlinked parent folders and artifacts without a project). Original-file edits need no command and are live once published. Metadata/file replacement increments revision; use `show`'s revision for guarded changes and inspect again on conflict.
 
+Hidden paths (any dot-prefixed component, including link targets) are never served or published; unknown or hidden paths return 404 pages.
+
 ## Withdraw and recover
 
 ```sh

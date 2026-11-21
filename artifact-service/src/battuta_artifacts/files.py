@@ -43,9 +43,15 @@ def _link_target(parent: Path, name: str, directory: int) -> Path:
     return Path(os.path.realpath(os.path.join(parent, os.readlink(name, dir_fd=directory))))
 
 
+class HiddenPathError(OSError):
+    """A link resolves to a dot-prefixed path inside the project checkout."""
+
+
 def _check_target(target: Path, link_root: Path) -> None:
     if target == link_root or not target.is_relative_to(link_root):
         raise OSError("Link target is outside the project checkout")
+    if any(part.startswith(".") for part in target.relative_to(link_root).parts):
+        raise HiddenPathError("Link target is a hidden path")
     if not stat.S_ISREG(os.lstat(target).st_mode):
         raise OSError("Link target is not a regular file")
 

@@ -97,6 +97,22 @@ class RejectedLinkTests(LinkFixture):
                 self.assertNotEqual(result.exit_code, 0, result.output)
                 self.assertIn("File is unavailable", result.output)
 
+    def test_hidden_symlink_target_is_rejected_at_serve_and_publish(self):
+        self.publish_valid_link()
+        hidden = self.code / ".git/config"
+        hidden.parent.mkdir()
+        hidden.write_bytes(b"TOKEN")
+        self.repoint(hidden)
+
+        response = self.get()
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("Hidden file warning", response.text)
+        self.assertNotIn("TOKEN", response.text)
+        with self.assertRaises(ArtifactError) as raised:
+            assemble_files(self.bundle, "index.html", ("linked.txt",), project="procurement")
+        self.assertEqual(str(raised.exception), "File is unavailable: linked.txt (hidden target)")
+        self.assertNotIn(str(self.home), str(raised.exception))
+
     def test_symlinked_ancestor_inside_bundle_is_rejected(self):
         real = self.code / "docs"
         real.mkdir()

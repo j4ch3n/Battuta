@@ -70,6 +70,7 @@ To keep a project repository file git-tracked, link it into the bundle as a leaf
 symlink whose target is a regular file inside the owning project's code checkout.
 Other symlinks, directory symlinks, symlinked parent folders, FIFOs, devices and
 dangling links are rejected at publish and serve.
+Hidden paths (any dot-prefixed component) are never served; unknown or hidden paths return 404 pages.
 
 ## Existing Markdown and withdrawal
 

@@ -90,6 +90,35 @@ class HttpTests(HttpFixture):
                 self.assertEqual(response.status_code, 404)
                 self.assertNotIn(str(self.source), response.text)
 
+    def assert_error_page(self, response, heading, *absent):
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.headers["content-type"], "text/html; charset=utf-8")
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        self.assertIn(heading, response.text)
+        self.assertNotIn("<script", response.text)
+        for text in absent:
+            self.assertNotIn(text, response.text)
+
+    def test_unknown_path_returns_styled_404_page(self):
+        client = self.client()
+        for url in ("/artifacts/a/demo/nope.txt", "/artifacts/a/missing/", "/artifacts/a/demo/secret.txt"):
+            with self.subTest(url=url):
+                self.assert_error_page(client.get(url), "Artifact file not found", "nope", "private", str(self.source))
+
+    def test_hidden_request_paths_return_warning_page_without_bytes(self):
+        (self.source / ".env").write_text("SECRET-ENV")
+        (self.source / "sub/.git").mkdir(parents=True)
+        (self.source / "sub/.git/config").write_text("SECRET-GIT")
+        self.registry.register(slug="leaky", title="Leaky", description="Hidden files registered", status="published",
+                               source_root=str(self.source), entry_path="index.html", format="html",
+                               files={"index.html": "text/html", ".env": "text/plain", "sub/.git/config": "text/plain"})
+        client = self.client()
+        for slug in ("demo", "leaky", "missing"):
+            for path in (".env", "sub/.git/config", ".git/config", "sub/.hidden"):
+                with self.subTest(slug=slug, path=path):
+                    self.assert_error_page(client.get(f"/artifacts/a/{slug}/{path}"), "Hidden file warning",
+                                           "SECRET", path)
+
     def test_missing_file_and_post_registration_symlinks_are_not_served(self):
         client = self.client()
         script = self.source / "js/app.js"
