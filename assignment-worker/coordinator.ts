@@ -44,9 +44,9 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     accepted: ExecutionResult | undefined;
   let boundary: "completed" | "aborted" | "error" | undefined;
   let boundaryError: string | undefined;
-  // Set when a turn ended while a delegate run was active; the run's result turn is then the next settle.
-  let awaitingRun = false;
-  // The last run outcome seen when the current TODO started; a newer outcome ended during this TODO.
+  // The last run outcome at the turn's boundary; a newer one at settle has a result turn still to come.
+  let boundaryRunOutcome: RunOutcome | undefined;
+  // The last run outcome when the current TODO started; only a newer one is named in this TODO's blocker.
   let seenRunOutcome: RunOutcome | undefined;
   let tail: Promise<unknown> = Promise.resolve();
   let reconciling: Promise<void> | undefined;
@@ -97,7 +97,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     accepted = undefined;
     boundary = undefined;
     boundaryError = undefined;
-    awaitingRun = false;
+    boundaryRunOutcome = undefined;
     phase = "idle";
     queueMicrotask(() => {
       void coordinator.reconcile("idle");
@@ -186,7 +186,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     accepted = undefined;
     boundary = undefined;
     boundaryError = undefined;
-    awaitingRun = false;
+    boundaryRunOutcome = undefined;
     seenRunOutcome = runs?.lastRunOutcome?.();
     phase = "executing";
     sessions.runTodo({ ...binding }, structuredClone(current), latest, workspace);
@@ -330,6 +330,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     observeBoundary(outcome, errorMessage) {
       if (stopped || phase !== "executing") return;
       boundary = outcome;
+      boundaryRunOutcome = runs?.lastRunOutcome?.();
       boundaryError = errorMessage;
     },
     settle(event) {
@@ -348,20 +349,18 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
           return;
         }
         if (!accepted) {
-          // A run in progress, or one that ended after this TODO's boundary and before settle, keeps the
-          // TODO bound: its result arrives as a new turn, which reports or blocks. The result turn itself
-          // (awaitingRun already set) does not defer again.
+          // A run in progress, or one that ended after this turn's boundary, keeps the TODO bound: its
+          // result arrives as a new turn. A run that ended before the boundary has no turn to come (its
+          // result was returned or steered into this one), so deferring for it would never settle.
           const ended = runs?.lastRunOutcome?.();
-          const endedDuringTodo = ended !== undefined && ended !== seenRunOutcome;
-          if (runs?.isRunActive() || (endedDuringTodo && !awaitingRun)) {
-            awaitingRun = true;
+          if (runs?.isRunActive() || ended !== boundaryRunOutcome) {
             diagnostics(
               "Turn ended with a delegate run active or its result queued; TODO stays bound",
             );
             return;
           }
           await blockRun(
-            failedRunBlocker(awaitingRun ? ended : undefined) ??
+            failedRunBlocker(ended !== seenRunOutcome ? ended : undefined) ??
               "Execution settled without a valid report_execution_result",
           );
           return;

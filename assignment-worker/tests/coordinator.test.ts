@@ -774,3 +774,110 @@ test("a second run started by the result turn keeps the TODO bound until that ru
   await h.complete();
   expect(h.state.assignment.status).toBe("done");
 });
+
+test.each(failedRuns)(
+  "a run that ended as %j before the first boundary blocks at once with the run outcome",
+  async (outcome, blocker) => {
+    const h = harness(1);
+    await h.begin();
+    // The run ended inside the turn, so no result turn follows.
+    h.runs.outcome = outcome;
+    h.coordinator.observeBoundary("completed");
+    await h.coordinator.settle({ aborted: false });
+    expect(h.state.assignment.status).toBe("blocked");
+    expect(h.state.assignment.blocker).toBe(blocker);
+    expect(h.notifications).toHaveLength(1);
+  },
+);
+
+test("a run that succeeded before the first boundary blocks at once when nothing is reported", async () => {
+  const h = harness(1);
+  await h.begin();
+  h.runs.outcome = { sessionId: "run-11", state: "finished" };
+  h.coordinator.observeBoundary("completed");
+  await h.coordinator.settle({ aborted: false });
+  expect(h.state.assignment.status).toBe("blocked");
+  expect(h.state.assignment.blocker).toBe(
+    "Execution settled without a valid report_execution_result",
+  );
+  expect(h.notifications).toHaveLength(1);
+});
+
+test.each(["first turn", "result turn of an earlier run"])(
+  "a run that ends between boundary and settle of the %s defers once, then blocks",
+  async (turn) => {
+    const h = harness(1);
+    await h.begin();
+    const earlierRun = turn !== "first turn";
+    if (earlierRun) {
+      h.runs.active = true;
+      h.coordinator.observeBoundary("completed");
+      await h.coordinator.settle({ aborted: false });
+      h.runs.active = false;
+      h.runs.outcome = { sessionId: "run-12", state: "finished" };
+    }
+    h.coordinator.observeBoundary("completed");
+    h.runs.outcome = { sessionId: "run-13", state: "failed", reason: "exited with code 1" };
+    h.diagnostics.mockClear();
+    await h.coordinator.settle({ aborted: false });
+    expect(h.state.assignment.status).toBe("in_process");
+    h.coordinator.observeBoundary("completed");
+    await h.coordinator.settle({ aborted: false });
+    expect(h.state.assignment.status).toBe("blocked");
+    expect(h.state.assignment.blocker).toBe(
+      "Delegate run run-13 failed: exited with code 1; no report_execution_result was accepted",
+    );
+    const deferrals = h.diagnostics.mock.calls.filter(([event]) =>
+      String(event).includes("TODO stays bound"),
+    );
+    expect(deferrals).toHaveLength(1);
+  },
+);
+
+test("a chained run that ends between boundary and settle settles done when its result turn reports", async () => {
+  const h = harness(1, { active: true });
+  await h.begin();
+  h.coordinator.observeBoundary("completed");
+  await h.coordinator.settle({ aborted: false });
+  // The result turn starts a second run, which ends just after that turn's boundary.
+  h.runs.outcome = { sessionId: "run-14", state: "finished" };
+  h.coordinator.observeBoundary("completed");
+  h.runs.active = false;
+  h.runs.outcome = { sessionId: "run-15", state: "finished" };
+  await h.coordinator.settle({ aborted: false });
+  expect(h.state.assignment.status).toBe("in_process");
+  await h.complete();
+  expect(h.state.assignment.status).toBe("done");
+  expect(h.notifications.map((d) => d.assignment.status)).toEqual(["done"]);
+});
+
+test("a chained run does not block while active, then blocks with its own outcome", async () => {
+  const h = harness(1, { active: true });
+  await h.begin();
+  h.coordinator.observeBoundary("completed");
+  await h.coordinator.settle({ aborted: false });
+  // The first run failed, and its result turn started a second run, which is still active.
+  h.runs.outcome = { sessionId: "run-16", state: "failed", reason: "exited with code 1" };
+  h.coordinator.observeBoundary("completed");
+  await h.coordinator.settle({ aborted: false });
+  expect(h.state.assignment.status).toBe("in_process");
+  h.runs.active = false;
+  h.runs.outcome = { sessionId: "run-17", state: "stopped" };
+  h.coordinator.observeBoundary("completed");
+  await h.coordinator.settle({ aborted: false });
+  expect(h.state.assignment.blocker).toBe(
+    "Delegate run run-17 was stopped; no report_execution_result was accepted",
+  );
+});
+
+test("a run that failed during an earlier TODO is not named in a later TODO's blocker", async () => {
+  const h = harness(2);
+  await h.begin();
+  h.runs.outcome = { sessionId: "run-18", state: "failed", reason: "exited with code 1" };
+  await h.complete();
+  h.coordinator.observeBoundary("completed");
+  await h.coordinator.settle({ aborted: false });
+  expect(h.state.assignment.blocker).toBe(
+    "Execution settled without a valid report_execution_result",
+  );
+});
