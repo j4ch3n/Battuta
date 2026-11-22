@@ -46,6 +46,8 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
   let boundaryError: string | undefined;
   // Set when a turn ended while a delegate run was active; the run's result turn is then the next settle.
   let awaitingRun = false;
+  // The last run outcome seen when the current TODO started; a newer outcome ended during this TODO.
+  let seenRunOutcome: RunOutcome | undefined;
   let tail: Promise<unknown> = Promise.resolve();
   let reconciling: Promise<void> | undefined;
   const abilities: ReadonlySet<string> = parseAbilities(options.capabilities);
@@ -185,6 +187,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     boundary = undefined;
     boundaryError = undefined;
     awaitingRun = false;
+    seenRunOutcome = runs?.lastRunOutcome?.();
     phase = "executing";
     sessions.runTodo({ ...binding }, structuredClone(current), latest, workspace);
   }
@@ -345,16 +348,20 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
           return;
         }
         if (!accepted) {
-          // A run in progress keeps the TODO bound: its result arrives as a new turn, which reports or blocks.
-          if (runs?.isRunActive()) {
+          // A run in progress, or one that ended after this TODO's boundary and before settle, keeps the
+          // TODO bound: its result arrives as a new turn, which reports or blocks. The result turn itself
+          // (awaitingRun already set) does not defer again.
+          const ended = runs?.lastRunOutcome?.();
+          const endedDuringTodo = ended !== undefined && ended !== seenRunOutcome;
+          if (runs?.isRunActive() || (endedDuringTodo && !awaitingRun)) {
             awaitingRun = true;
             diagnostics(
-              "Turn ended with a delegate run active; TODO stays bound for its result turn",
+              "Turn ended with a delegate run active or its result queued; TODO stays bound",
             );
             return;
           }
           await blockRun(
-            failedRunBlocker(awaitingRun ? runs?.lastRunOutcome?.() : undefined) ??
+            failedRunBlocker(awaitingRun ? ended : undefined) ??
               "Execution settled without a valid report_execution_result",
           );
           return;

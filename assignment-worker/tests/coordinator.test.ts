@@ -708,6 +708,57 @@ test.each(failedRuns)(
   },
 );
 
+test("a run that ends between the boundary and settle keeps the TODO bound until its result turn settles done", async () => {
+  const h = harness(1);
+  await h.begin();
+  h.coordinator.observeBoundary("completed");
+  h.runs.outcome = { sessionId: "run-4", state: "finished" };
+  await h.coordinator.settle({ aborted: false });
+  expect(h.state.assignment.status).toBe("in_process");
+  expect(h.state.todos[0].status).toBe("in_progress");
+  expect(h.notifications).toHaveLength(0);
+  await h.complete();
+  expect(h.state.todos[0].status).toBe("done");
+  expect(h.state.assignment.status).toBe("done");
+  expect(h.notifications.map((d) => d.assignment.status)).toEqual(["done"]);
+});
+
+test("a run that fails between the boundary and settle blocks its follow-up turn when that turn reports nothing", async () => {
+  const h = harness(1);
+  await h.begin();
+  h.coordinator.observeBoundary("completed");
+  h.runs.outcome = { sessionId: "run-9", state: "failed", reason: "exited with code 1" };
+  await h.coordinator.settle({ aborted: false });
+  expect(h.state.assignment.status).toBe("in_process");
+  h.coordinator.observeBoundary("completed");
+  await h.coordinator.settle({ aborted: false });
+  expect(h.state.assignment.status).toBe("blocked");
+  expect(h.state.assignment.blocker).toBe(
+    "Delegate run run-9 failed: exited with code 1; no report_execution_result was accepted",
+  );
+  expect(h.state.todos[0].status).toBe("blocked");
+  expect(h.notifications).toHaveLength(1);
+});
+
+test("the normal result turn after a run blocks without deferring again", async () => {
+  const h = harness(1, { active: true });
+  await h.begin();
+  h.coordinator.observeBoundary("completed");
+  await h.coordinator.settle({ aborted: false });
+  h.runs.active = false;
+  h.runs.outcome = { sessionId: "run-10", state: "finished" };
+  h.coordinator.observeBoundary("completed");
+  await h.coordinator.settle({ aborted: false });
+  expect(h.state.assignment.status).toBe("blocked");
+  expect(h.state.assignment.blocker).toBe(
+    "Execution settled without a valid report_execution_result",
+  );
+  const deferrals = h.diagnostics.mock.calls.filter(([event]) =>
+    String(event).includes("TODO stays bound"),
+  );
+  expect(deferrals).toHaveLength(1);
+});
+
 test("a second run started by the result turn keeps the TODO bound until that run ends", async () => {
   const h = harness(1, { active: true });
   await h.begin();
