@@ -39,6 +39,17 @@ export interface ExecutionSessions {
   appendEntry(kind: string, data: unknown): void;
 }
 export type ReconcileReason = "startup" | "reconnect" | "idle" | "event" | "fallback";
+/** How the worker's last delegate run ended; `finished` carries no reason. */
+export type RunOutcome = {
+  sessionId?: string;
+  state: "finished" | "failed" | "stopped";
+  reason?: string;
+};
+/** The delegate runs as the coordinator sees them: whether one is active, and how the last one ended. */
+export interface RunTracker {
+  isRunActive(): boolean;
+  lastRunOutcome?(): RunOutcome | undefined;
+}
 export interface CoordinatorOptions {
   workerId: string;
   capabilities: string[];
@@ -46,6 +57,8 @@ export interface CoordinatorOptions {
   sessions: ExecutionSessions;
   notify: (detail: Detail) => Promise<MailDelivery>;
   diagnostics: (event: string, error?: unknown) => void;
+  /** Absent in tests and bots without delegation: then no run is ever active. */
+  runs?: RunTracker;
 }
 export interface Coordinator {
   reconcile(reason: ReconcileReason): Promise<void>;

@@ -12,16 +12,31 @@ import type {
   Binding,
   Detail,
   ExecutionResult,
+  RunOutcome,
   TodoRow,
   AssignmentView,
   Workspace,
 } from "./types.ts";
 
+/** The blocker for a result turn that reports nothing after its run failed, timed out or was stopped. */
+function failedRunBlocker(outcome: RunOutcome | undefined): string | undefined {
+  if (!outcome || outcome.state === "finished") return undefined;
+  const run = `Delegate run ${outcome.sessionId ?? "(session id not reported)"}`;
+  const timeout = /timed out after (\d+)ms/.exec(outcome.reason ?? "");
+  const how =
+    outcome.state === "stopped"
+      ? "was stopped"
+      : timeout
+        ? `timed out after ${Number(timeout[1]) / 1000}s`
+        : `failed: ${outcome.reason ?? "unknown error"}`;
+  return `${run} ${how}; no report_execution_result was accepted`;
+}
+
 type Phase =
   "idle" | "claiming" | "switching" | "executing" | "persisting" | "reporting" | "paused";
 
 export function createCoordinator(options: CoordinatorOptions): Coordinator {
-  const { assignments, sessions, notify, diagnostics } = options;
+  const { assignments, sessions, notify, diagnostics, runs } = options;
   let phase: Phase = "idle",
     stopped = false;
   let binding: Binding | undefined,
@@ -29,6 +44,8 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     accepted: ExecutionResult | undefined;
   let boundary: "completed" | "aborted" | "error" | undefined;
   let boundaryError: string | undefined;
+  // Set when a turn ended while a delegate run was active; the run's result turn is then the next settle.
+  let awaitingRun = false;
   let tail: Promise<unknown> = Promise.resolve();
   let reconciling: Promise<void> | undefined;
   const abilities: ReadonlySet<string> = parseAbilities(options.capabilities);
@@ -78,6 +95,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     accepted = undefined;
     boundary = undefined;
     boundaryError = undefined;
+    awaitingRun = false;
     phase = "idle";
     queueMicrotask(() => {
       void coordinator.reconcile("idle");
@@ -166,6 +184,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     accepted = undefined;
     boundary = undefined;
     boundaryError = undefined;
+    awaitingRun = false;
     phase = "executing";
     sessions.runTodo({ ...binding }, structuredClone(current), latest, workspace);
   }
@@ -326,7 +345,18 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
           return;
         }
         if (!accepted) {
-          await blockRun("Execution settled without a valid report_execution_result");
+          // A run in progress keeps the TODO bound: its result arrives as a new turn, which reports or blocks.
+          if (runs?.isRunActive()) {
+            awaitingRun = true;
+            diagnostics(
+              "Turn ended with a delegate run active; TODO stays bound for its result turn",
+            );
+            return;
+          }
+          await blockRun(
+            failedRunBlocker(awaitingRun ? runs?.lastRunOutcome?.() : undefined) ??
+              "Execution settled without a valid report_execution_result",
+          );
           return;
         }
         const report = accepted,

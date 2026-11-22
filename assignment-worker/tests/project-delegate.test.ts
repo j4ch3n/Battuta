@@ -626,3 +626,22 @@ test("a run ended by delegate_stop is reported as stopped, not failed", async ()
   expect(content).toContain("stopped");
   expect(content).not.toContain("failed");
 });
+
+test("the last run's outcome records how a failed run ended, for the coordinator's blocker", async () => {
+  const { tools, handle } = await install();
+  const { heldRun } = await startHeld(tools);
+  heldRun.reject(new Error("/usr/bin/node timed out after 1800000ms"));
+  await vi.waitFor(() => expect(handle?.isRunActive()).toBe(false));
+  expect(handle?.lastRunOutcome?.()).toMatchObject({
+    state: "failed",
+    reason: "/usr/bin/node timed out after 1800000ms",
+  });
+});
+
+test("the last run's outcome is finished when the run completes", async () => {
+  const { tools, handle } = await install();
+  const { heldRun } = await startHeld(tools);
+  heldRun.resolve();
+  await vi.waitFor(() => expect(handle?.isRunActive()).toBe(false));
+  expect(handle?.lastRunOutcome?.()).toMatchObject({ state: "finished" });
+});

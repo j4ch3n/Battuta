@@ -9,10 +9,14 @@ import type {
   TodoTarget,
   Detail,
   MailDelivery,
+  RunOutcome,
 } from "../types.ts";
 import { detail } from "./fixtures.ts";
 
-function harness(count = 2) {
+/** The delegate run tracker the coordinator reads; tests change it to simulate a run starting or ending. */
+type FakeRuns = { active: boolean; outcome?: RunOutcome };
+
+function harness(count = 2, runs: FakeRuns = { active: false }) {
   const state = detail();
   state.todos = Array.from({ length: count }, (_, i) => ({
     ...state.todos[0],
@@ -147,9 +151,14 @@ function harness(count = 2) {
     notify,
     workerId: "test-worker",
     capabilities: [],
+    runs: {
+      isRunActive: () => runs.active,
+      lastRunOutcome: () => runs.outcome,
+    },
   });
   return {
     state,
+    runs,
     assignments,
     sessions,
     coordinator,
@@ -619,4 +628,98 @@ test("an invalid flat report is rejected with a field-specific message and the r
   await h.complete();
   expect(h.state.assignment.status).toBe("done");
   expect(h.notifications.map((d) => d.assignment.status)).toEqual(["done"]);
+});
+
+test("a turn that ends during a delegate run keeps the TODO bound; its result turn reports and settles done", async () => {
+  const h = harness(1, { active: true });
+  await h.begin();
+  h.coordinator.observeBoundary("completed");
+  await h.coordinator.settle({ aborted: false });
+  expect(h.state.assignment.status).toBe("in_process");
+  expect(h.state.todos[0].status).toBe("in_progress");
+  expect(h.notifications).toHaveLength(0);
+  // The run ends; its result arrives as a new turn, which reports a valid completion.
+  h.runs.active = false;
+  h.runs.outcome = { sessionId: "run-1", state: "finished" };
+  await h.complete();
+  expect(h.state.todos[0].status).toBe("done");
+  expect(h.state.assignment.status).toBe("done");
+  expect(h.notifications.map((d) => d.assignment.status)).toEqual(["done"]);
+});
+
+test("no active run and no report still blocks with the existing message", async () => {
+  const h = harness(1);
+  await h.begin();
+  h.coordinator.observeBoundary("completed");
+  await h.coordinator.settle({ aborted: false });
+  expect(h.state.assignment.status).toBe("blocked");
+  expect(h.state.assignment.blocker).toBe(
+    "Execution settled without a valid report_execution_result",
+  );
+  expect(h.notifications).toHaveLength(1);
+});
+
+test("a finished run whose result turn reports nothing keeps the existing message", async () => {
+  const h = harness(1, { active: true });
+  await h.begin();
+  h.coordinator.observeBoundary("completed");
+  await h.coordinator.settle({ aborted: false });
+  h.runs.active = false;
+  h.runs.outcome = { sessionId: "run-2", state: "finished" };
+  h.coordinator.observeBoundary("completed");
+  await h.coordinator.settle({ aborted: false });
+  expect(h.state.assignment.status).toBe("blocked");
+  expect(h.state.assignment.blocker).toBe(
+    "Execution settled without a valid report_execution_result",
+  );
+});
+
+const failedRuns: [RunOutcome, string][] = [
+  [
+    { sessionId: "run-7", state: "failed", reason: "/usr/bin/node timed out after 1800000ms" },
+    "Delegate run run-7 timed out after 1800s; no report_execution_result was accepted",
+  ],
+  [
+    { sessionId: "run-8", state: "failed", reason: "exited with code 1" },
+    "Delegate run run-8 failed: exited with code 1; no report_execution_result was accepted",
+  ],
+  [
+    { state: "stopped" },
+    "Delegate run (session id not reported) was stopped; no report_execution_result was accepted",
+  ],
+];
+
+test.each(failedRuns)(
+  "a run that ends as %j blocks its result turn, which reports nothing, with the run outcome",
+  async (outcome, blocker) => {
+    const h = harness(1, { active: true });
+    await h.begin();
+    h.coordinator.observeBoundary("completed");
+    await h.coordinator.settle({ aborted: false });
+    expect(h.state.assignment.status).toBe("in_process");
+    h.runs.active = false;
+    h.runs.outcome = outcome;
+    h.coordinator.observeBoundary("completed");
+    await h.coordinator.settle({ aborted: false });
+    expect(h.state.assignment.status).toBe("blocked");
+    expect(h.state.assignment.blocker).toBe(blocker);
+    expect(h.state.todos[0].status).toBe("blocked");
+    expect(h.notifications).toHaveLength(1);
+  },
+);
+
+test("a second run started by the result turn keeps the TODO bound until that run ends", async () => {
+  const h = harness(1, { active: true });
+  await h.begin();
+  h.coordinator.observeBoundary("completed");
+  await h.coordinator.settle({ aborted: false });
+  // The first run finished, and the result turn starts a second run before it ends.
+  h.runs.outcome = { sessionId: "run-3", state: "finished" };
+  h.runs.active = true;
+  h.coordinator.observeBoundary("completed");
+  await h.coordinator.settle({ aborted: false });
+  expect(h.state.assignment.status).toBe("in_process");
+  expect(h.notifications).toHaveLength(0);
+  await h.complete();
+  expect(h.state.assignment.status).toBe("done");
 });

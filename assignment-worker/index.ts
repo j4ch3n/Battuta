@@ -15,7 +15,7 @@ import { guardWorktreeCommand } from "./worktree-guard.ts";
 import { registerProjectDelegate } from "./project-delegate.ts";
 import { createNotifier } from "./notify.ts";
 import { ensureAssignmentWorkspace } from "./workspace.ts";
-import type { AssignmentClient, Coordinator, Detail } from "./types.ts";
+import type { AssignmentClient, Coordinator, Detail, RunTracker } from "./types.ts";
 
 export default async function worker(pi: ExtensionAPI) {
   let coordinator: Coordinator | undefined, client: AssignmentClient | undefined;
@@ -25,7 +25,7 @@ export default async function worker(pi: ExtensionAPI) {
   let stopped = false,
     restored = false;
   // Set once the delegate package loads (last, below); a run in progress keeps the worker busy.
-  const delegation: { runs?: { isRunActive(): boolean } } = {};
+  const delegation: { runs?: RunTracker } = {};
   const RUN_ACTIVE = "a Claude run is still active; wait for its finished message or stop it";
   const diagnostic = (event: string) => console.error(`[assignment-worker] ${event}`);
   const wake = () => {
@@ -143,6 +143,11 @@ export default async function worker(pi: ExtensionAPI) {
       assignments: client,
       notify: notifier,
       diagnostics: diagnostic,
+      // Read at each settle: the delegate runs are registered after this coordinator is created.
+      runs: {
+        isRunActive: () => delegation.runs?.isRunActive() ?? false,
+        lastRunOutcome: () => delegation.runs?.lastRunOutcome?.(),
+      },
       sessions: {
         prepareWorkspace: (target) =>
           ensureAssignmentWorkspace(join(homedir(), ".battuta"), target),
