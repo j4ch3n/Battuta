@@ -1,6 +1,7 @@
 import type { Static } from "typebox";
 import type { AssignmentSchema, TodoSchema, DetailSchema, FailureSchema } from "./contracts.ts";
-export type { ExecutionResult } from "./contracts.ts";
+export type { ExecutionResult, LifecycleSettings, LifecycleMessage } from "./contracts.ts";
+import type { LifecycleSettings } from "./contracts.ts";
 import type { ExecutionResult } from "./contracts.ts";
 export type AssignmentView = Static<typeof AssignmentSchema>;
 export type TodoRow = Static<typeof TodoSchema>;
@@ -21,7 +22,11 @@ export interface AssignmentClient {
     status?: AssignmentView["status"];
   }): Promise<{ ok: true; assignments: AssignmentView[] }>;
   get(target: Target): Promise<Detail>;
-  claim(target: Target & { claimed_by: string; abilities: string[] }): Promise<Detail>;
+  claim(
+    target: Target & { claimed_by: string; abilities: string[]; conversation_id: string },
+  ): Promise<Detail>;
+  renew(input: Claim): Promise<{ ok: true; assignment: AssignmentView }>;
+  settings(): Promise<LifecycleSettings>;
   start(target: TodoTarget): Promise<{ ok: true; assignment: AssignmentView; todo: TodoRow }>;
   record(
     input: TodoTarget & ExecutionResult,

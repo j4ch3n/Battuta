@@ -6,6 +6,7 @@ import {
   ProgressSchema,
   ListSchema,
   FailureSchema,
+  SettingsSchema,
   parseValue,
 } from "./contracts.ts";
 import type {
@@ -99,12 +100,23 @@ export class AssignmentService implements AssignmentClient {
     assignment_id,
     claimed_by,
     abilities,
-  }: Target & { claimed_by: string; abilities: string[] }) {
+    conversation_id,
+  }: Target & { claimed_by: string; abilities: string[]; conversation_id: string }) {
     return this.call(
       "claim_assignment",
-      { project, assignment_id, claimed_by, abilities },
+      { project, assignment_id, claimed_by, abilities, conversation_id },
       DetailSchema,
     );
+  }
+  renew({ project, assignment_id, claimed_at, claimed_by }: Claim) {
+    return this.call(
+      "renew_assignment",
+      { project, assignment_id, claimed_at, claimed_by },
+      AssignedSchema,
+    );
+  }
+  async settings() {
+    return (await this.call("get_lifecycle_settings", {}, SettingsSchema, false)).settings;
   }
   start({
     project,

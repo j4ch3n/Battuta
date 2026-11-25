@@ -1,5 +1,11 @@
 import { expect, test } from "vitest";
-import { parseAbilities, parseBinding, parseExecutionResult } from "../contracts.ts";
+import {
+  fill,
+  messageText,
+  parseAbilities,
+  parseBinding,
+  parseExecutionResult,
+} from "../contracts.ts";
 
 test.each(["completed", "blocked"] as const)(
   "accepts truthful %s with exact nonblank evidence",
@@ -115,4 +121,20 @@ test.each([
   ],
 ])("%s is rejected with a field-specific message", (_name, value, message) => {
   expect(() => parseExecutionResult(value)).toThrow(message);
+});
+
+test.each([
+  ["assignment_id", "1234abcd"],
+  ["worker", "worker-1"],
+  ["claimed_at", "2026-11-04T12:00:00.123456+00:00"],
+  ["position", "3"],
+] as const)("fill substitutes {%s} in objective and body", (name, value) => {
+  const filled = fill(
+    { objective: `A {${name}} B`, body: `{${name}}{${name}}` },
+    { [name]: value },
+  );
+  expect(filled).toEqual({ objective: `A ${value} B`, body: `${value}${value}` });
+});
+test("messageText puts a blank line between objective and body", () => {
+  expect(messageText({ objective: "Stop", body: "Reason" })).toBe("Stop\n\nReason");
 });

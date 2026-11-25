@@ -6,7 +6,7 @@ import {
   UncertainAssignmentWriteError,
   createAssignmentClient,
 } from "../client.ts";
-import { detail } from "./fixtures.ts";
+import { detail, settings } from "./fixtures.ts";
 
 test("code-owned client preserves exact execution targets and timestamp strings", async () => {
   const d = detail();
@@ -82,6 +82,7 @@ test("business refusals retain authoritative recovery metadata", async () => {
       assignment_id: "1234abcd",
       claimed_by: "test-worker",
       abilities: [],
+      conversation_id: "11111111-1111-4111-8111-111111111111",
     })
     .catch((e: unknown) => e);
   expect(error).toBeInstanceOf(AssignmentRefusalError);
@@ -101,6 +102,7 @@ test.each(["network", "malformed"])(
         assignment_id: "1234abcd",
         claimed_by: "test-worker",
         abilities: [],
+        conversation_id: "11111111-1111-4111-8111-111111111111",
       })
       .catch((e: unknown) => e);
     expect(error).toBeInstanceOf(UncertainAssignmentWriteError);
@@ -148,7 +150,68 @@ test.each([
         assignment_id: "1234abcd",
         claimed_by: "test-worker",
         abilities: [],
+        conversation_id: "11111111-1111-4111-8111-111111111111",
       }),
     ).rejects.toBeInstanceOf(UncertainAssignmentWriteError);
   },
 );
+
+const claim = {
+  project: "atlas",
+  assignment_id: "1234abcd",
+  claimed_at: "2026-11-04T12:00:00.123456+00:00",
+  claimed_by: "test-worker",
+};
+test("renew sends the claim and maps refusals and lost acknowledgements", async () => {
+  const d = detail();
+  const callTool = vi
+    .fn<Client["callTool"]>()
+    .mockResolvedValueOnce({
+      content: [],
+      structuredContent: { ok: true, assignment: d.assignment },
+    })
+    .mockResolvedValueOnce({
+      content: [],
+      isError: true,
+      structuredContent: {
+        ok: false,
+        code: "stale_claim",
+        message: "Gone",
+        assignment: d.assignment,
+      },
+    })
+    .mockRejectedValueOnce(new Error("offline"));
+  const client = new AssignmentService({ callTool, close: vi.fn() });
+  await client.renew({ ...claim, session_file: "private" } as typeof claim);
+  expect(callTool).toHaveBeenLastCalledWith({ name: "renew_assignment", arguments: claim });
+  await expect(client.renew(claim)).rejects.toBeInstanceOf(AssignmentRefusalError);
+  await expect(client.renew(claim)).rejects.toBeInstanceOf(UncertainAssignmentWriteError);
+});
+test("claim sends the conversation the expiry notice will use", async () => {
+  const callTool = vi
+    .fn<Client["callTool"]>()
+    .mockResolvedValue({ content: [], structuredContent: detail() });
+  const client = new AssignmentService({ callTool, close: vi.fn() });
+  const input = {
+    project: "atlas",
+    assignment_id: "1234abcd",
+    claimed_by: "test-worker",
+    abilities: ["research"],
+    conversation_id: "11111111-1111-4111-8111-111111111111",
+  };
+  await client.claim(input);
+  expect(callTool).toHaveBeenCalledWith({ name: "claim_assignment", arguments: input });
+});
+test("settings are read and validated", async () => {
+  const callTool = vi
+    .fn<Client["callTool"]>()
+    .mockResolvedValueOnce({ content: [], structuredContent: { ok: true, settings: settings() } })
+    .mockResolvedValueOnce({
+      content: [],
+      structuredContent: { ok: true, settings: { lease: {} } },
+    });
+  const client = new AssignmentService({ callTool, close: vi.fn() });
+  expect(await client.settings()).toEqual(settings());
+  expect(callTool).toHaveBeenCalledWith({ name: "get_lifecycle_settings", arguments: {} });
+  await expect(client.settings()).rejects.not.toBeInstanceOf(UncertainAssignmentWriteError);
+});
