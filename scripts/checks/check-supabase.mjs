@@ -61,6 +61,16 @@ process.on("SIGTERM", () => shutdown("SIGTERM"));
 try {
   cli("start", "--exclude", "studio,imgproxy,logflare,vector,supavisor");
   cli("db", "reset", "--local", "--no-seed", "--yes");
+  // Store the lifecycle settings the way the deploy does; claims refuse until they exist.
+  const settings = resolve(reports, "lifecycle-settings.sql");
+  writeFileSync(
+    settings,
+    run(process.execPath, [resolve(root, "scripts/supabase/sync-lifecycle-settings.mjs")], {
+      stdio: ["ignore", "pipe", "inherit"],
+      encoding: "utf8",
+    }),
+  );
+  cli("db", "query", "--local", "--file", settings);
   cli("db", "lint", "--local", "--schema", "public", "--fail-on", "warning");
   cli("test", "db");
   const status = JSON.parse(

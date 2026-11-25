@@ -1,0 +1,40 @@
+lease:
+  duration: 10m # lease set at claim; each renewal sets lease_expired_at = now() + duration
+heartbeat:
+  interval: 1m # renewal tick
+expiry:
+  check_interval: 1m # pg_cron schedule for the lifecycle scan (expiry, then progress)
+progress:
+  report_after: 10m # ask a worker to report after this long with no report or mail
+ask:
+  chase_after: 30m # chase the Manager when a question has no answer
+roles:
+  manager: manager # mail role for expiry notices and questions
+messages:
+  expiry_blocker:
+    objective: "Lease expired for {worker}"
+    body: >-
+      The worker stopped renewing its lease (process stopped or unreachable).
+      Claim version: {claimed_at}.
+  manager_expiry_notice:
+    objective: "Assignment {assignment_id} blocked: lease expired for {worker}"
+    body: >-
+      assignment_id: {assignment_id}. Claim version: {claimed_at}. The worker stopped
+      renewing its lease. Inspect the assignment before reactivating.
+  progress_request:
+    objective: "Report your status on assignment {assignment_id}"
+    body: >-
+      Nothing has been reported on this assignment for a while. Tell the Manager now
+      what you are doing, whether it is making progress, and what is in the way.
+  idle_reminder:
+    objective: "TODO {position} has no report"
+    body: >-
+      You stopped without reporting. Continue the work, report it, or ask the Manager.
+  no_report_blocker:
+    objective: "No report for TODO {position}"
+    body: >-
+      The worker stopped twice without reporting the TODO.
+  ask_chase:
+    objective: "Waiting for your answer on assignment {assignment_id}"
+    body: >-
+      {worker} is still waiting for an answer to the linked question.

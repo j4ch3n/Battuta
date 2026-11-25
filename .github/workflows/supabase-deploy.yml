@@ -44,6 +44,18 @@ jobs:
         if: ${{ !inputs.dry-run }}
         run: supabase db push --yes
 
+      - uses: ./.github/actions/setup-node-checks
+        if: ${{ !inputs.dry-run }}
+
+      # Fails before writing when the YAML is invalid, so the stored settings stay unchanged.
+      - name: Sync lifecycle settings
+        if: ${{ !inputs.dry-run }}
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          node scripts/supabase/sync-lifecycle-settings.mjs > "$RUNNER_TEMP/lifecycle-settings.sql"
+          supabase db query --db-url "$SUPABASE_DB_URL" --file "$RUNNER_TEMP/lifecycle-settings.sql"
+
       - name: Set Edge Function secrets
         if: ${{ !inputs.dry-run }}
         env:

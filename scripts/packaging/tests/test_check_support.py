@@ -19,7 +19,8 @@ class SupportChecksTests(unittest.TestCase):
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name).resolve()
         for name in ("scripts/checks/check-support.mjs", "scripts/packaging/release-build.sh", "scripts/packaging/release-wheels.sh", "scripts/bot_setup/run-dev.sh",
-                     "scripts/setup-memory.sh", "scripts/setup-artifacts.sh", "scripts/bot_setup/run-worker.sh"):
+                     "scripts/setup-memory.sh", "scripts/setup-artifacts.sh", "scripts/bot_setup/run-worker.sh",
+                     "scripts/supabase/sync-lifecycle-settings.test.mjs"):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             if name == "scripts/checks/check-support.mjs":

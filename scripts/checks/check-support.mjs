@@ -48,6 +48,7 @@ if (names.includes("scripts")) {
   run("bash", ["-n", "scripts/packaging/release-build.sh", "scripts/bot_setup/run-dev.sh"]);
   run("bash", ["-n", "scripts/setup-memory.sh", "scripts/setup-artifacts.sh"]);
   run("bash", ["-n", "scripts/bot_setup/run-worker.sh"]);
+  run(process.execPath, ["--test", "scripts/supabase/sync-lifecycle-settings.test.mjs"]);
 }
 for (const name of names)
   for (const project of groups[name]) pythonTests(`${project}/tests`, project);
