@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(76);
+select plan(85);
 select ok((select relrowsecurity from pg_class where oid = 'public.assignments'::regclass), 'assignments RLS enabled');
 select ok((select relrowsecurity from pg_class where oid = 'public.todos'::regclass), 'todos RLS enabled');
 select ok(not has_table_privilege('anon','public.assignments','SELECT'), 'no anonymous reads');
@@ -37,7 +37,9 @@ cross join unnest(array[
  'public.assignment_prepare_notes(text,text)',
  'public.assignment_locate_notes(text,text)',
  'public.assignment_create(text,text,text[],text,text[],text[],public.assignment_difficulty)',
- 'public.assignment_claim(text,text,text,text[])',
+ 'public.assignment_claim(text,text,text,text[],uuid)',
+ 'public.assignment_renew(text,text,timestamptz,text)',
+ 'public.assignment_settings_get()',
  'public.assignment_start_todo(text,text,timestamptz,integer,timestamptz,text)',
  'public.assignment_record_todo_result(text,text,timestamptz,integer,timestamptz,text,text,text[],text,text)',
  'public.assignment_block(text,text,timestamptz,text,text)',
@@ -55,6 +57,9 @@ from unnest(array[
  'public.assignment_finish_owned(text,text,timestamptz)',
  'public.assignment_ability_catalog()',
  'public.assignment_ability_error(text[])',
- 'public.assignment_claimant_error(text,text,timestamptz,text)']) signature;
+ 'public.assignment_claimant_error(text,text,timestamptz,text)',
+ 'public.assignment_settings_apply(jsonb)',
+ 'public.assignment_lease_duration()',
+ 'public.assignment_cron_schedule(integer)']) signature;
 select * from finish();
 rollback;
