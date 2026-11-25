@@ -68,7 +68,7 @@ later calls.
 | `status` | Distinguish waiting (`active`), claimed (`in_process`), blocked, and terminal work |
 | `ready` | See whether prerequisites and TODO state currently permit a claim; it does not reserve work |
 | `claimed_by` | The claiming bot's Agent Mail mailbox, such as `worker-1`; mail it to chase or steer that bot. A retained name is not proof it is still running, and a blank name alone does not prove work is available |
-| `lease_expired` | True when an `in_process` assignment has run past its 45-minute lease (UTC); the worker is likely gone or stuck. Replan: mail `claimed_by` once, then create a new assignment one difficulty level up if there is no reply. Always false for blocked, done, and other states |
+| `lease_expired` | True when an `in_process` assignment's worker stopped renewing its lease; the database then blocks it and mails you an expiry notice. Treat the notice like any other blocker: the worker stopped or is unreachable, so cancel the assignment or create a replacement one difficulty level up. Always false for blocked, done, and other states |
 | `require_abilities` | Read the exact abilities a worker must all satisfy |
 | `difficulty` | Read the Manager's advice on how demanding the work is; the worker decides the model |
 | TODO `summary` / `evidence` / `blocker` | Evaluate actual outcomes, verification, and missing inputs before accepting results or replanning |
@@ -76,6 +76,10 @@ later calls.
 On `ok: false` or a tool error, read the explanation and use the returned error
 code and recovery state. A readable message explains the problem; structured
 fields identify what to refresh or correct. Do not treat a rejected call as saved.
+
+A worker's reply to a progress request that shows steady progress needs no
+action. One that shows repeated retries, workarounds, or no clear path means
+redirect the worker by mail, or cancel and replan.
 
 ## Recovery and uncertainty
 

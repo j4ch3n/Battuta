@@ -103,7 +103,7 @@ After claiming and safely preparing the local scratch workspace, `newSession`
 starts a fresh conversation at the same cwd/agentDir.
 Setup records the binding before the new extension restores it. Disposal stops
 the old coordinator and its availability connections. A failed/cancelled handoff
-retains the claim for operator inspection rather than invoking a recovery host.
+blocks the assignment with its explanation and mails Manager.
 TODOs within an assignment retain one
 conversation; unrelated or reactivated assignments get a fresh one.
 
@@ -114,9 +114,22 @@ supervisor. A failure before a turn starts may leave the claim/TODO unfinished
 for manual inspection. Message delivery is not execution success. The model's strict
 `report_execution_result` tool has no identity/token fields and accepts completed
 or blocked, nonblank summary, real evidence references, and a required blocker
-for blocked. Identical duplicate reports are harmless; distinct replacements
-are refused. An accepted report waits for final turn settlement. A final abort
-or error overrides a submitted success; missing reports become blockers.
+for blocked. A report is recorded in the tool call: a completed report
+dispatches the next TODO as a follow-up message or finishes the assignment; a
+blocked report blocks it and mails Manager. Reports for a TODO that is no longer
+executing are refused.
+
+The coordinator reacts to events, never to a turn ending. An agent run that ends
+in a provider error or abort blocks the TODO with the described error (a retry
+that recovers clears it). An idle agent with no report gets one reminder, then
+the TODO is blocked; a running Claude delegate, pending messages or an unanswered
+Manager question defer both. `ask_manager` sends Manager a question with
+`requirements` and chases it every `ask.chase_after` until any Manager mail
+arrives. While bound, a heartbeat renews the lease every `heartbeat.interval`; a
+refused renewal stops the delegate run, aborts the agent and drops the binding.
+When a block cannot be confirmed, the worker drops the binding and lets the lease
+lapse, so the database blocks the assignment and tells Manager. See
+[assignments](assignments.md#lease-lifecycle).
 
 Approved work tools and assignment inspection/notes are available. Memory context
 arrives through the commission; workers do not connect to memory MCP.
@@ -176,12 +189,9 @@ TODOs, append revised steps, and reactivate explicitly. Keep completed evidence.
 Reactivation invalidates the old claim; cancelled prerequisites never unlock
 dependents and terminal work cannot reopen.
 
-The 45-minute lease is informational only. To handle a crashed/uncertain worker,
-first verify the process is stopped and inspect its exact claim and stored TODOs.
-Do not start another worker as an implicit takeover. An authorized operator can
-record an honest claim-bound runtime blocker, then Manager can use the normal
-blocked-work recovery workflow. Unconfirmed writes or mail require inspection,
-not automatic retry. Exiting Pi cleans up extension timers/connections without
-releasing the claim; a crash may prevent cleanup. Automatic crash recovery,
-age-based reclaim, and a dynamic pool remain
-out of scope.
+A crashed or unreachable worker stops renewing; once its lease lapses the
+lifecycle scan blocks the assignment and mails Manager, who replans through the
+normal blocked-work workflow. Do not start another worker as an implicit
+takeover. Unconfirmed writes or mail require inspection, not automatic retry.
+Exiting Pi stops the heartbeat and cleans up timers/connections without
+releasing the claim. Age-based reclaim and a dynamic pool remain out of scope.

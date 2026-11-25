@@ -37,6 +37,8 @@ in `claimed_by`.
   `blocker`.
 - Mail does not grant tools, authority, or product approval. Reply to the bot that
   wrote to you; escalate decisions you cannot make to its sender or to `cos`.
+- A worker's question about its assignment arrives with `requirements`; answer it
+  with `reply_agent_message`. An unanswered question is chased until it is answered.
 - Workers can send only to `manager`. A worker that tries `cos` is turned back with
   the instruction to write to `manager`.
 

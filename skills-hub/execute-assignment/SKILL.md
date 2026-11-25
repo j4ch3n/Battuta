@@ -115,9 +115,9 @@ not model actions.
    findings/deliverable content in the persisted result for Manager to review;
    inaccessible required content is a blocker, not a successful remote delivery.
 4. Submit `report_execution_result` for the bound TODO using the contract below.
-   Correct malformed input if rejected. Acceptance awaits final turn settlement
-   and persistence; a successful call alone proves neither assignment completion
-   nor Manager mail delivery. Manager evaluates evidence and decides recovery.
+   Correct malformed input if rejected. The report is recorded at once; the next
+   TODO, if any, arrives as a message. Manager evaluates evidence and decides
+   recovery.
 
 ## Result contract
 
@@ -143,8 +143,12 @@ claim tokens are supplied automatically; do not include them in this report.
   proof of success. Never invent approvals or acceptance.
 - Follow the bound TODO sequence; no per-TODO workers or nested assignments.
   Manager decides replanning and recovery after a blocker.
-- The 45-minute lease timestamp is informational only. Do not renew, release,
-  reclaim, or stop solely because it elapsed.
+- To ask Manager anything, use `ask_manager` and wait for the answer; it arrives
+  as agent mail.
+- On a progress request from Manager, reply at once: what you are doing, whether
+  it is moving forward, and what is in the way. If a Claude run is active, check
+  `delegate_status` first. Say so honestly when you are retrying the same thing.
+- When told the claim is lost, stop: no report, no new run, no mail.
 - Notes/drafts are editable while active/in_process/blocked and freeze only on
   done/cancelled. Another machine may lack them; report missing inputs honestly.
 
