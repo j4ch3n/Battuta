@@ -9,14 +9,14 @@ import type {
   TodoTarget,
   Detail,
   MailDelivery,
-  RunOutcome,
 } from "../types.ts";
-import { detail } from "./fixtures.ts";
+import { detail, settings } from "./fixtures.ts";
 
-/** The delegate run tracker the coordinator reads; tests change it to simulate a run starting or ending. */
-type FakeRuns = { active: boolean; outcome?: RunOutcome };
+const conversationId = "22222222-2222-4222-8222-222222222222";
 
-function harness(count = 2, runs: FakeRuns = { active: false }) {
+function harness(count = 2) {
+  const runs = { active: false, stop: vi.fn(() => ((runs.active = false), Promise.resolve())) };
+  const asks = { waiting: false, cancel: vi.fn(() => (asks.waiting = false)) };
   const state = detail();
   state.todos = Array.from({ length: count }, (_, i) => ({
     ...state.todos[0],
@@ -107,6 +107,8 @@ function harness(count = 2, runs: FakeRuns = { active: false }) {
       state.assignment.closed_at = stamp();
       return Promise.resolve({ ok: true as const, assignment: clone(state.assignment) });
     }),
+    renew: vi.fn(() => Promise.resolve({ ok: true as const, assignment: clone(state.assignment) })),
+    settings: vi.fn(() => Promise.resolve(settings())),
     close: vi.fn(() => Promise.resolve()),
   } satisfies AssignmentClient;
   const sessions = {
@@ -133,6 +135,8 @@ function harness(count = 2, runs: FakeRuns = { active: false }) {
       turns.push({ binding, position: todo.position });
       return Promise.resolve();
     }),
+    remind: vi.fn(),
+    abort: vi.fn(),
     appendEntry: (kind: string, data: unknown) => {
       entries.push({ kind, data: clone(data) });
     },
@@ -151,14 +155,21 @@ function harness(count = 2, runs: FakeRuns = { active: false }) {
     notify,
     workerId: "test-worker",
     capabilities: [],
-    runs: {
-      isRunActive: () => runs.active,
-      lastRunOutcome: () => runs.outcome,
-    },
+    conversationId,
+    settings: settings(),
+    runs: { isRunActive: () => runs.active, stop: runs.stop },
+    asks,
   });
+  const bound: Binding[] = [];
+  const unbound: Binding[] = [];
+  coordinator.on("bound", (b) => bound.push(b));
+  coordinator.on("unbound", (b) => unbound.push(b));
   return {
     state,
     runs,
+    asks,
+    bound,
+    unbound,
     assignments,
     sessions,
     coordinator,
@@ -184,8 +195,6 @@ function harness(count = 2, runs: FakeRuns = { active: false }) {
         summary: "Verified",
         evidence: ["proof"],
       });
-      coordinator.observeBoundary("completed");
-      await coordinator.settle({ aborted: false });
     },
   };
 }
@@ -198,6 +207,7 @@ test("configured general workers claim without a model bootstrap", async () => {
     assignment_id: "1234abcd",
     claimed_by: "test-worker",
     abilities: [],
+    conversation_id: conversationId,
   });
 });
 
@@ -258,6 +268,8 @@ test.each(["claim", "restore"])(
         diagnostics: h.diagnostics,
         workerId: "restored-worker",
         capabilities: [],
+        conversationId,
+        settings: settings(),
       });
       await restored.restoreBinding(h.opened[0]);
     } else await h.coordinator.reconcile("idle");
@@ -268,7 +280,7 @@ test.each(["claim", "restore"])(
     expect(h.notifications).toHaveLength(1);
   },
 );
-test("uncertain workspace blocker retains claim and pauses without opening a session", async () => {
+test("an unconfirmed workspace blocker releases the claim to lapse without opening a session", async () => {
   const h = harness();
   h.sessions.prepareWorkspace.mockRejectedValueOnce(new Error("denied"));
   h.assignments.block.mockRejectedValue(new UncertainAssignmentWriteError("block_assignment"));
@@ -276,6 +288,7 @@ test("uncertain workspace blocker retains claim and pauses without opening a ses
   expect(h.state.assignment.status).toBe("in_process");
   expect(h.sessions.openAssignmentSession).not.toHaveBeenCalled();
   expect(h.notifications).toEqual([]);
+  expect(h.unbound).toHaveLength(1);
 });
 test("cancellation during preparation prevents handoff and execution", async () => {
   const h = harness();
@@ -343,56 +356,6 @@ test("empty boards and known contention do not invoke the model", async () => {
   expect(h.opened).toEqual([]);
 });
 
-test("malformed reports are correctable, duplicates are idempotent and accepted evidence is immutable", async () => {
-  const h = harness(1);
-  await h.begin();
-  await expect(
-    h.coordinator.acceptReport({ outcome: "blocked", summary: "Missing", evidence: [] }),
-  ).rejects.toThrow();
-  const report = { outcome: "completed", summary: "Verified", evidence: ["proof"] };
-  await h.coordinator.acceptReport(report);
-  await h.coordinator.acceptReport(structuredClone(report));
-  await expect(h.coordinator.acceptReport({ ...report, summary: "Different" })).rejects.toThrow();
-  report.evidence.push("unaccepted");
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  expect(h.state.todos[0].evidence).toEqual(["proof"]);
-  expect(h.notifications).toHaveLength(1);
-});
-
-test.each(["error", "aborted"] as const)(
-  "final %s wins over a submitted success report",
-  async (outcome) => {
-    const h = harness();
-    await h.begin();
-    await h.coordinator.acceptReport({
-      outcome: "completed",
-      summary: "Claimed success",
-      evidence: [],
-    });
-    h.coordinator.observeBoundary(outcome);
-    await h.coordinator.settle({ aborted: outcome === "aborted" });
-    expect(h.state.assignment.status).toBe("blocked");
-    expect(h.state.todos[0].status).toBe("blocked");
-    expect(h.turns).toHaveLength(1);
-    expect(h.notifications[0].assignment.status).toBe("blocked");
-  },
-);
-
-test("a corrected retry may complete, but final prose without a report blocks", async () => {
-  const good = harness(1);
-  await good.begin();
-  good.coordinator.observeBoundary("error");
-  await good.complete();
-  expect(good.state.assignment.status).toBe("done");
-  const missing = harness(1);
-  await missing.begin();
-  missing.coordinator.observeBoundary("completed");
-  await missing.coordinator.settle({ aborted: false });
-  expect(missing.state.assignment.status).toBe("blocked");
-  expect(missing.notifications).toHaveLength(1);
-});
-
 test("blocked reports stop the assignment without rewriting future TODOs", async () => {
   const h = harness();
   await h.begin();
@@ -402,8 +365,6 @@ test("blocked reports stop the assignment without rewriting future TODOs", async
     evidence: [],
     blocker: "Missing authority",
   });
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
   expect(h.state.assignment.blocker).toBe("Missing authority");
   expect(h.state.todos.map((t) => t.status)).toEqual(["blocked", "todo"]);
   expect(h.notifications[0].todos[1].status).toBe("todo");
@@ -414,26 +375,27 @@ test("obsolete claims stop without completion mail or recovery claims", async ()
   await h.begin();
   h.state.assignment.status = "cancelled";
   await h.coordinator.acceptReport({ outcome: "completed", summary: "Late", evidence: [] });
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
   await h.coordinator.reconcile("fallback");
   expect(h.state.assignment.status).toBe("cancelled");
   expect(h.notifications).toEqual([]);
   expect(h.opened).toHaveLength(1);
+  expect(h.sessions.abort).toHaveBeenCalled();
+  expect(h.unbound).toHaveLength(1);
 });
 
-test("uncertain claims pause with one attempt and no inferred ownership", async () => {
+test("an uncertain claim is never treated as owned", async () => {
   const h = harness();
   h.assignments.claim.mockRejectedValue(new UncertainAssignmentWriteError("Unknown"));
   await h.coordinator.reconcile("startup");
-  await h.coordinator.reconcile("fallback");
   expect(h.assignments.claim).toHaveBeenCalledTimes(1);
+  expect(h.bound).toEqual([]);
+  expect(h.opened).toEqual([]);
   expect(h.turns).toEqual([]);
   expect(h.diagnostics).toHaveBeenCalled();
 });
 
 test.each([true, false])(
-  "uncertain result confirms exact persisted evidence or pauses (committed=%s)",
+  "uncertain result confirms exact persisted evidence or releases the claim (committed=%s)",
   async (committed) => {
     const h = harness(1);
     await h.begin();
@@ -449,16 +411,16 @@ test.each([true, false])(
   },
 );
 
-test("backend outage while blocking keeps owned work paused and never fabricates remote status", async () => {
+test("backend outage while blocking releases the claim to lapse and never fabricates remote status", async () => {
   const h = harness();
   await h.begin();
   h.assignments.block.mockRejectedValue(new Error("Offline"));
-  h.coordinator.observeBoundary("error");
-  await h.coordinator.settle({ aborted: false });
+  await h.coordinator.agentFailed("Model provider unavailable: offline");
   await h.coordinator.reconcile("fallback");
   expect(h.state.assignment.status).toBe("in_process");
   expect(h.notifications).toEqual([]);
   expect(h.opened).toHaveLength(1);
+  expect(h.unbound).toHaveLength(1);
 });
 
 test.each([true, false])(
@@ -471,8 +433,7 @@ test.each([true, false])(
       if (committed) await original(input);
       throw new UncertainAssignmentWriteError("Lost blocker acknowledgement");
     });
-    h.coordinator.observeBoundary("error");
-    await h.coordinator.settle({ aborted: false });
+    await h.coordinator.agentFailed("Model provider unavailable: offline");
     expect(h.notifications).toHaveLength(committed ? 1 : 0);
     expect(h.assignments.block).toHaveBeenCalledTimes(1);
     expect(h.state.assignment.status).toBe(committed ? "blocked" : "in_process");
@@ -488,8 +449,7 @@ test("uncertain blocker does not report a different authoritative claim's outcom
     h.state.assignment.blocker = "Execution ended with an unrecoverable error";
     return Promise.reject(new UncertainAssignmentWriteError("Old claim reply lost"));
   });
-  h.coordinator.observeBoundary("error");
-  await h.coordinator.settle({ aborted: false });
+  await h.coordinator.agentFailed("Model provider unavailable: offline");
   expect(h.notifications).toEqual([]);
 });
 
@@ -528,8 +488,8 @@ test("stop invalidates callbacks immediately and never releases a claim", async 
   const h = harness();
   await h.begin();
   await h.coordinator.stop();
-  h.coordinator.observeBoundary("error");
-  await h.coordinator.settle({ aborted: true });
+  await h.coordinator.agentFailed("Execution was aborted before confirmed completion");
+  await h.coordinator.agentIdle();
   await h.coordinator.reconcile("event");
   expect(h.state.assignment.status).toBe("in_process");
   expect(h.notifications).toEqual([]);
@@ -543,17 +503,16 @@ test("return to idle reconciles the board even if the availability event was mis
   expect(h.turns).toHaveLength(1);
 });
 
-test("cancelled conversation handoff retains the claim for operator inspection", async () => {
+test("a failed conversation handoff blocks with its explanation and tells the Manager", async () => {
   const conversation = harness();
   conversation.sessions.openAssignmentSession.mockRejectedValue(
     new Error("Session initialization failed"),
   );
   await conversation.coordinator.reconcile("startup");
-  expect(conversation.state.assignment.status).toBe("in_process");
-  expect(conversation.notifications).toEqual([]);
+  expect(conversation.state.assignment.status).toBe("blocked");
+  expect(conversation.state.assignment.blocker).toMatch(/conversation did not initialize/);
+  expect(conversation.notifications).toHaveLength(1);
   expect(conversation.turns).toEqual([]);
-  await conversation.coordinator.reconcile("event");
-  expect(conversation.assignments.claim).toHaveBeenCalledTimes(1);
 });
 
 test.each([true, false])(
@@ -588,12 +547,16 @@ test.each(["failed", "uncertain"] as const)(
   },
 );
 
-test("error boundary blocker states the provider failure", async () => {
+test("an agent error blocks with its explanation, stopping an active run first", async () => {
   const h = harness(1);
   await h.begin();
-  h.coordinator.observeBoundary("error", "insufficient_quota");
-  await h.coordinator.settle({ aborted: false });
-  expect(h.state.assignment.blocker).toContain("out of credit");
+  h.runs.active = true;
+  await h.coordinator.agentFailed("Model provider is out of credit: insufficient_quota");
+  expect(h.runs.stop).toHaveBeenCalledTimes(1);
+  expect(h.state.assignment.status).toBe("blocked");
+  expect(h.state.assignment.blocker).toBe("Model provider is out of credit: insufficient_quota");
+  expect(h.notifications).toHaveLength(1);
+  expect(h.unbound).toHaveLength(1);
 });
 
 test("first TODO starts without any model selection step", async () => {
@@ -624,260 +587,112 @@ test("an invalid flat report is rejected with a field-specific message and the r
   await expect(
     h.coordinator.acceptReport({ outcome: "blocked", summary: "Missing input", evidence: [] }),
   ).rejects.toThrow(/blocker is required when outcome is "blocked"/);
-  // The model corrects the report within the same turn; settle happens at turn end.
   await h.complete();
   expect(h.state.assignment.status).toBe("done");
   expect(h.notifications.map((d) => d.assignment.status)).toEqual(["done"]);
 });
 
-test("a turn that ends during a delegate run keeps the TODO bound; its result turn reports and settles done", async () => {
-  const h = harness(1, { active: true });
-  await h.begin();
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  expect(h.state.assignment.status).toBe("in_process");
-  expect(h.state.todos[0].status).toBe("in_progress");
-  expect(h.notifications).toHaveLength(0);
-  // The run ends; its result arrives as a new turn, which reports a valid completion.
-  h.runs.active = false;
-  h.runs.outcome = { sessionId: "run-1", state: "finished" };
-  await h.complete();
-  expect(h.state.todos[0].status).toBe("done");
-  expect(h.state.assignment.status).toBe("done");
-  expect(h.notifications.map((d) => d.assignment.status)).toEqual(["done"]);
-});
-
-test("no active run and no report still blocks with the existing message", async () => {
-  const h = harness(1);
-  await h.begin();
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  expect(h.state.assignment.status).toBe("blocked");
-  expect(h.state.assignment.blocker).toBe(
-    "Execution settled without a valid report_execution_result",
-  );
-  expect(h.notifications).toHaveLength(1);
-});
-
-test("a finished run whose result turn reports nothing keeps the existing message", async () => {
-  const h = harness(1, { active: true });
-  await h.begin();
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  h.runs.active = false;
-  h.runs.outcome = { sessionId: "run-2", state: "finished" };
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  expect(h.state.assignment.status).toBe("blocked");
-  expect(h.state.assignment.blocker).toBe(
-    "Execution settled without a valid report_execution_result",
-  );
-});
-
-const failedRuns: [RunOutcome, string][] = [
-  [
-    { sessionId: "run-7", state: "failed", reason: "/usr/bin/node timed out after 1800000ms" },
-    "Delegate run run-7 timed out after 1800s; no report_execution_result was accepted",
-  ],
-  [
-    { sessionId: "run-8", state: "failed", reason: "exited with code 1" },
-    "Delegate run run-8 failed: exited with code 1; no report_execution_result was accepted",
-  ],
-  [
-    { state: "stopped" },
-    "Delegate run (session id not reported) was stopped; no report_execution_result was accepted",
-  ],
-];
-
-test.each(failedRuns)(
-  "a run that ends as %j blocks its result turn, which reports nothing, with the run outcome",
-  async (outcome, blocker) => {
-    const h = harness(1, { active: true });
-    await h.begin();
-    h.coordinator.observeBoundary("completed");
-    await h.coordinator.settle({ aborted: false });
-    expect(h.state.assignment.status).toBe("in_process");
-    h.runs.active = false;
-    h.runs.outcome = outcome;
-    h.coordinator.observeBoundary("completed");
-    await h.coordinator.settle({ aborted: false });
-    expect(h.state.assignment.status).toBe("blocked");
-    expect(h.state.assignment.blocker).toBe(blocker);
-    expect(h.state.todos[0].status).toBe("blocked");
-    expect(h.notifications).toHaveLength(1);
-  },
-);
-
-test("a run that ends between the boundary and settle keeps the TODO bound until its result turn settles done", async () => {
-  const h = harness(1);
-  await h.begin();
-  h.coordinator.observeBoundary("completed");
-  h.runs.outcome = { sessionId: "run-4", state: "finished" };
-  await h.coordinator.settle({ aborted: false });
-  expect(h.state.assignment.status).toBe("in_process");
-  expect(h.state.todos[0].status).toBe("in_progress");
-  expect(h.notifications).toHaveLength(0);
-  await h.complete();
-  expect(h.state.todos[0].status).toBe("done");
-  expect(h.state.assignment.status).toBe("done");
-  expect(h.notifications.map((d) => d.assignment.status)).toEqual(["done"]);
-});
-
-test("a run that fails between the boundary and settle blocks its follow-up turn when that turn reports nothing", async () => {
-  const h = harness(1);
-  await h.begin();
-  h.coordinator.observeBoundary("completed");
-  h.runs.outcome = { sessionId: "run-9", state: "failed", reason: "exited with code 1" };
-  await h.coordinator.settle({ aborted: false });
-  expect(h.state.assignment.status).toBe("in_process");
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  expect(h.state.assignment.status).toBe("blocked");
-  expect(h.state.assignment.blocker).toBe(
-    "Delegate run run-9 failed: exited with code 1; no report_execution_result was accepted",
-  );
-  expect(h.state.todos[0].status).toBe("blocked");
-  expect(h.notifications).toHaveLength(1);
-});
-
-test("the normal result turn after a run blocks without deferring again", async () => {
-  const h = harness(1, { active: true });
-  await h.begin();
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  h.runs.active = false;
-  h.runs.outcome = { sessionId: "run-10", state: "finished" };
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  expect(h.state.assignment.status).toBe("blocked");
-  expect(h.state.assignment.blocker).toBe(
-    "Execution settled without a valid report_execution_result",
-  );
-  const deferrals = h.diagnostics.mock.calls.filter(([event]) =>
-    String(event).includes("TODO stays bound"),
-  );
-  expect(deferrals).toHaveLength(1);
-});
-
-test("a second run started by the result turn keeps the TODO bound until that run ends", async () => {
-  const h = harness(1, { active: true });
-  await h.begin();
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  // The first run finished, and the result turn starts a second run before it ends.
-  h.runs.outcome = { sessionId: "run-3", state: "finished" };
-  h.runs.active = true;
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  expect(h.state.assignment.status).toBe("in_process");
-  expect(h.notifications).toHaveLength(0);
-  await h.complete();
-  expect(h.state.assignment.status).toBe("done");
-});
-
-test.each(failedRuns)(
-  "a run that ended as %j before the first boundary blocks at once with the run outcome",
-  async (outcome, blocker) => {
-    const h = harness(1);
-    await h.begin();
-    // The run ended inside the turn, so no result turn follows.
-    h.runs.outcome = outcome;
-    h.coordinator.observeBoundary("completed");
-    await h.coordinator.settle({ aborted: false });
-    expect(h.state.assignment.status).toBe("blocked");
-    expect(h.state.assignment.blocker).toBe(blocker);
-    expect(h.notifications).toHaveLength(1);
-  },
-);
-
-test("a run that succeeded before the first boundary blocks at once when nothing is reported", async () => {
-  const h = harness(1);
-  await h.begin();
-  h.runs.outcome = { sessionId: "run-11", state: "finished" };
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  expect(h.state.assignment.status).toBe("blocked");
-  expect(h.state.assignment.blocker).toBe(
-    "Execution settled without a valid report_execution_result",
-  );
-  expect(h.notifications).toHaveLength(1);
-});
-
-test.each(["first turn", "result turn of an earlier run"])(
-  "a run that ends between boundary and settle of the %s defers once, then blocks",
-  async (turn) => {
-    const h = harness(1);
-    await h.begin();
-    const earlierRun = turn !== "first turn";
-    if (earlierRun) {
-      h.runs.active = true;
-      h.coordinator.observeBoundary("completed");
-      await h.coordinator.settle({ aborted: false });
-      h.runs.active = false;
-      h.runs.outcome = { sessionId: "run-12", state: "finished" };
-    }
-    h.coordinator.observeBoundary("completed");
-    h.runs.outcome = { sessionId: "run-13", state: "failed", reason: "exited with code 1" };
-    h.diagnostics.mockClear();
-    await h.coordinator.settle({ aborted: false });
-    expect(h.state.assignment.status).toBe("in_process");
-    h.coordinator.observeBoundary("completed");
-    await h.coordinator.settle({ aborted: false });
-    expect(h.state.assignment.status).toBe("blocked");
-    expect(h.state.assignment.blocker).toBe(
-      "Delegate run run-13 failed: exited with code 1; no report_execution_result was accepted",
-    );
-    const deferrals = h.diagnostics.mock.calls.filter(([event]) =>
-      String(event).includes("TODO stays bound"),
-    );
-    expect(deferrals).toHaveLength(1);
-  },
-);
-
-test("a chained run that ends between boundary and settle settles done when its result turn reports", async () => {
-  const h = harness(1, { active: true });
-  await h.begin();
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  // The result turn starts a second run, which ends just after that turn's boundary.
-  h.runs.outcome = { sessionId: "run-14", state: "finished" };
-  h.coordinator.observeBoundary("completed");
-  h.runs.active = false;
-  h.runs.outcome = { sessionId: "run-15", state: "finished" };
-  await h.coordinator.settle({ aborted: false });
-  expect(h.state.assignment.status).toBe("in_process");
-  await h.complete();
-  expect(h.state.assignment.status).toBe("done");
-  expect(h.notifications.map((d) => d.assignment.status)).toEqual(["done"]);
-});
-
-test("a chained run does not block while active, then blocks with its own outcome", async () => {
-  const h = harness(1, { active: true });
-  await h.begin();
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  // The first run failed, and its result turn started a second run, which is still active.
-  h.runs.outcome = { sessionId: "run-16", state: "failed", reason: "exited with code 1" };
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  expect(h.state.assignment.status).toBe("in_process");
-  h.runs.active = false;
-  h.runs.outcome = { sessionId: "run-17", state: "stopped" };
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  expect(h.state.assignment.blocker).toBe(
-    "Delegate run run-17 was stopped; no report_execution_result was accepted",
-  );
-});
-
-test("a run that failed during an earlier TODO is not named in a later TODO's blocker", async () => {
+test("a completed report is recorded in the tool call and the next TODO dispatched", async () => {
   const h = harness(2);
   await h.begin();
-  h.runs.outcome = { sessionId: "run-18", state: "failed", reason: "exited with code 1" };
   await h.complete();
-  h.coordinator.observeBoundary("completed");
-  await h.coordinator.settle({ aborted: false });
-  expect(h.state.assignment.blocker).toBe(
-    "Execution settled without a valid report_execution_result",
-  );
+  expect(h.assignments.record).toHaveBeenCalledTimes(1);
+  expect(h.state.todos[0].status).toBe("done");
+  expect(h.turns.map((t) => t.position)).toEqual([1, 2]);
+});
+
+test("a blocked report notifies and unbinds", async () => {
+  const h = harness();
+  await h.begin();
+  await h.coordinator.acceptReport({
+    outcome: "blocked",
+    summary: "Stuck",
+    evidence: [],
+    blocker: "Missing token",
+  });
+  expect(h.notifications.map((d) => d.assignment.status)).toEqual(["blocked"]);
+  expect(h.unbound).toHaveLength(1);
+});
+
+test("an idle agent without a report is reminded once, then blocked", async () => {
+  const h = harness(1);
+  await h.begin();
+  await h.coordinator.agentIdle();
+  expect(h.sessions.remind).toHaveBeenCalledTimes(1);
+  expect(h.sessions.remind.mock.calls[0][0]).toBe("idle_reminder 1\n\nidle_reminder body");
+  expect(h.state.assignment.status).toBe("in_process");
+  await h.coordinator.agentIdle();
+  expect(h.state.assignment.status).toBe("blocked");
+  expect(h.state.assignment.blocker).toBe("no_report_blocker 1\n\nno_report_blocker body");
+  expect(h.notifications).toHaveLength(1);
+});
+
+test("each TODO gets its own reminder", async () => {
+  const h = harness(2);
+  await h.begin();
+  await h.coordinator.agentIdle();
+  await h.complete();
+  await h.coordinator.agentIdle();
+  expect(h.sessions.remind).toHaveBeenCalledTimes(2);
+  expect(h.state.assignment.status).toBe("in_process");
+});
+
+test.each(["a run active", "pending messages", "a waiting question", "no bound TODO"] as const)(
+  "an idle agent with %s is left alone",
+  async (condition) => {
+    const h = harness(1);
+    if (condition !== "no bound TODO") await h.begin();
+    if (condition === "a run active") h.runs.active = true;
+    if (condition === "pending messages") h.pending(true);
+    if (condition === "a waiting question") h.asks.waiting = true;
+    await h.coordinator.agentIdle();
+    await h.coordinator.agentIdle();
+    expect(h.sessions.remind).not.toHaveBeenCalled();
+    expect(h.assignments.block).not.toHaveBeenCalled();
+  },
+);
+
+test("a lost lease stops the run and the agent, cancels the question and unbinds", async () => {
+  const h = harness(1);
+  await h.begin();
+  h.runs.active = true;
+  h.asks.waiting = true;
+  await h.coordinator.leaseLost("Lease renewal refused: Claim replaced");
+  expect(h.runs.stop).toHaveBeenCalledTimes(1);
+  expect(h.sessions.abort).toHaveBeenCalledTimes(1);
+  expect(h.asks.cancel).toHaveBeenCalled();
+  expect(h.unbound).toHaveLength(1);
+  expect(h.entries.at(-1)?.kind).toBe("assignment-released");
+  await expect(
+    h.coordinator.acceptReport({ outcome: "completed", summary: "Late", evidence: [] }),
+  ).rejects.toThrow();
+  await vi.waitFor(() => expect(h.assignments.list).toHaveBeenCalledTimes(2));
+});
+
+test("a refused record releases the claim", async () => {
+  const h = harness(1);
+  await h.begin();
+  h.state.assignment.claimed_at = "2026-11-04T13:00:00.000001Z";
+  await h.complete();
+  expect(h.unbound).toHaveLength(1);
+  expect(h.notifications).toEqual([]);
+});
+
+test("claim and restore emit bound with the claim", async () => {
+  const h = harness(1);
+  await h.begin();
+  expect(h.bound.map((b) => b.claimed_at)).toEqual([
+    h.state.assignment.claimed_at,
+    h.state.assignment.claimed_at,
+  ]);
+});
+
+test("the last report during a tool call never opens a new session", async () => {
+  const h = harness(1);
+  await h.begin();
+  h.busy(true);
+  await h.complete();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(h.state.assignment.status).toBe("done");
+  expect(h.sessions.openAssignmentSession).toHaveBeenCalledTimes(1);
 });

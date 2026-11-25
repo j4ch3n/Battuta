@@ -4,63 +4,77 @@ import {
   UncertainAssignmentWriteError,
   blockAndInspect,
 } from "./client.ts";
-import { describeFailure } from "./errors.ts";
-import { parseAbilities, parseExecutionResult } from "./contracts.ts";
+import { fill, messageText, parseAbilities, parseExecutionResult } from "./contracts.ts";
 import type {
   Coordinator,
   CoordinatorOptions,
   Binding,
   Detail,
   ExecutionResult,
-  RunOutcome,
   TodoRow,
   AssignmentView,
   Workspace,
 } from "./types.ts";
 
-/** The blocker for a result turn that reports nothing after its run failed, timed out or was stopped. */
-function failedRunBlocker(outcome: RunOutcome | undefined): string | undefined {
-  if (!outcome || outcome.state === "finished") return undefined;
-  const run = `Delegate run ${outcome.sessionId ?? "(session id not reported)"}`;
-  const timeout = /timed out after (\d+)ms/.exec(outcome.reason ?? "");
-  const how =
-    outcome.state === "stopped"
-      ? "was stopped"
-      : timeout
-        ? `timed out after ${Number(timeout[1]) / 1000}s`
-        : `failed: ${outcome.reason ?? "unknown error"}`;
-  return `${run} ${how}; no report_execution_result was accepted`;
-}
+type Phase = "idle" | "claiming" | "switching" | "executing" | "persisting" | "reporting";
 
-type Phase =
-  "idle" | "claiming" | "switching" | "executing" | "persisting" | "reporting" | "paused";
-
+/**
+ * The worker's only writer of assignment and TODO state. It reacts to events (a report, an agent error, an
+ * idle agent, a lost lease) and never infers an outcome from a turn ending. When a write cannot be
+ * confirmed it blocks with an explanation; when even that fails it releases the claim and lets the lease
+ * lapse, so the database blocks the assignment and tells the Manager.
+ */
 export function createCoordinator(options: CoordinatorOptions): Coordinator {
-  const { assignments, sessions, notify, diagnostics, runs } = options;
+  const { assignments, sessions, notify, diagnostics, runs, asks, settings } = options;
   let phase: Phase = "idle",
     stopped = false;
-  let binding: Binding | undefined,
-    current: TodoRow | undefined,
-    accepted: ExecutionResult | undefined;
-  let boundary: "completed" | "aborted" | "error" | undefined;
-  let boundaryError: string | undefined;
-  // The last run outcome at the turn's boundary; a newer one at settle has a result turn still to come.
-  let boundaryRunOutcome: RunOutcome | undefined;
-  // The last run outcome when the current TODO started; only a newer one is named in this TODO's blocker.
-  let seenRunOutcome: RunOutcome | undefined;
+  let binding: Binding | undefined, current: TodoRow | undefined, workspace: Workspace | undefined;
+  let reminded = false;
   let tail: Promise<unknown> = Promise.resolve();
   let reconciling: Promise<void> | undefined;
   const abilities: ReadonlySet<string> = parseAbilities(options.capabilities);
-  let workspace: Workspace | undefined;
+  const listeners = {
+    bound: [] as ((b: Binding) => void)[],
+    unbound: [] as ((b: Binding) => void)[],
+  };
+  const emit = (event: keyof typeof listeners, value: Binding) => {
+    for (const listener of listeners[event]) listener({ ...value });
+  };
   function serial<T>(work: () => Promise<T>): Promise<T> {
     const next = tail.then(work);
     tail = next.catch(() => {});
     return next;
   }
-  function pause(event: string, error?: unknown) {
+  function unbind() {
+    const previous = binding;
+    binding = undefined;
+    workspace = undefined;
+    current = undefined;
+    reminded = false;
+    asks?.cancel();
+    phase = "idle";
+    if (previous) emit("unbound", previous);
+    queueMicrotask(() => {
+      void coordinator.reconcile("idle");
+    });
+  }
+  /** Drops the claim locally: stop the run and the agent, stop renewing, return to idle. */
+  async function release(event: string, error?: unknown) {
     if (stopped) return;
-    phase = "paused";
     diagnostics(event, error);
+    if (!binding) {
+      phase = "idle";
+      return;
+    }
+    sessions.appendEntry("assignment-released", {
+      assignment_id: binding.assignment_id,
+      claimed_at: binding.claimed_at,
+      reason: event,
+    });
+    if (runs?.isRunActive())
+      await runs.stop().catch((e: unknown) => diagnostics("Run stop failed", e));
+    sessions.abort();
+    unbind();
   }
   const matches = (row: AssignmentView) =>
     binding !== undefined &&
@@ -68,17 +82,10 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     row.project === binding.project &&
     row.claimed_at === binding.claimed_at &&
     row.claimed_by === binding.claimed_by;
-  function checkLive(detail: Detail) {
-    if (!matches(detail.assignment) || detail.assignment.status !== "in_process") {
-      pause("Execution claim was superseded; progression stopped");
-      return false;
-    }
-    return true;
-  }
   async function deliver(detail: Detail) {
     if (stopped) return;
     if (!matches(detail.assignment) || !["done", "blocked"].includes(detail.assignment.status)) {
-      pause("Persisted outcome no longer belongs to this execution");
+      await release("Persisted outcome no longer belongs to this execution");
       return;
     }
     phase = "reporting";
@@ -90,18 +97,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     } catch (error) {
       diagnostics("Manager notification failed after persistence; do not replay execution", error);
     }
-    if (stopped) return;
-    binding = undefined;
-    workspace = undefined;
-    current = undefined;
-    accepted = undefined;
-    boundary = undefined;
-    boundaryError = undefined;
-    boundaryRunOutcome = undefined;
-    phase = "idle";
-    queueMicrotask(() => {
-      void coordinator.reconcile("idle");
-    });
+    if (!stopped) unbind();
   }
   async function blockRun(explanation: string) {
     if (stopped || !binding) return;
@@ -110,7 +106,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
       const detail = await blockAndInspect(assignments, binding, explanation);
       if (!stopped) await deliver(detail);
     } catch (error) {
-      pause("Could not confirm the execution blocker; keep the claim for inspection", error);
+      await release("Could not confirm the execution blocker; the lease will lapse", error);
     }
   }
   async function finish() {
@@ -120,7 +116,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
       await assignments.finish(binding);
     } catch (error) {
       if (!(error instanceof UncertainAssignmentWriteError)) {
-        pause("Assignment completion refused", error);
+        await release("Assignment completion refused", error);
         return;
       }
     }
@@ -128,7 +124,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     const detail = await assignments.get(binding);
     if (stopped) return;
     if (!matches(detail.assignment) || detail.assignment.status !== "done") {
-      pause("Assignment completion remains unconfirmed; inspect before repeating");
+      await release("Assignment completion remains unconfirmed; inspect before repeating");
       return;
     }
     await deliver(detail);
@@ -149,13 +145,17 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
   async function advance(detail?: Detail) {
     if (stopped || !binding) return;
     const latest = detail ?? (await assignments.get(binding));
-    if (stopped || !checkLive(latest)) return;
+    if (stopped) return;
+    if (!matches(latest.assignment) || latest.assignment.status !== "in_process") {
+      await release("Execution claim was superseded; progression stopped");
+      return;
+    }
     if (!latest.assignment.require_abilities.every((ability) => abilities.has(ability))) {
       await blockRun("This session lacks required specialist abilities; no TODO was dispatched");
       return;
     }
-    const workspace = await prepareWorkspace();
-    if (!workspace) return;
+    const ready = await prepareWorkspace();
+    if (!ready) return;
     const next = latest.todos.find((todo) => !["done", "cancelled"].includes(todo.status));
     if (!next) {
       if (!latest.todos.length) {
@@ -175,7 +175,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
       });
     } catch (error) {
       if (error instanceof AssignmentRefusalError) {
-        pause("TODO start refused; inspect current execution", error);
+        await release("TODO start refused; inspect current execution", error);
         return;
       }
       await blockRun("TODO start could not be confirmed before invoking the model");
@@ -183,13 +183,9 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
     }
     if (stopped) return;
     current = started.todo;
-    accepted = undefined;
-    boundary = undefined;
-    boundaryError = undefined;
-    boundaryRunOutcome = undefined;
-    seenRunOutcome = runs?.lastRunOutcome?.();
+    reminded = false;
     phase = "executing";
-    sessions.runTodo({ ...binding }, structuredClone(current), latest, workspace);
+    sessions.runTodo({ ...binding }, structuredClone(current), latest, ready);
   }
   function matchesReport(todo: TodoRow, row: AssignmentView, report: ExecutionResult) {
     return (
@@ -202,6 +198,39 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
         ? row.status === "in_process"
         : row.status === "blocked" && row.blocker === report.blocker)
     );
+  }
+  async function record(report: ExecutionResult) {
+    if (!binding || !current) return;
+    const position = current.position;
+    phase = "persisting";
+    let stored;
+    try {
+      stored = await assignments.record({
+        ...binding,
+        position,
+        expected_updated_at: current.updated_at,
+        ...report,
+      });
+    } catch (error) {
+      if (!(error instanceof UncertainAssignmentWriteError)) {
+        await release("Execution result refused; stop obsolete progression", error);
+        return;
+      }
+      const inspected = await assignments.get(binding);
+      const todo = inspected.todos.find((todo) => todo.position === position);
+      if (!todo || !matchesReport(todo, inspected.assignment, report)) {
+        await release("Execution result remains unconfirmed; do not replay work");
+        return;
+      }
+      stored = { assignment: inspected.assignment, todo };
+    }
+    if (stopped) return;
+    if (!matchesReport(stored.todo, stored.assignment, report)) {
+      await release("Stored result did not match the submitted report");
+      return;
+    }
+    if (report.outcome === "blocked") await deliver(await assignments.get(binding));
+    else await advance();
   }
   const coordinator: Coordinator = {
     reconcile() {
@@ -226,6 +255,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
                 assignment_id: candidate.id,
                 claimed_by: options.workerId,
                 abilities: [...abilities],
+                conversation_id: options.conversationId,
               });
             } catch (error) {
               if (stopped) return;
@@ -234,7 +264,8 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
                 ["not_claimable", "not_found", "ability_mismatch"].includes(error.refusal.code)
               )
                 continue;
-              pause("Claim could not be confirmed; do not infer ownership or retry", error);
+              // An unconfirmed claim nobody renews lapses, and the cron blocks it and tells the Manager.
+              await release("Claim could not be confirmed; do not infer ownership", error);
               return;
             }
             if (stopped) return;
@@ -242,7 +273,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
               !detail.assignment.claimed_at ||
               detail.assignment.claimed_by !== options.workerId
             ) {
-              pause("Claim response omitted its version; inspect ownership");
+              await release("Claim response omitted its version; inspect ownership");
               return;
             }
             binding = {
@@ -253,14 +284,17 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
               session_file: "",
             };
             phase = "switching";
+            emit("bound", binding);
             if (!(await prepareWorkspace())) return;
+            let live: Detail;
             try {
-              if (!checkLive(await assignments.get(binding))) return;
+              live = await assignments.get(binding);
             } catch (error) {
-              pause(
-                "Claim could not be verified after workspace preparation; retained for inspection",
-                error,
-              );
+              await release("Claim could not be verified after workspace preparation", error);
+              return;
+            }
+            if (!matches(live.assignment) || live.assignment.status !== "in_process") {
+              await release("Execution claim was superseded; progression stopped");
               return;
             }
             try {
@@ -269,10 +303,7 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
             } catch (error) {
               if (stopped) return;
               diagnostics("Fresh assignment conversation failed", error);
-              pause(
-                "Assignment conversation did not initialize; inspect the retained claim",
-                error,
-              );
+              await blockRun("Assignment conversation did not initialize; no work was dispatched");
             }
             return;
           }
@@ -301,110 +332,63 @@ export function createCoordinator(options: CoordinatorOptions): Coordinator {
         if (binding && phase !== "switching" && phase !== "idle") return;
         binding = { ...next };
         phase = "switching";
+        emit("bound", binding);
         try {
           await advance();
         } catch (error) {
-          await blockRun("Assignment context could not be loaded");
           diagnostics("Assignment context failed", error);
+          await blockRun("Assignment context could not be loaded");
         }
       });
     },
     acceptReport(value) {
-      return serial(() => {
+      return serial(async () => {
+        const report = structuredClone(parseExecutionResult(value));
         if (stopped || phase !== "executing" || !current || !binding)
           throw new Error("No bound executing TODO accepts this report");
-        const report = structuredClone(parseExecutionResult(value));
-        if (accepted && !isDeepStrictEqual(accepted, report))
-          throw new Error("A different report was already accepted for this TODO");
-        if (!accepted) {
-          sessions.appendEntry("assignment-report", {
-            assignment_id: binding.assignment_id,
-            position: current.position,
-            report,
-          });
-          accepted = report;
+        sessions.appendEntry("assignment-report", {
+          assignment_id: binding.assignment_id,
+          position: current.position,
+          report,
+        });
+        try {
+          await record(report);
+        } catch (error) {
+          await release("Execution result could not be inspected or advanced", error);
         }
-        return Promise.resolve({ accepted: true as const });
+        return { accepted: true as const };
       });
     },
-    observeBoundary(outcome, errorMessage) {
-      if (stopped || phase !== "executing") return;
-      boundary = outcome;
-      boundaryRunOutcome = runs?.lastRunOutcome?.();
-      boundaryError = errorMessage;
+    agentFailed(blocker) {
+      return serial(async () => {
+        if (stopped || phase !== "executing" || !binding) return;
+        if (runs?.isRunActive())
+          await runs.stop().catch((error: unknown) => diagnostics("Run stop failed", error));
+        await blockRun(blocker);
+      });
     },
-    settle(event) {
+    agentIdle() {
       return serial(async () => {
         if (stopped || phase !== "executing" || !binding || !current) return;
-        if (event.aborted || boundary === "aborted" || boundary === "error") {
-          await blockRun(
-            event.aborted || boundary === "aborted"
-              ? "Execution was aborted before confirmed completion"
-              : describeFailure(boundaryError),
-          );
+        if (runs?.isRunActive() || sessions.hasPendingMessages() || asks?.waiting) return;
+        const values = { position: String(current.position), assignment_id: binding.assignment_id };
+        if (!reminded) {
+          reminded = true;
+          sessions.remind(messageText(fill(settings.messages.idle_reminder, values)));
           return;
         }
-        if (boundary !== "completed") {
-          pause("Execution settled without a final boundary outcome");
-          return;
-        }
-        if (!accepted) {
-          // A run in progress, or one that ended after this turn's boundary, keeps the TODO bound: its
-          // result arrives as a new turn. A run that ended before the boundary has no turn to come (its
-          // result was returned or steered into this one), so deferring for it would never settle.
-          const ended = runs?.lastRunOutcome?.();
-          if (runs?.isRunActive() || ended !== boundaryRunOutcome) {
-            diagnostics(
-              "Turn ended with a delegate run active or its result queued; TODO stays bound",
-            );
-            return;
-          }
-          await blockRun(
-            failedRunBlocker(ended !== seenRunOutcome ? ended : undefined) ??
-              "Execution settled without a valid report_execution_result",
-          );
-          return;
-        }
-        const report = accepted,
-          position = current.position;
-        phase = "persisting";
-        try {
-          let recorded;
-          try {
-            recorded = await assignments.record({
-              ...binding,
-              position,
-              expected_updated_at: current.updated_at,
-              ...report,
-            });
-          } catch (error) {
-            if (!(error instanceof UncertainAssignmentWriteError)) {
-              pause("Execution result refused; stop obsolete progression", error);
-              return;
-            }
-            const inspected = await assignments.get(binding);
-            const todo = inspected.todos.find((todo) => todo.position === position);
-            if (!todo || !matchesReport(todo, inspected.assignment, report)) {
-              pause("Execution result remains unconfirmed; do not replay work");
-              return;
-            }
-            recorded = { assignment: inspected.assignment, todo };
-          }
-          if (stopped) return;
-          if (!matchesReport(recorded.todo, recorded.assignment, report)) {
-            pause("Stored result did not match the submitted report");
-            return;
-          }
-          if (report.outcome === "blocked") await deliver(await assignments.get(binding));
-          else await advance();
-        } catch (error) {
-          pause("Execution result could not be inspected or advanced", error);
-        }
+        await blockRun(messageText(fill(settings.messages.no_report_blocker, values)));
       });
+    },
+    leaseLost(reason) {
+      return serial(() => release(reason));
     },
     stop() {
       stopped = true;
       return Promise.resolve();
+    },
+    on(event, listener) {
+      listeners[event].push(listener);
     },
   };
   return coordinator;
