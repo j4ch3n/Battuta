@@ -52,8 +52,12 @@ export async function sendProgrammaticMail(
     recipientRole: string;
     conversationId: string;
     content: MessageContent;
+    messageType?: "chat" | "chase";
+    replyExpectation?: { window: "short" | "medium" | "long" } | null;
   },
 ): Promise<MessageReference> {
+  const messageType = input.messageType ?? "chat",
+    replyExpectation = input.replyExpectation ?? null;
   let request: ReturnType<typeof sendRequest>;
   try {
     const role = validate(BotName, input.senderRole);
@@ -62,9 +66,9 @@ export async function sendProgrammaticMail(
       { role, sessionId },
       {
         recipient: input.recipientRole,
-        message_type: "chat",
+        message_type: messageType,
         content: input.content,
-        reply_expectation: null,
+        reply_expectation: replyExpectation,
       },
     );
   } catch (error) {
@@ -80,8 +84,8 @@ export async function sendProgrammaticMail(
       message.conversation_id !== request.conversation_id ||
       message.sender !== request.sender_role ||
       message.recipient !== request.recipient_role ||
-      message.message_type !== "chat" ||
-      message.response_due !== null ||
+      message.message_type !== messageType ||
+      (message.response_due === null) !== (replyExpectation === null) ||
       !isDeepStrictEqual(message.content, request.content)
     )
       throw new Error("Mismatched stored result");
