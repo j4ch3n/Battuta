@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(85);
+select plan(89);
 select ok((select relrowsecurity from pg_class where oid = 'public.assignments'::regclass), 'assignments RLS enabled');
 select ok((select relrowsecurity from pg_class where oid = 'public.todos'::regclass), 'todos RLS enabled');
 select ok(not has_table_privilege('anon','public.assignments','SELECT'), 'no anonymous reads');
@@ -60,6 +60,10 @@ from unnest(array[
  'public.assignment_claimant_error(text,text,timestamptz,text)',
  'public.assignment_settings_apply(jsonb)',
  'public.assignment_lease_duration()',
- 'public.assignment_cron_schedule(integer)']) signature;
+ 'public.assignment_cron_schedule(integer)',
+ 'public.assignment_fill(jsonb,public.assignments)',
+ 'public.assignment_expire_leases()',
+ 'public.assignment_request_progress()',
+ 'public.assignment_lifecycle_scan()']) signature;
 select * from finish();
 rollback;
