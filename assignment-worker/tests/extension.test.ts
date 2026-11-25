@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import worker from "../index.ts";
-import { detail } from "./fixtures.ts";
+import { detail, settings } from "./fixtures.ts";
 
 const backend = vi.hoisted(() => ({
   list: vi.fn(),
@@ -11,7 +11,15 @@ const backend = vi.hoisted(() => ({
   subscribe: vi.fn<(callback: (state: string) => void) => void>(),
   get: vi.fn(),
   start: vi.fn(),
+  block: vi.fn(),
+  renew: vi.fn(),
+  settings: vi.fn(),
   on: vi.fn(),
+  mail: vi.fn(),
+}));
+vi.mock("@battuta/agent-mail/transport", () => ({
+  sendProgrammaticMail: backend.mail,
+  UncertainWriteError: class extends Error {},
 }));
 vi.mock("../client.ts", () => ({
   createAssignmentClient: vi.fn(() =>
@@ -21,8 +29,21 @@ vi.mock("../client.ts", () => ({
       close: backend.close,
       get: backend.get,
       start: backend.start,
+      block: backend.block,
+      renew: backend.renew,
+      settings: backend.settings,
     }),
   ),
+  AssignmentRefusalError: class extends Error {},
+  UncertainAssignmentWriteError: class extends Error {},
+  blockAndInspect: async (
+    client: { block: (input: unknown) => Promise<unknown>; get: () => Promise<unknown> },
+    claim: object,
+    blocker: string,
+  ) => {
+    await client.block({ ...claim, blocker });
+    return client.get();
+  },
 }));
 vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({
@@ -38,7 +59,9 @@ vi.mock("@supabase/supabase-js", () => ({
 }));
 const delegate = vi.hoisted(() => ({ active: false }));
 vi.mock("../project-delegate.ts", () => ({
-  registerProjectDelegate: vi.fn(() => Promise.resolve({ isRunActive: () => delegate.active })),
+  registerProjectDelegate: vi.fn(() =>
+    Promise.resolve({ isRunActive: () => delegate.active, stop: () => Promise.resolve() }),
+  ),
 }));
 vi.mock("../workspace.ts", () => ({
   ensureAssignmentWorkspace: vi.fn(() =>
@@ -49,6 +72,12 @@ vi.mock("../workspace.ts", () => ({
   ),
 }));
 beforeEach(() => {
+  backend.settings.mockResolvedValue(settings());
+  backend.renew.mockResolvedValue({ ok: true });
+  backend.mail.mockResolvedValue({
+    conversation_id: "11111111-1111-4111-8111-111111111111",
+    id: "aaaaaaaaaaaa",
+  });
   vi.stubEnv("AGENT_ID", "worker-1");
   vi.stubEnv("BATTUTA_WORKER_CAPABILITIES", "[]");
 });
@@ -129,6 +158,7 @@ test.each(["worker-1", "worker-2"])(
       assignment_id: row.assignment.id,
       claimed_by: workerId,
       abilities: [],
+      conversation_id: expect.any(String) as string,
     });
     await vi.advanceTimersByTimeAsync(30000);
     expect(sendUserMessage).toHaveBeenCalledTimes(3);
@@ -258,7 +288,7 @@ test("a bound native extension dispatches its TODO through Pi without a host sen
       }),
       display: true,
     },
-    { triggerTurn: true },
+    { triggerTurn: true, deliverAs: "followUp" },
   );
   expect(setActiveTools).toHaveBeenCalled();
   expect(setActiveTools.mock.calls[0][0]).toContain("report_execution_result");
@@ -372,4 +402,155 @@ test("the delegate control tools are in the active tool list", async () => {
     expect.arrayContaining(["delegate", "delegate_reply", "delegate_status", "delegate_stop"]),
   );
   await handlers.get("session_shutdown")!({}, ctx);
+});
+
+/** A worker restored onto an in_process assignment whose first TODO has been dispatched. */
+async function bootBound() {
+  vi.useFakeTimers();
+  const row = detail();
+  row.assignment.status = "in_process";
+  row.assignment.claimed_at = "2026-11-05T12:00:00Z";
+  row.assignment.claimed_by = "worker-1";
+  backend.get.mockResolvedValue(row);
+  backend.start.mockResolvedValue({
+    ok: true,
+    assignment: row.assignment,
+    todo: { ...row.todos[0], status: "in_progress" },
+  });
+  backend.block.mockImplementation((input: { blocker: string }) => {
+    row.assignment.status = "blocked";
+    row.assignment.blocker = input.blocker;
+    return Promise.resolve({ ok: true, assignment: row.assignment });
+  });
+  const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => Promise<void>>();
+  const sendMessage = vi.fn();
+  const tools = new Map<
+    string,
+    { execute: (id: string, args: unknown, ...rest: unknown[]) => Promise<unknown> }
+  >();
+  let next: (_args: string, ctx: ExtensionContext) => Promise<void> = () => Promise.resolve();
+  await worker({
+    on: (name: string, fn: unknown) => handlers.set(name, fn as never),
+    registerTool: (tool: { name: string; execute: never }) => tools.set(tool.name, tool),
+    registerCommand: (_name: string, options: { handler: typeof next }) => {
+      next = options.handler;
+    },
+    appendEntry: vi.fn(),
+    sendMessage,
+    sendUserMessage: vi.fn(),
+    setActiveTools: vi.fn(),
+  } as unknown as ExtensionAPI);
+  const ctx = {
+    isIdle: () => true,
+    hasPendingMessages: () => false,
+    abort: vi.fn(),
+    sessionManager: {
+      getEntries: () => [
+        {
+          type: "custom",
+          customType: "assignment-binding",
+          data: {
+            project: "atlas",
+            assignment_id: "1234abcd",
+            claimed_at: row.assignment.claimed_at,
+            claimed_by: "worker-1",
+          },
+        },
+      ],
+      getSessionId: () => "11111111-1111-4111-8111-111111111111",
+      getSessionFile: () => "/private/session.jsonl",
+    },
+  } as unknown as ExtensionContext;
+  vi.stubEnv("SUPABASE_URL", "http://127.0.0.1:54321");
+  vi.stubEnv("SUPABASE_SECRET_KEY", "local-test-key");
+  await handlers.get("session_start")!({ reason: "new" }, ctx);
+  await next("", ctx);
+  const shutdown = () => handlers.get("session_shutdown")!({}, ctx);
+  return { handlers, tools, sendMessage, ctx, row, shutdown };
+}
+
+test("ask_manager sends a question with requirements to the configured manager", async () => {
+  const { tools, ctx, shutdown } = await bootBound();
+  await tools
+    .get("ask_manager")!
+    .execute(
+      "id",
+      { objective: "Which API?", requirements: ["Name the API"] },
+      undefined,
+      undefined,
+      ctx,
+    );
+  expect(backend.mail).toHaveBeenCalledWith(expect.anything(), {
+    senderRole: "worker-1",
+    recipientRole: "manager",
+    conversationId: "11111111-1111-4111-8111-111111111111",
+    content: { project: "atlas", objective: "Which API?", requirements: ["Name the API"] },
+    messageType: "chat",
+    replyExpectation: { window: "long" },
+  });
+  await shutdown();
+});
+
+test("any Manager mail ends the wait, so no chase follows", async () => {
+  const { tools, handlers, ctx, shutdown } = await bootBound();
+  await tools
+    .get("ask_manager")!
+    .execute(
+      "id",
+      { objective: "Which API?", requirements: ["Name the API"] },
+      undefined,
+      undefined,
+      ctx,
+    );
+  await handlers.get("message_start")!(
+    {
+      message: {
+        role: "custom",
+        customType: "agent-mail",
+        content: JSON.stringify({ sender: "manager", recipient: "worker-1" }),
+      },
+    },
+    ctx,
+  );
+  await vi.advanceTimersByTimeAsync(settings().ask.chase_after * 1000 * 2);
+  expect(backend.mail).toHaveBeenCalledTimes(1);
+  await shutdown();
+});
+
+test("an errored agent run blocks the TODO with the described error once it settles", async () => {
+  const { handlers, ctx, shutdown } = await bootBound();
+  await handlers.get("agent_end")!(
+    { messages: [{ role: "assistant", stopReason: "error", errorMessage: "insufficient_quota" }] },
+    ctx,
+  );
+  await handlers.get("agent_settled")!({ aborted: false }, ctx);
+  expect(backend.block).toHaveBeenCalledWith(
+    expect.objectContaining({ blocker: expect.stringContaining("out of credit") as string }),
+  );
+  await shutdown();
+});
+
+test("a retried run that recovers does not block", async () => {
+  const { handlers, ctx, sendMessage, shutdown } = await bootBound();
+  await handlers.get("agent_end")!(
+    { messages: [{ role: "assistant", stopReason: "error", errorMessage: "overloaded" }] },
+    ctx,
+  );
+  await handlers.get("agent_end")!({ messages: [{ role: "assistant", stopReason: "stop" }] }, ctx);
+  await handlers.get("agent_settled")!({ aborted: false }, ctx);
+  expect(backend.block).not.toHaveBeenCalled();
+  expect(sendMessage).toHaveBeenLastCalledWith(
+    expect.objectContaining({ customType: "assignment-reminder" }),
+    { triggerTurn: true, deliverAs: "followUp" },
+  );
+  await shutdown();
+});
+
+test("the heartbeat renews while bound and stops at shutdown", async () => {
+  const { shutdown } = await bootBound();
+  await vi.advanceTimersByTimeAsync(settings().heartbeat.interval * 1000);
+  expect(backend.renew).toHaveBeenCalledTimes(1);
+  await shutdown();
+  await vi.advanceTimersByTimeAsync(settings().heartbeat.interval * 1000 * 3);
+  expect(backend.renew).toHaveBeenCalledTimes(1);
 });

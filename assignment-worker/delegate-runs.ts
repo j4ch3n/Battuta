@@ -1,7 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { openChannel, type ChannelServer, type ProxyMessage } from "./delegate-channel.ts";
-import type { RunOutcome } from "./types.ts";
 
 export const RUN_ACTIVE = "a run is active; use delegate_status, delegate_reply or delegate_stop";
 export const RUN_FINISHED = "run finished; start a new run with sessionId to continue";
@@ -64,8 +63,6 @@ interface Run {
 
 export interface DelegateRuns {
   readonly active: boolean;
-  /** How the most recent run ended, once it has; the coordinator names it when a result turn never reports. */
-  readonly lastOutcome: RunOutcome | undefined;
   /**
    * Starts `execute` in the background and resolves once Claude has started (or after a short wait). A run
    * that settles before that returns its result, or throws its error, directly. Throws when a run is active.
@@ -110,7 +107,6 @@ export async function createDelegateRuns(
   { startWaitMs = 30_000, stopGraceMs = 10_000 } = {},
 ): Promise<DelegateRuns> {
   let current: Run | undefined;
-  let last: RunOutcome | undefined;
 
   const notify = (customType: string, content: string, triggerTurn: boolean) =>
     pi.sendMessage({ customType, content, display: true }, { triggerTurn });
@@ -151,16 +147,6 @@ export async function createDelegateRuns(
     return { done, cancel: () => clearTimeout(timer) };
   };
 
-  function outcomeOf(
-    run: Run,
-    settled: { ok: true; result: ToolResult } | { ok: false; error: unknown },
-  ): RunOutcome {
-    if (run.stopped) return { sessionId: run.sessionId, state: "stopped" };
-    if (settled.ok) return { sessionId: run.sessionId, state: "finished" };
-    const reason = settled.error instanceof Error ? settled.error.message : String(settled.error);
-    return { sessionId: run.sessionId, state: "failed", reason };
-  }
-
   function cleanup(run: Run) {
     for (const key of ENV_KEYS) delete process.env[key];
     channel.expect(null);
@@ -172,10 +158,6 @@ export async function createDelegateRuns(
   return {
     get active() {
       return current !== undefined;
-    },
-
-    get lastOutcome() {
-      return last;
     },
 
     async start({ assignmentId, cwd, dirs, execute }) {
@@ -218,13 +200,11 @@ export async function createDelegateRuns(
       if (winner === "settled") {
         cleanup(run);
         const settled = await outcome;
-        last = outcomeOf(run, settled);
         if (settled.ok) return settled.result;
         throw settled.error;
       }
       void outcome.then((settled) => {
         cleanup(run);
-        last = outcomeOf(run, settled);
         const session = run.sessionId ? ` (session ${run.sessionId})` : "";
         // A stopped run usually exits with an error; it is not a failure of the work.
         if (run.stopped) notify("delegate-run", `Claude run stopped${session}.`, true);

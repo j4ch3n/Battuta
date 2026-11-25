@@ -275,6 +275,6 @@ export async function registerProjectDelegate(
   for (const tool of controlTools(() => runs)) pi.registerTool(tool);
   return {
     isRunActive: () => runs?.active ?? false,
-    lastRunOutcome: () => runs?.lastOutcome,
+    stop: () => runs?.stop() ?? Promise.resolve(),
   };
 }
