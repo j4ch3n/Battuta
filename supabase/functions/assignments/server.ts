@@ -54,7 +54,7 @@ const operations: Record<ToolName, { rpc: string; description: string }> = {
   claim_assignment: {
     rpc: "assignment_claim",
     description:
-      "Atomically claim a ready active assignment. Lease timestamp is informational only; no expiry reclaim.",
+      "Atomically claim a ready active assignment. The lease is set by the database and renewed by the worker's heartbeat; a lapsed lease blocks the assignment.",
   },
   start_todo: {
     rpc: "assignment_start_todo",
@@ -76,6 +76,16 @@ const operations: Record<ToolName, { rpc: string; description: string }> = {
     description:
       "Code-owned execution: complete a nonempty assignment only when all TODOs are done/cancelled, using the current claim regardless of its age.",
   },
+  renew_assignment: {
+    rpc: "assignment_renew",
+    description:
+      "Code-owned execution: renew this claim's lease while the worker is alive. The database sets the length.",
+  },
+  get_lifecycle_settings: {
+    rpc: "assignment_settings_get",
+    description:
+      "Read the lifecycle settings workers use: heartbeat interval, chase delay, Manager role and fixed messages.",
+  },
   reactivate_assignment: {
     rpc: "assignment_reactivate",
     description:
@@ -96,7 +106,12 @@ export function createAssignmentHandler(rpc: Rpc): (request: Request) => Promise
             inputSchema: contract.input,
             outputSchema: contract.output,
             annotations: {
-              readOnlyHint: ["list_assignments", "get_assignment", "locate_notes"].includes(name),
+              readOnlyHint: [
+                "list_assignments",
+                "get_assignment",
+                "locate_notes",
+                "get_lifecycle_settings",
+              ].includes(name),
               destructiveHint: false,
             },
           },

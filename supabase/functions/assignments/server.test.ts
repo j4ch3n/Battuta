@@ -75,6 +75,7 @@ Deno.test(
           assignment_id: "a3f91c2e",
           claimed_by: "worker-1",
           abilities: ["mobile_use"],
+          conversation_id: "6f1e2d3c-4b5a-4987-8a6b-5c4d3e2f1a0b",
         },
       ],
     ] as const) {
@@ -400,3 +401,76 @@ Deno.test(
     assert.equal(malformed.structuredContent.code, "backend_error");
   },
 );
+
+const settings = {
+  lease: { duration: 600 },
+  heartbeat: { interval: 60 },
+  expiry: { check_interval: 60 },
+  progress: { report_after: 600 },
+  ask: { chase_after: 1800 },
+  roles: { manager: "manager" },
+  messages: Object.fromEntries(
+    [
+      "expiry_blocker",
+      "manager_expiry_notice",
+      "progress_request",
+      "idle_reminder",
+      "no_report_blocker",
+      "ask_chase",
+    ].map((name) => [name, { objective: `${name} objective`, body: `${name} body` }]),
+  ),
+};
+
+Deno.test("renew_assignment forwards the claim to assignment_renew", async () => {
+  const seen: [string, Record<string, unknown>][] = [];
+  const claim = {
+    project: "Atlas",
+    assignment_id: "a3f91c2e",
+    claimed_at: "2026-11-25T12:00:00.000001Z",
+    claimed_by: "worker-1",
+  };
+  const result = await call(
+    (name, args) => {
+      seen.push([name, args]);
+      return Promise.resolve({ data: { ok: true, assignment }, error: null });
+    },
+    "renew_assignment",
+    claim,
+  );
+  assert.equal(result.isError, false);
+  assert.deepEqual(seen, [
+    [
+      "assignment_renew",
+      {
+        p_project: "Atlas",
+        p_assignment_id: "a3f91c2e",
+        p_claimed_at: claim.claimed_at,
+        p_claimed_by: "worker-1",
+      },
+    ],
+  ]);
+});
+
+Deno.test("get_lifecycle_settings returns settings or the not_configured refusal", async () => {
+  const ok = await call(
+    (name) => {
+      assert.equal(name, "assignment_settings_get");
+      return Promise.resolve({ data: { ok: true, settings }, error: null });
+    },
+    "get_lifecycle_settings",
+    {},
+  );
+  assert.equal(ok.isError, false);
+  assert.deepEqual(ok.structuredContent.settings, settings);
+  const refused = await call(
+    () =>
+      Promise.resolve({
+        data: { ok: false, code: "not_configured", message: "Lifecycle settings are not synced." },
+        error: null,
+      }),
+    "get_lifecycle_settings",
+    {},
+  );
+  assert.equal(refused.isError, true);
+  assert.equal(refused.structuredContent.code, "not_configured");
+});

@@ -35,6 +35,7 @@ Deno.test("creation accepts only known difficulty levels", () => {
     );
 });
 
+const conversation = "6f1e2d3c-4b5a-4987-8a6b-5c4d3e2f1a0b";
 Deno.test("claim requires code-owned identity and an explicit ability set", () => {
   assert.equal(toolContracts.claim_assignment.input.safeParse(target).success, false);
   assert.deepEqual(
@@ -42,13 +43,28 @@ Deno.test("claim requires code-owned identity and an explicit ability set", () =
       ...target,
       claimed_by: "worker-1",
       abilities: [],
+      conversation_id: conversation,
     }),
-    { ...target, claimed_by: "worker-1", abilities: [] },
+    { ...target, claimed_by: "worker-1", abilities: [], conversation_id: conversation },
   );
+  for (const conversation_id of [undefined, "", "not-a-uuid"])
+    assert.equal(
+      toolContracts.claim_assignment.input.safeParse({
+        ...target,
+        claimed_by: "worker-1",
+        abilities: [],
+        conversation_id,
+      }).success,
+      false,
+    );
   for (const claimed_by of ["", " ", null, "bad\0id"]) {
     assert.equal(
-      toolContracts.claim_assignment.input.safeParse({ ...target, claimed_by, abilities: [] })
-        .success,
+      toolContracts.claim_assignment.input.safeParse({
+        ...target,
+        claimed_by,
+        abilities: [],
+        conversation_id: conversation,
+      }).success,
       false,
     );
   }

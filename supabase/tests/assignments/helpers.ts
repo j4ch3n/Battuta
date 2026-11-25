@@ -45,6 +45,7 @@ export interface Result {
   nextStep?: string;
   missing_assignment_ids?: string[];
   message?: string;
+  settings: { lease: { duration: number } };
 }
 export function localEnv(name: string): string {
   const value = Deno.env.get(name);
