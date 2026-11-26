@@ -91,10 +91,8 @@ What a spike taught goes back to the decision that needed it.
 
 A failed review becomes a new implement assignment, one difficulty level up with
 the findings as context, then a fresh review of the same focus. Do not reopen the
-old assignment. The new brief tells the worker to verify before implementing:
-check each finding against the codebase first, fix the ones that hold, and push
-back with technical reasoning on a finding that is wrong rather than accepting it
-blindly. After a few cycles without progress, escalate to CoS with a
+old assignment. Its brief carries the verify-before-implementing
+instruction described in the `coordinate-workers` skill. After a few cycles without progress, escalate to CoS with a
 recommendation.
 
 ## How and why

@@ -29,6 +29,12 @@ Receive completed/blocked summaries through Agent Mail and inspect authoritative
 
 For blockers, cancel/replace the assignment or cancel unfinished TODOs, append replacements, and reactivate explicitly. Preserve completed evidence. Dependencies cannot be edited and cancelled prerequisites do not unlock dependents; replace affected downstream plans when needed. No terminal reopening, age-based reclaim, nested assignments, or original-worker affinity. Escalate product/authority decisions to CoS with a recommendation.
 
+When a review fails, commission the fix as a new implement assignment whose brief
+tells the worker to verify before implementing: check each finding against the
+codebase first, fix the ones that hold, and push back with technical reasoning on
+a finding that is wrong rather than accepting it blindly. Pass the findings as
+context; do not pre-judge them in the brief.
+
 ## Ticket lifecycle
 
 Keep each Linear ticket's status truthful as delivery progresses, in both
