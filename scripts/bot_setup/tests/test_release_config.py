@@ -35,6 +35,11 @@ def deployment(tmp_path, monkeypatch):
     helper.parent.mkdir(parents=True)
     helper.touch()
     helper.with_name("configure-dream.js").touch()
+    gh = tmp_path / "stub-bin/gh"
+    gh.parent.mkdir()
+    gh.write_text("#!/bin/sh\nexit 0\n")
+    gh.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{gh.parent}:{os.environ['PATH']}")
     monkeypatch.setattr(release, "run", lambda *args, **kwargs: None)
     registrations.clear()
     monkeypatch.setattr(release, "register_doc_service", lambda home, *, deployment: registrations.append(deployment) or True)
@@ -177,6 +182,14 @@ def test_preflight_all_instances_before_any_write(deployment, conflict):
         release.configure_release(root, env_file=env_file, home=home)
     assert "private-sentinel" not in str(error.value)
     assert not (home / ".battuta/pi-bots/cos-bot").exists()
+
+
+def test_signed_out_gh_stops_main_release_before_writes(deployment, tmp_path):
+    root, home, env_file = deployment
+    (tmp_path / "stub-bin/gh").write_text("#!/bin/sh\nexit 1\n")
+    with pytest.raises(click.ClickException, match="gh auth login"):
+        release.configure_release(root, env_file=env_file, home=home)
+    assert not (home / ".battuta/pi-bots").exists()
 
 
 def test_zero_workers(deployment):

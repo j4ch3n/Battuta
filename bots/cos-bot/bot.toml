@@ -70,5 +70,6 @@ include = [
   "communicate-with-manager",
   "manage-google",
   "owner-coaching",
+  "technical-brainstorming",
   "project-management",
 ]

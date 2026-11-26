@@ -184,7 +184,7 @@ Telegram separately.
 
 Setup steps select known Python functions, not shell commands or imports:
 CoS supports Telegram, MCP, memory settings, browser and dream provisioning;
-Manager supports MCP and memory settings;
+Manager supports MCP and memory settings, and a GitHub CLI sign-in check for merging;
 Worker uses the specialised worker-profile preparation step.
 
 Use [development commands](commands.md) for configuration/launch and

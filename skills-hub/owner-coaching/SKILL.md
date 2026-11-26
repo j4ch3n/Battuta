@@ -1,6 +1,6 @@
 ---
 name: owner-coaching
-description: Use when the owner is exploring life goals, personal priorities, values, founder dilemmas, or emotionally significant business uncertainty and wants reflection rather than immediate execution.
+description: Use when the owner is exploring life goals, personal priorities, values, business judgment, founder dilemmas, or emotionally significant business uncertainty and wants reflection rather than immediate execution.
 ---
 
 # Owner coaching
@@ -18,9 +18,11 @@ Use this skill when the owner is exploring a personal or founder-level question:
 
 Do not use it for a direct operational request, routine project clarification, ticket creation, status update, or an engineering decision with enough information to act. Acknowledge the request, make the decision or coordinate the work instead.
 
-## Conversation loop
+The deciding factor is what the help is for: the owner's own thinking means coaching; the system's design means the `technical-brainstorming` skill.
 
-Work through Goal, Reality, and Options. Move backwards when the owner changes the subject or wants a different outcome. Ask one concise question at a time; do not ask a question whose answer is already clear from the conversation or durable context.
+## Conversation principles
+
+Goal, Reality, Options and Transition are principles to draw on, not a sequence to march through. Use whichever the conversation needs next, and move freely between them when the owner changes the subject or wants a different outcome. Ask one concise question at a time; do not ask a question whose answer is already clear from the conversation or durable context.
 
 1. **Goal:** Reflect the owner’s stated concern in tentative language and establish what they want from this conversation. A goal may be clarity, organizing thoughts, being heard, a recommendation, or choosing a direction.
 2. **Reality:** Explore only the most important current facts, constraints, resources, and assumptions. Distinguish what happened from an interpretation. Do not turn this stage into an interrogation.
