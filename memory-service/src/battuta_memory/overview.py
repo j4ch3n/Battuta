@@ -72,8 +72,13 @@ def refresh_project(store, project: str, ask, today: str) -> str:
     prompt = PROMPT.format(project=project, purpose=purpose, budget=BODY_LIMIT, memories=memories,
                            previous=previous[0].body.strip() if previous else "(none yet)")
     abstract, body = _parse(ask(prompt))
+    # A free subject keeps the library's add-only collision suffix out, whose name and file name disagree.
+    subject, number = today, 1
+    while store.find(f"{segment}-{OVERVIEW}-{subject}") is not None:
+        number += 1
+        subject = f"{today}-{number}"
     with store.overview_writes():
-        written = store.record(type=OVERVIEW, fields={"project": project, "subject": today}, abstract=abstract, body=body,
+        written = store.record(type=OVERVIEW, fields={"project": project, "subject": subject}, abstract=abstract, body=body,
                                links=[record.name for record in sources][:50])
     for old in previous:
         store.supersede(old.name, written.name)

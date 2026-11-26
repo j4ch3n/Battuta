@@ -77,7 +77,7 @@ export default function dreamExtension(pi: ExtensionAPI) {
     name: "memory_dream",
     label: "Memory dream",
     description:
-      "Run the memory dream: upload recent owner conversation, then let the memory service distill, consolidate and refresh overviews. Report the returned status and counts honestly; never invent a summary.",
+      "Run the memory dream: upload recent owner conversation, then let the memory service distill, consolidate and refresh overviews. Call it only for the scheduled dream prompt or when the owner explicitly asks. Report the returned status and counts honestly; never invent a summary.",
     parameters: Type.Object({}, { additionalProperties: false }),
     async execute(_id, _params, signal, _update, ctx) {
       const abort = signal ?? new AbortController().signal;

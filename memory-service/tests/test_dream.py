@@ -90,6 +90,16 @@ class DreamTests(unittest.TestCase):
         self.assertFalse(old.is_active())
         self.assertEqual(old.superseded_by, "mocktest-overview-2026-11-27")
 
+    def test_same_day_dreams_give_each_overview_its_own_name_and_file(self):
+        for index, text in enumerate(("MockTest's client is Acme Ltd", "MockTest now launches on 2027-04-15")):
+            self.state.start(os.getpid())
+            upload(self.store, ("owner", text))
+            self.dream(StubDistiller({"type": "fact", "fields": {"project": "mocktest", "subject": f"fact-{index}"}, "abstract": text}), StubOverview())
+        current = active_overviews(self.store, "mocktest")
+        self.assertEqual([record.name for record in current], ["mocktest-overview-2026-11-26-2"])
+        self.assertEqual(current[0].path.stem, current[0].name)
+        self.assertEqual(self.store.find("mocktest-overview-2026-11-26").superseded_by, "mocktest-overview-2026-11-26-2")
+
     def test_unchanged_store_makes_no_overview_call(self):
         overview = StubOverview()
         self.dream(StubDistiller(), overview)
@@ -109,6 +119,20 @@ class DreamTests(unittest.TestCase):
 
 
 class ProposalFilterTests(unittest.TestCase):
+    def test_recall_cooccurrence_links_stay_within_one_project(self):
+        store = make_store(self)
+        for project, subject in (("battuta", "acme"), ("mocktest", "acme"), ("mocktest", "invoices")):
+            store.record(**entity(project, subject, f"Acme Ltd invoices for {project} {subject}"))
+        with store.overview_writes():
+            store.record(type="overview", fields={"project": "mocktest", "subject": "2026-11-26"}, abstract="Acme Ltd invoices digest", body="Acme Ltd invoices")
+        for _ in range(3):
+            Reads(store).recall(query="Acme Ltd invoices")
+        BattutaManage(store).sleep(reasoner=no_review)
+        links = {record.name: set(record.links) for record in store.records()}
+        self.assertEqual(links["mocktest-entity-acme"], {"mocktest-entity-invoices"})
+        self.assertEqual(links["battuta-entity-acme"], set())
+        self.assertEqual(links["mocktest-overview-2026-11-26"], set())
+
     def test_filters_cross_project_and_overview_proposals(self):
         store = make_store(self)
         store.record(**entity("battuta", "acme", "Acme Ltd is the client paying monthly invoices"))

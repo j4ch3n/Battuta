@@ -1,4 +1,4 @@
-"""The library's Manage layer, minus proposals that would rewrite overviews or move knowledge between projects."""
+"""The library's Manage layer, minus proposals and links that would touch overviews or cross projects."""
 from agent_memory.core import reasoning
 from agent_memory.core.manage import Manage
 
@@ -22,3 +22,11 @@ class BattutaManage(Manage):
                 continue
             kept.append(proposal)
         return kept
+
+    # Unscoped recall returns several projects together; linking per project keeps every link inside one.
+    def _add_cooccurrence_links(self, records):
+        groups = {}
+        for record in records:
+            if record.type != OVERVIEW:
+                groups.setdefault(project_of(record), []).append(record)
+        return [action for group in groups.values() for action in super()._add_cooccurrence_links(group)]
