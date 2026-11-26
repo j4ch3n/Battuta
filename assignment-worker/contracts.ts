@@ -167,7 +167,47 @@ export const FailureSchema = Type.Union([
   Type.Object({ ...refused, code: Type.Literal("not_found") }),
   Type.Object({ ...refused, code: Type.Literal("invalid_input") }),
   Type.Object({ ...refused, code: Type.Literal("backend_error") }),
+  Type.Object({ ...refused, code: Type.Literal("not_configured") }),
 ]);
+const seconds = Type.Integer({ minimum: 1 });
+const strict = <P extends Parameters<typeof Type.Object>[0]>(properties: P) =>
+  Type.Object(properties, { additionalProperties: false });
+const LifecycleMessageSchema = strict({ objective: text, body: text });
+/** Stored lifecycle settings (durations in seconds), synced from config/assignment-lifecycle.yaml. */
+export const LifecycleSettingsSchema = strict({
+  lease: strict({ duration: seconds }),
+  heartbeat: strict({ interval: seconds }),
+  expiry: strict({ check_interval: seconds }),
+  progress: strict({ report_after: seconds }),
+  ask: strict({ chase_after: seconds }),
+  roles: strict({ manager: text }),
+  messages: strict({
+    expiry_blocker: LifecycleMessageSchema,
+    manager_expiry_notice: LifecycleMessageSchema,
+    progress_request: LifecycleMessageSchema,
+    idle_reminder: LifecycleMessageSchema,
+    no_report_blocker: LifecycleMessageSchema,
+    ask_chase: LifecycleMessageSchema,
+  }),
+});
+export const SettingsSchema = strict({ ok: Type.Literal(true), settings: LifecycleSettingsSchema });
+export type LifecycleSettings = Static<typeof LifecycleSettingsSchema>;
+export type LifecycleMessage = Static<typeof LifecycleMessageSchema>;
+type Placeholder = "assignment_id" | "worker" | "claimed_at" | "position";
+
+/** Fills a configured message; an unknown placeholder is left as written. */
+export function fill(
+  message: LifecycleMessage,
+  values: Partial<Record<Placeholder, string>>,
+): LifecycleMessage {
+  const apply = (text: string) =>
+    text.replace(
+      /\{(assignment_id|worker|claimed_at|position)\}/g,
+      (token, name: Placeholder) => values[name] ?? token,
+    );
+  return { objective: apply(message.objective), body: apply(message.body) };
+}
+export const messageText = (message: LifecycleMessage) => `${message.objective}\n\n${message.body}`;
 const report = { summary: text, evidence: Type.Array(text) };
 export const ExecutionResultSchema = Type.Union([
   Type.Object({ ...report, outcome: Type.Literal("completed") }, { additionalProperties: false }),

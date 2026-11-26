@@ -7,7 +7,12 @@ import { createClient } from "@supabase/supabase-js";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Type } from "typebox";
+import { sendProgrammaticMail } from "@battuta/agent-mail/transport";
 import { createAssignmentClient } from "./client.ts";
+import { createAsk, type Ask } from "./ask.ts";
+import { describeFailure } from "./errors.ts";
+import { createHeartbeat, type Heartbeat } from "./heartbeat.ts";
 import { delegationPromptSection } from "./delegation.ts";
 import { createCoordinator } from "./coordinator.ts";
 import { ExecutionResultParameters, currentBinding, parseAbilities } from "./contracts.ts";
@@ -15,7 +20,30 @@ import { guardWorktreeCommand } from "./worktree-guard.ts";
 import { registerProjectDelegate } from "./project-delegate.ts";
 import { createNotifier } from "./notify.ts";
 import { ensureAssignmentWorkspace } from "./workspace.ts";
-import type { AssignmentClient, Coordinator, Detail } from "./types.ts";
+import type {
+  AssignmentClient,
+  Coordinator,
+  Detail,
+  LifecycleSettings,
+  RunTracker,
+} from "./types.ts";
+
+const ABORTED = "Execution was aborted before confirmed completion";
+const AskParameters = Type.Object({
+  objective: Type.String({
+    minLength: 1,
+    maxLength: 2000,
+    description: "The question for the Manager, in one or two sentences.",
+  }),
+  body: Type.Optional(
+    Type.String({ minLength: 1, maxLength: 4000, description: "Context the Manager needs." }),
+  ),
+  requirements: Type.Array(Type.String({ minLength: 1, maxLength: 4000 }), {
+    minItems: 1,
+    maxItems: 30,
+    description: "What the answer must settle, one item each.",
+  }),
+});
 
 export default async function worker(pi: ExtensionAPI) {
   let coordinator: Coordinator | undefined, client: AssignmentClient | undefined;
@@ -24,8 +52,13 @@ export default async function worker(pi: ExtensionAPI) {
   let context: ExtensionContext | undefined, command: ExtensionCommandContext | undefined;
   let stopped = false,
     restored = false;
+  let settings: LifecycleSettings | undefined,
+    heartbeat: Heartbeat | undefined,
+    ask: Ask | undefined;
+  // The last agent loop's error; a retry that recovers ends with a later agent_end that clears it.
+  let lastError: string | undefined;
   // Set once the delegate package loads (last, below); a run in progress keeps the worker busy.
-  const delegation: { runs?: { isRunActive(): boolean } } = {};
+  const delegation: { runs?: RunTracker } = {};
   const RUN_ACTIVE = "a Claude run is still active; wait for its finished message or stop it";
   const diagnostic = (event: string) => console.error(`[assignment-worker] ${event}`);
   const wake = () => {
@@ -36,15 +69,39 @@ export default async function worker(pi: ExtensionAPI) {
     name: "report_execution_result",
     label: "Report execution result",
     description:
-      "Submit this bound TODO's completed or blocked outcome; awaits final turn settlement and persistence.",
+      "Submit this bound TODO's completed or blocked outcome; it is recorded immediately and the next TODO arrives as a message.",
     parameters: ExecutionResultParameters,
     async execute(_id, value) {
       if (!coordinator || stopped) throw new Error("Worker execution is not available");
       if (delegation.runs?.isRunActive()) throw new Error(RUN_ACTIVE);
       const result = await coordinator.acceptReport(value);
+      return { content: [{ type: "text", text: "Report recorded." }], details: result };
+    },
+  });
+  pi.registerTool({
+    name: "ask_manager",
+    label: "Ask the Manager",
+    description:
+      "Ask the Manager a question about the bound assignment. The answer arrives as agent mail; continue other work or wait for it.",
+    parameters: AskParameters,
+    async execute(_id, { objective, body, requirements }, _signal, _onUpdate, ctx) {
+      const binding = currentBinding(ctx);
+      if (!ask || stopped || !binding) throw new Error("No bound assignment to ask about");
+      await ask.ask({
+        project: binding.project,
+        assignmentId: binding.assignment_id,
+        objective,
+        body,
+        requirements,
+      });
       return {
-        content: [{ type: "text", text: "Report accepted; awaiting final turn settlement." }],
-        details: result,
+        content: [
+          {
+            type: "text",
+            text: "Question sent to the Manager; continue other work or wait for the answer.",
+          },
+        ],
+        details: {},
       };
     },
   });
@@ -107,6 +164,7 @@ export default async function worker(pi: ExtensionAPI) {
       "find",
       "ls",
       "report_execution_result",
+      "ask_manager",
       // Only installed tools activate: `delegate` comes from the general worker's package, not the influencer's.
       "delegate",
       "delegate_modes",
@@ -127,28 +185,75 @@ export default async function worker(pi: ExtensionAPI) {
       await client.close();
       return;
     }
+    try {
+      settings = await client.settings();
+    } catch (error) {
+      throw new Error(
+        `Lifecycle settings unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
+      );
+    }
     db = createClient(supabaseUrl, secretKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
+    const mail = db;
+    const assignments = client;
+    const conversationId = ctx.sessionManager.getSessionId();
+    const manager = settings.roles.manager;
     const notifier = createNotifier({
-      client: db,
-      conversationId: ctx.sessionManager.getSessionId(),
+      client: mail,
+      conversationId,
       senderName: workerId,
-      managerName: "manager",
+      managerName: manager,
       appendEntry: (kind, data) => pi.appendEntry(kind, data),
+    });
+    ask = createAsk({
+      send: (message) =>
+        sendProgrammaticMail(mail, {
+          senderRole: workerId,
+          recipientRole: manager,
+          conversationId,
+          ...message,
+        }),
+      chaseAfterMs: settings.ask.chase_after * 1000,
+      chase: settings.messages.ask_chase,
+      worker: workerId,
+      diagnostics: diagnostic,
+    });
+    heartbeat = createHeartbeat({
+      renew: (claim) => assignments.renew(claim),
+      intervalMs: settings.heartbeat.interval * 1000,
+      onLost: (reason) => void coordinator?.leaseLost(reason),
+      diagnostics: diagnostic,
     });
     coordinator = createCoordinator({
       workerId,
       capabilities,
+      conversationId,
+      settings,
       assignments: client,
       notify: notifier,
       diagnostics: diagnostic,
+      asks: ask,
+      // Read on each event: the delegate runs are registered after this coordinator is created.
+      runs: {
+        isRunActive: () => delegation.runs?.isRunActive() ?? false,
+        stop: () => delegation.runs?.stop() ?? Promise.resolve(),
+      },
       sessions: {
         prepareWorkspace: (target) =>
           ensureAssignmentWorkspace(join(homedir(), ".battuta"), target),
         isIdle: () => context?.isIdle() ?? false,
         hasPendingMessages: () => context?.hasPendingMessages() ?? true,
         appendEntry: (kind, data) => pi.appendEntry(kind, data),
+        abort: () => context?.abort(),
+        remind(text) {
+          if (stopped) return;
+          pi.sendMessage(
+            { customType: "assignment-reminder", content: text, display: true },
+            { triggerTurn: true, deliverAs: "followUp" },
+          );
+        },
         async openAssignmentSession(detail: Detail) {
           if (!command) throw new Error("Session replacement requires command context");
           const binding = {
@@ -187,10 +292,15 @@ export default async function worker(pi: ExtensionAPI) {
               }),
               display: true,
             },
-            { triggerTurn: true },
+            { triggerTurn: true, deliverAs: "followUp" },
           );
         },
       },
+    });
+    coordinator.on("bound", (binding) => heartbeat?.start(binding));
+    coordinator.on("unbound", () => {
+      heartbeat?.stop();
+      ask?.cancel();
     });
     db.channel(`assignment-availability-${ctx.sessionManager.getSessionId()}`)
       .on(
@@ -207,23 +317,53 @@ export default async function worker(pi: ExtensionAPI) {
     // A live replacement restores through its command before reconciling another assignment.
     if (event.reason !== "new") wake();
   });
-  pi.on("agent_before_settle", (event) => {
-    const last = [...event.context.contextMessages]
-      .reverse()
-      .find((message) => message.role === "assistant");
-    coordinator?.observeBoundary(
-      event.outcome,
-      last && "errorMessage" in last ? last.errorMessage : undefined,
-    );
+  pi.on("message_start", (event) => {
+    const message = event.message;
+    if (message.role !== "custom" || message.customType !== "agent-mail" || !settings) return;
+    if (typeof message.content !== "string") return;
+    try {
+      const mail = JSON.parse(message.content) as { sender?: unknown };
+      if (mail.sender === settings.roles.manager) ask?.answered();
+    } catch {
+      // Malformed mail is the agent-mail extension's concern; it never ends a wait.
+    }
+  });
+  pi.on("agent_end", (event) => {
+    const last = [...event.messages].reverse().find((message) => message.role === "assistant");
+    const stop = last && "stopReason" in last ? last.stopReason : undefined;
+    lastError =
+      stop === "error"
+        ? describeFailure("errorMessage" in last! ? last.errorMessage : undefined)
+        : stop === "aborted"
+          ? ABORTED
+          : undefined;
   });
   pi.on("agent_settled", async (event, ctx) => {
     context = ctx;
-    await coordinator?.settle(event);
+    const failure = event.aborted ? ABORTED : lastError;
+    lastError = undefined;
+    if (failure) await coordinator?.agentFailed(failure);
+    else await coordinator?.agentIdle();
     wake();
   });
+  const shutdown = () => {
+    heartbeat?.stop();
+    ask?.cancel();
+    const binding = context ? currentBinding(context) : undefined;
+    if (binding) pi.appendEntry("assignment-shutdown", { assignment_id: binding.assignment_id });
+  };
+  process.once("SIGTERM", shutdown);
+  process.once("SIGINT", shutdown);
   pi.on("session_shutdown", async () => {
     if (stopped) return;
     stopped = true;
+    process.off("SIGTERM", shutdown);
+    process.off("SIGINT", shutdown);
+    try {
+      shutdown();
+    } catch (error) {
+      diagnostic(`Shutdown entry failed: ${String(error)}`);
+    }
     if (timer) clearInterval(timer);
     await coordinator?.stop();
     await db?.removeAllChannels();

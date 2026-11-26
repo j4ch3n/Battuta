@@ -9,6 +9,9 @@ Supabase URL/secret key, not a new OAuth login or task CLI.
 The Supabase project must have this checkout's migrations applied and the
 `assignments` Edge Function deployed. Use the repository's existing Supabase
 deployment workflow for a remote project, with normal operator approval.
+The deployment workflow also stores the lifecycle settings from
+`config/assignment-lifecycle.yaml`; it needs the `SUPABASE_DB_URL` repository
+secret. Claims are refused with `not_configured` until the settings are stored.
 `[functions.assignments] verify_jwt = false` delegates authentication to the
 secret-key handler; it does not make the MCP service public.
 
@@ -17,11 +20,14 @@ serve functions from the checkout:
 
 ```sh
 supabase migration up --local
+node scripts/supabase/sync-lifecycle-settings.mjs > /tmp/lifecycle-settings.sql
+supabase db query --local --file /tmp/lifecycle-settings.sql
 supabase functions serve assignments
 ```
 
-Expected: migrations apply without resetting existing data and the local function
-server reports its endpoint. Stop on migration/runtime errors; do not reset the
+Expected: migrations apply without resetting existing data, the settings query
+exits 0 (an invalid YAML file exits 1 before anything is written), and the local
+function server reports its endpoint. Stop on migration/runtime errors; do not reset the
 database to bypass them. Do not start another server if one is already serving.
 
 ## Bot configuration

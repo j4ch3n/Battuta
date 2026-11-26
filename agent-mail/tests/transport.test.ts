@@ -112,3 +112,47 @@ test("known backend validation refusal is a failed send, not an uncertain send",
   await expect(sendProgrammaticMail(client(invoke), input)).rejects.toBeInstanceOf(MailSendError);
   expect(invoke).toHaveBeenCalledTimes(1);
 });
+
+test.each([
+  {
+    name: "chase without an expectation",
+    extra: { messageType: "chase" as const },
+    stored: { message_type: "chase" },
+    sent: { message_type: "chase", response_due_minutes: null },
+  },
+  {
+    name: "question with requirements and a long expectation",
+    extra: {
+      content: { ...input.content, requirements: ["Answer the question"] },
+      replyExpectation: { window: "long" as const },
+    },
+    stored: {
+      content: { ...input.content, requirements: ["Answer the question"] },
+      response_due: "2026-11-04T12:20:00Z",
+    },
+    sent: { message_type: "chat", response_due_minutes: 20 },
+  },
+])("programmatic mail sends a $name", async ({ extra, stored, sent }) => {
+  const invoke = vi.fn().mockResolvedValue({ data: { data: { ...row, ...stored } }, error: null });
+  const result = await sendProgrammaticMail(client(invoke), { ...input, ...extra });
+  expect(result).toEqual({ conversation_id: conversationId, id: "123456abcdef" });
+  expect((invoke.mock.calls[0] as [string, { body: unknown }])[1].body).toMatchObject(sent);
+});
+
+test.each([
+  {
+    name: "message type",
+    stored: { message_type: "chat" },
+    extra: { messageType: "chase" as const },
+  },
+  {
+    name: "missing reply due",
+    stored: {},
+    extra: { replyExpectation: { window: "short" as const } },
+  },
+])("an acknowledgement with a different $name is uncertain", async ({ stored, extra }) => {
+  const invoke = vi.fn().mockResolvedValue({ data: { data: { ...row, ...stored } }, error: null });
+  await expect(sendProgrammaticMail(client(invoke), { ...input, ...extra })).rejects.toBeInstanceOf(
+    UncertainWriteError,
+  );
+});

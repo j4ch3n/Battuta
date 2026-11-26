@@ -626,3 +626,14 @@ test("a run ended by delegate_stop is reported as stopped, not failed", async ()
   expect(content).toContain("stopped");
   expect(content).not.toContain("failed");
 });
+
+test("the tracker's stop ends the active run, so a lost claim stops editing", async () => {
+  const { tools, handle } = await install();
+  const { heldRun, received } = await startHeld(tools);
+  expect(handle?.isRunActive()).toBe(true);
+  const stopping = handle!.stop();
+  await vi.waitFor(() => expect(received).toEqual([{ type: "stop" }]));
+  heldRun.reject(new Error("stopped"));
+  await stopping;
+  expect(handle?.isRunActive()).toBe(false);
+});

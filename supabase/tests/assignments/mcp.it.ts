@@ -47,11 +47,13 @@ Deno.test("remote MCP authenticates before discovery and exposes shared lifecycl
         "create_assignment",
         "finish_assignment",
         "get_assignment",
+        "get_lifecycle_settings",
         "list_assignments",
         "locate_notes",
         "prepare_notes",
         "reactivate_assignment",
         "record_todo_result",
+        "renew_assignment",
         "start_todo",
         "update_todo",
       ]);
@@ -114,8 +116,14 @@ Deno.test("remote MCP authenticates before discovery and exposes shared lifecycl
         ...target,
         claimed_by,
         abilities: ["research"],
+        conversation_id: crypto.randomUUID(),
       });
       const execution = { ...target, claimed_by, claimed_at: claimed.result.assignment.claimed_at };
+      assert.equal((await call(manager, "renew_assignment", execution)).isError, false);
+      assert.equal(
+        (await call(manager, "get_lifecycle_settings", {})).result.settings.lease.duration,
+        600,
+      );
       const refused = await call(manager, "finish_assignment", execution);
       assert.equal(refused.isError, true);
       assert.deepEqual(

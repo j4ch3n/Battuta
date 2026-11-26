@@ -1,6 +1,7 @@
 import type { Static } from "typebox";
 import type { AssignmentSchema, TodoSchema, DetailSchema, FailureSchema } from "./contracts.ts";
-export type { ExecutionResult } from "./contracts.ts";
+export type { ExecutionResult, LifecycleSettings, LifecycleMessage } from "./contracts.ts";
+import type { LifecycleSettings } from "./contracts.ts";
 import type { ExecutionResult } from "./contracts.ts";
 export type AssignmentView = Static<typeof AssignmentSchema>;
 export type TodoRow = Static<typeof TodoSchema>;
@@ -21,7 +22,11 @@ export interface AssignmentClient {
     status?: AssignmentView["status"];
   }): Promise<{ ok: true; assignments: AssignmentView[] }>;
   get(target: Target): Promise<Detail>;
-  claim(target: Target & { claimed_by: string; abilities: string[] }): Promise<Detail>;
+  claim(
+    target: Target & { claimed_by: string; abilities: string[]; conversation_id: string },
+  ): Promise<Detail>;
+  renew(input: Claim): Promise<{ ok: true; assignment: AssignmentView }>;
+  settings(): Promise<LifecycleSettings>;
   start(target: TodoTarget): Promise<{ ok: true; assignment: AssignmentView; todo: TodoRow }>;
   record(
     input: TodoTarget & ExecutionResult,
@@ -36,22 +41,44 @@ export interface ExecutionSessions {
   hasPendingMessages(): boolean;
   openAssignmentSession(detail: Detail): Promise<Binding>;
   runTodo(binding: Binding, todo: TodoRow, detail: Detail, workspace: Workspace): void;
+  /** Sends the agent a reminder that starts a turn. */
+  remind(text: string): void;
+  /** Aborts the agent's current turn. */
+  abort(): void;
   appendEntry(kind: string, data: unknown): void;
 }
 export type ReconcileReason = "startup" | "reconnect" | "idle" | "event" | "fallback";
+/** The delegate runs as the coordinator sees them: whether one is active, and how to stop it. */
+export interface RunTracker {
+  isRunActive(): boolean;
+  stop(): Promise<unknown>;
+}
 export interface CoordinatorOptions {
   workerId: string;
   capabilities: string[];
+  /** The conversation the database mails the Manager in if this claim's lease lapses. */
+  conversationId: string;
+  settings: LifecycleSettings;
   assignments: AssignmentClient;
   sessions: ExecutionSessions;
   notify: (detail: Detail) => Promise<MailDelivery>;
   diagnostics: (event: string, error?: unknown) => void;
+  /** Absent in tests and bots without delegation: then no run is ever active. */
+  runs?: RunTracker;
+  /** The worker's question to the Manager, when one is waiting. */
+  asks?: { readonly waiting: boolean; cancel(): void };
 }
 export interface Coordinator {
   reconcile(reason: ReconcileReason): Promise<void>;
   restoreBinding(binding: Binding): Promise<void>;
+  /** Records the TODO now, then dispatches the next one or finishes the assignment. */
   acceptReport(value: unknown): Promise<{ accepted: true }>;
-  observeBoundary(outcome: "completed" | "aborted" | "error", errorMessage?: string): void;
-  settle(event: { aborted: boolean }): Promise<void>;
+  /** The agent ended with an error or was aborted: block with this explanation. */
+  agentFailed(blocker: string): Promise<void>;
+  /** The agent went idle: remind once, then block, when the TODO has no report. */
+  agentIdle(): Promise<void>;
+  /** The claim is gone: stop the run and the agent, drop the binding. */
+  leaseLost(reason: string): Promise<void>;
   stop(): Promise<void>;
+  on(event: "bound" | "unbound", listener: (binding: Binding) => void): void;
 }

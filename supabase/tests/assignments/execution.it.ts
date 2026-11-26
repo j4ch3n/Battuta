@@ -93,7 +93,7 @@ Deno.test("complete plans publish atomically and dependency claims have one winn
     const claimed = claims.find((r) => r.ok)!.assignment;
     assert.equal(claimed.status, "in_process");
     const [interval] =
-      await sql`select lease_expired_at - claimed_at = interval '45 minutes' as valid from public.assignments where id = ${a.assignment.id}`;
+      await sql`select abs(extract(epoch from lease_expired_at - claimed_at) - 600) < 1 as valid from public.assignments where id = ${a.assignment.id}`;
     assert.equal(interval.valid, true);
     const missing = await rpc(sql, "assignment_create", [
       project,

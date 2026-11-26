@@ -39,8 +39,9 @@ Assignment states are `active`, `in_process`, `blocked`, `done`, `cancelled`.
 TODO states are `todo`, `in_progress`, `blocked`, `done`, `cancelled`.
 
 An atomic claim locks a ready active assignment and returns the full plan with
-an exact `claimed_at` version and server-computed `lease_expired_at` 45 minutes
-later. `lease_expired` is true only for an `in_process` assignment past that time (UTC);
+an exact `claimed_at` version and server-computed `lease_expired_at` one lease
+duration later (see [lease lifecycle](#lease-lifecycle)). `lease_expired` is true
+only for an `in_process` assignment past that time (UTC);
 blocked, done, and other states always report false. Exactly one contender wins. Readiness requires satisfied prerequisites,
 no blocked/in-progress TODO, and at least one `todo` item.
 
@@ -61,9 +62,40 @@ Add actual specialists through coordinated catalog, prerequisite-validation, and
 database updates, not prompts alone. Manager must keep appended work compatible
 with the assignment's immutable requirements or publish a replacement assignment.
 
-**The lease is informational, not a deadline.** Age never renews, releases,
-reclaims, stops, filters, or rejects a claim. Keep claim and item-version strings
-unchanged: JavaScript Date conversion loses PostgreSQL microseconds.
+Keep claim and item-version strings unchanged: JavaScript Date conversion loses
+PostgreSQL microseconds.
+
+### Lease lifecycle
+
+The lease is a liveness heartbeat. Durations and mail text live in
+`config/assignment-lifecycle.yaml`; `scripts/supabase/sync-lifecycle-settings.mjs`
+validates the file, converts durations to whole seconds, and stores it in the
+single-row `assignment_settings` table through `assignment_settings_apply`, which
+also (re)schedules the cron job. Claims refuse with `not_configured` until settings
+are synced.
+
+- **Claim** sets `lease_expired_at = now() + lease.duration` and records the
+  worker's `claim_conversation_id`. Only `in_process` rows carry a lease; leaving
+  `in_process` clears it.
+- **Heartbeat.** The worker calls `renew_assignment` every `heartbeat.interval`
+  with its exact claim. Renewal changes only `lease_expired_at`; it refuses
+  (`stale_claim`) once the claim was replaced or the lease already lapsed, and the
+  worker then stops its run and drops the binding.
+- **Lifecycle scan.** pg_cron job `assignment-lifecycle-scan` runs every
+  `expiry.check_interval`. It first blocks each `in_process` row whose lease has
+  passed, with the `expiry_blocker` text, and mails the Manager the
+  `manager_expiry_notice` in the claim's conversation. It then mails each worker
+  that has sent nothing and received nothing for `progress.report_after` a
+  `progress_request` steer, skipped while the worker's question to the Manager is
+  unanswered. Each row runs in its own subtransaction, so one failure never stops
+  the others.
+- **Cron mail content** must satisfy agent-mail's strict content schema: only
+  `project`, `ticket`, `objective`, `body`, `requirements`, `result` and
+  `related_messages`. The assignment ID and claim version go in the objective and
+  body text, never as extra keys; a row with unknown keys would stop the Manager's
+  mail reader.
+
+Workers read the same settings with `get_lifecycle_settings`.
 
 | MCP tool                              | Authority and effect                                                                                                                           |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -72,7 +104,9 @@ unchanged: JavaScript Date conversion loses PostgreSQL microseconds.
 | `append_todos` / `update_todo`        | Manager appends or edits/cancels unfinished active/blocked work; exact expected_updated_at required for updates                                |
 | `close_assignment`                    | Cancel nonterminal work without rewriting TODO results                                                                                         |
 | `reactivate_assignment`               | Explicitly return blocked work to active after resolving/cancelling blocked/in-progress TODOs and leaving executable TODOs; clear former claim |
-| `claim_assignment`                    | Worker-code-owned whole-assignment claim with claimed_by and configured capabilities                                                           |
+| `claim_assignment`                    | Worker-code-owned whole-assignment claim with claimed_by, configured capabilities and conversation_id                                          |
+| `renew_assignment`                    | Code-owned heartbeat: extends the current claim's lease; refuses a replaced claim or a lapsed lease                                            |
+| `get_lifecycle_settings`              | Read the synced lease, heartbeat, progress, ask and message settings                                                                           |
 | `start_todo`                          | Code-owned current-claim operation; exact item token, first unfinished position, no parallel TODO                                              |
 | `record_todo_result`                  | Code-owned completed/blocked report, summary/evidence and required blocker for blocked; block assignment and TODO atomically                   |
 | `block_assignment`                    | Code-owned claim-bound runtime blocker, also blocking a running TODO                                                                           |

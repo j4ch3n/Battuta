@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
 import { createCoordinator } from "../coordinator.ts";
 import { parseAbilities } from "../contracts.ts";
-import { detail } from "./fixtures.ts";
+import { detail, settings } from "./fixtures.ts";
 
 // Synthetic catalog entries exercise set routing without approving runtime abilities.
 vi.mock("../../supabase/functions/assignments/abilities.json", () => ({
@@ -26,6 +26,8 @@ test.each([
   const coordinator = createCoordinator({
     workerId: "worker-test",
     capabilities,
+    conversationId: "22222222-2222-4222-8222-222222222222",
+    settings: settings(),
     assignments: {
       list: () => Promise.resolve({ ok: true, assignments: [row.assignment] }),
       claim,
@@ -34,6 +36,8 @@ test.each([
       record: vi.fn(),
       block: vi.fn(),
       finish: vi.fn(),
+      renew: vi.fn(),
+      settings: vi.fn(),
       close: vi.fn(),
     },
     sessions: {
@@ -49,6 +53,8 @@ test.each([
           session_file: "/session",
         }),
       runTodo: vi.fn(),
+      remind: vi.fn(),
+      abort: vi.fn(),
       appendEntry: vi.fn(),
     },
     notify: vi.fn(),

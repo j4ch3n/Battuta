@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { currentBinding } from "./contracts.ts";
+import type { RunTracker } from "./types.ts";
 import { preapprovedDirs, resolveDelegationCwd } from "./delegation-cwd.ts";
 import {
   createDelegateRuns,
@@ -203,7 +204,7 @@ export async function registerProjectDelegate(
     /** The proxy script; defaults to the one shipped beside this extension. */
     proxyPath?: string;
   },
-): Promise<{ isRunActive(): boolean } | undefined> {
+): Promise<RunTracker | undefined> {
   const entry = join(profileDir, PACKAGE_ENTRY);
   if (!(await exists(entry))) {
     // Error level, and the worker keeps running without delegation: a missing package must never pass silently.
@@ -272,5 +273,8 @@ export async function registerProjectDelegate(
     }),
   );
   for (const tool of controlTools(() => runs)) pi.registerTool(tool);
-  return { isRunActive: () => runs?.active ?? false };
+  return {
+    isRunActive: () => runs?.active ?? false,
+    stop: () => runs?.stop() ?? Promise.resolve(),
+  };
 }

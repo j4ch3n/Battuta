@@ -84,6 +84,7 @@ const failure = z.discriminatedUnion("code", [
   refused.extend({ code: z.literal("not_found") }),
   refused.extend({ code: z.literal("invalid_input") }),
   refused.extend({ code: z.literal("backend_error") }),
+  refused.extend({ code: z.literal("not_configured") }),
 ]);
 const assigned = z.object({ ok: z.literal(true), assignment });
 const detail = assigned.extend({ todos: z.array(todo) });
@@ -131,6 +132,25 @@ const item = {
   expected_updated_at: timestamp,
 };
 const report = { ...item, summary: text, evidence: z.array(text) };
+const seconds = z.number().int().positive();
+const message = z.object({ objective: text, body: text });
+// Stored lifecycle settings: durations in integer seconds, synced from config/assignment-lifecycle.yaml.
+const lifecycleSettings = z.object({
+  lease: z.object({ duration: seconds }),
+  heartbeat: z.object({ interval: seconds }),
+  expiry: z.object({ check_interval: seconds }),
+  progress: z.object({ report_after: seconds }),
+  ask: z.object({ chase_after: seconds }),
+  roles: z.object({ manager: text }),
+  messages: z.object({
+    expiry_blocker: message,
+    manager_expiry_notice: message,
+    progress_request: message,
+    idle_reminder: message,
+    no_report_blocker: message,
+    ask_chase: message,
+  }),
+});
 
 export const toolContracts = {
   create_assignment: {
@@ -184,7 +204,12 @@ export const toolContracts = {
   },
   locate_notes: { input: z.strictObject(target), output: notes },
   claim_assignment: {
-    input: z.strictObject({ ...target, claimed_by: text, abilities: abilityProposal }),
+    input: z.strictObject({
+      ...target,
+      claimed_by: text,
+      abilities: abilityProposal,
+      conversation_id: z.uuid(),
+    }),
     output: z.union([detail, failure]),
   },
   start_todo: { input: z.strictObject(item), output: z.union([progressed, failure]) },
@@ -200,6 +225,11 @@ export const toolContracts = {
     output: z.union([assigned, failure]),
   },
   finish_assignment: { input: z.strictObject(claim), output: z.union([assigned, failure]) },
+  renew_assignment: { input: z.strictObject(claim), output: z.union([assigned, failure]) },
+  get_lifecycle_settings: {
+    input: z.strictObject({}),
+    output: z.union([z.object({ ok: z.literal(true), settings: lifecycleSettings }), failure]),
+  },
   reactivate_assignment: { input: z.strictObject(target), output: z.union([detail, failure]) },
 };
 export type ToolName = keyof typeof toolContracts;
