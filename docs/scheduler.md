@@ -1,6 +1,6 @@
 # CoS scheduler
 
-Battuta installs unmodified `npm:@jl1990/pi-scheduler@0.5.1` (upstream tag `v0.5.1`) for CoS only. See the [upstream command reference](https://github.com/jl1990/pi-scheduler/tree/v0.5.1) for all options. No scheduler fork or separate service is required.
+Battuta installs unmodified `npm:@jl1990/pi-scheduler@0.6.0` (upstream tag `v0.6.0`) for CoS only. See the [upstream command reference](https://github.com/jl1990/pi-scheduler/tree/v0.6.0) for all options. No scheduler fork or separate service is required.
 
 ## Storage and launch
 

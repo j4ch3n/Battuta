@@ -1,6 +1,6 @@
 # Browser setup and configuration
 
-CoS and numbered workers use `npm:@amaster.ai/pi-browser-use@0.1.38` with the
+CoS and numbered workers use `npm:@amaster.ai/pi-browser-use@0.1.41` with the
 host's Chromium. Manager has no browser package, skill, profile, or Chromium
 requirement. The owner selected this package instead of Obscura; no comparison
 study is implied.
@@ -52,7 +52,7 @@ login is separate from normal headless operation and setup validation.
 ## Global settings limitation
 
 Do not create or modify `~/.pi/agent/settings.json` for Battuta. The extension's
-[shared loader](https://cdn.jsdelivr.net/npm/@amaster.ai/pi-shared@0.1.38/dist/settings.js)
+[shared loader](https://cdn.jsdelivr.net/npm/@amaster.ai/pi-shared@0.1.41/dist/settings.js)
 supports `PI_CODING_AGENT_DIR`, but still merges global < private agent < trusted
 project settings. There is no supported switch to disable the global read.
 Environment references expand in private settings, not project settings.
