@@ -123,7 +123,7 @@ for value in data['requires']:
                 settings = json.loads((root / "bots/cos-bot/.pi/settings.json").read_text())
                 self.assertNotIn("extensions", settings)
                 self.assertTrue((root / "bots/cos-bot/.pi/extensions/dream/dist/index.js").is_file())
-                run(str(installed["battuta-memory"][1] / "bin/python"), "-c", "import sqlite3,sqlite_vec,onnxruntime,tokenizers; c=sqlite3.connect(':memory:'); c.enable_load_extension(True); sqlite_vec.load(c); c.close(); assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()")
+                run(str(installed["battuta-memory"][1] / "bin/python"), "-c", "import sqlite3, onnxruntime, tokenizers, jieba; c=sqlite3.connect(':memory:'); c.execute('create virtual table t using fts5(x)'); c.close(); assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()")
 
 
 if __name__ == "__main__":
