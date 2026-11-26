@@ -22,7 +22,13 @@ def test_release_requirements_pin_closure_and_internal_urls():
     assert "battuta-project @ https://github.com/example/repo/releases/download/v1.2.3/battuta_project-1.2.3+gabc1234-py3-none-any.whl" in result
 
 
-@pytest.mark.parametrize("requirement", ["click>=8", "click", "-e ../source", "thing @ file:///source", "thing @ https://example.com/unknown.whl", "click==8.*"])
+def test_commit_pinned_git_source_is_kept():
+    line = "agent-memory-core @ git+https://github.com/tigerless-labs/agent-memory@2648ba02d3c0364f9787f0e8fb49f69f47d2e3f7#subdirectory=packages/core"
+    assert wheels.release_requirements(line, release_url="https://example.com/v1.2.3", tool_version="1.2.3") == [line]
+
+
+@pytest.mark.parametrize("requirement", ["click>=8", "click", "-e ../source", "thing @ file:///source", "thing @ https://example.com/unknown.whl", "click==8.*",
+                                         "thing @ git+https://github.com/example/thing@main", "thing @ git+https://github.com/example/thing@2648ba02"])
 def test_unpinned_or_local_requirements_fail(requirement):
     with pytest.raises(click.ClickException):
         wheels.release_requirements(requirement, release_url="https://example.com/v1.2.3", tool_version="1.2.3+gabc1234")

@@ -103,11 +103,11 @@ for value in data['requires']:
             env_file = work / ".env.prod"
             template = run(str(installed["battuta-bot-setup"][0] / "battuta-bot-setup"), "env-example", capture_output=True).stdout
             if influencer:
-                env_file.write_text(template + "\nBATTUTA_WORKER_1_TYPE=influencer\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\nLINEAR_API_TOKEN=fixture\nCOS_TELEGRAM_TOKEN=101:fixture\nTELEGRAM_ALLOWED_USER_ID=123\nBATTUTA_DREAM_MODEL=fixture/model\n")
+                env_file.write_text(template + "\nBATTUTA_WORKER_1_TYPE=influencer\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\nLINEAR_API_TOKEN=fixture\nCOS_TELEGRAM_TOKEN=101:fixture\nTELEGRAM_ALLOWED_USER_ID=123\n")
                 run(str(installed["battuta-bot-setup"][0] / "battuta-bot-setup"), "configure-release", "--root", str(root), "--env-file", str(env_file), "--deployment", "influencer")
                 self.assertFalse((root / "skills-hub").exists())
             else:
-                env_file.write_text(template + "\nBATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=general\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\nLINEAR_API_TOKEN=fixture\nCOS_TELEGRAM_TOKEN=101:fixture\nTELEGRAM_ALLOWED_USER_ID=123\nBATTUTA_DREAM_MODEL=fixture/model\n")
+                env_file.write_text(template + "\nBATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=general\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\nLINEAR_API_TOKEN=fixture\nCOS_TELEGRAM_TOKEN=101:fixture\nTELEGRAM_ALLOWED_USER_ID=123\n")
                 agent = Path(env["HOME"]) / ".battuta/pi-bots/cos-bot/.pi"
                 agent.mkdir(parents=True)
                 (agent / "settings.json").write_text("{}")

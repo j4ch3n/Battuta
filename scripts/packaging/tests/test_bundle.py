@@ -22,7 +22,7 @@ def source(tmp_path, monkeypatch):
     (root / "RELEASE.md").write_text("[Setup](docs/setup.md)")
     (root / "docs").mkdir()
     (root / "docs/setup.md").write_text("setup")
-    for name in ("skills-hub/project-management/references/installation.md", "skills-hub/project-management/references/commands.md", "skills-hub/project-management/SKILL.md", ".agents/skills/battuta-setup/references/development.md", ".agents/skills/battuta-verify/references/checks.md", "memory-service/DESIGN.md"):
+    for name in ("skills-hub/project-management/references/installation.md", "skills-hub/project-management/references/commands.md", "skills-hub/project-management/SKILL.md", ".agents/skills/battuta-setup/references/development.md", ".agents/skills/battuta-verify/references/checks.md", "memory-service/README.md"):
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("guide")
@@ -91,7 +91,7 @@ def test_staged_archive_separates_documentation_and_bots(source, tmp_path):
     assert (target / "docs/setup.md").read_text() == "setup"
     assert not (target / "skills-hub").exists()
     assert (target / ".agents/skills/battuta-setup/references/development.md").is_file()
-    assert (target / "memory-service/DESIGN.md").is_file()
+    assert (target / "memory-service/README.md").is_file()
     assert (target / "bots/LICENSE").read_text() == "repository license"
     assert not list((target / "bots").rglob("skills-hub"))
     for profile in ("cos-bot", "manager-bot", "worker", "worker-influencer"):

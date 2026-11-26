@@ -28,6 +28,11 @@ def validate_memory_url(value: str | None = None) -> str:
     return value
 
 
+def read_endpoint(url: str) -> str:
+    """Manager reads through the stateless read-only endpoint beside the full one."""
+    return url.rstrip("/") + "/read"
+
+
 def assignment_server(supabase_url: str) -> dict:
     try:
         endpoint = urlsplit(supabase_url)
@@ -61,10 +66,10 @@ def mcp_payload(*, role: Literal["cos", "manager", "worker"], supabase_url: str,
         servers["memory"] = {"url": url, "enabled": False}
     elif role == "manager":
         servers["memory"] = {
-            "url": url,
+            "url": read_endpoint(url),
             "enabled": True,
             "exposure": "codemode",
-            "description": "Shared project memory, including retrieval and supported maintenance",
+            "description": "Read-only project memory: recall and project overviews",
         }
     else:
         servers["memory"] = {"enabled": False}
