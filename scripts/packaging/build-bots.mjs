@@ -1,5 +1,5 @@
 import { build } from "esbuild";
-import { readFile, cp, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { resolve, dirname, join } from "node:path";
 import { createRequire } from "node:module";
 
@@ -60,15 +60,4 @@ for (const { entry, output } of builds) {
         throw new Error(`Undeclared runtime dependency ${name} for ${output}`);
     }
   }
-}
-const prompts = join(destination, "bots/_shared/memory-client/dist/prompts");
-await mkdir(dirname(prompts), { recursive: true });
-await cp(join(source, "memory-client/prompts"), prompts, { recursive: true });
-for (const { entry, output } of builds) {
-  if (entry.startsWith("memory-client/"))
-    await cp(
-      join(source, "memory-client/prompts"),
-      join(dirname(join(destination, output)), "prompts"),
-      { recursive: true },
-    );
 }
