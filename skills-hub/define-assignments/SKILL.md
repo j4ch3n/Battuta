@@ -83,9 +83,18 @@ correctness for normal work; add risk and integration for hard or cross-boundary
 work. End each milestone with its reviews as assignments that depend on the work
 they judge. Read the returned evidence yourself; do not repeat the review.
 
+A spike is a bounded research or implement assignment to learn something. Label
+it a throwaway spike in its goal. Its output stays labeled throwaway, and keeping
+what it produced is a new request: a normal implement assignment, its reviews,
+and the foundation or routine checkpoint that applies. Never merge spike code.
+What a spike taught goes back to the decision that needed it.
+
 A failed review becomes a new implement assignment, one difficulty level up with
 the findings as context, then a fresh review of the same focus. Do not reopen the
-old assignment. After a few cycles without progress, escalate to CoS with a
+old assignment. The new brief tells the worker to verify before implementing:
+check each finding against the codebase first, fix the ones that hold, and push
+back with technical reasoning on a finding that is wrong rather than accepting it
+blindly. After a few cycles without progress, escalate to CoS with a
 recommendation.
 
 ## How and why
