@@ -68,6 +68,7 @@ dependencies = [
     { name = "agent-memory-executor" },
     { name = "agent-memory-mcp" },
     { name = "click" },
+    { name = "json-repair" },
     { name = "mcp" },
     { name = "numpy" },
     { name = "onnxruntime" },
@@ -82,6 +83,7 @@ requires-dist = [
     { name = "agent-memory-executor", git = "https://github.com/tigerless-labs/agent-memory?subdirectory=packages%2Fexecutor&rev=2648ba02d3c0364f9787f0e8fb49f69f47d2e3f7" },
     { name = "agent-memory-mcp", git = "https://github.com/tigerless-labs/agent-memory?subdirectory=packages%2Fmcp&rev=2648ba02d3c0364f9787f0e8fb49f69f47d2e3f7" },
     { name = "click", specifier = ">=8.1,<9" },
+    { name = "json-repair", specifier = ">=0.64.9,<1" },
     { name = "mcp", specifier = ">=1.26,<2" },
     { name = "numpy", specifier = ">=2,<3" },
     { name = "onnxruntime", specifier = ">=1.22,<2" },
@@ -351,6 +353,15 @@ name = "jieba"
 version = "0.42.1"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/c6/cb/18eeb235f833b726522d7ebed54f2278ce28ba9438e3135ab0278d9792a2/jieba-0.42.1.tar.gz", hash = "sha256:055ca12f62674fafed09427f176506079bc135638a14e23e25be909131928db2", size = 19214172, upload-time = "2020-01-20T14:27:23.5Z" }
+
+[[package]]
+name = "json-repair"
+version = "0.64.9"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/78/2b/537bf1dab1c058bfb2287662bf6c10de0c3907570781ccc0fc56878e39a7/json_repair-0.64.9.tar.gz", hash = "sha256:0e7e02e1c04d14b3677f97d13a8ff6b473cacb07b7111857c4202721b14efdc2", size = 56686, upload-time = "2026-11-10T04:29:13.966Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/40/1c/b38f71c1b4e859e10568336d8fbb271170150033c3a9d02b3e126b500828/json_repair-0.64.9-py3-none-any.whl", hash = "sha256:531c7d429db82731f3c9811157c025599a2ef620823c56d9143bab0b5ad97930", size = 54891, upload-time = "2026-11-10T04:29:12.575Z" },
+]
 
 [[package]]
 name = "jsonschema"

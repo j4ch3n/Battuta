@@ -1,6 +1,5 @@
 """Wrapper step after consolidation: one bounded digest per changed project, superseding the last one."""
-import json
-import re
+import json_repair
 
 from agent_memory.core import timestamp
 
@@ -54,10 +53,9 @@ def changed(store, segment) -> bool:
 
 
 def _parse(reply: str) -> tuple[str, str]:
-    match = re.search(r"\{.*\}", reply, re.DOTALL)
-    if not match:
+    payload = json_repair.loads(reply)
+    if not isinstance(payload, dict):
         raise ValueError("overview reply has no JSON object")
-    payload = json.loads(match.group(0))
     abstract, body = str(payload.get("abstract") or "").strip(), str(payload.get("body") or "").strip()
     if not abstract or not body:
         raise ValueError("overview reply needs abstract and body")
