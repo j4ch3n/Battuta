@@ -132,6 +132,9 @@ unverified download.
 
 Each wheel carries exact runtime dependency pins in standard `Requires-Dist`
 metadata. Internal Battuta dependencies point to wheels from the **same release**.
+Third-party dependencies that publish no wheel (commit-pinned git sources or
+source-only packages) are built once at release time into pure-Python wheels on the
+same release and pinned by SHA-256 digest.
 uv reads that metadata automatically; there are no separate constraint files,
 source installations, or `--with` arguments.
 

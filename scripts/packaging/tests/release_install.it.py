@@ -64,7 +64,8 @@ class ReleaseInstallation(unittest.TestCase):
                     digest, name = line.split()
                     self.assertEqual(Path(name).name, name)
                     self.assertEqual(hashlib.sha256((assets / name).read_bytes()).hexdigest(), digest)
-            wheels = [(wheel, wheel_metadata(wheel)) for wheel in assets.glob("*.whl")]
+            # Dependency wheels are digest-pinned in tool metadata and installed through it.
+            wheels = [(wheel, wheel_metadata(wheel)) for wheel in assets.glob("battuta_*.whl")]
             self.assertEqual({metadata["Name"] for _, metadata in wheels}, set(COMMANDS))
             self.assertFalse(list(assets.glob("*-constraints.txt")))
             installed = {}
