@@ -3,7 +3,7 @@ FROM oraclelinux@sha256:377bdd87c32d4866618b771e4e3960eb3b3914e2a136defc78b997f1
 
 ARG NODE_VERSION
 ARG PNPM_VERSION
-RUN dnf install -y curl tar gzip xz git libstdc++ libgomp util-linux findutils && dnf clean all
+RUN dnf install -y curl tar gzip xz git libstdc++ libatomic libgomp util-linux findutils && dnf clean all
 COPY --from=uv /uv /uvx /usr/local/bin/
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 RUN source /etc/os-release && test "$ID" = ol && test "${VERSION_ID%%.*}" = 9 && test "$(uname -m)" = aarch64

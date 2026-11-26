@@ -75,7 +75,7 @@ guide does not migrate deployments or provide database rollback.
 
 Use Bash with shell tracing disabled. The bot user needs `curl`, `sha256sum`,
 `script`, working systemd user services, and tmux for requested UI maintenance.
-The OS native libraries include `libstdc++` and `libgomp`; have the
+The OS native libraries include `libstdc++`, `libatomic`, and `libgomp`; have the
 administrator supply missing OS packages rather than changing system packages
 during agent-run checks.
 
