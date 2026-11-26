@@ -82,6 +82,8 @@ class ProjectContext(Model):
 
 class ProjectList(Model):
     projects: list[ProjectContext]
+    descriptions: dict[str, str | None] = {}
+    descriptions_error: str | None = None
 
 
 class LinearResult(Model):
@@ -99,8 +101,7 @@ class Explanation(Model):
     project: str
     root: Path
     managed_root: Path
-    summary_path: Path
-    summary: str | None
+    overview: str
     repository_url: str | None = None
     linear_project_url: str | None = None
     readme: str | None

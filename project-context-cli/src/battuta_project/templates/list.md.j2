@@ -1,5 +1,9 @@
 {% for project in projects %}
-{{ loop.index }}. **{{ project.name }}**
+{{ loop.index }}. **{{ project.name }}**{{ '' if descriptions_error else ' — ' ~ (descriptions.get(project.name) or '(no description yet)') }}
    Project Root: {{ project.root | display_path }}
    Code: {{ project.code | display_path }}
 {% endfor %}
+{% if descriptions_error %}
+Descriptions: memory query failed ({{ descriptions_error }})
+{% endif %}
+Run `battuta-project explain <name>` for the full overview.

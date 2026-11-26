@@ -38,7 +38,7 @@ class CliTests(ProjectTestCase):
         self.assertIn("Initialized project: harbor-web", output)
         self.assertIn("~/.battuta/projects/harbor-web/code", output)
         self.assertNotIn("Current project:", output)
-        self.assertIn("Summary: ~/.battuta/projects/harbor-web/SUMMARY.md", output)
+        self.assertNotIn("SUMMARY", output)
         self.assertNotIn("Specs Root:", output)
         self.assertNotIn("Constitution:", output)
         self.assertNotIn("Memory:", output)
@@ -75,22 +75,6 @@ class CliTests(ProjectTestCase):
         self.assertIn("Project Root: ~/.battuta/projects/atlas-api/code", self.invoke("explain", "atlas-api"))
         result = self.runner.invoke(main, ["explain"])
         self.assertNotEqual(result.exit_code, 0)
-
-    def test_explain_displays_only_explicit_project_summary(self):
-        atlas = self.project.root / "SUMMARY.md"
-        atlas.write_text("# Atlas\n\nMap imports.\n", encoding="utf-8")
-        self.invoke("init", "harbor-web", "--github", "https://github.com/team/harbor-web")
-        harbor = self.registry.load("harbor-web").root / "SUMMARY.md"
-        harbor.write_text("# Harbor\n\nHarbor scheduling.\n", encoding="utf-8")
-        for name, included, excluded in (
-            ("atlas-api", "Map imports.", "Harbor scheduling."),
-            ("harbor-web", "Harbor scheduling.", "Map imports."),
-        ):
-            with self.subTest(project=name):
-                output = self.invoke("explain", name)
-                self.assertIn(included, output)
-                self.assertNotIn(excluded, output)
-                self.assertNotIn("Specs Root:", output)
 
     def test_explain_prints_repository_and_unlinked_linear_without_http(self):
         with linear_http() as requests:
@@ -280,7 +264,7 @@ class CliTests(ProjectTestCase):
         project = self.registry.load("linth")
         self.assertTrue(project.code.is_dir())
         self.assertEqual(list(project.code.iterdir()), [])
-        self.assertIn("# Project Summary: linth", (project.root / "SUMMARY.md").read_text())
+        self.assertFalse((project.root / "SUMMARY.md").exists())
         self.assertIsNone(project.config.github.repository)
 
     def test_init_uses_explicit_name_with_different_repository_basename(self):
@@ -312,7 +296,7 @@ class CliTests(ProjectTestCase):
                     self.assertEqual((self.project.root / "project.yaml").read_bytes(), config)
                     self.assertFalse((self.registry.root / "linth").exists())
 
-    def test_github_link_preserves_workspace_summary_and_linear_metadata(self):
+    def test_github_link_preserves_workspace_and_linear_metadata(self):
         self.invoke("init", "linth", "--linear", "project-1,team-1")
         project = self.registry.load("linth")
         marker = project.code / "notes.txt"
@@ -323,7 +307,6 @@ class CliTests(ProjectTestCase):
         metadata = project.root / "specs" / ".config.json"
         metadata.write_text('{"specs": [{"name": "API", "versions": ["v1"]}]}')
         artifacts = {path: path.read_bytes() for path in (spec, metadata)}
-        summary = (project.root / "SUMMARY.md").read_bytes()
         with linear_http() as requests, patch("battuta_project.registry.subprocess.run", side_effect=AssertionError("link must not run subprocesses")):
             self.assertIn("https://github.com/team/other", self.invoke("github", "link", "linth", "git@github.com:team/other.git"))
             self.assertEqual(requests, [])
@@ -333,7 +316,6 @@ class CliTests(ProjectTestCase):
         self.assertEqual(linked.config.linear.project_id, "project-1")
         self.assertEqual(linked.config.linear.team_id, "team-1")
         self.assertEqual(marker.read_text(), "Keep my work")
-        self.assertEqual((project.root / "SUMMARY.md").read_bytes(), summary)
         for path, original in artifacts.items():
             self.assertEqual(path.read_bytes(), original)
 

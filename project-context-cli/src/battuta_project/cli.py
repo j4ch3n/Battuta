@@ -4,7 +4,7 @@ import click
 import json
 import shlex
 
-from . import worktrees
+from . import memory, worktrees
 from .explain import explain_project
 from .linear import LinearClient, require_linear_token
 from .models import LinearConfig, LinearResult, ProjectList
@@ -67,7 +67,14 @@ def list_projects(as_json: bool):
     if as_json:
         click.echo(json.dumps({"projects": sorted(p.name for p in projects)}, ensure_ascii=False))
         return
-    click.echo(render("list.md.j2", ProjectList(projects=projects)) if projects else registry.discovery.unavailable_message())
+    if not projects:
+        click.echo(registry.discovery.unavailable_message())
+        return
+    try:
+        listing = ProjectList(projects=projects, descriptions=memory.descriptions([p.name for p in projects]))
+    except memory.MemoryUnavailable as error:
+        listing = ProjectList(projects=projects, descriptions_error=str(error))
+    click.echo(render("list.md.j2", listing))
 
 
 @main.command()
@@ -82,7 +89,7 @@ def remove(project_name: str):
 @click.argument("project_name")
 @click.pass_obj
 def explain(token: str, project_name: str):
-    """Show project summary, artifact paths, URLs, guidance, and checkout tree."""
+    """Show the memory overview, artifact paths, URLs, guidance, and checkout tree."""
     project = ProjectRegistry().load(project_name)
     explanation = explain_project(project)
     if project.config.linear.project_id:

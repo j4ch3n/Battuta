@@ -41,6 +41,8 @@ class DiscoveryTests(ProjectTestCase):
             "3. **harbor-web**\n"
             "   Project Root: ~/.battuta/projects/harbor-web\n"
             "   Code: ~/.battuta/projects/harbor-web/code\n"
+            "Descriptions: memory query failed (unreachable)\n"
+            "Run `battuta-project explain <name>` for the full overview.\n"
         ))
         self.assertEqual(requests, [])
 
@@ -137,9 +139,10 @@ class DiscoveryTests(ProjectTestCase):
         with patch("pathlib.Path.home", return_value=self.home / "different-home"):
             output = render("list.md.j2", ProjectList(projects=[self.project]))
         self.assertEqual(output, (
-            "1. **atlas-api**\n"
+            "1. **atlas-api** — (no description yet)\n"
             f"   Project Root: {self.project.root}\n"
-            f"   Code: {self.project.code}"
+            f"   Code: {self.project.code}\n"
+            "Run `battuta-project explain <name>` for the full overview."
         ))
         self.assertNotIn("~", output)
 
