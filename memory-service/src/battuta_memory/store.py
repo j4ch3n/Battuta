@@ -11,6 +11,8 @@ from agent_memory.core import placement
 from agent_memory.core.errors import FieldError, ValidationError
 from agent_memory.core.store import Store
 
+from . import query_terms  # noqa: F401  (keyword queries drop stopwords)
+from . import query_terms  # noqa: F401  (keyword queries drop stopwords)
 from .layout import OVERVIEW
 
 CATALOG_FILE = ".state/battuta-catalog.json"

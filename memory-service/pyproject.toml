@@ -9,6 +9,7 @@ dependencies = [
   "agent-memory-mcp",
   "click>=8.1,<9",
   "json-repair>=0.64.9,<1",
+  "stopwordsiso>=0.7.1,<1",
   "mcp>=1.26,<2",
   "numpy>=2,<3",
   "onnxruntime>=1.22,<2",
