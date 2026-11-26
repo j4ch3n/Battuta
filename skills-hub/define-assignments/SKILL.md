@@ -112,7 +112,7 @@ init with a vendor, author in the returned draft, artifact-review, publish only 
 owner has authorised that artifact, then verify local_url. It must not ask for a
 standalone or self-contained HTML file as the deliverable, and must not copy a file
 over a generated index.html. Verification items must say: verify local_url; report
-the public URL as "not checked (behind owner's Cloudflare gate)".
+the public URL.
 
 Allow multiple open assignments, but sequence conflicting workspace changes through immutable dependencies. Workers claim whole assignments and execute their TODOs sequentially; do not plan per-TODO ownership or a TODO graph. Manager remains available for asynchronous results and evidence assessment. Keep product scope/authority decisions with CoS; use explicit blocked-work recovery rather than routine execution-status edits.
 
