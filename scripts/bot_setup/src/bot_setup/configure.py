@@ -58,6 +58,8 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
     private = resolve_agent_dir(manifest, f"{role}-bot", Path.home()).parent
     validate_private_home(private)
     url = validate_memory_url(values.get("BATTUTA_MEMORY_URL"))
+    if "github" in steps:
+        check_github()
     if "browser" in steps:
         browser_settings(bot_dir, private, home=Path.home(), bot="cos-bot")
     projects = [safe_path(root, project) for project in manifest.packages.node_projects]
@@ -91,7 +93,8 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
     handlers = {
         "telegram": telegram_config,
         "mcp": lambda: configure_mcp(private, role=role, memory_url=url, supabase_url=supabase_url),
-        "browser": browser, "dream": dream, "github": check_github,
+        "browser": browser, "dream": dream,
+        "github": lambda: None,  # checked during preflight, before any write
     }
     for step in steps:
         handlers[step]()

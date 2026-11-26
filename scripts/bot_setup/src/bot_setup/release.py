@@ -18,6 +18,7 @@ from .mcp import mcp_payload, validate_memory_url
 from .telegram import telegram_payload
 from .manifest import load_profile
 from .files import merged_json, prepare_files, write_file
+from .github import check_github
 from .runtime import initialize_settings_if_missing
 
 
@@ -70,6 +71,8 @@ def configure_release(root: Path, *, env_file: Path, home: Path, deployment: str
         if not (profile / "AGENTS.md").is_file() or not (profile / ".pi/settings.json").is_file():
             raise click.ClickException(f"Missing installed role profile: {profile}")
         validate_private_home(private)
+        if "github" in manifest.setup.steps:
+            check_github()
         prepared_claude_skills(profile / CLAUDE_SKILLS, manifest)
         instances.append((profile, private, manifest))
         if role != "manager" and profile.name != "worker-influencer":
