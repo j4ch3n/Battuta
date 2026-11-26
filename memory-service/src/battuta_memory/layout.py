@@ -16,6 +16,8 @@ def store_config() -> Config:
     config.index.tokenizer = "cjk"
     config.index.vector_enabled = True
     config.index.vector_model = VECTOR_MODEL
+    # The library ORs every query word, stopwords included; a lighter abstract boost lets vector matches compete.
+    config.index.bm25_abstract_weight = 1.5
     config.recall.injection_enabled = False
     config.manage.auto_dream = False
     return config
