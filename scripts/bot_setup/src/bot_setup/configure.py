@@ -14,6 +14,7 @@ from .install import install_packages, run, warn_running_session
 from .files import prepare_files, safe_path
 from .manifest import load_profile
 from .json_config import read_config, write_config
+from .github import check_github
 from .mcp import assignment_server, configure_mcp, validate_memory_url
 from .release import validate_private_home
 from .telegram import prepare_telegram_config
@@ -90,7 +91,7 @@ def configure_source(root: Path, *, role: str, bot_dir: Path | None = None, env_
     handlers = {
         "telegram": telegram_config,
         "mcp": lambda: configure_mcp(private, role=role, memory_url=url, supabase_url=supabase_url),
-        "browser": browser, "dream": dream,
+        "browser": browser, "dream": dream, "github": check_github,
     }
     for step in steps:
         handlers[step]()

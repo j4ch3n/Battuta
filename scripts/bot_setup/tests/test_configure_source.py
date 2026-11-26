@@ -1,6 +1,7 @@
 """Clean source configuration installs Telegram for CoS only."""
 
 import json
+import os
 import tomllib
 from pathlib import Path
 from unittest.mock import patch
@@ -15,6 +16,11 @@ from skill_fixtures import copy_telegram_template, skill_catalog
 @pytest.fixture(autouse=True)
 def isolated_home(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    gh = tmp_path / "stub-bin/gh"
+    gh.parent.mkdir()
+    gh.write_text("#!/bin/sh\nexit 0\n")
+    gh.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{gh.parent}:{os.environ['PATH']}")
 
 
 @pytest.mark.parametrize("role", ["cos", "manager"])

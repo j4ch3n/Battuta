@@ -224,6 +224,9 @@ Changes require a restart, not live autoscaling.
 For `main` only, stop CoS before configuration. Configuration provisions the nightly dream
 task; a missed run may execute when CoS next starts. The dream runs in a Claude Code worker on
 the memory service host, so `claude` must be installed and signed in for the service user.
+Manager merges routine pull requests with `gh`, so for `main` it must be signed in as the
+service user to an account with merge rights on managed repositories. Configuration stops if
+`gh auth status` fails.
 
 ```bash
 battuta-bot-setup configure-release --root "$install_path" --env-file "$env_file" \

@@ -43,7 +43,7 @@ policy = "create-only"
 optional = true
 
 [setup]
-steps = ["mcp"]
+steps = ["mcp", "github"]
 
 [skills]
 include = [
