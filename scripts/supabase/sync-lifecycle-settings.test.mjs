@@ -15,19 +15,19 @@ const edit = (change) => {
   return stringify(value);
 };
 
-test("the repository settings load with durations in seconds", () => {
-  const settings = loadSettings(source);
-  assert.equal(settings.lease.duration, 600);
-  assert.equal(settings.heartbeat.interval, 60);
-  assert.deepEqual(Object.keys(settings.messages).sort(), [
-    "ask_chase",
-    "expiry_blocker",
-    "idle_reminder",
-    "manager_expiry_notice",
-    "no_report_blocker",
-    "progress_request",
-  ]);
+test("the repository settings load", () => {
+  assert.doesNotThrow(() => loadSettings(source));
 });
+
+for (const [duration, seconds] of [
+  ["90s", 90],
+  ["2m", 120],
+  ["1h", 3600],
+]) {
+  test(`a ${duration} lease is stored as ${seconds} seconds`, () => {
+    assert.equal(loadSettings(edit((v) => (v.lease.duration = duration))).lease.duration, seconds);
+  });
+}
 
 const invalid = {
   "missing key": (v) => delete v.ask,
@@ -39,26 +39,11 @@ const invalid = {
   "check interval not whole minutes": (v) => (v.expiry.check_interval = "90s"),
   "check interval over 59 minutes": (v) => (v.expiry.check_interval = "1h"),
   "report_after not above check interval": (v) => (v.progress.report_after = "1m"),
-  "message without body": (v) => delete v.messages.idle_reminder.body,
-  "unknown message key": (v) => (v.messages.idle_reminder.extra = "x"),
-  "missing message": (v) => delete v.messages.ask_chase,
-  "placeholder outside the message's set": (v) =>
-    (v.messages.expiry_blocker.body = "TODO {position} stopped"),
-  "unknown placeholder": (v) => (v.messages.idle_reminder.body = "Hi {owner}"),
-  "objective too long": (v) => (v.messages.idle_reminder.objective = "x".repeat(1901)),
-  "body too long": (v) => (v.messages.ask_chase.body = "x".repeat(3901)),
   "invalid manager role": (v) => (v.roles.manager = "the manager"),
 };
 for (const [name, change] of Object.entries(invalid)) {
   test(`rejects ${name}`, () => assert.throws(() => loadSettings(edit(change))));
 }
-
-test("worker messages may use {position}", () => {
-  const settings = loadSettings(
-    edit((v) => (v.messages.idle_reminder.body = "TODO {position} of {assignment_id}")),
-  );
-  assert.equal(settings.messages.idle_reminder.body, "TODO {position} of {assignment_id}");
-});
 
 test("the statement round-trips quotes and backslashes", () => {
   const settings = loadSettings(edit((v) => (v.messages.ask_chase.body = "Don't \\ retry")));

@@ -12,18 +12,14 @@ const DURATIONS = {
   progress: ["report_after"],
   ask: ["chase_after"],
 };
-const SQL_PLACEHOLDERS = ["assignment_id", "worker", "claimed_at"];
-const WORKER_PLACEHOLDERS = [...SQL_PLACEHOLDERS, "position"];
-const MESSAGES = {
-  expiry_blocker: SQL_PLACEHOLDERS,
-  manager_expiry_notice: SQL_PLACEHOLDERS,
-  progress_request: SQL_PLACEHOLDERS,
-  idle_reminder: WORKER_PLACEHOLDERS,
-  no_report_blocker: WORKER_PLACEHOLDERS,
-  ask_chase: WORKER_PLACEHOLDERS,
-};
-// Agent-mail limits (objective 2000, body 4000) less headroom for filled placeholders.
-const LIMITS = { objective: 1900, body: 3900 };
+const MESSAGES = [
+  "expiry_blocker",
+  "manager_expiry_notice",
+  "progress_request",
+  "idle_reminder",
+  "no_report_blocker",
+  "ask_chase",
+];
 const UNITS = { s: 1, m: 60, h: 3600 };
 
 function fail(message) {
@@ -75,19 +71,14 @@ export function loadSettings(text) {
     fail("roles.manager must be a mail role name");
   settings.roles = { manager: value.roles.manager };
 
-  exactKeys(object(value.messages, "messages"), Object.keys(MESSAGES), "messages.");
+  // Message text is configuration: only its shape is checked here.
+  exactKeys(object(value.messages, "messages"), MESSAGES, "messages.");
   settings.messages = {};
-  for (const [name, allowed] of Object.entries(MESSAGES)) {
+  for (const name of MESSAGES) {
     const message = object(value.messages[name], `messages.${name}`);
     exactKeys(message, ["objective", "body"], `messages.${name}.`);
-    for (const [field, limit] of Object.entries(LIMITS)) {
-      const text = message[field];
-      if (typeof text !== "string" || !text.trim() || text.length > limit)
-        fail(`messages.${name}.${field} must be nonblank text of at most ${limit} characters`);
-      for (const [, placeholder] of text.matchAll(/\{([^}]*)\}/g))
-        if (!allowed.includes(placeholder))
-          fail(`messages.${name}.${field} cannot use {${placeholder}}`);
-    }
+    if (typeof message.objective !== "string" || typeof message.body !== "string")
+      fail(`messages.${name} objective and body must be text`);
     settings.messages[name] = { objective: message.objective, body: message.body };
   }
   return settings;

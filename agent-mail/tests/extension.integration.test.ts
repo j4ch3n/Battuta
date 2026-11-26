@@ -129,6 +129,7 @@ async function claimedAssignment(claimedBy: string) {
       p_assignment_id: id,
       p_claimed_by: claimedBy,
       p_abilities: ["research"],
+      p_conversation_id: randomUUID(),
     }),
   );
   return id;

@@ -195,7 +195,7 @@ export type LifecycleSettings = Static<typeof LifecycleSettingsSchema>;
 export type LifecycleMessage = Static<typeof LifecycleMessageSchema>;
 type Placeholder = "assignment_id" | "worker" | "claimed_at" | "position";
 
-/** Fills a configured message; the settings sync already rejected unknown placeholders. */
+/** Fills a configured message; an unknown placeholder is left as written. */
 export function fill(
   message: LifecycleMessage,
   values: Partial<Record<Placeholder, string>>,
