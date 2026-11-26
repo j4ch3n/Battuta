@@ -6,15 +6,15 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 component="$root/memory-service"
 python="$component/.venv/bin/python"
 cli="$component/.venv/bin/battuta-memory"
-archive=""
+source_dir=""
 
 fail() { printf 'Memory setup: %s\n' "$*" >&2; exit 1; }
-usage() { printf 'Usage: bash scripts/setup-memory.sh [--archive /path/onnx.tar.gz]\n'; }
+usage() { printf 'Usage: bash scripts/setup-memory.sh [--from-dir /path/to/model-files]\n'; }
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --archive)
-      [[ $# -ge 2 && -f "$2" ]] || fail '--archive requires an existing model archive file.'
-      archive="$2"
+    --from-dir)
+      [[ $# -ge 2 && -d "$2" ]] || fail '--from-dir requires an existing directory holding onnx/model_int8.onnx and tokenizer.json.'
+      source_dir="$2"
       shift 2
       ;;
     --help|-h) usage; exit 0 ;;
@@ -58,11 +58,11 @@ else
   [[ -x "$python" ]] || fail 'Missing uv-managed memory environment; reinstall the selected release tool as the bot user.'
 fi
 
-run 'native SQLite and ONNX loading' 'Use managed CPython 3.12 with SQLite extension loading. On Oracle Linux 9, have the administrator supply libgomp/libstdc++ if missing; read the error above.' \
-  "$python" -c "import sqlite3, sqlite_vec, onnxruntime, tokenizers; c=sqlite3.connect(':memory:'); c.enable_load_extension(True); sqlite_vec.load(c); c.enable_load_extension(False); c.close(); assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()"
+run 'native SQLite FTS5 and ONNX loading' 'Use managed CPython 3.12 with SQLite FTS5. On Oracle Linux 9, have the administrator supply libgomp/libstdc++ if missing; read the error above.' \
+  "$python" -c "import sqlite3, onnxruntime, tokenizers, jieba; c=sqlite3.connect(':memory:'); c.execute('create virtual table t using fts5(x)'); c.close(); assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()"
 model_args=(model install)
-if [[ -n "$archive" ]]; then model_args+=(--archive "$archive"); fi
-run 'verified model provisioning' 'Check HOME/cache ownership, disk space, and network access; use --archive for offline provisioning. Move an unverified existing cache aside explicitly rather than overwriting it.' \
+if [[ -n "$source_dir" ]]; then model_args+=(--from-dir "$source_dir"); fi
+run 'verified model provisioning' 'Check HOME/cache ownership, disk space, and network access; use --from-dir for offline provisioning. Move an unverified existing cache aside explicitly rather than overwriting it.' \
   "$cli" "${model_args[@]}"
 run 'backend readiness' 'Read the error above. Stop an existing server before doctor (use memory_health when running). Keep HOME/data paths consistent; never bypass fingerprint checks.' \
   "$cli" doctor --json
