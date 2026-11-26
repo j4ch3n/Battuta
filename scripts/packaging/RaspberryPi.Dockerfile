@@ -3,7 +3,7 @@ FROM debian:trixie-slim@sha256:24a01011d10eba3a023bc8585b9650b8b29021240d4217c05
 
 ARG NODE_VERSION
 ARG PNPM_VERSION
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates tar gzip xz-utils git libstdc++6 libgomp1 util-linux findutils && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates tar gzip xz-utils git libstdc++6 libatomic1 libgomp1 util-linux findutils && rm -rf /var/lib/apt/lists/*
 COPY --from=uv /uv /uvx /usr/local/bin/
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 RUN source /etc/os-release && test "$ID" = debian && test "${VERSION_ID%%.*}" = 13 && test "$(uname -m)" = aarch64
