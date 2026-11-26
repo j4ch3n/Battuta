@@ -357,6 +357,8 @@ export default async function worker(pi: ExtensionAPI) {
   pi.on("session_shutdown", async () => {
     if (stopped) return;
     stopped = true;
+    process.off("SIGTERM", shutdown);
+    process.off("SIGINT", shutdown);
     try {
       shutdown();
     } catch (error) {

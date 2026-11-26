@@ -554,3 +554,10 @@ test("the heartbeat renews while bound and stops at shutdown", async () => {
   await vi.advanceTimersByTimeAsync(settings().heartbeat.interval * 1000 * 3);
   expect(backend.renew).toHaveBeenCalledTimes(1);
 });
+
+test("session shutdown removes the worker's signal handlers, so replaced sessions do not accumulate", async () => {
+  const before = process.listenerCount("SIGTERM") + process.listenerCount("SIGINT");
+  const { shutdown } = await bootBound();
+  await shutdown();
+  expect(process.listenerCount("SIGTERM") + process.listenerCount("SIGINT")).toBe(before);
+});
