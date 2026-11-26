@@ -1,62 +1,41 @@
-import { dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { homedir } from "node:os";
 import { atomicPrivateWrite } from "./dream-files.ts";
 import { reconcileDreamSchedule } from "./dream-schedule.ts";
 import { schedulerStorePath } from "./scheduler-config.ts";
 import { initializeSchedulerStore, readSchedulerStore } from "./scheduler-store.ts";
-import { dreamConfigSchema } from "./dream-config.ts";
 import { lstat } from "node:fs/promises";
 
 // Run only during operator-invoked configuration, with the CoS stopped. Never
 // edit the scheduler's store concurrently with its in-process read/modify/write.
 export async function configureDream(_directory, { release = false } = {}) {
-  const parsed = dreamConfigSchema.safeParse({
-    version: 1,
-    model: process.env.BATTUTA_DREAM_MODEL,
-  });
-  if (!parsed.success)
-    throw new Error("BATTUTA_DREAM_MODEL is required and must use provider/model-id");
-  const model = parsed.data;
   const storePath = schedulerStorePath();
-  const dataDirectory = process.env.BATTUTA_MEMORY_DATA_DIR ?? join(homedir(), ".battuta/memory");
-  const modelPath = join(dataDirectory, "dream-config.json");
   if (release) {
-    for (const path of [dirname(modelPath), modelPath, dirname(storePath), storePath]) {
+    for (const path of [dirname(storePath), storePath]) {
       try {
         const info = await lstat(path);
-        if (
-          info.isSymbolicLink() ||
-          (path === modelPath || path === storePath ? !info.isFile() : !info.isDirectory())
-        )
+        if (info.isSymbolicLink() || (path === storePath ? !info.isFile() : !info.isDirectory()))
           throw new Error(`Unsafe release destination: ${path}`);
       } catch (error) {
         if (error.code !== "ENOENT") throw error;
       }
     }
-    const emptyStore = { version: 2, revision: 0, tasks: [] };
-    const initial = reconcileDreamSchedule(emptyStore, new Date().toISOString());
-    const outcomes = [];
-    for (const [path, content] of [
-      [modelPath, model],
-      [storePath, initial],
-    ]) {
-      const created = await atomicPrivateWrite(path, JSON.stringify(content, null, 2) + "\n", {
-        createOnly: true,
-        preserveParentMode: path === storePath,
-      });
-      if (!created && !(await lstat(path)).isFile())
-        throw new Error(`Expected regular file: ${path}`);
-      outcomes.push({ path, created });
-    }
-    console.log(JSON.stringify(outcomes));
+    const initial = reconcileDreamSchedule(
+      { version: 2, revision: 0, tasks: [] },
+      new Date().toISOString(),
+    );
+    const created = await atomicPrivateWrite(storePath, JSON.stringify(initial, null, 2) + "\n", {
+      createOnly: true,
+      preserveParentMode: true,
+    });
+    if (!created && !(await lstat(storePath)).isFile())
+      throw new Error(`Expected regular file: ${storePath}`);
+    console.log(JSON.stringify([{ path: storePath, created }]));
     return;
   }
   await initializeSchedulerStore(storePath);
   const store = await readSchedulerStore(storePath);
   const result = reconcileDreamSchedule(store, new Date().toISOString());
-  // The manifest-prepared project extension is discovered by Pi.
-  await atomicPrivateWrite(modelPath, JSON.stringify(model, null, 2) + "\n");
   if (result !== store)
     await atomicPrivateWrite(storePath, JSON.stringify(result, null, 2) + "\n", {
       preserveParentMode: true,

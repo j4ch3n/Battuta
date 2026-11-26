@@ -9,9 +9,6 @@ export interface SourceMessage {
   source_timezone?: string | null;
   original_mail?: { message_ref: { conversation_id: string; id: string }; sender: string };
 }
-export interface CaptureSegment {
-  messages: SourceMessage[];
-}
 
 function object(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
@@ -61,24 +58,4 @@ export function collectMessages(entries: readonly unknown[]): SourceMessage[] {
         ]
       : [];
   });
-}
-
-export function splitSegments(messages: SourceMessage[]): CaptureSegment[] {
-  const segments: CaptureSegment[] = [];
-  let current: SourceMessage[] = [];
-  let length = 0;
-  for (const message of messages) {
-    for (let start = 0; start < message.text.length; start += 12000) {
-      const part = message.text.slice(start, start + 12000);
-      if (length + part.length > 12000) {
-        segments.push({ messages: current });
-        current = [];
-        length = 0;
-      }
-      current.push({ ...message, text: part });
-      length += part.length;
-    }
-  }
-  if (current.length) segments.push({ messages: current });
-  return segments;
 }

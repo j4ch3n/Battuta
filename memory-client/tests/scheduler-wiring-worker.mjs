@@ -10,7 +10,6 @@ const [directory, phase] = process.argv.slice(2);
 const store = join(directory, "stable schedules/schedule-prompts.json");
 process.env.PI_SCHEDULER_STATE_FILE = store;
 process.env.BATTUTA_MEMORY_DATA_DIR = join(directory, "memory");
-process.env.BATTUTA_DREAM_MODEL = "offline/dream";
 if (phase === "seed") {
   const workspace = join(directory, "release-one");
   await mkdir(join(workspace, ".pi"), { recursive: true });

@@ -1,92 +1,97 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { setTimeout as delay } from "node:timers/promises";
 import { Type } from "typebox";
-import { clientConfig } from "./config.ts";
-import { schedulerStorePath } from "./scheduler-config.ts";
-import { enabledDreamModel } from "./dream-config.ts";
-import { DreamExecutionError, type DreamFailure, executeDream } from "./dream-executor.ts";
-import { recordDreamUsage } from "./dream-usage.ts";
-import { abortable } from "./abortable.ts";
-import type { DreamOutcome } from "./dream-result.ts";
-import { dreamDiagnostic } from "./dream-errors.ts";
+import { z } from "zod";
+import { extractConversation, windowStart } from "./conversation-extract.ts";
+import { failureReason } from "./recall.ts";
+import { MemoryClient, type MemoryApi } from "./mcp-client.ts";
+
+const POLL_MS = 10_000;
+const MAX_WAIT_MS = 45 * 60_000;
+
+const stateSchema = z.object({
+  status: z.enum(["idle", "running", "succeeded", "failed"]),
+  step: z.string().nullish(),
+  last_success_at: z.string().nullish(),
+  error: z.string().nullish(),
+  report: z.record(z.string(), z.unknown()).nullish(),
+});
+type DreamState = z.infer<typeof stateSchema>;
+
+export interface DreamOptions {
+  sessionDir: string;
+  signal: AbortSignal;
+  pollMs?: number;
+  maxWaitMs?: number;
+  sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
+  now?: () => Date;
+}
+
+function summary(state: DreamState, uploaded: unknown) {
+  const report = state.report ?? {};
+  const distill = (report.distill ?? {}) as Record<string, { batches?: { written?: string[] }[] }>;
+  const written = Object.values(distill).flatMap((day) =>
+    (day.batches ?? []).flatMap((batch) => batch.written ?? []),
+  );
+  return {
+    status: state.status,
+    step: state.step ?? undefined,
+    error: state.error ?? undefined,
+    uploaded,
+    memories_written: written.length,
+    consolidation: report.consolidate,
+    overviews_refreshed: report.overviews ?? [],
+  };
+}
+
+/** Client side of the dream: extract and upload, then trigger and watch. No model work happens here. */
+export async function runDream(client: MemoryApi, options: DreamOptions) {
+  const { signal } = options;
+  const sleep =
+    options.sleep ?? ((ms: number, abort: AbortSignal) => delay(ms, undefined, { signal: abort }));
+  const status = async () =>
+    stateSchema.parse(await client.call("memory_dream_status", {}, signal));
+  const before = await status();
+  if (before.status === "running")
+    return { status: "already_running", step: before.step ?? undefined };
+  const since = windowStart(before.last_success_at, options.now?.() ?? new Date());
+  const ndjson = await extractConversation(options.sessionDir, since);
+  const uploaded = ndjson ? await client.uploadArchive(ndjson, signal) : { days: {} };
+  const started = z
+    .object({ status: z.string() })
+    .parse(await client.call("memory_dream_start", {}, signal));
+  if (started.status === "already_running") return { status: "already_running", uploaded };
+  const deadline = Date.now() + (options.maxWaitMs ?? MAX_WAIT_MS);
+  for (;;) {
+    await sleep(options.pollMs ?? POLL_MS, signal);
+    const state = await status();
+    if (state.status !== "running") return summary(state, uploaded);
+    if (Date.now() > deadline)
+      return { status: "still_running", step: state.step ?? undefined, uploaded };
+  }
+}
 
 export default function dreamExtension(pi: ExtensionAPI) {
   if (process.env.AGENT_ROLE !== "cos") return;
-  const shutdown = new AbortController();
-  let started = false;
-  let active: Promise<DreamOutcome> | undefined;
-  async function execute(ctx: ExtensionContext, signal?: AbortSignal) {
-    let configured = false;
-    try {
-      const config = clientConfig();
-      // Recheck even when joining active work: queued prompts cannot bypass disablement.
-      const model = await enabledDreamModel(schedulerStorePath(), config.dataDirectory);
-      if (!model) throw new Error("Dream not configured");
-      configured = true;
-      if (!active) {
-        ctx.ui.setStatus("memory-dream", "Memory dream running");
-        active = executeDream(ctx, {
-          model,
-          shutdown: shutdown.signal,
-          signal,
-          onUsage: async (usage) => {
-            const safe = await recordDreamUsage(config.dataDirectory, usage);
-            pi.appendEntry("memory-dream-usage", { usage: safe });
-          },
-        }).finally(() => {
-          active = undefined;
-        });
-      }
-      const result = await abortable(active, signal ?? shutdown.signal);
-      ctx.ui.setStatus("memory-dream", `Memory dream ${result.status.replaceAll("_", " ")}`);
-      return result;
-    } catch (error) {
-      const failure: DreamFailure = !configured
-        ? "unavailable"
-        : error instanceof DreamExecutionError
-          ? error.failure
-          : signal?.aborted || shutdown.signal.aborted
-            ? "cancelled"
-            : "failed";
-      const messages: Record<DreamFailure, string> = {
-        unavailable: "Dream unavailable: configure an enabled nightly dream model and retry.",
-        cancelled: "Dream cancelled: retry the next eligible scheduled run.",
-        timed_out:
-          "Dream timed out: review availability and retry the next eligible scheduled run.",
-        failed: "Dream failed: review private operational logs and retry.",
-      };
-      ctx.ui.setStatus("memory-dream", `Memory dream ${failure.replace("_", " ")}`);
-      if (error instanceof DreamExecutionError) throw error;
-      throw new DreamExecutionError(failure, {
-        ...dreamDiagnostic(error, configured ? "execution" : "setup"),
-        ...(configured ? {} : { code: "unavailable", message: messages.unavailable }),
-      });
-    }
-  }
   pi.registerTool({
     name: "memory_dream",
     label: "Memory dream",
     description:
-      "Run the explicitly configured memory dream. On success, report successful completion and the returned public summary. For partial, already completed without a summary, or failed runs, report the actual status honestly. Never request or repeat private reflections. Does not accept custom prompts or models.",
+      "Run the memory dream: upload recent owner conversation, then let the memory service distill, consolidate and refresh overviews. Report the returned status and counts honestly; never invent a summary.",
     parameters: Type.Object({}, { additionalProperties: false }),
     async execute(_id, _params, signal, _update, ctx) {
+      const abort = signal ?? new AbortController().signal;
+      ctx.ui.setStatus("memory-dream", "Memory dream running");
       try {
-        const result = await execute(ctx, signal);
+        const result = await runDream(new MemoryClient(), {
+          sessionDir: ctx.sessionManager.getSessionDir(),
+          signal: abort,
+        });
+        ctx.ui.setStatus("memory-dream", `Memory dream ${result.status.replaceAll("_", " ")}`);
         return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
       } catch (error) {
-        const failure = error instanceof DreamExecutionError ? error.failure : "failed";
-        const result = {
-          status: failure,
-          error:
-            error instanceof DreamExecutionError && error.diagnostic
-              ? error.diagnostic
-              : failure === "unavailable"
-                ? {
-                    stage: "setup",
-                    code: "unavailable",
-                    message: "Configured dream model is unavailable.",
-                  }
-                : dreamDiagnostic(error, "execution"),
-        };
+        const result = { status: "failed", error: failureReason(error) };
+        ctx.ui.setStatus("memory-dream", "Memory dream failed");
         return {
           isError: true,
           content: [{ type: "text", text: JSON.stringify(result) }],
@@ -95,10 +100,4 @@ export default function dreamExtension(pi: ExtensionAPI) {
       }
     },
   });
-  pi.on("session_start", (_event, ctx) => {
-    if (started) return;
-    started = true;
-    void execute(ctx).catch(() => {});
-  });
-  pi.on("session_shutdown", () => shutdown.abort());
 }
