@@ -20,6 +20,8 @@ Inspect the exact intended runtime allowlist and publication authority. Private
 notes, credentials and unrelated sources must not be shared. A Worker declaring
 completion, a local render, a published URL, Manager approval and owner acceptance
 are different outcomes. Do not publish or expand sharing to obtain review evidence.
+Review a published artifact through its returned `local_url`, which serves the
+same content; do not fetch the public URL. Report the public URL.
 
 For a **blocked** verdict, name the missing evidence/access and what check would
 resolve it. For **changes-required**, specify the observed defect and concrete fix.
