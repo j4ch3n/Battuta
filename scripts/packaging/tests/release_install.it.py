@@ -56,6 +56,9 @@ class ReleaseInstallation(unittest.TestCase):
             claude = stubs / "claude"
             claude.write_text(f'#!/bin/sh\necho "$@" >> "{claude_log}"\n[ "$1 $2" = "mcp get" ] && exit 1\nexit 0\n')
             claude.chmod(0o755)
+            gh = stubs / "gh"
+            gh.write_text("#!/bin/sh\nexit 0\n")
+            gh.chmod(0o755)
             env["PATH"] = f"{stubs}{os.pathsep}{env['PATH']}"
             def run(*args, **kwargs):
                 return subprocess.run(args, env=kwargs.pop("env", env), cwd=work, check=True, text=True, **kwargs)
@@ -64,7 +67,8 @@ class ReleaseInstallation(unittest.TestCase):
                     digest, name = line.split()
                     self.assertEqual(Path(name).name, name)
                     self.assertEqual(hashlib.sha256((assets / name).read_bytes()).hexdigest(), digest)
-            wheels = [(wheel, wheel_metadata(wheel)) for wheel in assets.glob("*.whl")]
+            # Dependency wheels are digest-pinned in tool metadata and installed through it.
+            wheels = [(wheel, wheel_metadata(wheel)) for wheel in assets.glob("battuta_*.whl")]
             self.assertEqual({metadata["Name"] for _, metadata in wheels}, set(COMMANDS))
             self.assertFalse(list(assets.glob("*-constraints.txt")))
             installed = {}
@@ -119,7 +123,7 @@ for value in data['requires']:
                 settings = json.loads((root / "bots/cos-bot/.pi/settings.json").read_text())
                 self.assertNotIn("extensions", settings)
                 self.assertTrue((root / "bots/cos-bot/.pi/extensions/dream/dist/index.js").is_file())
-                run(str(installed["battuta-memory"][1] / "bin/python"), "-c", "import sqlite3,sqlite_vec,onnxruntime,tokenizers; c=sqlite3.connect(':memory:'); c.enable_load_extension(True); sqlite_vec.load(c); c.close(); assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()")
+                run(str(installed["battuta-memory"][1] / "bin/python"), "-c", "import sqlite3, onnxruntime, tokenizers, jieba; c=sqlite3.connect(':memory:'); c.execute('create virtual table t using fts5(x)'); c.close(); assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()")
 
 
 if __name__ == "__main__":

@@ -4,6 +4,12 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@earendil-works/pi-ai': 1.6.1
+  '@earendil-works/pi-agent-core': 1.6.1
+  '@earendil-works/pi-codemode': 1.6.1
+  '@earendil-works/pi-tui': 1.6.1
+
 importers:
 
   .:
@@ -218,9 +224,9 @@ packages:
   '@jl1990/pi-scheduler@0.6.0':
     resolution: {integrity: sha512-r+wKxm6Mev+wgrPXxV/HaEl41HqXYSZLJZIe9ofKQyXO4H0E6av4RAKqUznIo6neFSSEeWg3lEI2k+6fHgdrrw==}
     peerDependencies:
-      '@earendil-works/pi-ai': '*'
+      '@earendil-works/pi-ai': 1.6.1
       '@earendil-works/pi-coding-agent': '*'
-      '@earendil-works/pi-tui': '*'
+      '@earendil-works/pi-tui': 1.6.1
       typebox: '*'
     peerDependenciesMeta:
       '@earendil-works/pi-ai':

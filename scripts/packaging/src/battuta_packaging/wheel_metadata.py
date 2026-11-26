@@ -10,11 +10,14 @@ import subprocess
 import sys
 import tempfile
 import tomllib
+from urllib.parse import parse_qs, urlsplit
+import urllib.request
 import zipfile
 
 import click
 from packaging.markers import default_environment
 from packaging.requirements import InvalidRequirement, Requirement
+from packaging.specifiers import SpecifierSet
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
 
@@ -56,6 +59,44 @@ def release_requirements(export: str, *, release_url: str, tool_version: str) ->
         except (InvalidRequirement, InvalidVersion, ValueError) as error:
             raise click.ClickException("Release dependencies must be exact versions, commit-pinned git sources, or same-release Battuta wheels") from error
     return sorted(set(result))
+
+
+def source_only_packages(project: Path) -> dict[str, dict]:
+    """Locked third-party packages without a published wheel, which `uv tool install --no-build` rejects."""
+    lock = tomllib.loads((project / "uv.lock").read_text())
+    return {canonicalize_name(package["name"]): package for package in lock["package"]
+            if "wheels" not in package and canonicalize_name(package["name"]) not in PROJECTS and {"git", "registry"} & package["source"].keys()}
+
+
+def build_dependency_wheel(package: dict, work: Path, output: Path) -> Path:
+    """Build a locked git commit or hash-checked sdist into a pure-Python release wheel."""
+    work.mkdir(parents=True)
+    source = package["source"]
+    if "git" in source:
+        url = urlsplit(source["git"])
+        checkout = work / "checkout"
+        subprocess.run(["git", "clone", "--quiet", url._replace(query="", fragment="").geturl(), str(checkout)], check=True)
+        subprocess.run(["git", "-C", str(checkout), "checkout", "--quiet", url.fragment], check=True)
+        target = checkout / parse_qs(url.query).get("subdirectory", [""])[0]
+    else:
+        sdist = package["sdist"]
+        target = work / sdist["url"].rsplit("/", 1)[1]
+        with urllib.request.urlopen(sdist["url"]) as response:
+            target.write_bytes(response.read())
+        if "sha256:" + hashlib.sha256(target.read_bytes()).hexdigest() != sdist["hash"]:
+            raise click.ClickException(f"Downloaded source does not match the lockfile: {package['name']}")
+    subprocess.run(["uv", "build", str(target), "--wheel", "--out-dir", str(work / "dist")], check=True)
+    wheel, = (work / "dist").glob("*.whl")
+    if not wheel.name.endswith("-py3-none-any.whl"):
+        raise click.ClickException(f"Source-only dependency is not pure Python: {package['name']}")
+    return Path(shutil.move(wheel, output / wheel.name))
+
+
+def vendored_requirement(requirement: str, wheel: Path, release_url: str) -> str:
+    req = Requirement(requirement)
+    req.url = f"{release_url}/{wheel.name}#sha256={hashlib.sha256(wheel.read_bytes()).hexdigest()}"
+    req.specifier = SpecifierSet()
+    return str(req)
 
 
 def _toml(data: dict, prefix: tuple[str, ...] = ()) -> str:
@@ -124,6 +165,16 @@ def build_wheels(source: Path, output: Path, *, tag: str, tool_version: str) -> 
     check_internal_pins(requirements_by_project)
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="battuta-wheels-", dir="/tmp") as temporary:
+        # Published beside the tools and pinned by digest, so installs stay `--no-build`.
+        vendored = {}
+        for name, relative in PROJECTS.items():
+            locked = source_only_packages(source / relative)
+            for index, requirement in enumerate(requirements_by_project[name]):
+                dependency = canonicalize_name(Requirement(requirement).name)
+                if dependency in locked:
+                    if dependency not in vendored:
+                        vendored[dependency] = build_dependency_wheel(locked[dependency], Path(temporary) / "dependencies" / dependency, output)
+                    requirements_by_project[name][index] = vendored_requirement(requirement, vendored[dependency], release_url)
         for name, relative in PROJECTS.items():
             stage = Path(temporary) / name
             requirements = requirements_by_project[name]
