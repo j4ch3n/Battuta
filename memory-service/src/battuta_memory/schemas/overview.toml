@@ -1,0 +1,5 @@
+type = "overview"
+description = """A generated digest of one project, written only by the overview refresh."""
+key = ["project", "subject"]
+group = "project"
+mode = "add_only"

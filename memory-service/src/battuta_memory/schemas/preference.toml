@@ -1,0 +1,5 @@
+type = "preference"
+description = """A stable habit, taste, routine or way of working. Write one when someone says how they like things done, what they avoid, what they always choose, or a standing rhythm of their week; the subject names the topic and the habit (routine-school-run, comms-async-updates)."""
+key = ["project", "subject"]
+group = "project"
+mode = "upsert"

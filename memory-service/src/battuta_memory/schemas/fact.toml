@@ -1,0 +1,5 @@
+type = "fact"
+description = """A standing fact about a project: a constraint, a value, a date, a configuration, a rule. Write one when a specific value or rule is stated that a later task will need; a changed value is a successor of the earlier fact."""
+key = ["project", "subject"]
+group = "project"
+mode = "upsert"

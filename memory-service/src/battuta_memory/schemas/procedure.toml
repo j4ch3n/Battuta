@@ -1,0 +1,5 @@
+type = "procedure"
+description = """How a recurring task is done, step by step. Write one when a working sequence is established or corrected."""
+key = ["project", "subject"]
+group = "project"
+mode = "upsert"

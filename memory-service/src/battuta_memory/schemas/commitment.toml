@@ -1,0 +1,5 @@
+type = "commitment"
+description = """Something the owner or CoS promised to do, with whom and by when. Write one when a promise, deadline or follow-up is agreed; write its successor when it is done, moved or dropped."""
+key = ["project", "subject"]
+group = "project"
+mode = "upsert"

@@ -1,0 +1,5 @@
+type = "reference"
+description = """Outside material worth keeping: a link, a title, a recommendation, a quoted source. Write one when the conversation names material someone may return to."""
+key = ["project", "subject"]
+group = "project"
+mode = "upsert"

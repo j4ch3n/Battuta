@@ -1,0 +1,5 @@
+type = "decision"
+description = """A choice made in a project and why. Write one when the conversation settles on an approach, rejects an alternative, or changes an earlier choice; a changed choice is a successor of the earlier decision."""
+key = ["project", "subject"]
+group = "project"
+mode = "upsert"
