@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@10.20.0",
   "engines": {
-    "node": ">=24.21.0"
+    "node": ">=26.13.1"
   },
   "pnpm": {
     "overrides": {
@@ -40,7 +40,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@types/node": "24.19.1",
+    "@types/node": "26.6.11",
     "esbuild": "0.28.2",
     "eslint": "10.11.0",
     "eslint-config-prettier": "10.1.8",
