@@ -1,0 +1,5 @@
+type = "experience"
+description = """A lesson: symptom, cause, fix. Write one when something went wrong and the fix was found, or when an approach turned out to work."""
+key = ["project", "subject"]
+group = "project"
+mode = "upsert"

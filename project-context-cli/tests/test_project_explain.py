@@ -17,65 +17,10 @@ class ExplainTests(ProjectTestCase):
         self.assertIn("Managed Project Directory: ~/.battuta/projects/atlas-api", output)
         self.assertIn("Project Root: ~/.battuta/projects/atlas-api/code", output)
         self.assertNotIn("Specs Root:", output)
-        self.assertIn("Summary: ~/.battuta/projects/atlas-api/SUMMARY.md", output)
+        self.assertIn("## Project overview", output)
         self.assertNotIn("Constitution:", output)
         self.assertEqual(sorted(path.name for path in self.project.root.iterdir()), before)
         self.assertFalse((self.project.root / "specs").exists())
-
-    def test_summary_preserves_multiline_markdown_from_managed_root(self):
-        summary = "# Atlas\n\nPurpose: import maps.\n\n- **Current:** CSV imports\n- Proposed: offline use\n"
-        path = self.project.root / "SUMMARY.md"
-        path.write_text(summary, encoding="utf-8")
-        self.file("SUMMARY.md", "Wrong checkout summary")
-        result = explain_project(self.project)
-        output = render("explain.md.j2", result)
-        self.assertIn(summary, output)
-        self.assertNotIn("Wrong checkout summary", output)
-        self.assertEqual(path.read_text(encoding="utf-8"), summary)
-        self.assertEqual(result.summary, summary)
-
-    def test_missing_and_blank_summaries_are_reported_without_writing(self):
-        path = self.project.root / "SUMMARY.md"
-        for content in (None, "", " \t\n"):
-            with self.subTest(content=content):
-                if path.exists():
-                    path.unlink()
-                if content is not None:
-                    path.write_text(content, encoding="utf-8")
-                output = render("explain.md.j2", explain_project(self.project))
-                self.assertIn("Project summary: not written yet", output)
-                self.assertEqual(path.exists(), content is not None)
-                if content is not None:
-                    self.assertEqual(path.read_text(encoding="utf-8"), content)
-
-    def test_invalid_summary_files_report_the_path(self):
-        path = self.project.root / "SUMMARY.md"
-        if path.exists():
-            path.unlink()
-        path.mkdir()
-        with self.assertRaisesRegex(click.ClickException, "SUMMARY.md"):
-            explain_project(self.project)
-        path.rmdir()
-        path.write_bytes(b"\xff")
-        with self.assertRaisesRegex(click.ClickException, "SUMMARY.md"):
-            explain_project(self.project)
-        self.assertEqual(path.read_bytes(), b"\xff")
-        path.unlink()
-        outside = self.home / "outside-summary.md"
-        outside.write_text("Outside project")
-        path.symlink_to(outside)
-        with self.assertRaisesRegex(click.ClickException, "SUMMARY.md"):
-            explain_project(self.project)
-        self.assertEqual(outside.read_text(), "Outside project")
-
-    def test_summary_read_failure_preserves_content(self):
-        path = self.project.root / "SUMMARY.md"
-        path.write_bytes(b"# Atlas\n\nMap imports.\n")
-        original = path.read_bytes()
-        with patch("pathlib.Path.read_text", side_effect=PermissionError("access denied")):
-            with self.assertRaisesRegex(click.ClickException, "SUMMARY.md.*access denied"):
-                explain_project(self.project)
-        self.assertEqual(path.read_bytes(), original)
 
     def test_index_finds_deep_docs_but_limits_tree_to_two_directory_levels(self):
         for path in ("README.md", "AGENTS.md", "docs/README.md", "src/AGENTS.md", "src/api/README.md", "src/api/internal/AGENTS.md"):

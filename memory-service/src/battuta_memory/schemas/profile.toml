@@ -1,0 +1,5 @@
+type = "profile"
+description = """Who the owner is: name, role, situation, standing circumstances. Write one per fact under project global when the conversation states or changes such a fact about the owner; the subject names the fact (name, role, home)."""
+key = ["project", "subject"]
+group = "project"
+mode = "upsert"

@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from battuta_project.memory import MemoryUnavailable
 from battuta_project.registry import ProjectRegistry
 
 
@@ -17,6 +18,9 @@ class ProjectTestCase(unittest.TestCase):
         home = patch("pathlib.Path.home", return_value=self.home)
         home.start()
         self.addCleanup(home.stop)
+        memory = patch("battuta_project.memory._call", side_effect=MemoryUnavailable("unreachable"))
+        self.memory = memory.start()
+        self.addCleanup(memory.stop)
         self.registry = ProjectRegistry()
         clone = patch("battuta_project.registry.subprocess.run", side_effect=self.clone_repo)
         clone.start()

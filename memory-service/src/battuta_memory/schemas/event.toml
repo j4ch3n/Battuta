@@ -1,0 +1,5 @@
+type = "event"
+description = """Something that happened on a date: a meeting, a launch, an incident, a milestone. Each event is its own file with its own date; the subject names what happened."""
+key = ["project", "date", "subject"]
+group = "project"
+mode = "add_only"

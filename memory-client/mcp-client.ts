@@ -1,147 +1,63 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { z } from "zod";
-import { memoryRecordSchema, memoryProjectsSchema } from "./records.ts";
-import { normalizedProjects, validateMemoryProjects } from "./projects.ts";
-import { DreamDiagnosticError } from "./dream-errors.ts";
+import { memoryUrl } from "./config.ts";
 
-const memoryErrors: Record<string, string> = {
-  revision_conflict: "Memory changed since inventory; review fresh evidence.",
-  evidence_conflict: "Memory evidence changed or is inactive.",
-  scope_conflict: "Memory scope does not match its evidence or replacement.",
-  invalid_request: "Invalid request or conflicting memory state.",
-  embedding_limit: "Memory content exceeds the embedding token limit; shorten it.",
-  backend_unavailable: "Memory backend unavailable; retry later.",
-  inactive_memory: "Memory is inactive or was not found.",
-};
-
-export class MemoryMcpClient {
+export class MemoryError extends Error {
   constructor(
-    readonly url: string,
-    private readonly writeCatalog?: (signal: AbortSignal) => Promise<readonly string[]>,
+    readonly code: string,
+    message: string,
   ) {
-    const endpoint = new URL(url);
-    if (
-      !["127.0.0.1", "localhost", "[::1]"].includes(endpoint.hostname) ||
-      endpoint.protocol !== "http:"
-    )
-      throw new Error("Memory URL must be loopback HTTP");
+    super(message);
   }
-  async call(
-    name: string,
-    args: Record<string, unknown>,
-    signal: AbortSignal,
-    catalog?: readonly string[],
-  ): Promise<unknown> {
+}
+
+export interface MemoryApi {
+  call(name: string, args: Record<string, unknown>, signal: AbortSignal): Promise<unknown>;
+  uploadArchive(ndjson: string, signal: AbortSignal): Promise<unknown>;
+}
+
+export class MemoryClient implements MemoryApi {
+  readonly url: string;
+  constructor(url = memoryUrl()) {
+    this.url = url;
+  }
+
+  async call(name: string, args: Record<string, unknown>, signal: AbortSignal): Promise<unknown> {
     signal.throwIfAborted();
-    if (
-      ![
-        "memory_inventory",
-        "memory_recall",
-        "memory_get",
-        "memory_remember",
-        "memory_update",
-        "memory_forget",
-        "memory_link_projects",
-        "memory_cluster",
-        "memory_cue_targets",
-        "memory_set_cues",
-      ].includes(name)
-    )
-      throw new Error("Unsupported dream memory operation");
-    if (name === "memory_remember") {
-      const available = catalog ?? (await this.catalog(signal));
-      validateMemoryProjects(args.projects, available);
-    }
-    if (name === "memory_link_projects") {
-      const changes = z
-        .object({ add: z.array(z.string()).default([]), remove: z.array(z.string()).default([]) })
-        .parse(args);
-      const available = normalizedProjects(catalog ?? (await this.catalog(signal)));
-      const added = normalizedProjects(changes.add),
-        removed = normalizedProjects(changes.remove);
-      if (added.some((p) => removed.includes(p)))
-        throw new Error("Memory project membership invalid");
-      const record = memoryRecordSchema.parse(
-        await this.call("memory_get", { ref: args.ref }, signal),
-      );
-      if (
-        added.some((p) => !available.includes(p)) ||
-        removed.some((p) => !available.includes(p) && !record.projects.includes(p))
-      )
-        throw new Error("Memory project membership invalid");
-      validateMemoryProjects(
-        [...new Set([...record.projects, ...added])].filter((p) => !removed.includes(p)),
-        available,
-      );
-    }
-    const client = new Client({ name: "battuta-dream", version: "0.1.0" });
+    const client = new Client({ name: "battuta-memory-client", version: "0.2.0" });
     try {
       await client.connect(new StreamableHTTPClientTransport(new URL(this.url)), { signal });
       const result = await client.callTool({ name, arguments: args }, undefined, {
         signal,
+        timeout: 60_000,
       });
       const envelope = result.structuredContent as
-        | { ok?: boolean; data?: unknown; error?: { code?: string; retryable?: boolean } }
-        | undefined;
-      if (result.isError || !envelope?.ok || envelope.data === undefined) {
-        const code = envelope?.error?.code ?? "backend_unavailable";
-        const safeCode = Object.hasOwn(memoryErrors, code) ? code : "backend_unavailable";
-        throw Object.assign(
-          new DreamDiagnosticError({
-            stage: "memory",
-            code: safeCode,
-            message: memoryErrors[safeCode],
-            retryable: envelope?.error?.retryable !== false,
-          }),
-          {
-            retryable: envelope?.error?.retryable !== false,
-          },
+        { ok?: boolean; data?: unknown; error?: { code?: string; message?: string } } | undefined;
+      if (result.isError || !envelope?.ok || envelope.data === undefined)
+        throw new MemoryError(
+          envelope?.error?.code ?? "backend_unavailable",
+          envelope?.error?.message ?? "Memory backend unavailable",
         );
-      }
       return envelope.data;
     } finally {
       await client.close();
     }
   }
-  private async catalog(signal: AbortSignal): Promise<readonly string[]> {
-    if (!this.writeCatalog) throw new Error("Memory project membership catalog unavailable");
-    return this.writeCatalog(signal);
-  }
-  async capture(batch: Record<string, unknown>, signal: AbortSignal, catalog?: readonly string[]) {
-    signal.throwIfAborted();
-    const available = catalog ?? (await this.catalog(signal));
-    const items = z.array(z.object({ projects: memoryProjectsSchema })).parse(batch.items);
-    for (const item of items) validateMemoryProjects(item.projects, available);
-    const client = new Client({ name: "battuta-capture", version: "0.1.0" });
-    try {
-      await client.connect(new StreamableHTTPClientTransport(new URL(this.url)), { signal });
-      const result = await client.callTool(
-        { name: "memory_capture", arguments: batch },
-        undefined,
-        { signal, timeout: 30000 },
+
+  async uploadArchive(ndjson: string, signal: AbortSignal): Promise<unknown> {
+    const response = await fetch(new URL("/archive", this.url), {
+      method: "POST",
+      headers: { "content-type": "application/x-ndjson" },
+      body: ndjson,
+      signal,
+    });
+    const payload = (await response.json().catch(() => undefined)) as
+      { ok?: boolean; data?: unknown; error?: { code?: string; message?: string } } | undefined;
+    if (!response.ok || !payload?.ok)
+      throw new MemoryError(
+        payload?.error?.code ?? "backend_unavailable",
+        payload?.error?.message ?? `Archive upload failed (${response.status})`,
       );
-      const envelope = result.structuredContent as
-        | {
-            ok?: boolean;
-            data?: {
-              complete?: boolean;
-              items?: { code?: string; status?: string; item_id?: string }[];
-            };
-          }
-        | undefined;
-      if (result.isError || !envelope?.ok || !envelope.data?.complete) {
-        const failed = envelope?.data?.items?.filter((item) => item.status !== "completed") ?? [];
-        throw Object.assign(new Error("Memory capture incomplete"), {
-          rephrase: failed.length > 0 && failed.every((item) => item.code === "embedding_limit"),
-          rephrase_items: failed
-            .filter((item) => item.code === "embedding_limit")
-            .map((item) => item.item_id),
-        });
-      }
-      return envelope.data;
-    } finally {
-      await client.close();
-    }
+    return payload.data;
   }
 }

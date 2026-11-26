@@ -13,7 +13,7 @@ output as usable context.
 battuta-project init <project-name> [--github <repo-url>] [--linear <project-id>,<team-id>]
 ```
 
-Use `init` once to register a named project, create its managed workspace, and render a summary skeleton. GitHub is optional: without `--github`, the code directory is empty and repository metadata is null. With `--github`, the repository is cloned into that directory. The output reports managed project, code, configuration, and summary locations. Initialization does not select an execution target. Fill the overview from confirmed conversation and available repository evidence during project discovery.
+Use `init` once to register a named project and create its managed workspace. GitHub is optional: without `--github`, the code directory is empty and repository metadata is null. With `--github`, the repository is cloned into that directory. The output reports managed project, code, and configuration locations. Initialization does not select an execution target.
 
 ```sh
 battuta-project init linth
@@ -21,7 +21,7 @@ battuta-project init linth
 
 The project name must be nonblank and must not start with a dot or contain slashes, backslashes, or NUL. Shell-quote names containing spaces or special characters. For names beginning with `-`, place command options first, then `--` before positional arguments, for example `battuta-project explain -- '-atlas'`. GitHub is not required for project documents.
 
-The summary has Purpose, Users and use cases, Scope, Current capabilities, and Specifications sections with explicit unknowns. Initialization does not establish spec storage or a constitution. Managed documents are created by spec tools only when requested.
+Initialization does not establish spec storage or a constitution. Managed documents are created by spec tools only when requested.
 
 Accepted URL forms include:
 
@@ -49,7 +49,7 @@ The `--linear` option requires exactly two comma-separated, nonblank IDs in proj
 battuta-project github link linth https://github.com/team/linth.git
 ```
 
-Linking records or replaces GitHub metadata for the named project without a network request. It preserves the project directory, checkout, summary, Linear association, memory, and specs. It does not clone or configure Git remotes; populating or connecting a local Git checkout is a separate operation. The same HTTPS/SSH repository URL forms accepted by `init --github` are supported.
+Linking records or replaces GitHub metadata for the named project without a network request. It preserves the project directory, checkout, Linear association, memory, and specs. It does not clone or configure Git remotes; populating or connecting a local Git checkout is a separate operation. The same HTTPS/SSH repository URL forms accepted by `init --github` are supported.
 
 ## List registered projects
 
@@ -58,7 +58,7 @@ battuta-project list
 battuta-project list --json
 ```
 
-The command returns a numbered Markdown list sorted by project name. Each entry has a bold name followed by indented `Project Root` and `Code` lines: the managed project directory and repository checkout, respectively. Paths under the home directory are abbreviated with `~`; other paths remain absolute.
+The command returns a numbered Markdown list sorted by project name. Each entry has a bold name and the project's one-line description from memory (`(no description yet)` before the first dream), followed by indented `Project Root` and `Code` lines: the managed project directory and repository checkout, respectively. Paths under the home directory are abbreviated with `~`; other paths remain absolute. If memory is unavailable, every project is still listed without descriptions, followed by a `Descriptions: memory query failed (<reason>)` line.
 
 For automation, use `list --json` and parse the `projects` array:
 
@@ -74,8 +74,7 @@ include spec inventories.
 
 The labels differ between commands: `list` uses `Project Root` for the managed
 workspace and `Code` for the checkout. In `explain`, `Project Root` is the
-checkout; use `Managed Project Directory` for project documents and `Summary`
-for the overview.
+checkout; use `Managed Project Directory` for project documents.
 
 ## Worktrees
 
@@ -127,9 +126,9 @@ battuta-project explain <project-name>
 
 Run `explain` with the exact project name before working in its checkout or writing project artifacts. A missing or unknown name is an error, never a fallback to previous work.
 
-The output distinguishes the Managed Project Directory from Project Root (the repository checkout) and reports the Summary path. Unlike `list`, `explain` labels the checkout as `Project Root`. Spec and constitution discovery belong to spec tools and are not included as overview fields.
+The output distinguishes the Managed Project Directory from Project Root (the repository checkout) Unlike `list`, `explain` labels the checkout as `Project Root`. Spec and constitution discovery belong to spec tools and are not included as overview fields.
 
-The Project Summary section displays the overview as Markdown. `Project summary: not written yet` means the summary is missing or blank, not that the project is unknown. A file error means it could not be read; report the failure rather than inventing context. `explain` does not edit or create project material.
+The Project overview section is the project's digest from memory, followed by the date it was written so you can judge staleness. `not written yet` means the nightly dream has not written one; `memory doesn't know this project` means memory has no such project yet; `memory query failed (<reason>)` means memory was unavailable. Every other section still prints; report a missing overview rather than inventing context. `explain` does not edit or create project material.
 
 The output includes the repository URL and the linked Linear project's URL. Repository information comes from the local configuration; `no GitHub repository linked yet` means it is absent. For a linked project, the command fetches its actual URL from Linear and requires network access and a token with access to that project. An unlinked project shows `not linked` without contacting Linear. Lookup failures are reported as errors; the command does not change the project.
 
@@ -137,9 +136,9 @@ Use the documentation index to find and read applicable `README.md` and `AGENTS.
 
 ## Write project documents
 
-Use the [responsibility entries and Workspace binding](../SKILL.md#document-responsibilities) to shape documents. Use [project-spec agent tools](spec-tools.md) for managed specifications, technical plans, tasks, canonical checklists/reviews, and decisions. CoS writes full immutable versions; Manager writes full checklist/review replacements. The CLI does not author specs or record decisions. The project summary can use ordinary file tools at its reported location.
+Use the [responsibility entries and Workspace binding](../SKILL.md#document-responsibilities) to shape documents. Use [project-spec agent tools](spec-tools.md) for managed specifications, technical plans, tasks, canonical checklists/reviews, and decisions. CoS writes full immutable versions; Manager writes full checklist/review replacements. The CLI does not author specs or record decisions.
 
-Maintain the overview at the reported Summary path. Inspect the named project's inventory with `inspect_specs` and resolve versions/artifacts through `describe_spec`; no saved version is patched. Existing unregistered documents are preserved. Memory is durable operational context, not the product-decision or specification source of truth.
+Inspect the named project's inventory with `inspect_specs` and resolve versions/artifacts through `describe_spec`; no saved version is patched. Existing unregistered documents are preserved. Memory is durable operational context, not the product-decision or specification source of truth.
 
 Existing registrations may lack some scaffold files; `explain` does not write them. Requested authoring establishes missing artifacts and parent directories while preserving existing content; do not rerun `init` against an existing project.
 

@@ -83,12 +83,12 @@ def stage_bots(source: Path, destination: Path, *, tag: str, tool_version: str) 
                 raise click.ClickException(f"Skill resources must not be symlinks: {name}")
     for relative in ("docs", "RELEASE.md",
                      ".agents/skills/battuta-setup/references/development.md",
-                     ".agents/skills/battuta-verify/references/checks.md", "memory-service/DESIGN.md"):
+                     ".agents/skills/battuta-verify/references/checks.md", "memory-service/README.md"):
         path = source / relative
         if any(item.is_symlink() for item in [path, *path.rglob("*")]):
             raise click.ClickException(f"Documentation must not contain symlinks: {relative}")
     for relative in ("RELEASE.md", ".agents/skills/battuta-setup/references/development.md",
-                     ".agents/skills/battuta-verify/references/checks.md", "memory-service/DESIGN.md"):
+                     ".agents/skills/battuta-verify/references/checks.md", "memory-service/README.md"):
         target = destination / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source / relative, target)

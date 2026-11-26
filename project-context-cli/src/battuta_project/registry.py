@@ -7,13 +7,11 @@ import subprocess
 import tempfile
 
 import click
-from jinja2 import TemplateError
 from pydantic import ValidationError
 import yaml
 
 from .models import GithubConfig, LinearConfig, ProjectConfig, ProjectContext, Repository, project_name
 from .discovery import ProjectDiscovery
-from .presentation import render
 from .storage import atomic_write, check_registry_root, file_errors, regular_file
 
 
@@ -140,13 +138,7 @@ class ProjectRegistry:
                     linear=linear or LinearConfig(),
                 )
                 self._write_project(directory, config)
-                project = self.load(name)
-                try:
-                    summary = render("summary.md.j2", project)
-                except TemplateError as error:
-                    raise click.ClickException(f"Cannot render project summary: {error}") from error
-                atomic_write(directory / "SUMMARY.md", summary + "\n")
-                return project
+                return self.load(name)
             except (OSError, subprocess.CalledProcessError, click.ClickException) as error:
                 shutil.rmtree(directory)
                 if isinstance(error, FileNotFoundError):

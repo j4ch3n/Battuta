@@ -19,6 +19,8 @@ from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
 
 REPO_URL = "https://github.com/j4ch3n/Battuta"
+# A git source is reproducible only when it names a full commit.
+PINNED_GIT = re.compile(r"git\+https://[^@\s]+@[0-9a-f]{40}(#subdirectory=[\w./-]+)?")
 
 PROJECTS = {
     "battuta-project": "project-context-cli",
@@ -44,12 +46,15 @@ def release_requirements(export: str, *, release_url: str, tool_version: str) ->
                 requirement = Requirement(f"{name} @ {release_url}/{name.replace('-', '_')}-{tool_version}-py3-none-any.whl" + (f" ; {requirement.marker}" if requirement.marker else ""))
             else:
                 specs = list(requirement.specifier)
+                if requirement.url and PINNED_GIT.fullmatch(requirement.url):
+                    result.append(str(requirement))
+                    continue
                 if requirement.url or len(specs) != 1 or specs[0].operator != "==":
                     raise ValueError("unpinned runtime dependency")
                 Version(specs[0].version)
             result.append(str(requirement))
         except (InvalidRequirement, InvalidVersion, ValueError) as error:
-            raise click.ClickException("Release dependencies must be exact versions or same-release Battuta wheels") from error
+            raise click.ClickException("Release dependencies must be exact versions, commit-pinned git sources, or same-release Battuta wheels") from error
     return sorted(set(result))
 
 

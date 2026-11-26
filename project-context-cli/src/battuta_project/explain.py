@@ -5,8 +5,9 @@ from pathlib import Path
 
 import click
 
+from . import memory
 from .models import CheckoutEntry, Explanation, ProjectContext
-from .storage import check_registry_root, file_errors, regular_file
+from .storage import check_registry_root, file_errors
 
 
 EXCLUDED_DIRECTORIES = frozenset({
@@ -55,24 +56,31 @@ def _tree(entries: list[CheckoutEntry]) -> list[str]:
     return lines
 
 
+def overview_section(name: str) -> str:
+    try:
+        result = memory.overview(name)
+    except memory.MemoryUnavailable as error:
+        return f"Project overview: memory query failed ({error})."
+    if result["status"] == "unknown_project":
+        return "Project overview: memory doesn't know this project."
+    if result["status"] == "not_written":
+        return "Project overview: not written yet. The nightly memory dream writes it once the project has memories."
+    written = str(result["overview"].get("created") or "")[:10] or "unknown date"
+    return f"{result['overview']['body'].strip()}\n\n(memory overview, written {written})"
+
+
 def explain_project(project: ProjectContext) -> Explanation:
     with file_errors():
         check_registry_root(project.root.parent)
         if project.root.is_symlink() or project.code.is_symlink() or not project.code.is_dir():
             raise click.ClickException(f"Checkout must be a real directory: {project.code}")
-        summary_path = project.root / "SUMMARY.md"
-        regular_file(summary_path)
-        try:
-            summary = summary_path.read_text(encoding="utf-8") if summary_path.exists() else ""
-        except (OSError, UnicodeError) as error:
-            raise click.ClickException(f"{summary_path}: {error}") from error
         entries = _entries(project.code)
         documents = {entry.path for entry in entries if not entry.is_directory}
         repository = project.config.github.repository
         return Explanation(
             project=project.name, root=project.code,
             managed_root=project.root,
-            summary_path=summary_path, summary=summary if summary.strip() else None,
+            overview=overview_section(project.name),
             repository_url=f"https://github.com/{repository}" if repository else None,
             readme="README.md" if "README.md" in documents else None,
             agents="AGENTS.md" if "AGENTS.md" in documents else None,

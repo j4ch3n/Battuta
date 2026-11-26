@@ -14,7 +14,7 @@ pi = [
   "npm:pi-claude-directsdk@1.0.2",
   "npm:pi-web-access@0.43.0",
 ]
-node_projects = ["agent-mail", "project-spec", "memory-client"]
+node_projects = ["agent-mail", "project-spec"]
 
 [[extensions]]
 name = "agent-mail"

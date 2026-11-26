@@ -7,7 +7,6 @@ import unittest
 from unittest.mock import patch
 
 import click
-from jinja2 import TemplateNotFound, UndefinedError
 import yaml
 
 from battuta_project.registry import ProjectRegistry
@@ -116,51 +115,9 @@ class RegistryTests(unittest.TestCase):
                 project = ProjectRegistry().init("harbor-web", github=url)
                 self.assertEqual(project.name, "harbor-web")
 
-    def test_init_creates_summary_scaffold_beside_checkout(self):
+    def test_init_writes_no_summary(self):
         project = self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
-        summary = project.root / "SUMMARY.md"
-        self.assertTrue(summary.is_file())
-        content = summary.read_text(encoding="utf-8")
-        self.assertIn("# Project Summary: atlas-api", content)
-        for section in ("Purpose", "Users and use cases", "Scope", "Current capabilities", "Specifications"):
-            self.assertIn(f"## {section}", content)
-        self.assertNotIn("{{", content)
-        self.assertNotIn("[replace by project name]", content)
-        self.assertFalse((project.code / "SUMMARY.md").exists())
-        self.assertFalse((project.root / "MEMORY.md").exists())
-        self.assertFalse((project.root / "specs").exists())
-
-    def test_rendering_failure_preserves_existing_project_and_removes_new_project(self):
-        self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
-        for index, error in enumerate((TemplateNotFound("summary.md.j2"), UndefinedError("missing project name"))):
-            with self.subTest(error=type(error).__name__):
-                name = f"harbor-web-{index}"
-                with patch("battuta_project.registry.render", side_effect=error):
-                    with self.assertRaisesRegex(click.ClickException, "summary"):
-                        self.registry.init(name, github=f"https://github.com/team/{name}")
-                self.assertEqual(self.registry.load("atlas-api").name, "atlas-api")
-                self.assertFalse((self.root / name).exists())
-
-    def test_load_does_not_recreate_missing_summary(self):
-        project = self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
-        (project.root / "SUMMARY.md").unlink()
-        self.assertEqual(self.registry.load("atlas-api").code, project.code)
         self.assertEqual(sorted(p.name for p in project.root.iterdir()), ["code", "project.yaml"])
-
-    def test_summary_creation_failure_preserves_existing_project_and_removes_new_project(self):
-        self.registry.init("atlas-api", github="https://github.com/team/atlas-api")
-        from battuta_project.storage import atomic_write
-
-        def write(path, text):
-            if path.name == "SUMMARY.md":
-                raise OSError("summary disk full")
-            atomic_write(path, text)
-
-        with patch("battuta_project.registry.atomic_write", side_effect=write):
-            with self.assertRaisesRegex(click.ClickException, "summary disk full"):
-                self.registry.init("harbor-web", github="https://github.com/team/harbor-web")
-        self.assertEqual(self.registry.load("atlas-api").name, "atlas-api")
-        self.assertFalse((self.root / "harbor-web").exists())
 
     def test_init_records_optional_linear_metadata(self):
         for fields in ({}, {"project_id": "project-1"}, {"team_id": "team-1"},
@@ -322,11 +279,3 @@ class RegistryTests(unittest.TestCase):
                 self.registry.init(name, github="https://github.com/team/other")
         self.run.assert_not_called()
         self.assertFalse(self.root.exists())
-
-    def test_name_only_rendering_failure_preserves_existing_project(self):
-        self.registry.init("atlas-api")
-        with patch("battuta_project.registry.render", side_effect=UndefinedError("missing name")):
-            with self.assertRaisesRegex(click.ClickException, "summary"):
-                self.registry.init("linth")
-        self.assertEqual(self.registry.load("atlas-api").name, "atlas-api")
-        self.assertFalse((self.root / "linth").exists())

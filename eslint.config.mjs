@@ -10,6 +10,7 @@ export default defineConfig(
     "**/vendor/**",
     "skills-hub/**/{references,tools}/**",
     "**/.venv/**",
+    "**/.pi/**",
     ".memory-spike/**",
     "supabase/**",
     "dist/**",
@@ -34,7 +35,6 @@ export default defineConfig(
       "project-spec/**/*.ts",
       "memory-client/**/*.ts",
       "assignment-worker/**/*.ts",
-      "bots/**/.pi/extensions/**/*.ts",
     ],
     extends: [js.configs.recommended, tseslint.configs.recommendedTypeChecked],
     languageOptions: {

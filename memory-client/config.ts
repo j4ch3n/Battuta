@@ -1,52 +1,10 @@
-import { homedir } from "node:os";
-import { join } from "node:path";
-import { readFile } from "node:fs/promises";
-import { z } from "zod";
-
-const settingsSchema = z
-  .object({
-    enabled: z.boolean().default(true),
-    batchMessages: z.number().int().min(1).max(100).default(6),
-  })
-  .strict();
-export async function captureSettings(directory: string, role: "cos" | "manager" = "cos") {
-  const schema = settingsSchema.extend({ enabled: z.boolean().default(role === "cos") });
-  try {
-    const settings: unknown = JSON.parse(await readFile(join(directory, "settings.json"), "utf8"));
-    return schema.parse(
-      (settings as { battutaMemoryCapture?: unknown })?.battutaMemoryCapture ?? {},
-    );
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return schema.parse({});
-    throw error;
-  }
-}
-
-const recallSchema = z.object({
-  limit: z.number().int().min(1).max(100).catch(10),
-  maxDistance: z.number().gt(0).max(2).catch(0.9),
-});
-export async function recallSettings(directory: string) {
-  try {
-    const settings: unknown = JSON.parse(await readFile(join(directory, "settings.json"), "utf8"));
-    return recallSchema.parse(
-      (settings as { battutaMemoryRecall?: unknown })?.battutaMemoryRecall ?? {},
-    );
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return recallSchema.parse({});
-    throw error;
-  }
-}
-
-export function clientConfig() {
-  const role = process.env.AGENT_ROLE;
-  if (role !== "cos" && role !== "manager") throw new Error("AGENT_ROLE must be cos or manager");
-  const dataDirectory = process.env.BATTUTA_MEMORY_DATA_DIR ?? join(homedir(), ".battuta/memory");
-  return {
-    role,
-    dataDirectory,
-    directory: process.env.PI_CODING_AGENT_DIR ?? join(process.cwd(), ".pi"),
-    queue: join(dataDirectory, "capture-queue", role),
-    url: process.env.BATTUTA_MEMORY_URL ?? "http://127.0.0.1:8901/mcp",
-  } as const;
+export function memoryUrl(env: NodeJS.ProcessEnv = process.env): string {
+  const url = env.BATTUTA_MEMORY_URL ?? "http://127.0.0.1:8901/mcp";
+  const endpoint = new URL(url);
+  if (
+    !["127.0.0.1", "localhost", "[::1]"].includes(endpoint.hostname) ||
+    endpoint.protocol !== "http:"
+  )
+    throw new Error("Memory URL must be loopback HTTP");
+  return url;
 }

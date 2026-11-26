@@ -24,10 +24,10 @@ def test_native_configuration_preserves_custom_and_private_state(tmp_path, role)
         assert ("luma" in config["mcpServers"]) == (role == "cos")
         expected_memory = (
             {
-                "url": "http://localhost:8989/mcp",
+                "url": "http://localhost:8989/mcp/read",
                 "enabled": True,
                 "exposure": "codemode",
-                "description": "Shared project memory, including retrieval and supported maintenance",
+                "description": "Read-only project memory: recall and project overviews",
             }
             if role == "manager"
             else {"url": "http://localhost:8989/mcp", "enabled": False}

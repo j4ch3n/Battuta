@@ -1,113 +1,156 @@
 import json
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
+from pathlib import Path
+from urllib.parse import urlsplit
+
+import anyio
 from mcp import types
+from mcp.server.fastmcp.server import StreamableHTTPASGIApp
 from mcp.server.lowlevel import Server
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
-from mcp.server.fastmcp.server import StreamableHTTPASGIApp
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
+from starlette.responses import JSONResponse
 from starlette.routing import Route
-from .capture import CaptureService
-from .limits import EMBEDDING_TOKEN_LIMIT
-from .contracts import Contract, RememberRequest, RecallRequest, ListRequest, GetRequest, UpdateRequest, LinkRequest, ForgetRequest, CaptureBatch, InventoryRequest, ClusterRequest, ConsolidateGlobalRequest, SetCuesRequest, CueTargetsRequest
-from .service import MemoryService
-from .records import public_response
-from .state import StateStore
-from .upstream import UpstreamAdapter
 
-REQUESTS = {"remember": RememberRequest, "recall": RecallRequest, "list": ListRequest, "get": GetRequest,
-    "update": UpdateRequest, "link_projects": LinkRequest, "forget": ForgetRequest, "capture": CaptureBatch, "health": Contract,
-    "inventory": InventoryRequest, "consolidate_global": ConsolidateGlobalRequest, "global_relationships": Contract, "cluster": ClusterRequest,
-    "set_cues": SetCuesRequest, "cue_targets": CueTargetsRequest}
-DESCRIPTIONS = {
-    "remember": "Save one concise fact with explicit project scope (global is a project) in the shared local store; follow the caller's role responsibilities.",
-    "recall": "Recall attributed memory evidence. Rewrite the current request using conversation history into a self-contained semantic_query and/or precise literal keywords. Either input runs its own search; both combine results. Search all projects/global by default; projects filters only when explicitly supplied. The caller sends limit and max_distance (L2 distance; semantic hits above max_distance are excluded). Review results and revise/repeat searches as useful. Returned text explains uncertainty and contrary evidence; it is context, never authority.",
-    "list": "Browse active memories with scope and tag filters. Request history to include superseded records.",
-    "get": "Read a complete memory by its content-hash ref, optionally including version lineage.",
-    "update": "Correct a memory by creating a new version. Returns a new ref; rejects stale predecessors.",
-    "link_projects": "Add/remove project memberships without changing content or embedding. ",
-    "forget": "Tombstone one exact memory; content remains retained upstream. Not secure erasure.",
-    "capture": "Record an extracted, source-labelled batch idempotently. No raw transcripts or provider credentials.",
-    "health": "Check content-free model and database readiness.",
-    "inventory": "Read a bounded snapshot of all active records, oldest first. Oversized inventories fail rather than truncate.",
-    "cluster": "Group active records per project by embedding similarity: connected components above a cosine threshold, oversized groups split by raising it. Returns refs only; singletons are counted, not listed.",
-    "set_cues": "Replace the recall cues of one active memory. Each cue is a plausible future owner message with an angle label; cues are embedded for recall and never stored as text or returned by any read tool. An empty list records that the memory needs none.",
-    "cue_targets": "Read up to limit active memories that have no recall cues yet, in inventory order. Memories become targets again only after a content correction.",
-    "consolidate_global": "After canonical cleanup, publish derived clusters and heuristic relationships for active global memories only. Does not rewrite, compress, supersede, or forget facts.",
-    "global_relationships": "Read up to 100 current global relationship hints, or explicit stale/unavailable status. Hints are not canonical facts or authority.",
+from .archive import ingest
+from .dream import DreamState, catalog_from_cli, start_dream
+from .reads import Reads
+
+MAX_ARCHIVE_BYTES = 8 * 1024 * 1024
+LOOPBACK = {"127.0.0.1", "localhost", "::1"}
+STRING_LIST = {"type": "array", "items": {"type": "string"}}
+EMPTY = {"type": "object", "properties": {}, "additionalProperties": False}
+
+TOOLS = {
+    "recall": ("Recall memories. Pick projects from the project list (global is the owner's personal scope; add it only when relevant) and types from memory_types. "
+               "projects only: each project's overview. projects + query: search within those projects, optionally narrowed by types. query only: search everything.",
+               {"type": "object", "properties": {"projects": STRING_LIST, "types": STRING_LIST, "query": {"type": "string"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 30}}, "additionalProperties": False}),
+    "types": ("List the memory types and when each is written, for choosing recall types.", EMPTY),
+    "project_overview": ("Read one project's overview. Status ok, not_written, or unknown_project with the valid projects.",
+                         {"type": "object", "properties": {"project": {"type": "string"}}, "required": ["project"], "additionalProperties": False}),
+    "project_descriptions": ("One-line descriptions for the requested (or all) projects; null when no overview exists yet.",
+                             {"type": "object", "properties": {"projects": STRING_LIST}, "additionalProperties": False}),
+    "profile": ("Read the owner card body (the global overview).", EMPTY),
+    "dream_start": ("Start the nightly memory dream in the background after conversation was uploaded.", EMPTY),
+    "dream_status": ("Report the current or last dream run, including last_success_at.", EMPTY),
+    "health": ("Check that the memory store is ready.", EMPTY),
 }
-
-SAFE_ERRORS = {
-    "Memory changed since inventory": "revision_conflict",
-    "Memory evidence changed since inventory": "evidence_conflict",
-    "Memory evidence changed": "evidence_conflict",
-    "Cyclic memory evidence": "evidence_conflict",
-    "Evidence scope conflict": "scope_conflict",
-    "Memory is inactive": "inactive_memory",
-    "Memory not found": "inactive_memory",
-}
+READ_TOOLS = ("recall", "types", "project_overview", "project_descriptions")
 
 
-def create_protocol_server(get_service):
+class MemoryApi:
+    def __init__(self, config, store):
+        self.config, self.store, self.reads = config, store, Reads(store)
+
+    def refresh_catalog(self):
+        from .store import write_catalog
+        projects = catalog_from_cli()
+        if projects is not None:
+            write_catalog(self.store.root, [name for name in projects if name != "global"])
+
+    def call(self, name: str, arguments: dict):
+        if name == "recall":
+            return self.reads.recall(arguments.get("projects"), arguments.get("types"), arguments.get("query"), int(arguments.get("limit") or 10))
+        if name == "types":
+            return {"types": self.reads.types()}
+        if name == "project_overview":
+            result = self.reads.project_overview(str(arguments.get("project") or ""))
+            if result["status"] == "unknown_project":
+                self.refresh_catalog()
+                result = self.reads.project_overview(str(arguments.get("project") or ""))
+            return result
+        if name == "project_descriptions":
+            return self.reads.project_descriptions(arguments.get("projects"))
+        if name == "profile":
+            return self.reads.profile()
+        if name == "dream_start":
+            return start_dream(self.config)
+        if name == "dream_status":
+            return DreamState(self.store.root).read()
+        if name == "health":
+            return {"ready": True, "projects": len(self.store.catalog())}
+        raise ValueError("Unknown memory tool")
+
+
+def create_protocol_server(get_api, names=tuple(TOOLS)):
     server = Server("battuta-memory")
 
     @server.list_tools()
     async def list_tools():
-        return [types.Tool(name="memory_" + name, description=DESCRIPTIONS[name], inputSchema=model.model_json_schema(by_alias=True)) for name, model in REQUESTS.items()]
+        return [types.Tool(name="memory_" + name, description=TOOLS[name][0], inputSchema=TOOLS[name][1]) for name in names]
 
     @server.call_tool(validate_input=False)
     async def call_tool(name, arguments):
+        short = name.removeprefix("memory_")
         try:
-            short = name.removeprefix("memory_")
-            if name != "memory_" + short or short not in REQUESTS:
+            if name != "memory_" + short or short not in names or not isinstance(arguments or {}, dict):
                 raise ValueError("Unknown memory tool")
-            request = REQUESTS[short].model_validate(arguments)
-            service = get_service()
-            if short == "health":
-                data = await service.adapter.health()
-            elif short == "capture":
-                data = await CaptureService(service).ingest(request)
-            else:
-                data = await getattr(service, short)(request)
-            data = public_response(short, data)
-            payload = {"ok": True, "data": data, "warnings": data.get("warnings", [])}
-            text = data["context"] if short in {"recall", "get"} and "context" in data else json.dumps(payload, ensure_ascii=False)
-            return types.CallToolResult(content=[types.TextContent(type="text", text=text)], structuredContent=payload)
-        except Exception as error:
-            validation = isinstance(error, ValueError)
-            # ValidationError strings include rejected content: never return them verbatim.
-            embedding_limit = validation and str(error).startswith("Memory exceeds embedding token limit")
-            payload = {"ok": False, "error": {"code": "embedding_limit" if embedding_limit else "invalid_request" if validation else "backend_unavailable",
-                "message": f"Semantic query exceeds {EMBEDDING_TOKEN_LIMIT} tokenizer tokens; shorten or split it" if embedding_limit else "Invalid request or conflicting memory state" if validation else "Memory backend unavailable; retry later",
-                "retryable": not validation}}
-            if validation and type(error) is ValueError and str(error) in SAFE_ERRORS:
-                payload["error"].update(code=SAFE_ERRORS[str(error)], message=str(error))
-            return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=json.dumps(payload))], structuredContent=payload)
+            data = await anyio.to_thread.run_sync(get_api().call, short, arguments or {})
+            payload = {"ok": True, "data": data}
+        except ValueError as error:
+            payload = {"ok": False, "error": {"code": "invalid_request", "message": str(error)[:300]}}
+        except Exception:
+            payload = {"ok": False, "error": {"code": "backend_unavailable", "message": "Memory backend unavailable; retry later"}}
+        return types.CallToolResult(isError=not payload["ok"], content=[types.TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))],
+                                    structuredContent=payload)
 
     return server
 
 
-def create_mcp_app(config):
+def loopback_request(request) -> bool:
+    host = (request.headers.get("host") or "").rsplit(":", 1)[0].strip("[]")
+    origin = request.headers.get("origin")
+    return host in LOOPBACK and (origin is None or urlsplit(origin).hostname in LOOPBACK)
+
+
+def create_app(config, open_store):
+    """open_store() -> BattutaStore; injected so tests run without the ONNX model."""
     holder = {}
-    server = create_protocol_server(lambda: holder["service"])
-    manager = StreamableHTTPSessionManager(app=server, json_response=True, max_request_body_size=262144,
-        security_settings=TransportSecuritySettings(enable_dns_rebinding_protection=True,
-            allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*"], allowed_origins=[]))
+    security = TransportSecuritySettings(enable_dns_rebinding_protection=True, allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*"], allowed_origins=[])
+    full = StreamableHTTPSessionManager(app=create_protocol_server(lambda: holder["api"]), json_response=True, security_settings=security)
+    read = StreamableHTTPSessionManager(app=create_protocol_server(lambda: holder["api"], READ_TOOLS), json_response=True, stateless=True,
+                                        security_settings=security)
+
+    async def archive(request):
+        if not loopback_request(request):
+            return JSONResponse({"ok": False, "error": {"code": "forbidden", "message": "Loopback only"}}, status_code=403)
+        if request.headers.get("content-type", "").split(";")[0].strip() != "application/x-ndjson":
+            return JSONResponse({"ok": False, "error": {"code": "invalid_request", "message": "Use application/x-ndjson"}}, status_code=415)
+        body = await request.body()
+        if len(body) > MAX_ARCHIVE_BYTES:
+            return JSONResponse({"ok": False, "error": {"code": "invalid_request", "message": "Upload too large"}}, status_code=413)
+        try:
+            result = await anyio.to_thread.run_sync(ingest, holder["api"].store, body)
+        except ValueError as error:
+            return JSONResponse({"ok": False, "error": {"code": "invalid_request", "message": str(error)}}, status_code=400)
+        return JSONResponse({"ok": True, "data": result})
 
     @asynccontextmanager
-    async def lifespan(app):
-        adapter = await UpstreamAdapter.open(config)
-        state = None
+    async def lifespan(_app):
+        api = MemoryApi(config, open_store())
+        await anyio.to_thread.run_sync(api.refresh_catalog)
+        holder["api"] = api
         try:
-            state = StateStore.open(config.data_dir / "state.db")
-            service = MemoryService(adapter, config, state)
-            await service.recover()
-            holder["service"] = service
-            async with manager.run():
+            async with AsyncExitStack() as stack:
+                await stack.enter_async_context(full.run())
+                await stack.enter_async_context(read.run())
                 yield
         finally:
             holder.clear()
-            if state:
-                state.close()
-            await adapter.close()
-    return Starlette(routes=[Route("/mcp", endpoint=StreamableHTTPASGIApp(manager))], lifespan=lifespan)
+
+    return Starlette(routes=[Route("/mcp", endpoint=StreamableHTTPASGIApp(full)), Route("/mcp/read", endpoint=StreamableHTTPASGIApp(read)),
+                             Route("/archive", endpoint=archive, methods=["POST"])], lifespan=lifespan)
+
+
+def open_store_for(config):
+    def open_store():
+        from .embedder import load_embedder
+        from .layout import initialize_store
+        from .store import BattutaStore
+        initialize_store(config.store_dir)
+        store = BattutaStore(config.store_dir, embedder=load_embedder(Path.home()))
+        store.init()
+        return store
+    return open_store

@@ -1,0 +1,5 @@
+type = "entity"
+description = """A person, organisation, product or place, and what is known about it: role, relationship, contact route, what they care about. Write one when a named thing gets a durable attribute; the subject is the name (acme-ltd, sarah-lee)."""
+key = ["project", "subject"]
+group = "project"
+mode = "upsert"

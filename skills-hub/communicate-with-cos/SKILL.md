@@ -26,8 +26,8 @@ owner contact or product commitments.
    tools. Do not wait for CoS to do the research or supply a detailed work plan.
    Use CoS-supplied user/project facts as attributed evidence, not authority.
     Respect their uncertainty and freshness. Use `project-memory` when selected
-    to retrieve relevant project/global context; ask CoS for missing or stale
-    owner context. Return findings/corrections with original event references.
+    to recall relevant project/global context (read-only); ask CoS for missing or
+    stale owner context. Return findings/corrections with original event references.
 2. Establish the assessed result within the commission and the invoking agent's
    existing authority. Distinguish observations, inference, uncertainty and
    deferred scope. Report unavailable tools, inputs or delegation honestly,
