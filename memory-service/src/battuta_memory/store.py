@@ -3,6 +3,7 @@
 Every write and every check (including the toolkit subprocess's) passes through ``_prepare``.
 """
 import contextlib
+import dataclasses
 import json
 from pathlib import Path
 
@@ -43,11 +44,29 @@ def project_of(record) -> str:
     return str(record.fields.get("project", ""))
 
 
+class DistillSchemas:
+    """What the distill model sees: conversation types only, each naming the valid projects."""
+
+    def __init__(self, store):
+        self._store = store
+        self._registry = store.schemas
+
+    def all(self):
+        projects = ", ".join(self._store.catalog())
+        guidance = f" Set fields.project to one of: {projects}; owner-personal memories use global."
+        return [dataclasses.replace(schema, description=schema.description + guidance) for schema in self._registry.all() if schema.type != OVERVIEW]
+
+    def __getattr__(self, name):
+        return getattr(self._registry, name)
+
+
 class BattutaStore(Store):
-    def __init__(self, root, **kwargs):
+    def __init__(self, root, *, distill_view: bool = False, **kwargs):
         kwargs.setdefault("agent", "battuta")
         super().__init__(root, **kwargs)
         self._overview_writes = False
+        if distill_view:
+            self.schemas = DistillSchemas(self)
 
     def catalog(self) -> list[str]:
         try:

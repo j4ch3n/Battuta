@@ -23,13 +23,13 @@ class HashEmbedder:
         return self._vector(text)
 
 
-def make_store(case, projects=("battuta", "mocktest")) -> BattutaStore:
+def make_store(case, projects=("battuta", "mocktest"), distill_view=False) -> BattutaStore:
     directory = tempfile.TemporaryDirectory(prefix="battuta-memory-test-")
     case.addCleanup(directory.cleanup)
     root = Path(directory.name).resolve() / "store"
     initialize_store(root)
     write_catalog(root, list(projects))
-    store = BattutaStore(root, embedder=HashEmbedder())
+    store = BattutaStore(root, embedder=HashEmbedder(), distill_view=distill_view)
     store.init()
     return store
 
