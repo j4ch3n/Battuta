@@ -2,7 +2,7 @@
 
 Run all source-checkout commands from the repository root. See the shared [tech stack](../../../../docs/tech-stack.md) for runtime responsibilities and [command reference](../../../../docs/commands.md) for scripts and Make targets.
 
-Run CoS and Manager from a source checkout with Python **3.12+**, uv, Node.js from `.node-version` (24 LTS), pnpm **10.20.x**, and tmux. Local Supabase also needs Docker and the Supabase CLI; a remote Supabase project does not.
+Run CoS and Manager from a source checkout with Python **3.12+**, uv, Node.js from `.node-version` (26 LTS), pnpm **10.20.x**, and tmux. Local Supabase also needs Docker and the Supabase CLI; a remote Supabase project does not.
 
 ## Contributor tooling
 
