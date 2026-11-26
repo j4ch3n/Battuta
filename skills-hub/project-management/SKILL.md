@@ -45,7 +45,7 @@ project. Read only the references required by the current situation.
 
 | Situation | Operations and workflow | Observable result |
 | --- | --- | --- |
-| Discover or initialize | Use CLI `list`, `explain <project-name>`, or authorized `init`; use [GitHub linking](references/commands.md#link-github-later) and [Linear association](references/commands.md#linear-projects) for metadata. Read [engagement and initiation](references/engagement-and-initiation.md) for an unclear mandate. | Explicit project, checkout, summary, linked records, and authority gaps; initialization creates a summary skeleton, not completed requirements |
+| Discover or initialize | Use CLI `list`, `explain <project-name>`, or authorized `init`; use [GitHub linking](references/commands.md#link-github-later) and [Linear association](references/commands.md#linear-projects) for metadata. Read [engagement and initiation](references/engagement-and-initiation.md) for an unclear mandate. | Explicit project, checkout, memory overview, linked records, and authority gaps; initialization creates the workspace, not requirements |
 | Establish or refine scope | Use `inspect_specs` and `describe_spec` for authoritative documents; select the document responsibility below. Use the [product-decision workflow](references/product-decisions.md) for go/no-go/refine. | Reviewable requirements and an attributed decision or consequential question for CoS |
 | Prepare delivery | Develop complementary PRD detail, plans, tasks, and canonical checklist/review through [project-spec tools](references/spec-tools.md). Assess uncertainty with [adaptive delivery](references/adaptive-delivery.md). | Explicit versions, readiness evidence, acceptance, exclusions, dependencies, and executable briefs |
 | Commission and coordinate | Inspect/reuse Linear records. Commission Manager to prepare assignments, or use ticket-writing, define-assignments, todo, and coordinate-workers for commissioned planning. Use [dependency/handoff guidance](references/hybrid-and-dependencies.md). | Authorized assignments with ordered work, input paths, non-conflicting boundaries, and accountable dependencies |
@@ -70,7 +70,6 @@ provided. These are document methodologies, not automatic lifecycle gates.
 
 | Entry | Purpose and result |
 | --- | --- |
-| [Summary](references/summary/prompt.md) | Project-wide purpose, users, scope, current capabilities and spec links in `SUMMARY.md` |
 | [Specify](references/specify/prompt.md) | Feature requirements, scenarios and outcomes in a named versioned spec |
 | [Clarify](references/clarify/prompt.md) | Resolve ambiguity in a complete new requirements version |
 | [Plan](references/plan/prompt.md) | Technical design, including needed research, data models, contracts and quickstarts |
@@ -94,7 +93,7 @@ This binding overrides upstream runtime assumptions in imported prompts/template
 it supplies locations and invocation context, not a replacement methodology.
 
 1. Use CLI `list` for discovery and `explain <project-name>` for the intended
-   project's checkout, summary, and repository guidance. Read applicable
+   project's checkout, memory overview, and repository guidance. Read applicable
    README/AGENTS files and supplied relevant context. Ask which project/feature
    when ambiguous; do not infer ownership from the current directory.
 2. Resolve document inventories with `inspect_specs` and named versions/content
@@ -110,8 +109,7 @@ it supplies locations and invocation context, not a replacement methodology.
    through the owning role's tools. CoS creates immutable named versions; Manager
    fully replaces the single canonical checklist/review. Both roles use
    `read_constitution`; CoS uses `init_constitution`/`update_constitution` for
-   complete canonical versions. The summary can use ordinary file tools at the
-   CLI-reported location. Do not install Spec Kit, initialize its infrastructure,
+   complete canonical versions. Do not install Spec Kit, initialize its infrastructure,
    or create shared current-feature state.
 
 | Upstream name/path | Runtime reference |
@@ -140,10 +138,10 @@ or hook-related Done When items. Retained `EXECUTE_COMMAND` markers and optional
 branch-hook steps are reference text only. No hooks, registries, preset layers,
 or `.specify/` helper scripts participate in this runtime.
 
-Initialization creates a summary skeleton, not adopted principles or spec storage.
+Initialization creates the workspace, not adopted principles or spec storage.
 Older registrations may lack artifacts: `explain` stays read-only, while requested
-authoring creates only what is needed. Complete the summary from confirmed
-conversation and repository evidence, not guessed product context. CoS supplies
+authoring creates only what is needed. The project overview comes from memory,
+written by the nightly dream; do not guess product context. CoS supplies
 prepared relevant memory; Manager asks CoS for missing/stale context. Project
 facts retain explicit membership/qualifications; personal owner understanding is
 separate and grants no authority. Workers return essential gaps through their

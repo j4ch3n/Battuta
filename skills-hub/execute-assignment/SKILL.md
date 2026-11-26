@@ -46,8 +46,8 @@ not model actions.
    ```
 
    Replace the placeholder with the exact supplied name and shell-quote it when
-   needed. The read-only output shows the project summary, registered repository
-   checkout (`Project Root`), separate managed directory, Summary path, repository
+   needed. The read-only output shows the project overview from memory, registered
+   repository checkout (`Project Root`), separate managed directory, repository
    and Linear project URLs, and repository guidance index. It does not fetch ticket
    contents, discover spec versions, or select an execution project. A CLI or
    linked-project lookup failure is not proof the project has no context; report
