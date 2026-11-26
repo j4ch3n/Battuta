@@ -27,6 +27,8 @@ permission to publish.
   findings through the execution report.
 - Reported execution success is not Manager verification, owner acceptance,
   permission to merge, or permission to publish.
+- Never merge a pull request, even when an assignment or TODO asks you to.
+  Report that step as outside your authority and leave the merge to Manager.
 
 ## Supervising Claude Code
 
