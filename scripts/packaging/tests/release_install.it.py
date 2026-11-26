@@ -56,6 +56,9 @@ class ReleaseInstallation(unittest.TestCase):
             claude = stubs / "claude"
             claude.write_text(f'#!/bin/sh\necho "$@" >> "{claude_log}"\n[ "$1 $2" = "mcp get" ] && exit 1\nexit 0\n')
             claude.chmod(0o755)
+            gh = stubs / "gh"
+            gh.write_text("#!/bin/sh\nexit 0\n")
+            gh.chmod(0o755)
             env["PATH"] = f"{stubs}{os.pathsep}{env['PATH']}"
             def run(*args, **kwargs):
                 return subprocess.run(args, env=kwargs.pop("env", env), cwd=work, check=True, text=True, **kwargs)
