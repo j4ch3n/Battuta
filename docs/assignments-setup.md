@@ -10,8 +10,8 @@ The Supabase project must have this checkout's migrations applied and the
 `assignments` Edge Function deployed. Use the repository's existing Supabase
 deployment workflow for a remote project, with normal operator approval.
 The deployment workflow also stores the lifecycle settings from
-`config/assignment-lifecycle.yaml`; it needs the `SUPABASE_DB_URL` repository
-secret. Claims are refused with `not_configured` until the settings are stored.
+`config/assignment-lifecycle.yaml` in the linked project. Claims are refused
+with `not_configured` until the settings are stored.
 `[functions.assignments] verify_jwt = false` delegates authentication to the
 secret-key handler; it does not make the MCP service public.
 
