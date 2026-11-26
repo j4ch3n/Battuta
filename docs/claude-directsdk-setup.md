@@ -1,8 +1,7 @@
 # Claude DirectSDK setup
 
 Manager and Workers (including Influencer) run their default model through
-`pi-claude-directsdk@1.0.2`. CoS retains this provider as an option but defaults to
-Antigravity Neon. DirectSDK uses the Claude Agent SDK and the host's Claude Code
+`pi-claude-directsdk@1.0.2`, which uses the Claude Agent SDK and the host's Claude Code
 login instead of Pi's `anthropic` provider. Models use the `claude-directsdk/<model-id>`
 form in each manifest's `[defaults] model`. The package is installed by the normal bot
 setup because it is listed in each manifest's `[packages] pi`.
@@ -18,8 +17,8 @@ setup because it is listed in each manifest's `[packages] pi`.
 ## First launch: refresh the model catalog
 
 A fresh install has no `claude-directsdk` models until an interactive Pi session refreshes
-the catalog, and launchers pass `--model` on every start. Before the first Claude-default launch
-(or a host's first bot), start Pi interactively with that bot's agent directory, open
+the catalog, and launchers pass `--model` on every start. Before the first launch of a
+Claude-default bot (or a host's first bot), start Pi interactively with that bot's agent directory, open
 `/model` and wait for "Model catalogs refreshed". Until then launch fails with
 `Model "claude-directsdk/<id>" not found`. The snapshot is kept in the agent directory.
 
@@ -37,6 +36,6 @@ output means setup is incomplete; stop rather than starting bots.
 
 ## Separate manual functional check
 
-Start Pi, open `/model` and wait for the DirectSDK catalog refresh, then select the
-desired Claude model and confirm it answers a short message. Models that need usage credits can
+Start a bot, open `/model` and wait for the DirectSDK catalog refresh, then confirm the
+manifest's model is listed and answers a short message. Models that need usage credits can
 incur separate charges; see the extension's usage-credit guard.

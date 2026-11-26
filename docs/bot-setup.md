@@ -132,13 +132,9 @@ Current initial defaults:
 | Manager | `claude-directsdk/claude-opus-5-5`  | medium   |
 | Worker  | `claude-directsdk/claude-haiku-5-5` | medium   |
 
-CoS's `antigravity-acp` provider comes from the pinned `pi-agy-acp` package
-and uses the official Antigravity CLI. Claude remains installed for CoS and is
-the default for other roles through `pi-claude-directsdk`. Provider installation
-guidance is in the [release setup index](../RELEASE.md#extension-and-skill-setup-index).
-
-Changing the manifest model takes effect on the next launch without rewriting
-private preferences, credentials or sessions.
+The `antigravity-acp` provider comes from the pinned `pi-agy-acp` package; see
+[Antigravity setup](antigravity-setup.md). The `claude-directsdk` provider comes from the
+pinned `pi-claude-directsdk` package; see [Claude DirectSDK setup](claude-directsdk-setup.md).
 
 Setup does not authenticate, check provider model availability or invoke a model;
 confirm each manifest model matches the operator's account.
