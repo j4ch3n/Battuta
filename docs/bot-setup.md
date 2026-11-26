@@ -128,11 +128,11 @@ Current initial defaults:
 
 | Role    | Model                               | Thinking |
 | ------- | ----------------------------------- | -------- |
-| CoS     | `agy/gemini-4-neon`                 | medium   |
+| CoS     | `antigravity-acp/gemini-4-neon`     | medium   |
 | Manager | `claude-directsdk/claude-opus-5-5`  | medium   |
 | Worker  | `claude-directsdk/claude-haiku-5-5` | medium   |
 
-CoS's `agy` provider comes from the pinned `@timmyjl12/pi-agy-bridge` package
+CoS's `antigravity-acp` provider comes from the pinned `pi-agy-acp` package
 and uses the official Antigravity CLI. Claude remains installed for CoS and is
 the default for other roles through `pi-claude-directsdk`. Provider installation
 guidance is in the [release setup index](../RELEASE.md#extension-and-skill-setup-index).
