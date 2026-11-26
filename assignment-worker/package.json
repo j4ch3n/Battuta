@@ -6,7 +6,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.316",
     "@battuta/agent-mail": "workspace:*",
-    "@earendil-works/pi-coding-agent": "1.5.2",
+    "@earendil-works/pi-coding-agent": "1.6.1",
     "@modelcontextprotocol/client": "2.4.0",
     "@supabase/supabase-js": "2.117.2",
     "jiti": "2.7.0",

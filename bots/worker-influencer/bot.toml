@@ -18,7 +18,7 @@ thinking = "low"
 [packages]
 pi = [
   "npm:pi-claude-directsdk@1.0.2",
-  "npm:pi-web-access@0.43.0",
+  "npm:pi-web-access@0.48.0",
   "npm:pi-droid@0.2.0",
 ]
 node_projects = ["assignment-worker", "agent-mail"]
