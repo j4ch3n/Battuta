@@ -1,0 +1,39 @@
+# Development-only release build and install check; production never runs these containers.
+# Use dev-release.sh, which sets the toolchain versions from the checkout.
+name: battuta-release-dev
+
+x-common: &common
+  volumes:
+    - ../..:/source:ro
+    - assets:/assets
+    - assets:/wheels:ro
+    - uv-cache:/cache/uv
+    - pnpm-store:/cache/pnpm
+  environment:
+    UV_CACHE_DIR: /cache/uv
+    npm_config_store_dir: /cache/pnpm
+
+services:
+  oracle-ampere:
+    <<: *common
+    image: battuta-dev-oracle-ampere
+    build:
+      context: .
+      dockerfile: OracleAmpere.Dockerfile
+      args:
+        NODE_VERSION: ${NODE_VERSION:?run through dev-release.sh}
+        PNPM_VERSION: ${PNPM_VERSION:?run through dev-release.sh}
+  raspberry-pi:
+    <<: *common
+    image: battuta-dev-raspberry-pi
+    build:
+      context: .
+      dockerfile: RaspberryPi.Dockerfile
+      args:
+        NODE_VERSION: ${NODE_VERSION:?run through dev-release.sh}
+        PNPM_VERSION: ${PNPM_VERSION:?run through dev-release.sh}
+
+volumes:
+  assets:
+  uv-cache:
+  pnpm-store:

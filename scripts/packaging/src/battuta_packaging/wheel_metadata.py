@@ -3,6 +3,7 @@
 from email import message_from_bytes
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -144,7 +145,8 @@ def build_wheels(source: Path, output: Path, *, tag: str, tool_version: str) -> 
         raise click.ClickException("Release tag and tool version must match")
     if sys.version_info[:2] != (3, 12):
         raise click.ClickException("Build release wheels using managed Python 3.12")
-    release_url = f"{REPO_URL}/releases/download/{tag}"
+    # Development containers point internal pins at their local assets instead of an unpublished release.
+    release_url = os.environ.get("BATTUTA_RELEASE_URL") or f"{REPO_URL}/releases/download/{tag}"
     requirements_by_project = {}
     for name, relative in PROJECTS.items():
         project = source / relative
