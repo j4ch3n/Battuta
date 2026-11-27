@@ -5,6 +5,9 @@ description = "Battuta project checkouts, context indexes, and durable memory"
 requires-python = ">=3.12"
 dependencies = ["click>=8.1,<9", "pydantic>=2,<3", "PyYAML>=6,<7", "Jinja2>=3.1,<4", "gql[httpx]>=4.4,<5"]
 
+[dependency-groups]
+dev = ["pytest>=8,<10"]
+
 [project.scripts]
 battuta-project = "battuta_project.cli:main"
 
@@ -20,6 +23,12 @@ source = "vcs"
 
 [tool.hatch.version.raw-options]
 root = ".."
+
+[tool.pytest.ini_options]
+addopts = "-p no:cacheprovider --import-mode=importlib"
+testpaths = ["tests"]
+pythonpath = ["tests"]
+markers = ["integration: crosses packages or processes; lives in tests/integration/"]
 
 [tool.pyright]
 venvPath = "."

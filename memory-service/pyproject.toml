@@ -18,6 +18,9 @@ dependencies = [
   "uvicorn>=0.35,<1",
 ]
 
+[dependency-groups]
+dev = ["pytest>=8,<10"]
+
 [project.scripts]
 battuta-memory = "battuta_memory.cli:main"
 
@@ -41,6 +44,12 @@ root = ".."
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.pytest.ini_options]
+addopts = "-p no:cacheprovider --import-mode=importlib"
+testpaths = ["tests"]
+pythonpath = ["tests"]
+markers = ["integration: crosses packages or processes; lives in tests/integration/"]
 
 [tool.pyright]
 venvPath = "."

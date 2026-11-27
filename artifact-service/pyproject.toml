@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["httpx2"]
+dev = ["httpx2", "pytest>=8,<10"]
 
 [tool.uv.sources]
 battuta-project = { path = "../project-context-cli" }
@@ -38,6 +38,12 @@ source = "vcs"
 
 [tool.hatch.version.raw-options]
 root = ".."
+
+[tool.pytest.ini_options]
+addopts = "-p no:cacheprovider --import-mode=importlib"
+testpaths = ["tests"]
+pythonpath = ["tests"]
+markers = ["integration: crosses packages or processes; lives in tests/integration/"]
 
 [tool.pyright]
 venvPath = "."

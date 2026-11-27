@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readdirSync, realpathSync } from "node:fs";
+import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../..");
@@ -15,19 +15,7 @@ function run(command, args) {
 
 function pythonTests(directory, project) {
   const prefix = ["run", "--project", resolve(root, project), "--locked", "python"];
-  const tests = resolve(root, directory);
-  run(
-    "uv",
-    project.startsWith("scripts/") || project === "speech-service" || project === "doc-service"
-      ? [...prefix, "-m", "pytest", tests, "-q"]
-      : [...prefix, "-m", "unittest", "discover", "-s", tests, "-v"],
-  );
-  // unittest discovery excludes dotted module names; integration files are executable suites.
-  for (const file of readdirSync(tests)
-    .filter((name) => name.endsWith(".it.py"))
-    .sort()) {
-    run("uv", [...prefix, resolve(tests, file)]);
-  }
+  run("uv", [...prefix, "-m", "pytest", resolve(root, directory), "-q"]);
 }
 const groups = {
   scripts: ["scripts/bot_setup", "scripts/packaging"],

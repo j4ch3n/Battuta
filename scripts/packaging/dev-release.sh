@@ -17,5 +17,5 @@ for platform in "${platforms[@]}"; do
   "${compose[@]}" run --rm "$platform" bash /source/scripts/packaging/release-build.sh "$platform" "$tag" "$tool_version"
   "${compose[@]}" run --rm -e BATTUTA_RELEASE_ASSETS=/assets -e BATTUTA_RELEASE_TAG="$tag" \
     -e BATTUTA_RELEASE_PLATFORM="$platform" "$platform" \
-    uv run --no-project --python 3.12 python /source/scripts/packaging/tests/release_install.it.py
+    uv run --no-project --python 3.12 --with "pytest>=8,<10" python -m pytest /source/scripts/packaging/tests/integration/test_release_install.py -q
 done
