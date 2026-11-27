@@ -18,13 +18,13 @@ match the `battuta-project` catalog, ignoring case and spacing.
 
 ## CoS tools (`/mcp` only)
 
-| Tool                  | `data`                                                                                                            |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `memory_profile`      | `{status: "ok", body}` (the global overview) or `{status: "not_written"}`                                         |
-| `memory_dream_start`  | `{status: "started"}` or `{status: "already_running"}`                                                            |
-| `memory_dream_status` | `{status: idle \| running \| succeeded \| failed, step, started_at, finished_at, last_success_at, error, report}` |
-| `memory_health`       | `{ready, projects}` (catalog size)                                                                                |
-| `memory_forget`       | `{results: [{slug, result: forgotten \| superseded \| no-op, invalid_at, successor?}]}` (see below)               |
+| Tool                  | `data`                                                                                                                 |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `memory_profile`      | `{status: "ok", body}` (the global overview) or `{status: "not_written"}`                                              |
+| `memory_dream_start`  | `{status: "started"}` or `{status: "already_running"}`                                                                 |
+| `memory_dream_status` | `{status: idle \| running \| succeeded \| failed, step, started_at, finished_at, last_success_at, error, report}`      |
+| `memory_health`       | `{ready, projects}` (catalog size)                                                                                     |
+| `memory_forget`       | `{results: [{slug, result: forgotten \| superseded \| no-op, invalid_at, successor?}], message, warning?}` (see below) |
 
 ### `memory_forget`
 
@@ -35,7 +35,9 @@ entry, but historical reads still find it.
 
 Arguments:
 
-- `entries`: 1 to 25 items `{slug, successor?}`, both non-empty strings.
+- `entries`: at least one item `{slug, successor?}`, both non-empty strings.
+  Keep calls to 25 entries or fewer; a larger call still runs and adds a
+  `warning` to relay to the owner.
   - Without `successor`, the entry is forgotten (`result: "forgotten"`).
   - With `successor`, the entry is superseded by that active memory
     (`result: "superseded"`, `superseded_by` set).
@@ -45,12 +47,13 @@ Arguments:
 
 Each result has `invalid_at`, the ISO time the entry stopped being valid. An
 entry that was already invalid returns `no-op` with its existing `invalid_at`
-and is not changed.
+and is not changed. A successful call also returns `message`, a short
+summary of what changed to relay to the owner.
 
 The whole call is validated before anything is written. It fails with
 `invalid_request` and no writes when:
 
-- `entries` is not a list of 1 to 25 `{slug, successor?}` items, or an item
+- `entries` is not a non-empty list of `{slug, successor?}` items, or an item
   has an empty value or extra keys;
 - `reason` or `owner_confirmation` is missing or blank;
 - a slug is repeated, a successor equals its own slug, or a successor is also

@@ -7,7 +7,7 @@ from agent_memory.core.ledger import VERDICT_ACCEPTED, Decision, DecisionLedger
 
 from .dream import DreamState
 
-MAX_FORGET = 25
+SOFT_MAX_FORGET = 25  # larger batches still run; the reply carries a warning
 
 
 def _text(value) -> str | None:
@@ -16,8 +16,8 @@ def _text(value) -> str | None:
 
 def _validate(store, arguments: dict) -> tuple[list[dict], str, str]:
     entries = arguments.get("entries")
-    if not isinstance(entries, list) or not 1 <= len(entries) <= MAX_FORGET:
-        raise ValueError(f"entries must be a list of 1 to {MAX_FORGET} items")
+    if not isinstance(entries, list) or not entries:
+        raise ValueError("entries must be a non-empty list")
     plan = []
     for index, item in enumerate(entries):
         if not isinstance(item, dict) or set(item) - {"slug", "successor"} or _text(item.get("slug")) is None \
@@ -53,9 +53,22 @@ def _validate(store, arguments: dict) -> tuple[list[dict], str, str]:
     return plan, reason, confirmation
 
 
+def _summary(results: list[dict]) -> str:
+    counts = {action: sum(result["result"] == action for result in results) for action in ("forgotten", "superseded", "no-op")}
+    changed = counts["forgotten"] + counts["superseded"]
+    message = f"Done: {changed} {'memory' if changed == 1 else 'memories'} marked obsolete " \
+              f"({counts['forgotten']} forgotten, {counts['superseded']} superseded)."
+    if counts["no-op"]:
+        message += f" {counts['no-op']} already obsolete, left unchanged."
+    return message
+
+
 def forget(store, arguments: dict) -> dict:
     plan, reason, confirmation = _validate(store, arguments)
     ledger, results, applied = DecisionLedger(store.layout), [], []
+    extra = {}
+    if len(plan) > SOFT_MAX_FORGET:
+        extra["warning"] = f"{len(plan)} entries exceeds the recommended {SOFT_MAX_FORGET} per call; please double-check the owner meant all of them"
     for index, entry in enumerate(plan):
         record, slug, successor = entry["record"], entry["slug"], entry["successor"]
         if not record.is_active():
@@ -85,5 +98,5 @@ def forget(store, arguments: dict) -> dict:
             message = f"{slug} was {action} but its audit record is MISSING ({type(error).__name__}); forget stopped"
             result.update({"audit_missing": True, "error": message})
             return {"results": results, "applied": applied, "audit_missing": [slug],
-                    "not_processed": [later["slug"] for later in plan[index + 1:]], "error": message}
-    return {"results": results}
+                    "not_processed": [later["slug"] for later in plan[index + 1:]], "error": message, **extra}
+    return {"results": results, "message": _summary(results), **extra}

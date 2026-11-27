@@ -7,7 +7,7 @@ from agent_memory.core.ledger import DecisionLedger
 from agent_memory.core.store import Store
 
 from battuta_memory.dream import DreamState
-from battuta_memory.forget import forget
+from battuta_memory.forget import SOFT_MAX_FORGET, forget
 from battuta_memory.reads import Reads
 from helpers import entity, make_store
 
@@ -57,13 +57,16 @@ class ForgetTests(unittest.TestCase):
         self.assertEqual(result["invalid_at"], record.invalid_at)
         self.assertTrue(self.store.find(new).is_active())
 
-    def test_batch_limit(self):
-        slugs = [self.add(f"contact-{index}") for index in range(26)]
-        self.assert_rejected_without_writes({"entries": [{"slug": slug} for slug in slugs], **CONFIRM}, "1 to 25")
-        self.assert_rejected_without_writes({"entries": [], **CONFIRM}, "1 to 25")
-        results = self.call([{"slug": slug} for slug in slugs[:25]])["results"]
-        self.assertEqual({result["result"] for result in results}, {"forgotten"})
-        self.assertTrue(self.store.find(slugs[25]).is_active())
+    def test_batch_soft_cap(self):
+        self.assert_rejected_without_writes({"entries": [], **CONFIRM}, "non-empty")
+        slugs = [self.add(f"contact-{index}") for index in range(SOFT_MAX_FORGET + 1)]
+        within = self.call([{"slug": slug} for slug in slugs[:SOFT_MAX_FORGET]])
+        self.assertNotIn("warning", within)
+        self.assertIn(str(SOFT_MAX_FORGET), within["message"])
+        over = self.call([{"slug": slug} for slug in slugs])
+        self.assertIn("warning", over)
+        self.assertEqual([result["result"] for result in over["results"]], ["no-op"] * SOFT_MAX_FORGET + ["forgotten"])
+        self.assertFalse(self.store.find(slugs[-1]).is_active())
 
     def test_reason_and_confirmation_required(self):
         slug = self.add("acme-ltd")
