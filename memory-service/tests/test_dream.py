@@ -71,6 +71,7 @@ class DreamTests(unittest.TestCase):
         self.assertIn("Set fields.project to one of: battuta, global, mocktest", distiller.prompts[0])
         self.assertNotIn("- overview (", distiller.prompts[0])
         self.assertEqual(sorted(report["overviews"]), ["global", "mocktest"])
+        self.assertEqual(report["housekeeping"], {"purged": [], "dangling_links": []})
         self.assertIn("CEO of Fiscum", Reads(self.store).profile()["body"])
         self.assertEqual(Watermark(self.store.layout).read("cos-2026-11-26").backlog(), 0)
         self.assertEqual(self.state.read()["status"], "succeeded")

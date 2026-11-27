@@ -4,7 +4,8 @@ Battuta's long-term memory is one [agent-memory](https://github.com/tigerless-la
 store served by `battuta-memory`. The store is a folder of markdown files and a
 rebuildable index. CoS reads it, triggers the dream and, with the owner's
 confirmation, can forget entries through `memory_forget`. A forget ends an
-entry's validity, keeps the file and is audited in the decisions ledger. All
+entry's validity, keeps the file and is audited in the decisions ledger; the
+dream purges the file 30 days later. All
 model work happens in the dream, which runs Claude Code.
 
 ## Storage
@@ -57,15 +58,16 @@ The scheduler asks CoS to call `memory_dream` at 05:30. The tool:
    the server dedupes by entry id;
 3. calls `memory_dream_start` and polls `memory_dream_status` until the worker ends.
 
-The worker (`battuta-memory dream run`, a detached process) runs four steps,
+The worker (`battuta-memory dream run`, a detached process) runs five steps,
 recorded in `battuta-dream.json` as `step`:
 
-| Step          | Work                                                                                                                       |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `catalog`     | Refresh the project catalog from `battuta-project list --json`                                                             |
-| `distill`     | For each archive day past its watermark, Claude Code proposes memories; the store validates and writes them                |
-| `consolidate` | The library's review merges, supersedes, or reweights memories; overview targets and cross-project proposals are dropped   |
-| `overview`    | For each project whose memories changed (and `global`), Claude Code writes a new overview that supersedes the previous one |
+| Step           | Work                                                                                                                       |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `catalog`      | Refresh the project catalog from `battuta-project list --json`                                                             |
+| `distill`      | For each archive day past its watermark, Claude Code proposes memories; the store validates and writes them                |
+| `consolidate`  | The library's review merges, supersedes, or reweights memories; overview targets and cross-project proposals are dropped   |
+| `overview`     | For each project whose memories changed (and `global`), Claude Code writes a new overview that supersedes the previous one |
+| `housekeeping` | Delete memories retired more than 30 days ago, their index and embedding rows, and folders left empty; no model call       |
 
 Only one dream runs at a time; a second start reports `already_running`. A crashed
 worker shows as `failed` on the next status read. A failed dream leaves

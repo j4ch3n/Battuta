@@ -1,4 +1,4 @@
-"""The nightly dream: distill archived days, consolidate, refresh overviews. Runs in its own process."""
+"""The nightly dream: distill archived days, consolidate, refresh overviews, purge long-retired memories. Runs in its own process."""
 import datetime as dt
 import json
 import os
@@ -11,6 +11,7 @@ from agent_memory.core import sessions
 from agent_memory.core.distill import distill
 from agent_memory.core.watermark import Watermark
 
+from .housekeeping import purge_retired
 from .manage import BattutaManage
 from .overview import refresh_overviews
 from .store import write_catalog
@@ -113,6 +114,8 @@ def run_dream(store, state: DreamState, *, write_reasoner, manage_reasoner, ask,
                                  "open_proposals": len(dream.proposals), "report": dream.path}
         state.step("overview")
         report["overviews"] = refresh_overviews(store, ask, today or dt.date.today().isoformat())
+        state.step("housekeeping")
+        report["housekeeping"] = purge_retired(store)
     except Exception as error:
         report["failed_step"] = state._load().get("step")
         state.finish(False, f"{type(error).__name__}: {error}"[:500], report)
