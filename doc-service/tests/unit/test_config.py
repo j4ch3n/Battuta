@@ -17,7 +17,7 @@ def test_settings_default_locations_and_env_overrides():
     assert [str(p).endswith(".battuta/projects") for p in s.input_roots] == [True]
 
 
-@pytest.mark.parametrize("value", ["0", "abc"])
+@pytest.mark.parametrize("value", ["0", "abc"], ids=["zero", "non-numeric"])
 def test_settings_reject_non_positive(value):
     with pytest.raises(DocError) as e:
         Settings.from_env({"BATTUTA_DOC_MAX_QUEUE": value})
@@ -37,7 +37,7 @@ def test_resolve_source_accepts_file_in_root(tmp_path):
     ("directory", "invalid_source"),
     ("symlink_out", "path_not_allowed"),
     ("big", "too_large"),
-])
+], ids=["relative", "missing", "directory", "symlink-outside-root", "too-large"])
 def test_resolve_source_rejects(tmp_path, case, code):
     s = make_settings(tmp_path, BATTUTA_DOC_MAX_BYTES="10")
     root = tmp_path / "root"

@@ -4,7 +4,7 @@ import json
 import socket
 
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.streamable_http import streamable_http_client
 import pytest
 import uvicorn
 
@@ -97,13 +97,26 @@ def test_doc_job_reports_progress_and_final_payload_matches_convert(env):
     ("doc_job", {"doc_id": "b" * 16}, "not_found"),
     ("doc_delete", {}, "invalid_option"),
     ("doc_delete", {"doc_id": "a", "older_than_days": 1}, "invalid_option"),
-])
+], ids=["convert-no-wait", "convert-bad-ocr", "job-unknown", "delete-no-target", "delete-conflicting-target"])
 def test_dispatch_raises_doc_errors_with_code(env, name, args, code):
     settings, jobs, models, src = env
     args = {k: (src if v == "SRC" else v) for k, v in args.items()}
     with pytest.raises(DocError) as e:
         asyncio.run(dispatch(name, args, settings=settings, jobs=jobs, models=models))
     assert e.value.code == code
+
+
+HEALTH = b"GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
+
+
+async def raw_request(port, request):
+    reader, writer = await asyncio.open_connection("127.0.0.1", port)
+    try:
+        writer.write(request)
+        return await reader.read()
+    finally:
+        writer.close()
+        await writer.wait_closed()
 
 
 def serve(env, body):
@@ -132,7 +145,7 @@ def test_mcp_roundtrip_errors_progress_prompts_and_health(env):
     seen = []
 
     async def body(url, port):
-        async with streamablehttp_client(url + "/mcp") as (r, w, _):
+        async with streamable_http_client(url + "/mcp") as (r, w, _):
             async with ClientSession(r, w) as s:
                 caps = (await s.initialize()).capabilities
                 assert caps.prompts is None
@@ -146,13 +159,9 @@ def test_mcp_roundtrip_errors_progress_prompts_and_health(env):
                 env[1].error = DocError("busy", "full", retry_after_seconds=60)
                 bad = await s.call_tool("doc_convert", {"source": env[3]})
                 assert bad.isError and json.loads(bad.content[0].text) == {"code": "busy", "message": "full", "retry_after_seconds": 60}
-        reader, writer = await asyncio.open_connection("127.0.0.1", port)
-        writer.write(b"GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
-        assert b"200" in (await reader.read())[:20]
+        assert b"200" in (await raw_request(port, HEALTH))[:20]
         env[2].ready = False
-        reader, writer = await asyncio.open_connection("127.0.0.1", port)
-        writer.write(b"GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
-        data = await reader.read()
+        data = await raw_request(port, HEALTH)
         assert b"503" in data[:20] and b"warming_up" in data
 
     serve(env, body)
@@ -160,9 +169,7 @@ def test_mcp_roundtrip_errors_progress_prompts_and_health(env):
 
 def test_rejects_foreign_host_header(env):
     async def body(url, port):
-        reader, writer = await asyncio.open_connection("127.0.0.1", port)
-        writer.write(b"POST /mcp HTTP/1.1\r\nHost: evil.example\r\nContent-Type: application/json\r\nAccept: application/json, text/event-stream\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}")
-        status_line = (await reader.read())[:20]
+        status_line = (await raw_request(port, b"POST /mcp HTTP/1.1\r\nHost: evil.example\r\nContent-Type: application/json\r\nAccept: application/json, text/event-stream\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}"))[:20]
         assert b" 421" in status_line or b" 403" in status_line or b" 400" in status_line
 
     serve(env, body)

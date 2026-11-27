@@ -4,12 +4,13 @@ from battuta_doc.config import DocError
 from battuta_doc.options import ConvertOptions, make_doc_id, parse_languages, parse_pages
 
 
-@pytest.mark.parametrize("spec,expected", [("1-3,9", (1, 2, 3, 9)), ("2,1", (1, 2))])
+@pytest.mark.parametrize("spec,expected", [("1-3,9", (1, 2, 3, 9)), ("2,1", (1, 2))],
+                         ids=["range-and-single", "sorted"])
 def test_parse_pages(spec, expected):
     assert parse_pages(spec) == expected
 
 
-@pytest.mark.parametrize("spec", ["3-1", "0", "a"])
+@pytest.mark.parametrize("spec", ["3-1", "0", "a"], ids=["reversed-range", "zero", "non-numeric"])
 def test_parse_pages_invalid(spec):
     with pytest.raises(DocError) as e:
         parse_pages(spec)
@@ -18,7 +19,7 @@ def test_parse_pages_invalid(spec):
 
 @pytest.mark.parametrize("value,expected", [
     ("en, de", ("en", "de")), (["en", " "], ("en",)), (None, ()),
-])
+], ids=["string", "list", "none"])
 def test_parse_languages(value, expected):
     assert parse_languages(value) == expected
 
@@ -28,7 +29,7 @@ def test_defaults():
     assert (o.ocr, o.tables, o.figures, o.charts, o.formulas, o.pages) == ("auto", "accurate", "extract", True, False, None)
 
 
-@pytest.mark.parametrize("field,value", [("ocr", "x")])
+@pytest.mark.parametrize("field,value", [("ocr", "x")], ids=["ocr"])
 def test_options_reject_unknown_enum(field, value):
     with pytest.raises(DocError) as e:
         ConvertOptions.from_args(**{field: value})

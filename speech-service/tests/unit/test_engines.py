@@ -15,6 +15,7 @@ from battuta_speech import engines
         (55, [(0, 30 * 16000), (25 * 16000, 55 * 16000)]),
         (300, [(s * 16000, (s + 30) * 16000) for s in [*range(0, 270, 25), 270]]),
     ],
+    ids=["empty", "single-chunk", "two-chunks", "many-chunks"],
 )
 def test_chunks_cover_audio_with_overlap(seconds, expected):
     assert engines.chunk_bounds(seconds * 16000) == expected

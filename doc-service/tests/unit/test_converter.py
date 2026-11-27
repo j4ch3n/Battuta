@@ -22,7 +22,7 @@ class FakeOcr:
     ({"ocr": "off", "tables": "off", "charts": False, "figures": "off"}, dict(do_ocr=False, do_table_structure=False, charts=False, images=False, describe=False)),
     ({"ocr": "force", "tables": "fast", "formulas": True, "figures": "describe"},
      dict(do_ocr=True, force=True, mode="fast", formulas=True, describe=True, images=True)),
-])
+], ids=["defaults", "features-off", "force-fast-describe"])
 def test_pipeline_options_mapping(kw, expect):
     p = build_pipeline_options(opts(**kw), None, ocr_factory=lambda kind, lang: FakeOcr())
     got = {"do_ocr": p.do_ocr, "do_table_structure": p.do_table_structure, "charts": p.do_chart_extraction,
@@ -65,13 +65,6 @@ def run(conv, **kw):
     return conv.convert(Path("a.pdf"), opts(**kw), lambda *a: None)
 
 
-def test_pages_beyond_document_are_invalid_option(tmp_path):
-    conv = make(tmp_path, converter_factory=lambda po: fake_converter())
-    with pytest.raises(DocError) as e:
-        run(conv, pages="2-9")
-    assert e.value.code == "invalid_option"
-
-
 def test_page_range_passed_and_noncontiguous_warns(tmp_path):
     calls = []
     conv = make(tmp_path, converter_factory=lambda po: fake_converter(calls=calls))
@@ -88,14 +81,15 @@ def test_page_limit_enforced_before_conversion(tmp_path):
     assert e.value.code == "too_many_pages"
 
 
-@pytest.mark.parametrize("error,code", [
-    (RuntimeError("File is password protected"), "encrypted"),
-    (RuntimeError("bad xref table"), "unreadable"),
-])
-def test_error_mapping(tmp_path, error, code):
+@pytest.mark.parametrize("error,kw,code", [
+    (RuntimeError("File is password protected"), {}, "encrypted"),
+    (RuntimeError("bad xref table"), {}, "unreadable"),
+    (None, {"pages": "2-9"}, "invalid_option"),
+], ids=["encrypted", "unreadable", "pages-beyond-document"])
+def test_error_mapping(tmp_path, error, kw, code):
     conv = make(tmp_path, converter_factory=lambda po: fake_converter(raises=error))
     with pytest.raises(DocError) as e:
-        run(conv)
+        run(conv, **kw)
     assert e.value.code == code
 
 
@@ -103,7 +97,7 @@ def test_error_mapping(tmp_path, error, code):
     (ConversionStatus.SUCCESS, False, None),
     (ConversionStatus.PARTIAL_SUCCESS, True, None),
     (ConversionStatus.FAILURE, False, "conversion_failed"),
-])
+], ids=["success", "partial-success", "failure"])
 def test_conversion_status_mapping(tmp_path, status, warns, code):
     err = SimpleNamespace(error_message="page 2 failed")
     conv = make(tmp_path, converter_factory=lambda po: fake_converter(status=status, errors=[err]))

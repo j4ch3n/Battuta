@@ -2,7 +2,7 @@ import asyncio
 import socket
 
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.streamable_http import streamable_http_client
 import uvicorn
 
 from battuta_speech.server import create_mcp_app, dispatch
@@ -56,7 +56,7 @@ def test_two_mcp_clients_share_engine():
                         raise AssertionError("server stopped before startup")
                     await asyncio.sleep(0.01)
             url = f"http://127.0.0.1:{port}/mcp"
-            async with streamablehttp_client(url) as (a_read, a_write, _), streamablehttp_client(url) as (b_read, b_write, _):
+            async with streamable_http_client(url) as (a_read, a_write, _), streamable_http_client(url) as (b_read, b_write, _):
                 async with ClientSession(a_read, a_write) as a, ClientSession(b_read, b_write) as b:
                     await asyncio.gather(a.initialize(), b.initialize())
                     tools = await a.list_tools()

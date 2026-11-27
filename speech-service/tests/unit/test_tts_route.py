@@ -17,7 +17,8 @@ def test_tts_route_returns_ogg_bytes():
     assert response.content == b"ogg:hello"
 
 
-@pytest.mark.parametrize("body", [b"", b"   ", b"\xff", b"x" * 4001])
+@pytest.mark.parametrize("body", [b"", b"   ", b"\xff", b"x" * 4001],
+                         ids=["empty", "blank", "invalid-utf8", "too-long"])
 def test_tts_route_rejects_invalid_text(body):
     with TestClient(create_mcp_app(lambda: Engine())) as client:
         response = client.post("/tts", content=body)

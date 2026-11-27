@@ -91,7 +91,8 @@ def test_table_caption_and_header_row(tmp_path):
     assert "1x2" in index and "header: Name, Qty" in index
 
 
-@pytest.mark.parametrize("name", ["a\nb\n## injected", "../../etc/passwd", "résumé 文档.pdf"])
+@pytest.mark.parametrize("name", ["a\nb\n## injected", "../../etc/passwd", "résumé 文档.pdf"],
+                         ids=["newline-heading-injection", "path-traversal", "unicode"])
 def test_hostile_source_name(tmp_path, name):
     out = tmp_path / "out"
     summary = write_result(load("lorem_ipsum.docx.json"), out, source_name=name, options=OPTS)

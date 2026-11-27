@@ -27,4 +27,5 @@ packages = ["src/battuta_doc"]
 addopts = "-p no:cacheprovider --import-mode=importlib"
 testpaths = ["tests"]
 pythonpath = ["tests"]
+filterwarnings = ["error"]
 markers = ["integration: crosses packages or processes; lives in tests/integration/"]

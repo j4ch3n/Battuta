@@ -48,27 +48,28 @@ def test_page_image_renders_once_and_reuses_file(mgr, tmp_path):
     assert first.name == "p002.png" and first.parent.name == "pages" and mgr.page_image(doc_id, 2).stat().st_mtime_ns == stamp
 
 
-@pytest.mark.parametrize("page,scale,message", [(0, 1.5, "page"), (3, 1.5, "available pages: 1-2"), (1, 4, "scale")])
-def test_page_image_validation(mgr, tmp_path, page, scale, message):
-    make_pdf(tmp_path / "a.pdf")
-    doc_id = convert(mgr, tmp_path / "a.pdf").doc_id
+@pytest.mark.parametrize("suffix,page,scale,code,message", [
+    ("pdf", 0, 1.5, "invalid_option", "page"),
+    ("pdf", 3, 1.5, "invalid_option", "available pages: 1-2"),
+    ("pdf", 1, 4, "invalid_option", "scale"),
+    ("docx", 1, 1.5, "unsupported_format", ""),
+], ids=["page-zero", "page-beyond-document", "scale-too-large", "non-pdf-source"])
+def test_page_image_validation(mgr, tmp_path, suffix, page, scale, code, message):
+    source = tmp_path / f"a.{suffix}"
+    if suffix == "pdf":
+        make_pdf(source)
+    else:
+        source.write_bytes(b"docx")
+    doc_id = convert(mgr, source).doc_id
     with pytest.raises(DocError) as e:
         mgr.page_image(doc_id, page, scale)
-    assert e.value.code == "invalid_option" and message in e.value.message
+    assert e.value.code == code and message in e.value.message
 
 
 def test_page_image_unknown_doc(mgr):
     with pytest.raises(DocError) as e:
         mgr.page_image("f" * 16, 1)
     assert e.value.code == "not_found"
-
-
-def test_page_image_rejects_non_pdf_source(mgr, tmp_path):
-    (tmp_path / "a.docx").write_bytes(b"docx")
-    doc_id = convert(mgr, tmp_path / "a.docx").doc_id
-    with pytest.raises(DocError) as e:
-        mgr.page_image(doc_id, 1)
-    assert e.value.code == "unsupported_format"
 
 
 def run(mgr, name, args):

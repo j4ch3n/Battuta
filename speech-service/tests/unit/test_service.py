@@ -19,13 +19,14 @@ def test_round_trip():
     assert service.synthesize("hello") == b"hello"
 
 
-@pytest.mark.parametrize("data", ["!", "", "Y" * (16 * 1024 * 1024)])
+@pytest.mark.parametrize("data", ["!", "", "Y" * (16 * 1024 * 1024)],
+                         ids=["bad-base64", "empty", "too-large"])
 def test_rejects_invalid_audio(data):
     with pytest.raises(ValueError):
         SpeechService(Engine()).transcribe(data)
 
 
-@pytest.mark.parametrize("text", ["", " " * 5, "x" * 4001])
+@pytest.mark.parametrize("text", ["", " " * 5, "x" * 4001], ids=["empty", "blank", "too-long"])
 def test_rejects_invalid_text(text):
     with pytest.raises(ValueError):
         SpeechService(Engine()).synthesize(text)

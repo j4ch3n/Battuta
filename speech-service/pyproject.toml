@@ -28,4 +28,5 @@ packages = ["src/battuta_speech"]
 addopts = "-p no:cacheprovider --import-mode=importlib"
 testpaths = ["tests"]
 pythonpath = ["tests"]
+filterwarnings = ["error", "ignore:Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.:starlette.exceptions.StarletteDeprecationWarning"]
 markers = ["integration: crosses packages or processes; lives in tests/integration/"]
