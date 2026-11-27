@@ -5,27 +5,25 @@ from pathlib import Path
 
 import pytest
 
-from battuta_artifacts.registry import Registry
-
 pytestmark = pytest.mark.integration
 
 
-def test_removal_preserves_project_files_and_unrelated_artifacts(run, env):
+def test_removal_preserves_project_files_and_unrelated_artifacts(run, cli, env, tmp_path):
     home = Path(env["HOME"])
     run("battuta-project", "init", "atlas")
     root = home / ".battuta/projects/atlas"
-    (root / ".draft").write_text("preserved")
-    db = Path(env["BATTUTA_ARTIFACT_DB"])
-    run("battuta-artifact", "setup")
-    store = Registry(db)
-    store.register(slug="atlas-report", title="Report", description="Report", source_root=str(root),
-                   entry_path=".draft", format="markdown", files={".draft": "text/markdown"}, status="published")
-    store.register(slug="other", title="Other", description="Other", source_root="/unrelated",
-                   entry_path="index.html", format="html", files={"index.html": "text/html"})
+    (root / "draft.md").write_text("preserved")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "other.md").write_text("# Other")
+    cli("add-file", "--type", "markdown", "--file", str(root / "draft.md"), "--slug", "atlas-report",
+        "--title", "Report", "--description", "Report")
+    cli("add-file", "--type", "markdown", "--file", str(elsewhere / "other.md"), "--slug", "other",
+        "--title", "Other", "--description", "Other")
 
     run("battuta-project", "remove", "atlas")
 
     assert not root.exists()
-    assert [item["slug"] for item in store.list()] == ["other"]
-    assert next((home / ".Trash").glob("atlas-*/atlas/.draft")).read_text() == "preserved"
+    assert [item["slug"] for item in cli("list")["artifacts"]] == ["other"]
+    assert next((home / ".Trash").glob("atlas-*/atlas/draft.md")).read_text() == "preserved"
     assert json.loads(run("battuta-project", "list", "--json"))["projects"] == []
