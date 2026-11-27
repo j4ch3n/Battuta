@@ -37,6 +37,13 @@ class Recorder:
     def __fspath__(self):
         self._use(" as a path")
 
+    def __bool__(self):
+        self._use(" as a bool")
+
+    def __eq__(self, other):
+        self._use(" compared")
+
+    __hash__ = object.__hash__
     __str__ = __iter__ = __fspath__
 
 def stub_missing(attribute):
