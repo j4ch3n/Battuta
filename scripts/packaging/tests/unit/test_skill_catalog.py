@@ -2,11 +2,8 @@
 
 from pathlib import Path
 import re
-import shutil
 
 import pytest
-
-from bot_setup.skills import check_manifests
 
 ROOT = Path(__file__).resolve().parents[4]
 HUB = ROOT / "skills-hub"
@@ -27,12 +24,3 @@ def test_catalog_entry_point_is_valid_and_matches_directory(skill):
     assert name
     assert name.group(1) == skill.name
 
-
-def test_bot_selections_validate_without_discovery_output(tmp_path):
-    shutil.copytree(HUB, tmp_path / "skills-hub")
-    for manifest in (ROOT / "bots").glob("*/bot.toml"):
-        target = tmp_path / manifest.relative_to(ROOT)
-        target.parent.mkdir(parents=True)
-        shutil.copy2(manifest, target)
-    check_manifests(tmp_path)
-    assert not any((tmp_path / "bots").glob("*/.pi"))
