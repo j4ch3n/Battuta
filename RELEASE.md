@@ -374,6 +374,7 @@ the owner confirms it.
 | Workers and numbered instances         | [Worker setup](docs/workers-setup.md)                                           |
 | Worker Claude Code delegation          | [Delegation setup](docs/delegation-setup.md)                                    |
 | Claude models for all bots             | [Claude DirectSDK setup](docs/claude-directsdk-setup.md)                        |
+| Antigravity Neon (CoS default)         | [Antigravity setup](docs/antigravity-setup.md)                                  |
 | CoS and worker browsers                | [Browser setup](docs/browser-setup.md)                                          |
 | Google CLI                             | [Google setup](docs/gogcli-setup.md)                                            |
 | Luma                                   | [Luma setup](docs/luma-setup.md)                                                |

@@ -128,12 +128,13 @@ Current initial defaults:
 
 | Role    | Model                               | Thinking |
 | ------- | ----------------------------------- | -------- |
-| CoS     | `claude-directsdk/claude-haiku-5-5` | medium   |
+| CoS     | `antigravity-acp/gemini-4-neon`     | medium   |
 | Manager | `claude-directsdk/claude-opus-5-5`  | medium   |
 | Worker  | `claude-directsdk/claude-haiku-5-5` | medium   |
 
-The `claude-directsdk` provider comes from the pinned `pi-claude-directsdk` package; see
-[Claude DirectSDK setup](claude-directsdk-setup.md).
+The `antigravity-acp` provider comes from the pinned `pi-agy-acp` package; see
+[Antigravity setup](antigravity-setup.md). The `claude-directsdk` provider comes from the
+pinned `pi-claude-directsdk` package; see [Claude DirectSDK setup](claude-directsdk-setup.md).
 
 Setup does not authenticate, check provider model availability or invoke a model;
 confirm each manifest model matches the operator's account.

@@ -1,6 +1,6 @@
 # Claude DirectSDK setup
 
-Every bot (CoS, Manager, Workers including Influencer) runs its default model through
+Manager and Workers (including Influencer) run their default model through
 `pi-claude-directsdk@1.0.2`, which uses the Claude Agent SDK and the host's Claude Code
 login instead of Pi's `anthropic` provider. Models use the `claude-directsdk/<model-id>`
 form in each manifest's `[defaults] model`. The package is installed by the normal bot
@@ -17,8 +17,8 @@ setup because it is listed in each manifest's `[packages] pi`.
 ## First launch: refresh the model catalog
 
 A fresh install has no `claude-directsdk` models until an interactive Pi session refreshes
-the catalog, and launchers pass `--model` on every start. Before the first launch of a bot
-(or a host's first bot), start Pi interactively with that bot's agent directory, open
+the catalog, and launchers pass `--model` on every start. Before the first launch of a
+Claude-default bot (or a host's first bot), start Pi interactively with that bot's agent directory, open
 `/model` and wait for "Model catalogs refreshed". Until then launch fails with
 `Model "claude-directsdk/<id>" not found`. The snapshot is kept in the agent directory.
 
