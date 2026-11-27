@@ -13,7 +13,6 @@ import pytest
 pytestmark = pytest.mark.integration
 
 
-
 class WheelResourceTests(unittest.TestCase):
     def test_installed_resources_generate_selected_styles_and_notices(self):
         package = Path(__file__).resolve().parents[2]

@@ -1,13 +1,15 @@
 import subprocess
-import unittest
 from pathlib import Path
 
+import pytest
 
-class BrowserClientTests(unittest.TestCase):
-    def test_grouping_refresh_focus_empty_state_and_failed_fetch(self):
-        script = Path(__file__).parents[2] / "src/battuta_artifacts/assets/catalog.js"
-        # Stub only browser boundaries; execute the shipped client unchanged.
-        javascript = r"""
+pytestmark = pytest.mark.integration
+
+
+def test_grouping_refresh_focus_empty_state_and_failed_fetch():
+    script = Path(__file__).parents[2] / "src/battuta_artifacts/assets/catalog.js"
+    # Stub only browser boundaries; execute the shipped client unchanged.
+    javascript = r"""
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
@@ -132,5 +134,5 @@ await event.change();
 assert.equal(document.activeElement,body.children[2].querySelector('summary'));
 hide();assert.equal(event.closed,true);
 """
-        result = subprocess.run(["node", "--input-type=module", "-e", javascript, str(script)], capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
+    result = subprocess.run(["node", "--input-type=module", "-e", javascript, str(script)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr

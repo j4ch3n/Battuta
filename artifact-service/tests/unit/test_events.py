@@ -1,62 +1,74 @@
 import asyncio
-import tempfile
-import unittest
-from pathlib import Path
 
+import pytest
+
+from battuta_artifacts.app import create_app
+from battuta_artifacts.events import CatalogEvents
 from battuta_artifacts.registry import Registry, migrate
 
 
-class EventTests(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tmp.cleanup)
-        self.path = Path(self.tmp.name).resolve() / "registry.sqlite3"
-        migrate(self.path)
-        self.registry = Registry(self.path)
+@pytest.fixture
+def path(tmp_path):
+    path = tmp_path.resolve() / "registry.sqlite3"
+    migrate(path)
+    return path
 
-    def register(self):
-        self.registry.register(slug="demo", title="Demo", description="Description", source_root="/source",
-                               entry_path="index.html", format="html", files={"index.html": "text/html"})
 
-    async def test_commits_from_other_connections_refresh_every_subscriber(self):
-        from battuta_artifacts.events import CatalogEvents
+@pytest.fixture
+def registry(path):
+    return Registry(path)
 
-        events = CatalogEvents(self.path, interval=0.01)
+
+def register(registry):
+    registry.register(slug="demo", title="Demo", description="Description", source_root="/source",
+                      entry_path="index.html", format="html", files={"index.html": "text/html"})
+
+
+def test_commits_from_other_connections_refresh_every_subscriber(path, registry):
+    async def scenario():
+        events = CatalogEvents(path, interval=0.01)
         await events.start()
-        self.addAsyncCleanup(events.stop)
         streams = [events.stream(), events.stream()]
-        for stream in streams:
-            self.addAsyncCleanup(stream.aclose)
-            self.assertEqual((await anext(stream))["event"], "catalog-changed")
-        for change in [self.register, lambda: self.registry.update_metadata("demo", title="Changed"),
-                       lambda: self.registry.deregister("demo")]:
-            change()
+        try:
             for stream in streams:
-                event = await asyncio.wait_for(anext(stream), timeout=2)
-                self.assertEqual(event, {"event": "catalog-changed", "data": "refresh"})
+                assert (await anext(stream))["event"] == "catalog-changed"
+            for change in [lambda: register(registry), lambda: registry.update_metadata("demo", title="Changed"),
+                           lambda: registry.deregister("demo")]:
+                change()
+                for stream in streams:
+                    event = await asyncio.wait_for(anext(stream), timeout=2)
+                    assert event == {"event": "catalog-changed", "data": "refresh"}
+        finally:
+            for stream in streams:
+                await stream.aclose()
+            await events.stop()
 
-    async def test_slow_client_changes_coalesce_and_close_removes_subscription(self):
-        from battuta_artifacts.events import CatalogEvents
+    asyncio.run(scenario())
 
-        events = CatalogEvents(self.path, interval=0.01)
+
+def test_slow_client_changes_coalesce_and_close_removes_subscription(path, registry):
+    async def scenario():
+        events = CatalogEvents(path, interval=0.01)
         await events.start()
         stream = events.stream()
         await anext(stream)
-        self.register()
+        register(registry)
         await asyncio.sleep(0.04)
-        self.registry.update_metadata("demo", title="Changed")
+        registry.update_metadata("demo", title="Changed")
         await asyncio.sleep(0.04)
-        self.assertEqual(len(events.subscribers), 1)
-        self.assertEqual(next(iter(events.subscribers)).qsize(), 1)
+        assert len(events.subscribers) == 1
+        assert next(iter(events.subscribers)).qsize() == 1
         await stream.aclose()
-        self.assertEqual(len(events.subscribers), 0)
+        assert len(events.subscribers) == 0
         await events.stop()
         await events.stop()
 
-    async def test_http_stream_sends_event_and_disconnects_cleanly(self):
-        from battuta_artifacts.app import create_app
+    asyncio.run(scenario())
 
-        app = create_app(self.path)
+
+def test_http_stream_sends_event_and_disconnects_cleanly(path, registry):
+    async def scenario():
+        app = create_app(path)
         received = asyncio.Queue()
         disconnect = asyncio.Event()
 
@@ -76,9 +88,11 @@ class EventTests(unittest.IsolatedAsyncioTestCase):
             task = asyncio.create_task(app(scope, receive, send))
             try:
                 body = await asyncio.wait_for(received.get(), timeout=2)
-                self.assertIn(b"data: refresh", body)
-                self.register()
+                assert b"data: refresh" in body
+                register(registry)
                 await asyncio.wait_for(received.get(), timeout=3)
             finally:
                 disconnect.set()
                 await asyncio.wait_for(task, timeout=2)
+
+    asyncio.run(scenario())

@@ -4,155 +4,148 @@ import re
 import sqlite3
 from unittest.mock import patch
 
+import pytest
 from click.testing import CliRunner
 
 from battuta_artifacts.bundles import load_bundle
 from battuta_artifacts.cli import main
-from fixtures import BundleFixture
 from battuta_artifacts.registry import ArtifactError, Registry
+from battuta_artifacts.vendors import select_vendors
 
 
-class BundleTests(BundleFixture):
-    def test_empty_vendor_selection_is_rejected_without_creating_a_draft(self):
-        result = self.init()
+@pytest.mark.parametrize("args", [(), ("--vendor", "unknown")], ids=["no-vendor", "unknown-vendor"])
+def test_invalid_vendor_selection_creates_no_draft(bundle, args):
+    result = bundle.init(*args)
 
-        self.assertNotEqual(result.exit_code, 0, result.output)
-        self.assertFalse((self.project / "artifacts/sizing").exists())
-        self.assertEqual(self.store.list(), [])
+    assert result.exit_code != 0, result.output
+    assert not bundle.directory.exists()
+    assert bundle.store.list() == []
 
-    def test_unknown_vendors_do_not_create_a_draft(self):
-        result = self.init("--vendor", "unknown")
 
-        self.assertNotEqual(result.exit_code, 0, result.output)
-        self.assertFalse((self.project / "artifacts/sizing").exists())
-        self.assertEqual(self.store.list(), [])
+def test_load_bundle_requires_at_least_one_vendor():
+    with pytest.raises(ArtifactError, match="vendor"):
+        load_bundle(())
 
-    def test_load_bundle_requires_at_least_one_vendor(self):
-        with self.assertRaisesRegex(ArtifactError, "vendor"):
-            load_bundle(())
 
-    def test_missing_starter_resources_fail_before_creating_a_draft(self):
-        with self.assertRaisesRegex(ArtifactError, "Starter is unavailable"):
-            load_bundle(("mermaid",), starter=self.home)
+def test_missing_starter_resources_fail_before_creating_a_draft(tmp_path):
+    with pytest.raises(ArtifactError, match="Starter is unavailable"):
+        load_bundle(("mermaid",), starter=tmp_path)
 
-    def test_each_selection_generates_only_its_resolved_extension_styles(self):
-        expected = {
-            "reveal": {"reveal"},
-            "chartjs": {"chartjs"},
-            "three": {"three"},
-            "mermaid": {"mermaid"},
-            "photoswipe": {"photoswipe"},
-            "katex": {"katex"},
-            "animejs": {"animejs"},
-            "live-diagram": {"mermaid", "live-diagram"},
-        }
 
-        for selection, names in expected.items():
-            with self.subTest(selection=selection):
-                bundle, _ = load_bundle((selection,))
-                self.assertEqual(
-                    {entry.path for entry in bundle.files if entry.path.startswith("vendor/") and entry.path.endswith(".css")},
-                    {f"vendor/{name}.css" for name in names},
-                )
+@pytest.mark.parametrize(
+    ("selection", "names"),
+    [
+        ("reveal", {"reveal"}),
+        ("chartjs", {"chartjs"}),
+        ("three", {"three"}),
+        ("mermaid", {"mermaid"}),
+        ("photoswipe", {"photoswipe"}),
+        ("katex", {"katex"}),
+        ("animejs", {"animejs"}),
+        ("live-diagram", {"mermaid", "live-diagram"}),
+    ],
+    ids=["reveal", "chartjs", "three", "mermaid", "photoswipe", "katex", "animejs", "live-diagram"],
+)
+def test_each_selection_generates_only_its_resolved_extension_styles(selection, names):
+    bundle, _ = load_bundle((selection,))
 
-    def test_symlinked_artifact_directory_is_not_followed(self):
-        outside = self.home / "outside"
-        outside.mkdir()
-        (self.project / "artifacts").symlink_to(outside, target_is_directory=True)
+    assert {entry.path for entry in bundle.files if entry.path.startswith("vendor/") and entry.path.endswith(".css")} == {
+        f"vendor/{name}.css" for name in names
+    }
 
-        result = self.init("--vendor", "mermaid")
 
-        self.assertNotEqual(result.exit_code, 0, result.output)
-        self.assertEqual(list(outside.iterdir()), [])
-        self.assertEqual(self.store.list(), [])
+def test_symlinked_artifact_directory_is_not_followed(bundle):
+    outside = bundle.home / "outside"
+    outside.mkdir()
+    (bundle.project / "artifacts").symlink_to(outside, target_is_directory=True)
 
-    def test_existing_destination_is_preserved(self):
-        destination = self.project / "artifacts/sizing"
-        destination.mkdir(parents=True)
-        marker = destination / "working.txt"
-        marker.write_text("keep this work")
+    result = bundle.init("--vendor", "mermaid")
 
-        result = self.init("--vendor", "mermaid")
+    assert result.exit_code != 0, result.output
+    assert list(outside.iterdir()) == []
+    assert bundle.store.list() == []
 
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertEqual(marker.read_text(), "keep this work")
-        self.assertEqual(self.store.list(), [])
 
-    def test_write_and_registration_failures_remove_only_incomplete_draft(self):
-        real_open = os.open
+def test_existing_destination_is_preserved(bundle):
+    bundle.directory.mkdir(parents=True)
+    marker = bundle.directory / "working.txt"
+    marker.write_text("keep this work")
 
-        def fail_style_write(path, flags, *args, **kwargs):
-            if path == "mermaid.css" and flags & os.O_WRONLY:
-                raise OSError("style write failed")
-            return real_open(path, flags, *args, **kwargs)
+    result = bundle.init("--vendor", "mermaid")
 
-        failures = (
-            patch("battuta_artifacts.bundles.os.open", side_effect=fail_style_write),
-            patch.object(Registry, "register", side_effect=sqlite3.OperationalError("registration failed")),
-        )
-        sibling = self.project / "artifacts/other.txt"
-        sibling.parent.mkdir()
-        sibling.write_text("keep")
-        for failure in failures:
-            with self.subTest(failure=failure), failure:
-                result = self.init("--vendor", "mermaid")
-                self.assertEqual(result.exit_code, 5, result.output)
-                self.assertFalse((self.project / "artifacts/sizing").exists())
-                self.assertEqual(self.store.list(), [])
-                self.assertEqual(sibling.read_text(), "keep")
+    assert result.exit_code != 0
+    assert marker.read_text() == "keep this work"
+    assert bundle.store.list() == []
 
-    def test_live_diagram_bundle_links_resolved_css_and_matching_import_maps(self):
-        result = self.init("--vendor", "live-diagram")
 
-        self.assertEqual(result.exit_code, 0, result.output)
-        payload = json.loads(result.output)
-        directory = self.project / "artifacts/sizing"
-        self.assertEqual(payload["artifact"]["status"], "draft")
-        self.assertIsNone(payload["artifact"]["template"])
-        self.assertEqual(
-            {entry["path"] for entry in payload["files"]},
-            {
-                "index.html",
-                "styles.css",
-                "index.js",
-                "vendor/importmap.json",
-                "vendor/mermaid.css",
-                "vendor/live-diagram.css",
-                "NOTICE.txt",
-            },
-        )
-        self.assertEqual([vendor["name"] for vendor in payload["vendors"]], ["mermaid", "live-diagram"])
-        self.assertFalse(payload["vendors"][0]["selected"])
-        self.assertTrue(payload["vendors"][1]["selected"])
-        self.assertEqual(payload["vendors"][0]["stylesheets"], ["vendor/mermaid.css"])
-        html = (directory / "index.html").read_text()
-        self.assertLess(html.index('href="styles.css"'), html.index('href="vendor/mermaid.css"'))
-        self.assertLess(html.index('href="vendor/mermaid.css"'), html.index('href="vendor/live-diagram.css"'))
-        inline_map = json.loads(re.search(r'<script type="importmap">(.*?)</script>', html, re.DOTALL).group(1))
-        self.assertEqual(inline_map, json.loads((directory / "vendor/importmap.json").read_text()))
-        self.assertFalse((directory / "USAGE.md").exists())
+def fail_style_write():
+    real_open = os.open
 
-    def test_human_output_identifies_available_imports_and_local_styles(self):
-        result = CliRunner().invoke(
-            main,
-            [
-                "init",
-                "sizing",
-                "--project",
-                "procurement",
-                "--title",
-                "Sizing",
-                "--description",
-                "Evidence",
-                "--vendor",
-                "live-diagram",
-            ],
-        )
+    def fail(path, flags, *args, **kwargs):
+        if path == "mermaid.css" and flags & os.O_WRONLY:
+            raise OSError("style write failed")
+        return real_open(path, flags, *args, **kwargs)
 
-        self.assertEqual(result.exit_code, 0, result.output)
-        self.assertIn("Configured vendors:", result.output)
-        self.assertIn("mermaid (required)", result.output)
-        self.assertIn("live-diagram (selected)", result.output)
-        self.assertIn("vendor/live-diagram.css", result.output)
-        self.assertIn(str(self.project / "artifacts/sizing"), result.output)
-        self.assertIn("Interactive flowchart", result.output)
+    return patch("battuta_artifacts.bundles.os.open", side_effect=fail)
+
+
+def fail_registration():
+    return patch.object(Registry, "register", side_effect=sqlite3.OperationalError("registration failed"))
+
+
+@pytest.mark.parametrize("failure", [fail_style_write, fail_registration], ids=["style-write", "registration"])
+def test_write_and_registration_failures_remove_only_incomplete_draft(bundle, failure):
+    sibling = bundle.project / "artifacts/other.txt"
+    sibling.parent.mkdir()
+    sibling.write_text("keep")
+
+    with failure():
+        result = bundle.init("--vendor", "mermaid")
+
+    assert result.exit_code == 5, result.output
+    assert not bundle.directory.exists()
+    assert bundle.store.list() == []
+    assert sibling.read_text() == "keep"
+
+
+def test_live_diagram_bundle_links_resolved_css_and_matching_import_maps(bundle):
+    result = bundle.init("--vendor", "live-diagram")
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["artifact"]["status"] == "draft"
+    assert payload["artifact"]["template"] is None
+    assert {entry["path"] for entry in payload["files"]} == {
+        "index.html",
+        "styles.css",
+        "index.js",
+        "vendor/importmap.json",
+        "vendor/mermaid.css",
+        "vendor/live-diagram.css",
+        "NOTICE.txt",
+    }
+    assert [vendor["name"] for vendor in payload["vendors"]] == ["mermaid", "live-diagram"]
+    assert not payload["vendors"][0]["selected"]
+    assert payload["vendors"][1]["selected"]
+    assert payload["vendors"][0]["stylesheets"] == ["vendor/mermaid.css"]
+    html = (bundle.directory / "index.html").read_text()
+    assert html.index('href="styles.css"') < html.index('href="vendor/mermaid.css"')
+    assert html.index('href="vendor/mermaid.css"') < html.index('href="vendor/live-diagram.css"')
+    inline_map = json.loads(re.search(r'<script type="importmap">(.*?)</script>', html, re.DOTALL).group(1))
+    assert inline_map == json.loads((bundle.directory / "vendor/importmap.json").read_text())
+    assert not (bundle.directory / "USAGE.md").exists()
+
+
+def test_human_output_identifies_available_imports_and_local_styles(bundle):
+    result = CliRunner().invoke(
+        main,
+        ["init", "sizing", "--project", "procurement", "--title", "Sizing", "--description", "Evidence",
+         "--vendor", "live-diagram"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "mermaid (required)" in result.output
+    assert "live-diagram (selected)" in result.output
+    assert "vendor/live-diagram.css" in result.output
+    assert str(bundle.directory) in result.output
+    assert select_vendors(("live-diagram",))[1].purpose in result.output

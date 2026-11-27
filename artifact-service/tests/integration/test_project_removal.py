@@ -14,7 +14,6 @@ from battuta_artifacts.registry import Registry, migrate
 pytestmark = pytest.mark.integration
 
 
-
 class ProjectRemovalIntegration(unittest.TestCase):
     def test_withdraws_artifacts_and_preserves_project_files(self):
         with tempfile.TemporaryDirectory() as tmp:

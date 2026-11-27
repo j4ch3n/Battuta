@@ -12,6 +12,10 @@ from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 
 class AcceptanceTests(unittest.TestCase):
     def test_cli_and_server_bundle_markdown_events_and_removal(self):

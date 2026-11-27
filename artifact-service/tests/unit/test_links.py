@@ -1,167 +1,177 @@
 import os
 import shutil
-import tempfile
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import click
+import pytest
 from fastapi.testclient import TestClient
 
 from battuta_artifacts import files
+from battuta_artifacts.app import create_app
 from battuta_artifacts.models import assemble_files
 from battuta_artifacts.registry import ArtifactError
-from fixtures import BundleFixture
 
 
-class LinkFixture(BundleFixture):
-    def setUp(self):
-        super().setUp()
-        self.assertEqual(self.init("--vendor", "mermaid").exit_code, 0)
-        self.bundle = self.project / "artifacts/sizing"
-        self.code = self.project / "code"
-        (self.code / "notes.txt").write_bytes(b"tracked")
-        self.outside = self.home / "outside.txt"
-        self.outside.write_bytes(b"secret")
-        self.link = self.bundle / "linked.txt"
+@pytest.fixture
+def link(bundle):
+    assert bundle.init("--vendor", "mermaid").exit_code == 0
+    (bundle.code / "notes.txt").write_bytes(b"tracked")
+    outside = bundle.home / "outside.txt"
+    outside.write_bytes(b"secret")
+    path = bundle.directory / "linked.txt"
 
-    def command(self, *args):
-        from battuta_artifacts.cli import main
-        from click.testing import CliRunner
-        with patch.dict(os.environ, {"BATTUTA_ARTIFACT_BASE_URL": "https://example.test/artifacts"}):
-            return CliRunner().invoke(main, [*args, "--json"])
+    def publish(name="linked.txt"):
+        return bundle.publish("--file", name)
 
-    def publish(self, path="linked.txt"):
-        return self.command("publish", "--project", "procurement", "--artifact", "sizing", "--file", path)
+    def get(name="linked.txt"):
+        return bundle.get(name)
 
-    def get(self, path="linked.txt"):
-        from battuta_artifacts.app import create_app
-        with TestClient(create_app(self.store.path)) as client:
-            return client.get("/artifacts/a/sizing/" + path)
+    def publish_valid_link():
+        path.symlink_to(bundle.code / "notes.txt")
+        result = publish()
+        assert result.exit_code == 0, result.output
+        assert get().content == b"tracked"
 
-    def publish_valid_link(self):
-        self.link.symlink_to(self.code / "notes.txt")
-        result = self.publish()
-        self.assertEqual(result.exit_code, 0, result.output)
-        self.assertEqual(self.get().content, b"tracked")
+    def repoint(target):
+        path.unlink()
+        path.symlink_to(target)
 
-    def repoint(self, target):
-        self.link.unlink()
-        self.link.symlink_to(target)
+    return SimpleNamespace(bundle=bundle, code=bundle.code, directory=bundle.directory, outside=outside, path=path,
+                           publish=publish, get=get, publish_valid_link=publish_valid_link, repoint=repoint)
 
 
-class AllowedLinkTests(LinkFixture):
-    def test_leaf_link_into_project_checkout_publishes_and_serves_target_bytes(self):
-        nested = self.code / "docs/guide.txt"
-        nested.parent.mkdir()
-        nested.write_bytes(b"guide")
-        self.link.symlink_to(os.path.relpath(nested, self.bundle))
-        (self.code / "hop").symlink_to("docs/guide.txt")
-        (self.bundle / "chained.txt").symlink_to(self.code / "hop")
+@pytest.mark.parametrize("name", ["linked.txt", "chained.txt"], ids=["relative-leaf-link", "chained-link"])
+def test_leaf_link_into_project_checkout_publishes_and_serves_target_bytes(link, name):
+    nested = link.code / "docs/guide.txt"
+    nested.parent.mkdir()
+    nested.write_bytes(b"guide")
+    link.path.symlink_to(os.path.relpath(nested, link.directory))
+    (link.code / "hop").symlink_to("docs/guide.txt")
+    (link.directory / "chained.txt").symlink_to(link.code / "hop")
 
-        for path, expected in (("linked.txt", b"guide"), ("chained.txt", b"guide")):
-            with self.subTest(path=path):
-                result = self.publish(path)
-                self.assertEqual(result.exit_code, 0, result.output)
-                response = self.get(path)
-                self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.content, expected)
+    result = link.publish(name)
 
-    def test_regular_bundle_files_are_unaffected(self):
-        (self.bundle / "plain.txt").write_bytes(b"plain")
-        self.assertEqual(self.publish("plain.txt").exit_code, 0)
-        self.assertEqual(self.get("plain.txt").content, b"plain")
+    assert result.exit_code == 0, result.output
+    response = link.get(name)
+    assert response.status_code == 200
+    assert response.content == b"guide"
 
 
-class RejectedLinkTests(LinkFixture):
-    def targets(self):
-        (self.code / "inside-link").symlink_to(self.outside)
-        (self.code / "folder").mkdir()
-        os.mkfifo(self.code / "pipe")
-        return {
-            "absolute outside": self.outside,
-            "relative outside": os.path.relpath(self.outside, self.bundle),
-            "chain leaving root": self.code / "inside-link",
-            "directory": self.code / "folder",
-            "checkout root": self.code,
-            "fifo inside root": self.code / "pipe",
-            "device": "/dev/null",
-            "dangling": self.code / "missing.txt",
-        }
-
-    def test_disallowed_targets_are_rejected_at_publish_and_serve(self):
-        self.publish_valid_link()
-        for name, target in self.targets().items():
-            with self.subTest(target=name):
-                self.repoint(target)
-                self.assertEqual(self.get().status_code, 404)
-                result = self.publish()
-                self.assertNotEqual(result.exit_code, 0, result.output)
-                self.assertIn("File is unavailable", result.output)
-
-    def test_hidden_symlink_target_is_rejected_at_serve_and_publish(self):
-        self.publish_valid_link()
-        hidden = self.code / ".git/config"
-        hidden.parent.mkdir()
-        hidden.write_bytes(b"TOKEN")
-        self.repoint(hidden)
-
-        response = self.get()
-        self.assertEqual(response.status_code, 404)
-        self.assertIn("Hidden file warning", response.text)
-        self.assertNotIn("TOKEN", response.text)
-        with self.assertRaises(ArtifactError) as raised:
-            assemble_files(self.bundle, "index.html", ("linked.txt",), project="procurement")
-        self.assertEqual(str(raised.exception), "File is unavailable: linked.txt (hidden target)")
-        self.assertNotIn(str(self.home), str(raised.exception))
-
-    def test_symlinked_ancestor_inside_bundle_is_rejected(self):
-        real = self.code / "docs"
-        real.mkdir()
-        (real / "file.txt").write_bytes(b"tracked")
-        shutil.copytree(real, self.bundle / "docs")
-        self.assertEqual(self.publish("docs/file.txt").exit_code, 0)
-        shutil.rmtree(self.bundle / "docs")
-        (self.bundle / "docs").symlink_to(real, target_is_directory=True)
-
-        self.assertEqual(self.get("docs/file.txt").status_code, 404)
-        self.assertNotEqual(self.publish("docs/file.txt").exit_code, 0)
-
-    def test_artifacts_without_a_project_never_follow_links(self):
-        self.link.symlink_to(self.code / "notes.txt")
-        with self.assertRaisesRegex(ArtifactError, "File is unavailable"):
-            assemble_files(self.bundle, "index.html", ("linked.txt",))
-        self.assertEqual(assemble_files(self.bundle, "index.html", ("linked.txt",), project="procurement")["files"],
-                         {"index.html": "text/html", "linked.txt": "text/plain"})
-        self.store.register(slug="standalone", title="Standalone", description="Detached",
-                            source_root=str(self.bundle), entry_path="index.html", format="html",
-                            files={"index.html": "text/html", "linked.txt": "text/plain"}, status="published")
-        from battuta_artifacts.app import create_app
-        with TestClient(create_app(self.store.path)) as client:
-            self.assertEqual(client.get("/artifacts/a/standalone/index.html").status_code, 200)
-            self.assertEqual(client.get("/artifacts/a/standalone/linked.txt").status_code, 404)
-
-    def test_project_without_valid_checkout_rejects_links(self):
-        self.publish_valid_link()
-        real = self.project / "code-real"
-        self.code.rename(real)
-        self.code.symlink_to(real, target_is_directory=True)
-        self.assertEqual(self.get().status_code, 404)
-        self.assertNotEqual(self.publish().exit_code, 0)
-        self.code.unlink()
-        self.assertEqual(self.get().status_code, 404)
-
-    def test_registry_failures_disable_links(self):
-        self.assertIsNone(files.allowed_link_root(None))
-        for error in (click.ClickException("missing"), OSError("io"), ValueError("bad")):
-            with self.subTest(error=error), patch("battuta_project.registry.ProjectRegistry.load", side_effect=error):
-                self.assertIsNone(files.allowed_link_root("procurement"))
-        self.assertIsNone(files.allowed_link_root("unknown"))
+def test_regular_bundle_files_are_unaffected(link):
+    (link.directory / "plain.txt").write_bytes(b"plain")
+    assert link.publish("plain.txt").exit_code == 0
+    assert link.get("plain.txt").content == b"plain"
 
 
-class LinkRaceTests(LinkFixture):
-    def open(self):
-        return files.open_source(str(self.bundle), "linked.txt", link_root=self.code.resolve())
+def absolute_outside(link):
+    return link.outside
 
-    def swap_after_resolution(self, swap):
+
+def relative_outside(link):
+    return os.path.relpath(link.outside, link.directory)
+
+
+def chain_leaving_root(link):
+    (link.code / "inside-link").symlink_to(link.outside)
+    return link.code / "inside-link"
+
+
+def directory(link):
+    (link.code / "folder").mkdir()
+    return link.code / "folder"
+
+
+def fifo_inside_root(link):
+    os.mkfifo(link.code / "pipe")
+    return link.code / "pipe"
+
+
+@pytest.mark.parametrize(
+    "target",
+    [absolute_outside, relative_outside, chain_leaving_root, directory, lambda link: link.code, fifo_inside_root,
+     lambda link: "/dev/null", lambda link: link.code / "missing.txt"],
+    ids=["absolute-outside", "relative-outside", "chain-leaving-root", "directory", "checkout-root", "fifo-inside-root",
+         "device", "dangling"],
+)
+def test_disallowed_targets_are_rejected_at_publish_and_serve(link, target):
+    link.publish_valid_link()
+    link.repoint(target(link))
+
+    assert link.get().status_code == 404
+    result = link.publish()
+    assert result.exit_code != 0, result.output
+    assert "File is unavailable" in result.output
+
+
+def test_hidden_symlink_target_is_rejected_at_serve_and_publish(link):
+    link.publish_valid_link()
+    hidden = link.code / ".git/config"
+    hidden.parent.mkdir()
+    hidden.write_bytes(b"TOKEN")
+    link.repoint(hidden)
+
+    response = link.get()
+    assert response.status_code == 404
+    assert "Hidden file warning" in response.text
+    assert "TOKEN" not in response.text
+    with pytest.raises(ArtifactError) as raised:
+        assemble_files(link.directory, "index.html", ("linked.txt",), project="procurement")
+    assert str(raised.value) == "File is unavailable: linked.txt (hidden target)"
+    assert str(link.bundle.home) not in str(raised.value)
+
+
+def test_symlinked_ancestor_inside_bundle_is_rejected(link):
+    real = link.code / "docs"
+    real.mkdir()
+    (real / "file.txt").write_bytes(b"tracked")
+    shutil.copytree(real, link.directory / "docs")
+    assert link.publish("docs/file.txt").exit_code == 0
+    shutil.rmtree(link.directory / "docs")
+    (link.directory / "docs").symlink_to(real, target_is_directory=True)
+
+    assert link.get("docs/file.txt").status_code == 404
+    assert link.publish("docs/file.txt").exit_code != 0
+
+
+def test_artifacts_without_a_project_never_follow_links(link):
+    link.path.symlink_to(link.code / "notes.txt")
+    with pytest.raises(ArtifactError, match="File is unavailable"):
+        assemble_files(link.directory, "index.html", ("linked.txt",))
+    assert assemble_files(link.directory, "index.html", ("linked.txt",), project="procurement")["files"] == {
+        "index.html": "text/html", "linked.txt": "text/plain"}
+    link.bundle.store.register(slug="standalone", title="Standalone", description="Detached",
+                               source_root=str(link.directory), entry_path="index.html", format="html",
+                               files={"index.html": "text/html", "linked.txt": "text/plain"}, status="published")
+    with TestClient(create_app(link.bundle.store.path)) as client:
+        assert client.get("/artifacts/a/standalone/index.html").status_code == 200
+        assert client.get("/artifacts/a/standalone/linked.txt").status_code == 404
+
+
+def test_links_are_disabled_without_a_project(bundle):
+    assert files.allowed_link_root(None) is None
+    bundle.registry.assert_not_called()
+
+
+@pytest.mark.parametrize("error", [click.ClickException("missing"), OSError("io"), ValueError("bad")],
+                         ids=["unknown-project", "io-error", "invalid-context"])
+def test_registry_failures_disable_links(bundle, error):
+    assert files.allowed_link_root("procurement") == bundle.code.resolve()
+    bundle.registry.return_value.load.side_effect = error
+
+    assert files.allowed_link_root("procurement") is None
+
+
+def test_unregistered_project_disables_links(bundle):
+    assert files.allowed_link_root("unknown") is None
+
+
+@pytest.fixture
+def race(link):
+    def open_link():
+        return files.open_source(str(link.directory), "linked.txt", link_root=link.code.resolve())
+
+    def swap_after_resolution(swap):
         real = files._check_target
 
         def check_then_swap(*args):
@@ -170,43 +180,49 @@ class LinkRaceTests(LinkFixture):
 
         return patch("battuta_artifacts.files._check_target", side_effect=check_then_swap)
 
-    def test_target_swapped_to_outside_link_after_resolution_fails_closed(self):
-        self.link.symlink_to(self.code / "notes.txt")
+    link.open = open_link
+    link.swap_after_resolution = swap_after_resolution
+    return link
 
-        def swap():
-            (self.code / "notes.txt").unlink()
-            (self.code / "notes.txt").symlink_to(self.outside)
 
-        with self.swap_after_resolution(swap), self.assertRaises(OSError):
-            self.open()
+def test_target_swapped_to_outside_link_after_resolution_fails_closed(race):
+    race.path.symlink_to(race.code / "notes.txt")
 
-    def test_leaf_link_repointed_after_readlink_never_yields_outside_file(self):
-        self.link.symlink_to(self.code / "notes.txt")
-        real = os.readlink
+    def swap():
+        (race.code / "notes.txt").unlink()
+        (race.code / "notes.txt").symlink_to(race.outside)
 
-        def read_then_repoint(*args, **kwargs):
-            text = real(*args, **kwargs)
-            self.repoint(self.outside)
-            return text
+    with race.swap_after_resolution(swap), pytest.raises(OSError):
+        race.open()
 
-        with patch("battuta_artifacts.files.os.readlink", side_effect=read_then_repoint):
-            try:
-                with self.open() as source:
-                    self.assertEqual(source.read(), b"tracked")
-            except OSError:
-                pass
 
-    def test_ancestor_replaced_by_symlink_during_walk_fails_closed(self):
-        (self.code / "docs").mkdir()
-        (self.code / "docs/notes.txt").write_bytes(b"tracked")
-        self.link.symlink_to(self.code / "docs/notes.txt")
-        elsewhere = tempfile.mkdtemp(dir=self.home)
-        with open(os.path.join(elsewhere, "notes.txt"), "wb") as handle:
-            handle.write(b"secret")
+def test_leaf_link_repointed_after_readlink_never_yields_outside_file(race):
+    race.path.symlink_to(race.code / "notes.txt")
+    real = os.readlink
 
-        def swap():
-            (self.code / "docs").rename(self.code / "docs-old")
-            (self.code / "docs").symlink_to(elsewhere, target_is_directory=True)
+    def read_then_repoint(*args, **kwargs):
+        text = real(*args, **kwargs)
+        race.repoint(race.outside)
+        return text
 
-        with self.swap_after_resolution(swap), self.assertRaises(OSError):
-            self.open()
+    with patch("battuta_artifacts.files.os.readlink", side_effect=read_then_repoint):
+        try:
+            with race.open() as source:
+                assert source.read() == b"tracked"
+        except OSError:
+            pass
+
+
+def test_ancestor_replaced_by_symlink_during_walk_fails_closed(race, tmp_path_factory):
+    (race.code / "docs").mkdir()
+    (race.code / "docs/notes.txt").write_bytes(b"tracked")
+    race.path.symlink_to(race.code / "docs/notes.txt")
+    elsewhere = tmp_path_factory.mktemp("elsewhere")
+    (elsewhere / "notes.txt").write_bytes(b"secret")
+
+    def swap():
+        (race.code / "docs").rename(race.code / "docs-old")
+        (race.code / "docs").symlink_to(elsewhere, target_is_directory=True)
+
+    with race.swap_after_resolution(swap), pytest.raises(OSError):
+        race.open()
