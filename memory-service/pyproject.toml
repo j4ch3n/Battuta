@@ -50,6 +50,7 @@ addopts = "-p no:cacheprovider --import-mode=importlib"
 testpaths = ["tests"]
 pythonpath = ["tests"]
 markers = ["integration: crosses packages or processes; lives in tests/integration/"]
+filterwarnings = ["ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning"]
 
 [tool.pyright]
 venvPath = "."

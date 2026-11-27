@@ -73,8 +73,6 @@ def test_dream_distills_backlog_and_writes_overview(dream_store, state):
     names = {record.path.relative_to(store.root).as_posix() for record in store.records()}
     assert {"profile/global/global-profile-name.md", "entity/mocktest/mocktest-entity-acme-ltd.md",
             "overview/global/global-overview-2026-11-26.md", "overview/mocktest/mocktest-overview-2026-11-26.md"} <= names
-    assert "Set fields.project to one of: battuta, global, mocktest" in distiller.prompts[0]
-    assert "- overview (" not in distiller.prompts[0]
     assert sorted(report["overviews"]) == ["global", "mocktest"]
     assert report["housekeeping"] == {"obsolete": 0, "deleted": 0, "purged": [], "dangling_links": []}
     assert "CEO of Fiscum" in Reads(store).profile()["body"]

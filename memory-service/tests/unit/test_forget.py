@@ -83,20 +83,17 @@ def test_reason_and_confirmation_required(store, key, value):
     assert_rejected_without_writes(store, arguments, key)
 
 
-SLUG = "mocktest-entity-acme-ltd"
-
-
-@pytest.mark.parametrize("entries", [
-    "x",
-    [SLUG],
-    [{"slug": ""}],
-    [{"slug": SLUG, "successor": " "}],
-    [{"slug": SLUG, "extra": 1}],
-    [{}],
+@pytest.mark.parametrize("make_entries", [
+    lambda slug: "x",
+    lambda slug: [slug],
+    lambda slug: [{"slug": ""}],
+    lambda slug: [{"slug": slug, "successor": " "}],
+    lambda slug: [{"slug": slug, "extra": 1}],
+    lambda slug: [{}],
 ], ids=["not-a-list", "bare-string-entry", "empty-slug", "blank-successor", "extra-key", "no-slug"])
-def test_bad_entry_shapes_rejected(store, entries):
-    assert add(store, "acme-ltd") == SLUG
-    assert_rejected_without_writes(store, {"entries": entries, **CONFIRM})
+def test_bad_entry_shapes_rejected(store, make_entries):
+    slug = add(store, "acme-ltd")
+    assert_rejected_without_writes(store, {"entries": make_entries(slug), **CONFIRM})
 
 
 def test_unknown_slug_rejects_whole_batch(store):

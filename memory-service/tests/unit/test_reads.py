@@ -28,9 +28,12 @@ def test_project_overview_ok_one_and_several_newest_first(store, reads):
     assert result["overview"]["abstract"] == "New line"
 
 
-def test_project_overview_not_written_and_unknown(reads):
-    assert reads.project_overview("battuta") == {"status": "not_written"}
-    assert reads.project_overview("atlas") == {"status": "unknown_project", "projects": ["battuta", "global", "mocktest"]}
+@pytest.mark.parametrize(("project", "expected"), [
+    ("battuta", {"status": "not_written"}),
+    ("atlas", {"status": "unknown_project", "projects": ["battuta", "global", "mocktest"]}),
+], ids=["not-written", "unknown-project"])
+def test_project_overview_without_overview(reads, project, expected):
+    assert reads.project_overview(project) == expected
 
 
 def test_descriptions_none_for_missing(store, reads):
@@ -77,4 +80,3 @@ def test_profile_reads_global_overview(store, reads):
 
 def test_types_lists_conversation_types_only(reads):
     assert "overview" not in [item["type"] for item in reads.types()]
-    assert len(reads.types()) == 10

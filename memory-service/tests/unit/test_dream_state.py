@@ -37,16 +37,23 @@ def test_dead_pid_is_reported_failed_and_can_restart(config, state):
     assert popen.call_args.args[0][1:] == ["-m", "battuta_memory.cli", "dream", "run"]
 
 
-def test_status_keeps_last_success_across_failure(state):
-    state.start(os.getpid())
-    state.finish(True, report={})
-    success = state.read()["last_success_at"]
-    state.start(os.getpid())
-    state.finish(False, "boom")
-    assert state.read()["last_success_at"] == success
-    assert state.read()["status"] == "failed"
-
-
-def test_idle_before_first_dream(state):
-    assert state.read()["status"] == "idle"
-    assert state.read()["last_success_at"] is None
+@pytest.mark.parametrize(("outcomes", "status", "has_success"), [
+    ([], "idle", False),
+    ([True], "succeeded", True),
+    ([False], "failed", False),
+    ([True, False], "failed", True),
+], ids=["idle-before-first-dream", "success", "failure-without-success", "failure-keeps-last-success"])
+def test_status_after_dreams(state, outcomes, status, has_success):
+    successes = []
+    for ok in outcomes:
+        state.start(os.getpid())
+        if ok:
+            state.finish(True, report={})
+            successes.append(state.read()["last_success_at"])
+        else:
+            state.finish(False, "boom")
+    current = state.read()
+    assert current["status"] == status
+    assert (current["last_success_at"] is not None) == has_success
+    if successes:
+        assert current["last_success_at"] == successes[-1]
