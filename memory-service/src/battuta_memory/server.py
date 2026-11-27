@@ -15,6 +15,7 @@ from starlette.routing import Route
 
 from .archive import ingest
 from .dream import DreamState, catalog_from_cli, start_dream
+from .forget import MAX_FORGET, forget
 from .reads import Reads
 
 MAX_ARCHIVE_BYTES = 8 * 1024 * 1024
@@ -36,6 +37,14 @@ TOOLS = {
     "dream_start": ("Start the nightly memory dream in the background after conversation was uploaded.", EMPTY),
     "dream_status": ("Report the current or last dream run, including last_success_at.", EMPTY),
     "health": ("Check that the memory store is ready.", EMPTY),
+    "forget": ("CoS only, and only on the owner's confirmation or instruction: mark memories obsolete (end their validity; the file is kept). "
+               "Optional successor supersedes the entry with an active memory. All-or-nothing validation; each forget is logged in the decisions ledger.",
+               {"type": "object", "required": ["entries", "reason", "owner_confirmation"], "additionalProperties": False,
+                "properties": {"entries": {"type": "array", "minItems": 1, "maxItems": MAX_FORGET,
+                                           "items": {"type": "object", "required": ["slug"], "additionalProperties": False,
+                                                     "properties": {"slug": {"type": "string", "minLength": 1},
+                                                                    "successor": {"type": "string", "minLength": 1}}}},
+                               "reason": {"type": "string", "minLength": 1}, "owner_confirmation": {"type": "string", "minLength": 1}}}),
 }
 READ_TOOLS = ("recall", "types", "project_overview", "project_descriptions")
 
@@ -71,6 +80,8 @@ class MemoryApi:
             return DreamState(self.store.root).read()
         if name == "health":
             return {"ready": True, "projects": len(self.store.catalog())}
+        if name == "forget":
+            return forget(self.store, arguments)
         raise ValueError("Unknown memory tool")
 
 

@@ -74,7 +74,17 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
         assert "pi-browser-use" not in json.loads((pi / "settings.json").read_text())
     servers = json.loads((runtime_pi / "mcp.json").read_text())["mcpServers"]
     assert "assignments" in servers
-    assert servers["memory"]["enabled"] is (role == "manager")
+    memory = servers["memory"]
+    if role == "cos":
+        assert memory["enabled"] is True
+        assert memory["url"].endswith("/mcp") and not memory["url"].endswith("/read")
+        assert "memory_forget" in memory["toolExposure"]
+    elif role == "manager":
+        assert memory["enabled"] is True
+        assert memory["url"].endswith("/read")
+        assert "memory_forget" not in memory.get("toolExposure", {})
+    else:
+        assert memory["enabled"] is False
     assert not (tmp_path / "bots/worker/.pi/mcp.json").exists()
 
 

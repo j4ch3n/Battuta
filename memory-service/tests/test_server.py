@@ -9,7 +9,7 @@ from starlette.testclient import TestClient
 
 from battuta_memory import server
 from battuta_memory.config import MemoryConfig
-from helpers import make_store
+from helpers import entity, make_store
 
 LINE = json.dumps({"entry_id": "a", "conversation_id": "c", "speaker": "owner", "text": "hi", "timestamp": "2026-11-26T09:00:00Z"})
 
@@ -39,6 +39,28 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(reply["result"]["structuredContent"], {"ok": True, "data": {"status": "not_written"}})
         refused = self.rpc("/mcp/read", "tools/call", {"name": "memory_dream_start", "arguments": {}}).json()
         self.assertEqual(refused["result"]["structuredContent"]["error"]["code"], "invalid_request")
+
+    def test_forget_is_on_full_endpoint_only(self):
+        slug = self.store.record(**entity("mocktest", "acme-ltd", "Acme Ltd is the client")).name
+        tools = {tool["name"] for tool in self.rpc("/mcp/read", "tools/list").json()["result"]["tools"]}
+        self.assertNotIn("memory_forget", tools)
+        arguments = {"entries": [{"slug": slug}], "reason": "obsolete", "owner_confirmation": "owner said so"}
+        refused = self.rpc("/mcp/read", "tools/call", {"name": "memory_forget", "arguments": arguments}).json()
+        self.assertEqual(refused["result"]["structuredContent"]["error"]["code"], "invalid_request")
+        self.assertTrue(self.store.find(slug).is_active())
+        init = self.rpc("/mcp", "initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t", "version": "1"}})
+        session = {"mcp-session-id": init.headers["mcp-session-id"]}
+        self.client.post("/mcp", json={"jsonrpc": "2.0", "method": "notifications/initialized"},
+                         headers={"accept": "application/json, text/event-stream", "mcp-protocol-version": "2025-06-18", **session})
+        full_tools = {tool["name"] for tool in self.rpc("/mcp", "tools/list", headers=session).json()["result"]["tools"]}
+        self.assertIn("memory_forget", full_tools)
+        reply = self.rpc("/mcp", "tools/call", {"name": "memory_forget", "arguments": arguments}, headers=session).json()
+        result = reply["result"]["structuredContent"]
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["data"]["results"][0]["result"], "forgotten")
+        self.assertFalse(self.store.find(slug).is_active())
+        invalid = self.rpc("/mcp", "tools/call", {"name": "memory_forget", "arguments": {"entries": [{"slug": slug}]}}, headers=session).json()
+        self.assertEqual(invalid["result"]["structuredContent"]["error"]["code"], "invalid_request")
 
     def test_archive_route_ingests_and_rejects(self):
         ok = self.client.post("/archive", content=LINE + "\n", headers={"content-type": "application/x-ndjson"})
