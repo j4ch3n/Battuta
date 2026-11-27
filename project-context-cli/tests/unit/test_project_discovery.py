@@ -1,177 +1,139 @@
 """Filesystem project discovery without workspace changes."""
 
-from click.testing import CliRunner
 import json
-import os
+from pathlib import Path
 import shutil
-from unittest.mock import patch
+
+import pytest
 
 from battuta_project.cli import main
 from battuta_project.models import ProjectList
 from battuta_project.presentation import render
-from linear_fixtures import linear_http
-from project_fixtures import ProjectTestCase
 
 
-class DiscoveryTests(ProjectTestCase):
-    def setUp(self):
-        super().setUp()
-        self.runner = CliRunner()
-        token = patch.dict(os.environ, {"LINEAR_API_TOKEN": "test-token"})
-        token.start()
-        self.addCleanup(token.stop)
+def test_list_sorts_projects_and_renders_both_home_relative_paths(invoke, project, registry, linear_http):
+    registry.init("harbor-web", github="https://github.com/team/harbor-web")
+    registry.init("aardvark", github="https://github.com/team/aardvark")
+    with linear_http() as requests:
+        output = invoke("list")
+    assert output == (
+        "1. **aardvark**\n"
+        "   Project Root: ~/.battuta/projects/aardvark\n"
+        "   Code: ~/.battuta/projects/aardvark/code\n"
+        "2. **atlas-api**\n"
+        "   Project Root: ~/.battuta/projects/atlas-api\n"
+        "   Code: ~/.battuta/projects/atlas-api/code\n"
+        "3. **harbor-web**\n"
+        "   Project Root: ~/.battuta/projects/harbor-web\n"
+        "   Code: ~/.battuta/projects/harbor-web/code\n"
+        "Descriptions: memory query failed (unreachable)\n"
+        "Run `battuta-project explain <name>` for the full overview.\n"
+    )
+    assert requests == []
 
-    def invoke(self, *args):
-        result = self.runner.invoke(main, args)
-        self.assertEqual(result.exit_code, 0, result.output)
-        return result.output
 
-    def test_list_sorts_projects_and_renders_both_home_relative_paths(self):
-        self.registry.init("harbor-web", github="https://github.com/team/harbor-web")
-        self.registry.init("aardvark", github="https://github.com/team/aardvark")
-        with linear_http() as requests:
-            output = self.invoke("list")
-        self.assertEqual(output, (
-            "1. **aardvark**\n"
-            "   Project Root: ~/.battuta/projects/aardvark\n"
-            "   Code: ~/.battuta/projects/aardvark/code\n"
-            "2. **atlas-api**\n"
-            "   Project Root: ~/.battuta/projects/atlas-api\n"
-            "   Code: ~/.battuta/projects/atlas-api/code\n"
-            "3. **harbor-web**\n"
-            "   Project Root: ~/.battuta/projects/harbor-web\n"
-            "   Code: ~/.battuta/projects/harbor-web/code\n"
-            "Descriptions: memory query failed (unreachable)\n"
-            "Run `battuta-project explain <name>` for the full overview.\n"
-        ))
-        self.assertEqual(requests, [])
+def test_discovery_requires_project_yaml(invoke, project, registry):
+    (registry.root / "unregistered").mkdir()
+    (registry.root / ".hidden").mkdir()
+    (registry.root / "notes.txt").write_text("Notes")
+    (registry.root / "alias").symlink_to(project.root, target_is_directory=True)
+    output = invoke("list")
+    assert "1. **atlas-api**" in output
+    assert "2." not in output
+    assert not (registry.root / ".config.json").exists()
 
-    def test_discovery_requires_project_yaml(self):
-        (self.registry.root / "unregistered").mkdir()
-        (self.registry.root / ".hidden").mkdir()
-        (self.registry.root / "notes.txt").write_text("Notes")
-        (self.registry.root / "alias").symlink_to(self.project.root, target_is_directory=True)
-        self.assertIn("1. **atlas-api**", self.invoke("list"))
-        self.assertNotIn("2.", self.invoke("list"))
-        self.assertFalse((self.registry.root / ".config.json").exists())
 
-    def test_list_empty_or_missing_registry_does_not_create_state(self):
-        shutil.rmtree(self.registry.root)
-        for exists in (False, True):
-            with self.subTest(registry_exists=exists):
-                if exists:
-                    self.registry.root.mkdir()
-                output = self.invoke("list")
-                self.assertIn("No registered projects" if exists else "No Battuta project store has been initialized", output)
-                self.assertIn("battuta-project init <project-name>", output)
-                self.assertEqual(self.registry.root.exists(), exists)
-                self.assertFalse((self.registry.root / ".config.json").exists())
+@pytest.mark.parametrize("exists", [False, True], ids=["missing-store", "empty-registry"])
+def test_list_empty_or_missing_registry_does_not_create_state(invoke, project, registry, exists):
+    shutil.rmtree(registry.root)
+    if exists:
+        registry.root.mkdir()
+    output = invoke("list")
+    assert ("No registered projects" if exists else "No Battuta project store has been initialized") in output
+    assert "battuta-project init <project-name>" in output
+    assert json.loads(invoke("list", "--json")) == {"projects": []}
+    assert registry.root.exists() == exists
+    assert not (registry.root / ".config.json").exists()
 
-    def test_list_reports_invalid_registration_without_mutation(self):
-        (self.project.root / "project.yaml").write_text("invalid: true")
-        result = self.runner.invoke(main, ["list"])
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("project.yaml", result.output)
-        self.assertEqual((self.project.root / "project.yaml").read_text(), "invalid: true")
 
-    def test_list_json_is_complete_and_non_mutating(self):
-        for name in ("Atlas", "my project", "项目", "global"):
-            self.registry.init(name)
-        before = {str(p): p.read_bytes() for p in self.home.rglob("*") if p.is_file()}
-        self.assertEqual(json.loads(self.invoke("list", "--json")), {
-            "projects": ["Atlas", "atlas-api", "global", "my project", "项目"],
-        })
-        self.assertEqual({str(p): p.read_bytes() for p in self.home.rglob("*") if p.is_file()}, before)
+@pytest.mark.parametrize("args", [["list"], ["list", "--json"]], ids=["text", "json"])
+def test_list_reports_invalid_registration_without_mutation(runner, project, args):
+    (project.root / "project.yaml").write_text("invalid: true")
+    result = runner.invoke(main, args)
+    assert result.exit_code != 0
+    assert "project.yaml" in result.output
+    assert (project.root / "project.yaml").read_text() == "invalid: true"
 
-    def test_list_json_empty_registry(self):
-        shutil.rmtree(self.registry.root)
-        for exists in (False, True):
-            with self.subTest(exists=exists):
-                if exists:
-                    self.registry.root.mkdir()
-                self.assertEqual(json.loads(self.invoke("list", "--json")), {"projects": []})
-                self.assertEqual(self.registry.root.exists(), exists)
-                self.assertFalse((self.registry.root / ".config.json").exists())
 
-    def test_list_json_rejects_invalid_registration(self):
-        (self.project.root / "project.yaml").write_text("invalid: true")
-        result = self.runner.invoke(main, ["list", "--json"])
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("project.yaml", result.output)
+def test_list_json_is_complete_and_non_mutating(invoke, project, registry, home):
+    for name in ("Atlas", "my project", "项目", "global"):
+        registry.init(name)
+    before = {str(p): p.read_bytes() for p in home.rglob("*") if p.is_file()}
+    assert json.loads(invoke("list", "--json")) == {"projects": ["Atlas", "atlas-api", "global", "my project", "项目"]}
+    assert {str(p): p.read_bytes() for p in home.rglob("*") if p.is_file()} == before
 
-    def test_list_rejects_root_override(self):
-        root = self.home / "custom"
-        result = self.runner.invoke(main, ["list", "--json", "--root", str(root)])
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("No such option", result.output)
-        self.assertFalse(root.exists())
 
-    def test_list_rejects_unsafe_markers_or_broken_checkouts(self):
-        path = self.project.root / "project.yaml"
-        config = path.read_bytes()
-        for state in ("directory", "symlink", "broken-symlink", "malformed", "missing-checkout", "symlink-checkout"):
-            with self.subTest(state=state):
-                if state == "directory":
-                    path.unlink()
-                    path.mkdir()
-                elif state in ("symlink", "broken-symlink"):
-                    path.unlink()
-                    path.symlink_to(self.project.root / ("SUMMARY.md" if state == "symlink" else "absent"))
-                elif state == "malformed":
-                    path.write_text("not: valid: yaml")
-                else:
-                    self.project.code.rmdir()
-                    if state == "symlink-checkout":
-                        self.project.code.symlink_to(self.home, target_is_directory=True)
-                result = self.runner.invoke(main, ["list", "--json"])
-                self.assertNotEqual(result.exit_code, 0)
-                self.assertIn(str(self.project.root), result.output)
-                if path.is_symlink() or path.is_file():
-                    path.unlink()
-                else:
-                    path.rmdir()
-                path.write_bytes(config)
-                if self.project.code.is_symlink():
-                    self.project.code.unlink()
-                self.project.code.mkdir(exist_ok=True)
+def test_list_rejects_root_override(runner, home):
+    root = home / "custom"
+    result = runner.invoke(main, ["list", "--json", "--root", str(root)])
+    assert result.exit_code != 0
+    assert "No such option" in result.output
+    assert not root.exists()
 
-    def test_list_preserves_absolute_paths_outside_home(self):
-        with patch("pathlib.Path.home", return_value=self.home / "different-home"):
-            output = render("list.md.j2", ProjectList(projects=[self.project]))
-        self.assertEqual(output, (
-            "1. **atlas-api** — (no description yet)\n"
-            f"   Project Root: {self.project.root}\n"
-            f"   Code: {self.project.code}\n"
-            "Run `battuta-project explain <name>` for the full overview."
-        ))
-        self.assertNotIn("~", output)
 
-    def test_discovery_commands_reject_project_arguments(self):
-        for command in ("list",):
-            with self.subTest(command=command):
-                result = self.runner.invoke(main, [command, "atlas-api"])
-                self.assertNotEqual(result.exit_code, 0)
-                self.assertIn("unexpected extra argument", result.output)
+@pytest.mark.parametrize("state", ["directory", "symlink", "broken-symlink", "malformed", "missing-checkout", "symlink-checkout"])
+def test_list_rejects_unsafe_markers_or_broken_checkouts(runner, project, home, state):
+    path = project.root / "project.yaml"
+    if state == "directory":
+        path.unlink()
+        path.mkdir()
+    elif state in ("symlink", "broken-symlink"):
+        path.unlink()
+        path.symlink_to(project.root / ("SUMMARY.md" if state == "symlink" else "absent"))
+    elif state == "malformed":
+        path.write_text("not: valid: yaml")
+    else:
+        project.code.rmdir()
+        if state == "symlink-checkout":
+            project.code.symlink_to(home, target_is_directory=True)
+    result = runner.invoke(main, ["list", "--json"])
+    assert result.exit_code != 0
+    assert str(project.root) in result.output
 
-    def test_named_project_errors_distinguish_store_empty_and_unknown(self):
-        for state in ("missing store", "empty registry", "unknown"):
-            with self.subTest(state=state):
-                if self.registry.root.exists():
-                    shutil.rmtree(self.registry.root)
-                if state == "empty registry":
-                    self.registry.root.mkdir()
-                elif state == "unknown":
-                    self.registry.init("atlas-api")
-                before = sorted(self.home.rglob("*"))
-                result = self.runner.invoke(main, ["explain", "Battuta"])
-                self.assertNotEqual(result.exit_code, 0)
-                expected = {
-                    "missing store": "No Battuta project store has been initialized",
-                    "empty registry": "No registered projects",
-                    "unknown": "Project 'Battuta' is not registered",
-                }[state]
-                self.assertIn(expected, result.output)
-                self.assertIn("battuta-project init <project-name>", result.output)
-                if state == "unknown":
-                    self.assertIn("battuta-project list", result.output)
-                self.assertEqual(sorted(self.home.rglob("*")), before)
+
+def test_list_preserves_absolute_paths_outside_home(project, home, monkeypatch):
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home / "different-home"))
+    output = render("list.md.j2", ProjectList(projects=[project]))
+    assert output == (
+        "1. **atlas-api** — (no description yet)\n"
+        f"   Project Root: {project.root}\n"
+        f"   Code: {project.code}\n"
+        "Run `battuta-project explain <name>` for the full overview."
+    )
+    assert "~" not in output
+
+
+def test_list_rejects_project_arguments(runner, project):
+    result = runner.invoke(main, ["list", "atlas-api"])
+    assert result.exit_code != 0
+    assert "unexpected extra argument" in result.output
+
+
+@pytest.mark.parametrize("state, expected", [
+    ("missing store", "No Battuta project store has been initialized"),
+    ("empty registry", "No registered projects"),
+    ("unknown", "Project 'Battuta' is not registered"),
+], ids=["missing-store", "empty-registry", "unknown"])
+def test_named_project_errors_distinguish_store_empty_and_unknown(runner, project, registry, home, state, expected):
+    if state != "unknown":
+        shutil.rmtree(registry.root)
+    if state == "empty registry":
+        registry.root.mkdir()
+    before = sorted(home.rglob("*"))
+    result = runner.invoke(main, ["explain", "Battuta"])
+    assert result.exit_code != 0
+    assert expected in result.output
+    assert "battuta-project init <project-name>" in result.output
+    if state == "unknown":
+        assert "battuta-project list" in result.output
+    assert sorted(home.rglob("*")) == before

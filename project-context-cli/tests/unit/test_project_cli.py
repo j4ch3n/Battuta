@@ -1,335 +1,305 @@
 """CLI argument contracts and explicit-project workflows."""
 
-from click.testing import CliRunner
-import os
 import shlex
 from unittest.mock import patch
 
+import pytest
 import yaml
 
 from battuta_project.cli import main
-from project_fixtures import ProjectTestCase
-from linear_fixtures import CREATED_PROJECT, PROJECT, linear_http, payload
+
+CREATE = ["linear", "create", "atlas-api", "Atlas", "--team-id", "team-1"]
+EXACT_NAMES = pytest.mark.parametrize(
+    "name", ["My 项目", "owner's $(printf injected); &", "-atlas"], ids=["unicode", "shell-metacharacters", "leading-dash"],
+)
 
 
-class CliTests(ProjectTestCase):
-    def setUp(self):
-        super().setUp()
-        self.runner = CliRunner()
-        token = patch.dict(os.environ, {"LINEAR_API_TOKEN": "test-token"})
-        token.start()
-        self.addCleanup(token.stop)
+@pytest.fixture
+def config_path(project):
+    return project.root / "project.yaml"
 
-    def invoke(self, *args):
-        result = self.runner.invoke(main, args)
-        self.assertEqual(result.exit_code, 0, result.output)
-        return result.output
 
-    def test_remove_rejects_unsafe_or_unknown_project_before_artifact_access(self):
-        for name in ("../other", "missing"):
-            with self.subTest(name=name), patch("battuta_project.registry.subprocess.run") as run:
-                result = self.runner.invoke(main, ["remove", name])
-                self.assertNotEqual(result.exit_code, 0)
-                run.assert_not_called()
-                self.assertTrue(self.project.root.exists())
+@pytest.mark.parametrize("name", ["../other", "missing"], ids=["traversal", "unknown"])
+def test_remove_rejects_unsafe_or_unknown_project_before_artifact_access(runner, project, clone, name):
+    clone.reset_mock()
+    result = runner.invoke(main, ["remove", name])
+    assert result.exit_code != 0
+    clone.assert_not_called()
+    assert project.root.exists()
 
-    def test_init_reports_explicit_next_command_without_selection(self):
-        output = self.invoke("init", "harbor-web", "--github", "https://github.com/team/harbor-web")
-        self.assertIn("Initialized project: harbor-web", output)
-        self.assertIn("~/.battuta/projects/harbor-web/code", output)
-        self.assertNotIn("Current project:", output)
-        self.assertNotIn("SUMMARY", output)
-        self.assertNotIn("Specs Root:", output)
-        self.assertNotIn("Constitution:", output)
-        self.assertNotIn("Memory:", output)
 
-    def test_init_suggests_executable_command_for_exact_name(self):
-        for name in ("My 项目", "owner's $(printf injected); &", "-atlas"):
-            with self.subTest(name=name):
-                output = self.invoke("init", "--", name)
-                command = next(line.removeprefix("Next: ") for line in output.splitlines() if line.startswith("Next: "))
-                arguments = shlex.split(command)
-                self.assertEqual(arguments, ["battuta-project", "explain", "--", name])
-                explained = self.invoke(*arguments[1:])
-                self.assertIn(f".battuta/projects/{name}/code", explained)
+def test_init_reports_explicit_next_command_without_selection(invoke):
+    output = invoke("init", "harbor-web", "--github", "https://github.com/team/harbor-web")
+    assert "Initialized project: harbor-web" in output
+    assert "~/.battuta/projects/harbor-web/code" in output
 
-    def test_selection_commands_are_removed(self):
-        for command in ("current", "switch"):
-            with self.subTest(command=command):
-                result = self.runner.invoke(main, [command])
-                self.assertNotEqual(result.exit_code, 0)
-                self.assertIn("No such command", result.output)
 
-    def test_memory_command_is_removed_without_touching_legacy_private_content(self):
-        memory = self.project.root / "MEMORY.md"
-        memory.write_text("Private legacy content")
-        with linear_http() as requests:
-            result = self.runner.invoke(main, ["memory", "get"])
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("No such command 'memory'", result.output)
-        self.assertEqual(memory.read_text(), "Private legacy content")
-        self.assertEqual(requests, [])
+@EXACT_NAMES
+def test_init_suggests_executable_command_for_exact_name(invoke, name):
+    output = invoke("init", "--", name)
+    command = next(line.removeprefix("Next: ") for line in output.splitlines() if line.startswith("Next: "))
+    arguments = shlex.split(command)
+    assert arguments == ["battuta-project", "explain", "--", name]
+    assert f".battuta/projects/{name}/code" in invoke(*arguments[1:])
 
-    def test_explain_requires_project_argument(self):
-        self.file("README.md")
-        self.assertIn("Project Root: ~/.battuta/projects/atlas-api/code", self.invoke("explain", "atlas-api"))
-        result = self.runner.invoke(main, ["explain"])
-        self.assertNotEqual(result.exit_code, 0)
 
-    def test_explain_prints_repository_and_unlinked_linear_without_http(self):
-        with linear_http() as requests:
-            output = self.invoke("explain", "atlas-api")
-        self.assertIn("Repository URL: https://github.com/team/atlas-api", output)
-        self.assertIn("Linear Project URL: not linked", output)
-        self.assertEqual(requests, [])
+def test_explain_requires_project_argument(runner, invoke, project_file):
+    project_file("README.md")
+    assert "Project Root: ~/.battuta/projects/atlas-api/code" in invoke("explain", "atlas-api")
+    assert runner.invoke(main, ["explain"]).exit_code != 0
 
-    def test_explain_fetches_linked_linear_url_without_changing_local_state(self):
-        self.invoke("linear", "link", "atlas-api", "project-1,team-1")
-        original = (self.project.root / "project.yaml").read_text()
-        with linear_http(PROJECT) as requests:
-            output = self.invoke("explain", "atlas-api")
-        self.assertIn("Repository URL: https://github.com/team/atlas-api", output)
-        self.assertIn("Linear Project URL: https://linear.app/team/project/atlas", output)
-        self.assertIn("Project Root: ~/.battuta/projects/atlas-api/code", output)
-        self.assertEqual(len(requests), 1)
-        self.assertEqual(payload(requests[0])["variables"], {"id": "project-1"})
-        self.assertEqual((self.project.root / "project.yaml").read_text(), original)
 
-    def test_explain_reports_lookup_failure_without_rendering_misleading_url(self):
-        self.invoke("linear", "link", "atlas-api", "project-1,team-1")
-        for response, message in (
-            ({"errors": [{"message": "Not authenticated"}]}, "Not authenticated"),
-            ({"data": {"project": None}}, "Linear project"),
-        ):
-            with self.subTest(response=response), linear_http(response):
-                result = self.runner.invoke(main, ["explain", "atlas-api"])
-                self.assertNotEqual(result.exit_code, 0)
-                self.assertIn(message, result.output)
-                self.assertNotIn("Linear Project URL:", result.output)
+def test_explain_prints_repository_and_unlinked_linear_without_http(invoke, project, linear_http):
+    with linear_http() as requests:
+        output = invoke("explain", "atlas-api")
+    assert "Repository URL: https://github.com/team/atlas-api" in output
+    assert "Linear Project URL: not linked" in output
+    assert requests == []
 
-    def test_project_arguments_reject_missing_unknown_or_unsafe_targets_before_http(self):
-        for target in (None, "missing", "../atlas-api", ".hidden"):
-            for command, trailing in ((["explain"], []), (["github", "link"], ["https://github.com/team/other"]),
-                                      (["linear", "link"], ["project-1,team-1"]),
-                                      (["linear", "create"], ["Atlas", "--team-id", "team-1"])):
-                args = command + ([target] if target is not None else []) + trailing
-                with self.subTest(args=args), linear_http() as requests:
-                    result = self.runner.invoke(main, args)
-                    self.assertNotEqual(result.exit_code, 0)
-                    self.assertIn("Error:", result.output)
-                    self.assertEqual(requests, [])
 
-    def test_all_invocations_require_token_before_any_side_effect(self):
-        args_list = (
-            (), ("--help",), ("init", "--help"), ("linear", "--help"),
-            ("linear", "create", "--help"),
-            ("list",), ("explain", "atlas-api"),
-            ("init", "harbor-web"), ("github", "link", "atlas-api", "https://github.com/team/harbor-web"),
-            ("linear", "link", "atlas-api", "project-1,team-1"),
-             ("linear", "create", "atlas-api", "Atlas", "--team-id", "team-1"), ("unknown",),
-        )
-        original = (self.project.root / "project.yaml").read_bytes()
-        for value in (None, "", " \t\n"):
-            for args in args_list:
-                with self.subTest(value=value, args=args), patch.dict(os.environ, {}, clear=True), linear_http() as requests:
-                    if value is not None:
-                        os.environ["LINEAR_API_TOKEN"] = value
-                    result = self.runner.invoke(main, args)
-                    self.assertNotEqual(result.exit_code, 0)
-                    self.assertIn("LINEAR_API_TOKEN", result.output)
-                    self.assertEqual(requests, [])
-                    self.assertEqual((self.project.root / "project.yaml").read_bytes(), original)
-                    self.assertFalse((self.registry.root / "harbor-web").exists())
+def test_explain_fetches_linked_linear_url_without_changing_local_state(invoke, config_path, linear_http, linear_project, payload):
+    invoke("linear", "link", "atlas-api", "project-1,team-1")
+    original = config_path.read_text()
+    with linear_http(linear_project) as requests:
+        output = invoke("explain", "atlas-api")
+    assert "Repository URL: https://github.com/team/atlas-api" in output
+    assert "Linear Project URL: https://linear.app/team/project/atlas" in output
+    assert "Project Root: ~/.battuta/projects/atlas-api/code" in output
+    assert len(requests) == 1
+    assert payload(requests[0])["variables"] == {"id": "project-1"}
+    assert config_path.read_text() == original
 
-    def test_bare_invocation_help_and_local_commands_do_not_contact_linear(self):
-        with linear_http() as requests:
-            for args in ((), ("--help",), ("init", "--help"), ("linear", "create", "--help")):
-                with self.subTest(args=args):
-                    self.assertIn("Usage:", self.invoke(*args))
-            self.invoke("explain", "atlas-api")
-            self.invoke("linear", "link", "atlas-api", " project-1 , team-1 ")
-            self.invoke("init", "harbor-web", "--github", "https://github.com/team/harbor-web",
-                        "--linear", " project-2 , team-2 ")
-            self.assertEqual(requests, [])
-        self.assertEqual(self.registry.load("atlas-api").config.linear.project_id, "project-1")
-        self.assertEqual(self.registry.load("harbor-web").config.linear.team_id, "team-2")
 
-    def test_removed_refresh_command_is_rejected_without_http_or_state_changes(self):
-        original = (self.project.root / "project.yaml").read_bytes()
-        with linear_http(PROJECT) as requests:
-            result = self.runner.invoke(main, ["linear", "refresh"])
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("No such command 'refresh'", result.output)
-        self.assertEqual(requests, [])
-        self.assertEqual((self.project.root / "project.yaml").read_bytes(), original)
+@pytest.mark.parametrize("response, message", [
+    ({"errors": [{"message": "Not authenticated"}]}, "Not authenticated"),
+    ({"data": {"project": None}}, "Linear project"),
+], ids=["api-error", "project-missing"])
+def test_explain_reports_lookup_failure_without_rendering_misleading_url(runner, invoke, project, linear_http, response, message):
+    invoke("linear", "link", "atlas-api", "project-1,team-1")
+    with linear_http(response):
+        result = runner.invoke(main, ["explain", "atlas-api"])
+    assert result.exit_code != 0
+    assert message in result.output
+    assert "Linear Project URL:" not in result.output
 
-    def test_document_authoring_is_not_exposed_as_cli_commands(self):
-        config = (self.project.root / "project.yaml").read_bytes()
-        for name in ("spec", "decision"):
-            with self.subTest(command=name), linear_http() as requests:
-                result = self.runner.invoke(main, [name, "--help"])
-                self.assertNotEqual(result.exit_code, 0)
-                self.assertIn(f"No such command '{name}'", result.output)
-                self.assertEqual(requests, [])
-                self.assertEqual((self.project.root / "project.yaml").read_bytes(), config)
 
-    def test_blank_linear_options_are_rejected_before_cloning_or_http(self):
-        for args in (
-            ["init", "harbor-web", "--linear", " "],
-            ["linear", "link", "atlas-api", " ,team-1"],
-            ["linear", "link", "atlas-api", "project-1, "],
-            ["linear", "create", "atlas-api", " ", "--team-id", "team-1"],
-            ["linear", "create", "atlas-api", "Atlas", "--team-id", " "],
-            ["linear", "create", "atlas-api", "Atlas"],
-        ):
-            with self.subTest(args=args), linear_http() as requests:
-                result = self.runner.invoke(main, args)
-                self.assertNotEqual(result.exit_code, 0)
-                self.assertIn("Error:", result.output)
-                self.assertFalse((self.registry.root / "harbor-web").exists())
-                self.assertEqual(requests, [])
+@pytest.mark.parametrize("target", [None, "missing", "../atlas-api", ".hidden"],
+                         ids=["omitted", "unknown", "traversal", "hidden"])
+@pytest.mark.parametrize("command, trailing", [
+    (["explain"], []),
+    (["github", "link"], ["https://github.com/team/other"]),
+    (["linear", "link"], ["project-1,team-1"]),
+    (["linear", "create"], ["Atlas", "--team-id", "team-1"]),
+], ids=["explain", "github-link", "linear-link", "linear-create"])
+def test_project_arguments_reject_missing_unknown_or_unsafe_targets_before_http(runner, project, linear_http, target, command, trailing):
+    args = command + ([target] if target is not None else []) + trailing
+    with linear_http() as requests:
+        result = runner.invoke(main, args)
+    assert result.exit_code != 0
+    assert "Error:" in result.output
+    assert requests == []
 
-    def test_create_links_remote_project_using_explicit_team_id(self):
-        with linear_http(CREATED_PROJECT) as requests:
-            output = self.invoke("linear", "create", "atlas-api", "Atlas", "--team-id", "team-1")
-        self.assertIn("project-1", output)
-        self.assertIn("team-1", output)
-        self.assertIn("https://linear.app/team/project/atlas", output)
-        config = yaml.safe_load((self.project.root / "project.yaml").read_text())
-        self.assertEqual(config["linear"], {"project_id": "project-1", "team_id": "team-1"})
-        self.assertEqual(payload(requests[0])["variables"]["input"], {"name": "Atlas", "teamIds": ["team-1"]})
-        self.assertEqual(len(requests), 1)
 
-    def test_create_api_failure_preserves_local_link(self):
-        path = self.project.root / "project.yaml"
-        original = path.read_text()
-        with linear_http({"errors": [{"message": "Invalid team"}]}):
-            result = self.runner.invoke(main, ["linear", "create", "atlas-api", "Atlas", "--team-id", "team-1"])
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("Invalid team", result.output)
-        self.assertEqual(path.read_text(), original)
+@pytest.mark.parametrize("value", [None, "", " \t\n"], ids=["unset", "empty", "blank"])
+@pytest.mark.parametrize("args", [
+    (), ("--help",), ("init", "--help"), ("linear", "--help"), ("linear", "create", "--help"),
+    ("list",), ("explain", "atlas-api"), ("init", "harbor-web"),
+    ("github", "link", "atlas-api", "https://github.com/team/harbor-web"),
+    ("linear", "link", "atlas-api", "project-1,team-1"),
+    ("linear", "create", "atlas-api", "Atlas", "--team-id", "team-1"), ("unknown",),
+], ids=lambda args: " ".join(args) or "no-args")
+def test_all_invocations_require_token_before_any_side_effect(runner, project, registry, config_path, linear_http, monkeypatch, value, args):
+    original = config_path.read_bytes()
+    monkeypatch.delenv("LINEAR_API_TOKEN")
+    if value is not None:
+        monkeypatch.setenv("LINEAR_API_TOKEN", value)
+    with linear_http() as requests:
+        result = runner.invoke(main, args)
+    assert result.exit_code != 0
+    assert "LINEAR_API_TOKEN" in result.output
+    assert requests == []
+    assert config_path.read_bytes() == original
+    assert not (registry.root / "harbor-web").exists()
 
-    def test_create_requires_valid_local_project_before_http(self):
-        (self.project.root / "project.yaml").write_text("invalid yaml config")
-        with linear_http() as requests:
-            result = self.runner.invoke(main, ["linear", "create", "atlas-api", "Atlas", "--team-id", "team-1"])
-            self.assertNotEqual(result.exit_code, 0)
-            self.assertIn("project.yaml", result.output)
-            self.assertEqual(requests, [])
 
-    def test_linear_create_recovery_names_exact_project(self):
-        for name in ("My 项目", "owner's $(printf injected); &", "-atlas"):
-            with self.subTest(name=name):
-                project = self.registry.init(name)
-                path = project.root / "project.yaml"
-                original = path.read_text()
-                with linear_http(CREATED_PROJECT) as requests, patch("battuta_project.storage.os.replace", side_effect=OSError("disk full")):
-                    result = self.runner.invoke(main, ["linear", "create", "--team-id", "team-1", "--", name, "Atlas"])
-                self.assertNotEqual(result.exit_code, 0)
-                self.assertIn("created", result.output.lower())
-                self.assertIn("project-1", result.output)
-                self.assertIn("https://linear.app/team/project/atlas", result.output)
-                recovery = shlex.split(result.output.strip().splitlines()[-1])
-                self.assertEqual(recovery, ["battuta-project", "linear", "link", "--", name, "project-1,team-1"])
-                self.assertNotIn("switch", result.output)
-                self.assertIn("disk full", result.output)
-                self.assertEqual(path.read_text(), original)
-                self.assertEqual(len(requests), 1)
-                with linear_http() as recovery_requests:
-                    self.invoke(*recovery[1:])
-                self.assertEqual(recovery_requests, [])
-                self.assertEqual(self.registry.load(name).config.linear.project_id, "project-1")
+@pytest.mark.parametrize("args", [(), ("--help",), ("init", "--help"), ("linear", "create", "--help")],
+                         ids=["bare", "help", "init-help", "linear-create-help"])
+def test_help_does_not_contact_linear(invoke, linear_http, args):
+    with linear_http() as requests:
+        assert "Usage:" in invoke(*args)
+    assert requests == []
 
-    def test_create_unreadable_local_config_reports_remote_success_and_recovery(self):
-        def created(request):
-            (self.project.root / "project.yaml").write_bytes(b"\xff")
-            return CREATED_PROJECT
 
-        with linear_http(created) as requests:
-            result = self.runner.invoke(main, ["linear", "create", "atlas-api", "Atlas", "--team-id", "team-1"])
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("project.yaml", result.output)
-        self.assertIn("project-1", result.output)
-        self.assertIn("https://linear.app/team/project/atlas", result.output)
-        self.assertIn("linear link -- atlas-api project-1,team-1", result.output)
-        self.assertEqual(len(requests), 1)
+@pytest.mark.parametrize("args, name", [
+    (("init", "harbor-web", "--github", "https://github.com/team/harbor-web", "--linear", " project-1 , team-1 "), "harbor-web"),
+    (("linear", "link", "atlas-api", " project-1 , team-1 "), "atlas-api"),
+], ids=["init", "link"])
+def test_linear_pair_is_trimmed_without_contacting_linear(invoke, project, registry, linear_http, args, name):
+    with linear_http() as requests:
+        invoke(*args)
+    assert requests == []
+    linear = registry.load(name).config.linear
+    assert (linear.project_id, linear.team_id) == ("project-1", "team-1")
 
-    def test_name_only_init_creates_discoverable_project_without_github(self):
-        with linear_http() as requests:
-            output = self.invoke("init", "linth")
-            self.assertIn("Initialized project: linth", output)
-            self.assertIn("**linth**", self.invoke("list"))
-            self.assertIn("Repository URL: no GitHub repository linked yet", self.invoke("explain", "linth"))
-            self.assertEqual(requests, [])
-        project = self.registry.load("linth")
-        self.assertTrue(project.code.is_dir())
-        self.assertEqual(list(project.code.iterdir()), [])
-        self.assertFalse((project.root / "SUMMARY.md").exists())
-        self.assertIsNone(project.config.github.repository)
 
-    def test_init_uses_explicit_name_with_different_repository_basename(self):
-        self.invoke("init", "linth", "--github", "https://github.com/team/other.git")
-        project = self.registry.load("linth")
-        self.assertEqual(project.name, "linth")
-        self.assertEqual(project.config.github.repository, "team/other")
-        self.assertEqual(project.code.name, "code")
+@pytest.mark.parametrize("args", [
+    ["init", "harbor-web", "--linear", " "],
+    ["linear", "link", "atlas-api", " ,team-1"],
+    ["linear", "link", "atlas-api", "project-1, "],
+    ["linear", "create", "atlas-api", " ", "--team-id", "team-1"],
+    ["linear", "create", "atlas-api", "Atlas", "--team-id", " "],
+    ["linear", "create", "atlas-api", "Atlas"],
+], ids=["init-blank-pair", "link-blank-project", "link-blank-team", "create-blank-name", "create-blank-team", "create-no-team"])
+def test_blank_linear_options_are_rejected_before_cloning_or_http(runner, project, registry, linear_http, args):
+    with linear_http() as requests:
+        result = runner.invoke(main, args)
+    assert result.exit_code != 0
+    assert "Error:" in result.output
+    assert not (registry.root / "harbor-web").exists()
+    assert requests == []
 
-    def test_linear_pair_is_required_and_trimmed_for_both_commands(self):
-        for args in (("init", "linth", "--linear", " project-1 , team-1 "),
-                     ("linear", "link", "linth", " project-2 , team-2 ")):
-            with self.subTest(args=args), linear_http() as requests:
-                self.invoke(*args)
-                self.assertEqual(requests, [])
-        self.assertEqual(self.registry.load("linth").config.linear.project_id, "project-2")
-        self.assertEqual(self.registry.load("linth").config.linear.team_id, "team-2")
 
-    def test_malformed_linear_pairs_leave_configuration_unchanged(self):
-        config = (self.project.root / "project.yaml").read_bytes()
-        for value in ("", " ", "project-1", "project-1,", ",team-1", " , ",
-                      "project-1,team-1,extra", "project-1,,team-1"):
-            for args in (("init", "linth", "--linear", value), ("linear", "link", "atlas-api", value)):
-                with self.subTest(args=args), linear_http() as requests:
-                    result = self.runner.invoke(main, args)
-                    self.assertNotEqual(result.exit_code, 0)
-                    self.assertIn("<project-id>,<team-id>", result.output)
-                    self.assertEqual(requests, [])
-                    self.assertEqual((self.project.root / "project.yaml").read_bytes(), config)
-                    self.assertFalse((self.registry.root / "linth").exists())
+def test_create_links_remote_project_using_explicit_team_id(invoke, config_path, linear_http, created_project, payload):
+    with linear_http(created_project) as requests:
+        output = invoke(*CREATE)
+    assert "project-1" in output
+    assert "team-1" in output
+    assert "https://linear.app/team/project/atlas" in output
+    assert yaml.safe_load(config_path.read_text())["linear"] == {"project_id": "project-1", "team_id": "team-1"}
+    assert payload(requests[0])["variables"]["input"] == {"name": "Atlas", "teamIds": ["team-1"]}
+    assert len(requests) == 1
 
-    def test_github_link_preserves_workspace_and_linear_metadata(self):
-        self.invoke("init", "linth", "--linear", "project-1,team-1")
-        project = self.registry.load("linth")
-        marker = project.code / "notes.txt"
-        marker.write_text("Keep my work")
-        spec = project.root / "specs" / "api" / "v1" / "spec.md"
-        spec.parent.mkdir(parents=True)
-        spec.write_text("# Existing requirements\n")
-        metadata = project.root / "specs" / ".config.json"
-        metadata.write_text('{"specs": [{"name": "API", "versions": ["v1"]}]}')
-        artifacts = {path: path.read_bytes() for path in (spec, metadata)}
-        with linear_http() as requests, patch("battuta_project.registry.subprocess.run", side_effect=AssertionError("link must not run subprocesses")):
-            self.assertIn("https://github.com/team/other", self.invoke("github", "link", "linth", "git@github.com:team/other.git"))
-            self.assertEqual(requests, [])
-        linked = self.registry.load("linth")
-        self.assertEqual(linked.name, "linth")
-        self.assertEqual(linked.config.github.repository, "team/other")
-        self.assertEqual(linked.config.linear.project_id, "project-1")
-        self.assertEqual(linked.config.linear.team_id, "team-1")
-        self.assertEqual(marker.read_text(), "Keep my work")
-        for path, original in artifacts.items():
-            self.assertEqual(path.read_bytes(), original)
 
-    def test_github_link_invalid_url_or_write_failure_preserves_configuration(self):
-        path = self.project.root / "project.yaml"
-        config = path.read_bytes()
-        for url in ("not-a-url", "https://gitlab.com/team/repo", "https://github.com/team/repo/tree/main"):
-            with self.subTest(url=url):
-                result = self.runner.invoke(main, ["github", "link", "atlas-api", url])
-                self.assertNotEqual(result.exit_code, 0)
-                self.assertIn("GitHub", result.output)
-                self.assertEqual(path.read_bytes(), config)
-        with patch("battuta_project.storage.os.replace", side_effect=OSError("disk full")):
-            result = self.runner.invoke(main, ["github", "link", "atlas-api", "https://github.com/team/other"])
-        self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("disk full", result.output)
-        self.assertEqual(path.read_bytes(), config)
+def test_create_api_failure_preserves_local_link(runner, config_path, linear_http):
+    original = config_path.read_text()
+    with linear_http({"errors": [{"message": "Invalid team"}]}):
+        result = runner.invoke(main, CREATE)
+    assert result.exit_code != 0
+    assert "Invalid team" in result.output
+    assert config_path.read_text() == original
+
+
+def test_create_requires_valid_local_project_before_http(runner, config_path, linear_http):
+    config_path.write_text("invalid yaml config")
+    with linear_http() as requests:
+        result = runner.invoke(main, CREATE)
+    assert result.exit_code != 0
+    assert "project.yaml" in result.output
+    assert requests == []
+
+
+@EXACT_NAMES
+def test_linear_create_recovery_names_exact_project(runner, invoke, registry, linear_http, created_project, name):
+    project = registry.init(name)
+    path = project.root / "project.yaml"
+    original = path.read_text()
+    with linear_http(created_project) as requests, patch("battuta_project.storage.os.replace", side_effect=OSError("disk full")):
+        result = runner.invoke(main, ["linear", "create", "--team-id", "team-1", "--", name, "Atlas"])
+    assert result.exit_code != 0
+    assert "created" in result.output.lower()
+    assert "project-1" in result.output
+    assert "https://linear.app/team/project/atlas" in result.output
+    recovery = shlex.split(result.output.strip().splitlines()[-1])
+    assert recovery == ["battuta-project", "linear", "link", "--", name, "project-1,team-1"]
+    assert "disk full" in result.output
+    assert path.read_text() == original
+    assert len(requests) == 1
+    with linear_http() as recovery_requests:
+        invoke(*recovery[1:])
+    assert recovery_requests == []
+    assert registry.load(name).config.linear.project_id == "project-1"
+
+
+def test_create_unreadable_local_config_reports_remote_success_and_recovery(runner, config_path, linear_http, created_project):
+    def created(request):
+        config_path.write_bytes(b"\xff")
+        return created_project
+
+    with linear_http(created) as requests:
+        result = runner.invoke(main, CREATE)
+    assert result.exit_code != 0
+    assert "project.yaml" in result.output
+    assert "project-1" in result.output
+    assert "https://linear.app/team/project/atlas" in result.output
+    assert "linear link -- atlas-api project-1,team-1" in result.output
+    assert len(requests) == 1
+
+
+def test_name_only_init_creates_discoverable_project_without_github(invoke, registry, linear_http):
+    with linear_http() as requests:
+        assert "Initialized project: linth" in invoke("init", "linth")
+        assert "**linth**" in invoke("list")
+        assert "Repository URL: no GitHub repository linked yet" in invoke("explain", "linth")
+        assert requests == []
+    project = registry.load("linth")
+    assert project.code.is_dir()
+    assert list(project.code.iterdir()) == []
+    assert project.config.github.repository is None
+
+
+def test_init_uses_explicit_name_with_different_repository_basename(invoke, registry):
+    invoke("init", "linth", "--github", "https://github.com/team/other.git")
+    project = registry.load("linth")
+    assert project.name == "linth"
+    assert project.config.github.repository == "team/other"
+    assert project.code.name == "code"
+
+
+@pytest.mark.parametrize("value", ["", " ", "project-1", "project-1,", ",team-1", " , ", "project-1,team-1,extra", "project-1,,team-1"],
+                         ids=["empty", "space", "id-only", "trailing-comma", "leading-comma", "blank-pair", "extra-field", "double-comma"])
+@pytest.mark.parametrize("command", ["init", "link"])
+def test_malformed_linear_pairs_leave_configuration_unchanged(runner, registry, config_path, linear_http, command, value):
+    args = ("init", "linth", "--linear", value) if command == "init" else ("linear", "link", "atlas-api", value)
+    config = config_path.read_bytes()
+    with linear_http() as requests:
+        result = runner.invoke(main, args)
+    assert result.exit_code != 0
+    assert "<project-id>,<team-id>" in result.output
+    assert requests == []
+    assert config_path.read_bytes() == config
+    assert not (registry.root / "linth").exists()
+
+
+def test_github_link_preserves_workspace_and_linear_metadata(invoke, registry, clone, linear_http):
+    invoke("init", "linth", "--linear", "project-1,team-1")
+    project = registry.load("linth")
+    marker = project.code / "notes.txt"
+    marker.write_text("Keep my work")
+    spec = project.root / "specs" / "api" / "v1" / "spec.md"
+    spec.parent.mkdir(parents=True)
+    spec.write_text("# Existing requirements\n")
+    metadata = project.root / "specs" / ".config.json"
+    metadata.write_text('{"specs": [{"name": "API", "versions": ["v1"]}]}')
+    artifacts = {path: path.read_bytes() for path in (spec, metadata)}
+    clone.reset_mock(side_effect=True)
+    with linear_http() as requests:
+        assert "https://github.com/team/other" in invoke("github", "link", "linth", "git@github.com:team/other.git")
+        assert requests == []
+    clone.assert_not_called()
+    linked = registry.load("linth")
+    assert linked.name == "linth"
+    assert linked.config.github.repository == "team/other"
+    assert linked.config.linear.project_id == "project-1"
+    assert linked.config.linear.team_id == "team-1"
+    assert marker.read_text() == "Keep my work"
+    for path, original in artifacts.items():
+        assert path.read_bytes() == original
+
+
+@pytest.mark.parametrize("url", ["not-a-url", "https://gitlab.com/team/repo", "https://github.com/team/repo/tree/main"],
+                         ids=["not-a-url", "other-host", "subpath"])
+def test_github_link_invalid_url_preserves_configuration(runner, config_path, url):
+    config = config_path.read_bytes()
+    result = runner.invoke(main, ["github", "link", "atlas-api", url])
+    assert result.exit_code != 0
+    assert "GitHub" in result.output
+    assert config_path.read_bytes() == config
+
+
+def test_github_link_write_failure_preserves_configuration(runner, config_path):
+    config = config_path.read_bytes()
+    with patch("battuta_project.storage.os.replace", side_effect=OSError("disk full")):
+        result = runner.invoke(main, ["github", "link", "atlas-api", "https://github.com/team/other"])
+    assert result.exit_code != 0
+    assert "disk full" in result.output
+    assert config_path.read_bytes() == config

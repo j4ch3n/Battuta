@@ -1,15 +1,12 @@
 """Memory reads: fixed failure categories and the printed overview lines."""
 
 import json
-import unittest
-from unittest.mock import patch
 
 import httpx
-from click.testing import CliRunner
+import pytest
 
 from battuta_project import memory
 from battuta_project.cli import main
-from project_fixtures import ProjectTestCase
 
 
 def reply(data, ok=True):
@@ -23,73 +20,68 @@ def failing(error):
     return handler
 
 
-class TransportTests(unittest.TestCase):
-    def test_failures_map_to_fixed_categories(self):
-        cases = {
-            "unreachable": failing(httpx.ConnectError("refused http://secret@host")),
-            "timed out": failing(httpx.ReadTimeout("slow")),
-            "rejected": lambda request: httpx.Response(401),
-            "server error 500": lambda request: httpx.Response(500, text="Traceback /home/owner"),
-        }
-        for category, handler in cases.items():
-            with self.subTest(category=category), self.assertRaises(memory.MemoryUnavailable) as raised:
-                memory.overview("mocktest", httpx.MockTransport(handler))
-            self.assertEqual(str(raised.exception), category)
-
-    def test_contract_mismatch_is_rejected(self):
-        for response in (httpx.Response(200, text="not json"), reply({"status": "odd"}), reply({}, ok=False)):
-            with self.subTest(response=response.content[:20]), self.assertRaisesRegex(memory.MemoryUnavailable, "^rejected$"):
-                memory.overview("mocktest", httpx.MockTransport(lambda request, response=response: response))
-
-    def test_sends_one_tool_call_to_the_read_endpoint(self):
-        seen = []
-
-        def handler(request):
-            seen.append((str(request.url), json.loads(request.content)))
-            return reply({"descriptions": {"mocktest": "Banking prototype"}})
-
-        with patch.dict("os.environ", {"BATTUTA_MEMORY_URL": "http://127.0.0.1:9999/mcp"}, clear=False):
-            self.assertEqual(memory.descriptions(["mocktest"], httpx.MockTransport(handler)), {"mocktest": "Banking prototype"})
-        self.assertEqual(seen[0][0], "http://127.0.0.1:9999/mcp/read")
-        self.assertEqual(seen[0][1]["params"], {"name": "memory_project_descriptions", "arguments": {"projects": ["mocktest"]}})
+@pytest.mark.parametrize("category, handler", [
+    ("unreachable", failing(httpx.ConnectError("refused http://secret@host"))),
+    ("timed out", failing(httpx.ReadTimeout("slow"))),
+    ("rejected", lambda request: httpx.Response(401)),
+    ("server error 500", lambda request: httpx.Response(500, text="Traceback /home/owner")),
+], ids=["connect-error", "timeout", "unauthorized", "server-error"])
+def test_failures_map_to_fixed_categories(category, handler):
+    with pytest.raises(memory.MemoryUnavailable) as raised:
+        memory.overview("mocktest", httpx.MockTransport(handler))
+    assert str(raised.value) == category
 
 
-class OutputTests(ProjectTestCase):
-    def invoke(self, *args):
-        result = CliRunner().invoke(main, list(args), env={"LINEAR_API_TOKEN": "fixture"})
-        self.assertEqual(result.exit_code, 0, result.output)
-        return result.output
-
-    def test_explain_prints_each_overview_result(self):
-        cases = [
-            ({"status": "ok", "overview": {"body": "Atlas imports maps.", "created": "2026-11-26T05:31:00+00:00"}},
-             "Atlas imports maps.\n\n(memory overview, written 2026-11-26)"),
-            ({"status": "not_written"}, "Project overview: not written yet."),
-            ({"status": "unknown_project", "projects": []}, "Project overview: memory doesn't know this project."),
-            (memory.MemoryUnavailable("timed out"), "Project overview: memory query failed (timed out)."),
-        ]
-        for result, line in cases:
-            with self.subTest(line=line):
-                self.memory.side_effect = result if isinstance(result, Exception) else None
-                self.memory.return_value = result
-                output = self.invoke("explain", "atlas-api")
-                self.assertIn(line, output)
-                self.assertIn("Directory tree", output)
-
-    def test_list_shows_descriptions_and_failure_line(self):
-        self.memory.side_effect = None
-        self.memory.return_value = {"descriptions": {"atlas-api": "Map import service"}}
-        output = self.invoke("list")
-        self.assertIn("**atlas-api** — Map import service", output)
-        self.assertIn("Run `battuta-project explain <name>` for the full overview.", output)
-        self.memory.return_value = {"descriptions": {"atlas-api": None}}
-        self.assertIn("**atlas-api** — (no description yet)", self.invoke("list"))
-        self.memory.side_effect = memory.MemoryUnavailable("unreachable")
-        output = self.invoke("list")
-        self.assertIn("**atlas-api**\n", output)
-        self.assertIn("Descriptions: memory query failed (unreachable)", output)
-        self.assertEqual(json.loads(self.invoke("list", "--json")), {"projects": ["atlas-api"]})
+@pytest.mark.parametrize("response", [
+    httpx.Response(200, text="not json"), reply({"status": "odd"}), reply({}, ok=False),
+], ids=["not-json", "unknown-status", "error-envelope"])
+def test_contract_mismatch_is_rejected(response):
+    with pytest.raises(memory.MemoryUnavailable, match="^rejected$"):
+        memory.overview("mocktest", httpx.MockTransport(lambda request: response))
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_sends_one_tool_call_to_the_read_endpoint(monkeypatch):
+    seen = []
+
+    def handler(request):
+        seen.append((str(request.url), json.loads(request.content)))
+        return reply({"descriptions": {"mocktest": "Banking prototype"}})
+
+    monkeypatch.setenv("BATTUTA_MEMORY_URL", "http://127.0.0.1:9999/mcp")
+    assert memory.descriptions(["mocktest"], httpx.MockTransport(handler)) == {"mocktest": "Banking prototype"}
+    assert seen[0][0] == "http://127.0.0.1:9999/mcp/read"
+    assert seen[0][1]["params"] == {"name": "memory_project_descriptions", "arguments": {"projects": ["mocktest"]}}
+
+
+@pytest.mark.parametrize("result, line", [
+    ({"status": "ok", "overview": {"body": "Atlas imports maps.", "created": "2026-11-26T05:31:00+00:00"}},
+     "Atlas imports maps.\n\n(memory overview, written 2026-11-26)"),
+    ({"status": "not_written"}, "Project overview: not written yet."),
+    ({"status": "unknown_project", "projects": []}, "Project overview: memory doesn't know this project."),
+    (memory.MemoryUnavailable("timed out"), "Project overview: memory query failed (timed out)."),
+], ids=["written", "not-written", "unknown-project", "unavailable"])
+def test_explain_prints_each_overview_result(invoke, project, memory_call, result, line):
+    memory_call.side_effect = result if isinstance(result, Exception) else None
+    memory_call.return_value = result
+    output = invoke("explain", "atlas-api")
+    assert line in output
+    assert "Directory tree" in output
+
+
+@pytest.mark.parametrize("descriptions, line", [
+    ({"atlas-api": "Map import service"}, "**atlas-api** — Map import service"),
+    ({"atlas-api": None}, "**atlas-api** — (no description yet)"),
+], ids=["described", "undescribed"])
+def test_list_shows_descriptions(invoke, project, memory_call, descriptions, line):
+    memory_call.side_effect = None
+    memory_call.return_value = {"descriptions": descriptions}
+    output = invoke("list")
+    assert line in output
+    assert "Run `battuta-project explain <name>` for the full overview." in output
+
+
+def test_list_shows_failure_line_and_json_stays_plain(invoke, project):
+    output = invoke("list")
+    assert "**atlas-api**\n" in output
+    assert "Descriptions: memory query failed (unreachable)" in output
+    assert json.loads(invoke("list", "--json")) == {"projects": ["atlas-api"]}
