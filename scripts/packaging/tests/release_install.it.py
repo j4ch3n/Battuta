@@ -101,7 +101,7 @@ for value in data['requires']:
                 versions = run(str(python), "-c", "import importlib.metadata as m,json; print(json.dumps({d.metadata['Name'].lower().replace('_','-'):d.version for d in m.distributions()}))", capture_output=True).stdout
                 payload = json.dumps({"requires": metadata.get_all("Requires-Dist", []), "versions": json.loads(versions)})
                 run(str(installed["battuta-packaging"][1] / "bin/python"), "-c", check, input=payload)
-            root = work / "opt/battuta/latest"
+            root = work / "battuta/latest"
             packaging = str(installed["battuta-packaging"][0] / "battuta-packaging")
             node = shutil.which("node", path=env["PATH"])
             def install_bots():
