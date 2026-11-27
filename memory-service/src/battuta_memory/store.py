@@ -55,7 +55,8 @@ class DistillSchemas:
 
     def all(self):
         projects = ", ".join(self._store.catalog())
-        guidance = f" Set fields.project to one of: {projects}; owner-personal memories use global."
+        guidance = (f" Set fields.project to one of: {projects}; owner-personal memories use global."
+                    " When the owner or CoS declares entries stale or superseded, write each entry's exact slug verbatim in the body.")
         return [dataclasses.replace(schema, description=schema.description + guidance) for schema in self._registry.all() if schema.type != OVERVIEW]
 
     def __getattr__(self, name):
