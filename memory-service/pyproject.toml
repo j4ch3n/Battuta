@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8,<10"]
+dev = ["pytest>=8,<10", "pytest-bdd>=9,<10"]
 
 [project.scripts]
 battuta-memory = "battuta_memory.cli:main"
