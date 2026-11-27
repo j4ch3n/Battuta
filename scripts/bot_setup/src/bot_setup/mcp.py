@@ -62,8 +62,15 @@ def mcp_payload(*, role: Literal["cos", "manager", "worker"], supabase_url: str,
     if role != "worker":
         servers["linear"] = {"url": "https://mcp.linear.app/mcp", "headers": {"Authorization": "Bearer ${LINEAR_API_TOKEN}"}, "exposure": "codemode", "description": "Manage Linear issues, projects, and cycles"}
     if role == "cos":
-        # A disabled override also blocks an inherited user-level memory server.
-        servers["memory"] = {"url": url, "enabled": False}
+        # CoS gets the full endpoint for owner-confirmed memory_forget plus the project reads memory-client does not
+        # already register (it provides memory_recall and memory_types); other full-endpoint tools stay hidden.
+        servers["memory"] = {
+            "url": url,
+            "enabled": True,
+            "exposure": "hidden",
+            "toolExposure": {name: "codemode" for name in ("memory_forget", "memory_project_overview", "memory_project_descriptions")},
+            "description": "Owner-confirmed memory forget plus project memory reads",
+        }
     elif role == "manager":
         servers["memory"] = {
             "url": read_endpoint(url),

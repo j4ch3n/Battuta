@@ -30,13 +30,23 @@ def test_native_configuration_preserves_custom_and_private_state(tmp_path, role)
                 "description": "Read-only project memory: recall and project overviews",
             }
             if role == "manager"
-            else {"url": "http://localhost:8989/mcp", "enabled": False}
+            else {
+                "url": "http://localhost:8989/mcp",
+                "enabled": True,
+                "exposure": "hidden",
+                "toolExposure": {name: "codemode" for name in ("memory_forget", "memory_project_overview", "memory_project_descriptions")},
+                "description": "Owner-confirmed memory forget plus project memory reads",
+            }
             if role == "cos"
             else {"enabled": False}
         )
         assert config["mcpServers"]["memory"] == expected_memory
         if role == "cos":
-            assert "url" in config["mcpServers"]["memory"]
+            assert "memory_forget" in config["mcpServers"]["memory"]["toolExposure"]
+            assert "memory_recall" not in config["mcpServers"]["memory"]["toolExposure"]
+            assert not config["mcpServers"]["memory"]["url"].endswith("/read")
+        elif role == "manager":
+            assert "toolExposure" not in config["mcpServers"]["memory"]
         assert json.loads((pi / "settings.json").read_text()) == {"theme": "dark", "packages": ["npm:custom@1"]}
         assert auth.read_bytes() == b'{"private":"oauth"}\n'
         assert (pi / "mcp.json").stat().st_mode & 0o777 == 0o600

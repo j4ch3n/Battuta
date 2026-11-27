@@ -2,8 +2,10 @@
 
 Battuta's long-term memory is one [agent-memory](https://github.com/tigerless-labs/agent-memory)
 store served by `battuta-memory`. The store is a folder of markdown files and a
-rebuildable index. The memory client in CoS only reads it and triggers the dream;
-all model work happens in the dream, which runs Claude Code.
+rebuildable index. CoS reads it, triggers the dream and, with the owner's
+confirmation, can forget entries through `memory_forget`. A forget ends an
+entry's validity, keeps the file and is audited in the decisions ledger. All
+model work happens in the dream, which runs Claude Code.
 
 ## Storage
 
@@ -74,8 +76,14 @@ continues from the distill watermarks. Read `dream.log` for the cause.
 
 | Endpoint                | Clients                    | Tools                                                                                         |
 | ----------------------- | -------------------------- | --------------------------------------------------------------------------------------------- |
-| `/mcp`                  | CoS memory client          | All, including `memory_profile`, `memory_dream_start`, `memory_dream_status`, `memory_health` |
+| `/mcp`                  | CoS memory client, CoS MCP | All, including `memory_profile`, `memory_dream_start`, `memory_dream_status`, `memory_health` |
 | `/mcp/read` (stateless) | Manager, `battuta-project` | `memory_recall`, `memory_types`, `memory_project_overview`, `memory_project_descriptions`     |
 | `POST /archive`         | CoS memory client          | NDJSON conversation upload, at most 8 MiB, loopback only                                      |
+
+CoS's MCP entry uses `/mcp` but exposes only `memory_forget`,
+`memory_project_overview` and `memory_project_descriptions`; the CoS memory
+client already provides `memory_recall` and `memory_types`. CoS calls
+`memory_forget` only on the owner's confirmation or instruction. Manager stays
+read-only on `/mcp/read`.
 
 See the [tool reference](memory-tools.md) for arguments and results.
