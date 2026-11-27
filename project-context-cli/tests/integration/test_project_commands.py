@@ -48,7 +48,7 @@ def sentinels(tmp_path, cli):
     return files
 
 
-@pytest.mark.parametrize("operation", OPERATIONS)
+@pytest.mark.parametrize("operation", list(OPERATIONS), ids=list(OPERATIONS))
 def test_concurrent_explicit_project_operations_preserve_each_projects_files(tmp_path, env, cli, sentinels, operation):
     root = tmp_path / ".battuta/projects"
     assert "atlas" in cli("list")
@@ -72,3 +72,11 @@ def test_concurrent_explicit_project_operations_preserve_each_projects_files(tmp
         assert path.read_bytes() == original
     assert not (root / ".config.json").exists()
     assert not (root / ".config.lock").exists()
+
+
+def test_linear_link_keeps_github_repository_from_earlier_github_link(tmp_path, cli, sentinels):
+    cli(*OPERATIONS["github"]("atlas"))
+    cli(*OPERATIONS["linear"]("atlas"))
+    config = yaml.safe_load((tmp_path / ".battuta/projects/atlas/project.yaml").read_text())
+    assert config["github"]["repository"] == "team/atlas"
+    assert config["linear"] == {"project_id": "atlas-project", "team_id": "atlas-team"}

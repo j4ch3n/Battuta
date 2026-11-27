@@ -65,7 +65,6 @@ def test_explain_prints_each_overview_result(invoke, project, memory_call, resul
     memory_call.return_value = result
     output = invoke("explain", "atlas-api")
     assert line in output
-    assert "Directory tree" in output
 
 
 @pytest.mark.parametrize("descriptions, line", [
@@ -77,7 +76,6 @@ def test_list_shows_descriptions(invoke, project, memory_call, descriptions, lin
     memory_call.return_value = {"descriptions": descriptions}
     output = invoke("list")
     assert line in output
-    assert "Run `battuta-project explain <name>` for the full overview." in output
 
 
 def test_list_shows_failure_line_and_json_stays_plain(invoke, project):

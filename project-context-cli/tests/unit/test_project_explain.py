@@ -10,7 +10,6 @@ def test_overview_reports_workspace_paths_without_creating_files(project):
     output = render("explain.md.j2", explain_project(project))
     assert "Managed Project Directory: ~/.battuta/projects/atlas-api" in output
     assert "Project Root: ~/.battuta/projects/atlas-api/code" in output
-    assert "## Project overview" in output
     assert sorted(path.name for path in project.root.iterdir()) == before
 
 

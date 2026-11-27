@@ -247,7 +247,7 @@ def test_init_uses_explicit_name_with_different_repository_basename(invoke, regi
 
 @pytest.mark.parametrize("value", ["", " ", "project-1", "project-1,", ",team-1", " , ", "project-1,team-1,extra", "project-1,,team-1"],
                          ids=["empty", "space", "id-only", "trailing-comma", "leading-comma", "blank-pair", "extra-field", "double-comma"])
-@pytest.mark.parametrize("command", ["init", "link"])
+@pytest.mark.parametrize("command", ["init", "link"], ids=["init", "link"])
 def test_malformed_linear_pairs_leave_configuration_unchanged(runner, registry, config_path, linear_http, command, value):
     args = ("init", "linth", "--linear", value) if command == "init" else ("linear", "link", "atlas-api", value)
     config = config_path.read_bytes()

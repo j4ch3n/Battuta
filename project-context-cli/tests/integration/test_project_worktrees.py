@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 
 from click.testing import CliRunner
@@ -15,9 +16,14 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture
 def project(home, monkeypatch):
-    # Git hooks export GIT_DIR/GIT_INDEX_FILE, which would redirect these tests' own repositories.
+    if shutil.which("git") is None:
+        pytest.skip("git is not installed")
+    # Hermetic git: hooks export GIT_DIR/GIT_INDEX_FILE, and user/system config must not leak in.
     for key in [key for key in os.environ if key.startswith("GIT_")]:
         monkeypatch.delenv(key)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("LINEAR_API_TOKEN", "test-token")
     project = ProjectRegistry().init("atlas-api")
     git = ["git", "-C", str(project.code), "-c", "user.name=t", "-c", "user.email=t@t"]

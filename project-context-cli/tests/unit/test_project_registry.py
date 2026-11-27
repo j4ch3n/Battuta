@@ -93,8 +93,9 @@ def test_github_url_variants(registry, url):
     assert registry.init("harbor-web", github=url).config.github.repository == "team/harbor-web"
 
 
-def test_init_writes_no_summary(registry):
-    project = registry.init("atlas-api", github=ATLAS)
+@pytest.mark.parametrize("github", [None, ATLAS], ids=["name-only", "github"])
+def test_init_creates_only_code_and_config(registry, github):
+    project = registry.init("atlas-api", github=github)
     assert sorted(p.name for p in project.root.iterdir()) == ["code", "project.yaml"]
 
 
@@ -148,12 +149,13 @@ def test_invalid_urls_do_not_create_registry(registry, clone, root, url):
     clone.assert_not_called()
 
 
-def test_load_matches_exact_folder(registry):
+@pytest.mark.parametrize("name", ["atlas", "Atlas-api", "missing", "../atlas-api", ".config.json"],
+                         ids=["prefix", "case-mismatch", "unknown", "traversal", "config-file"])
+def test_load_matches_exact_folder(registry, name):
     registry.init("atlas-api", github=ATLAS)
     registry.init("harbor-web", github=HARBOR)
-    for name in ("atlas", "Atlas-api", "missing", "../atlas-api", ".config.json"):
-        with pytest.raises(click.ClickException):
-            registry.load(name)
+    with pytest.raises(click.ClickException):
+        registry.load(name)
     assert registry.load("atlas-api").name == "atlas-api"
 
 
@@ -222,7 +224,7 @@ def test_project_and_checkout_symlinks_are_rejected(registry, root, home):
         registry.load("atlas-api")
 
 
-@pytest.mark.parametrize("component", ["projects", ".battuta"])
+@pytest.mark.parametrize("component", ["projects", ".battuta"], ids=["projects-dir", "battuta-dir"])
 def test_symlink_registry_and_owned_parent_cannot_redirect_operations(registry, home, component):
     project = registry.init("atlas-api", github=ATLAS)
     (project.root / "SUMMARY.md").write_text("Preserve me\n")
