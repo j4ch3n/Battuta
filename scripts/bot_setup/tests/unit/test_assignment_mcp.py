@@ -10,7 +10,7 @@ from bot_setup.mcp import configure_mcp
 from bot_setup import mcp
 
 
-@pytest.mark.parametrize("name", ["normal", "测试 home%2F#"])
+@pytest.mark.parametrize("name", ["normal", "测试 home%2F#"], ids=["ascii", "unicode-and-escapes"])
 def test_assignment_root_header_encodes_caller_home_without_creating_storage(tmp_path, name):
     home = tmp_path / name
     header = mcp.assignment_environment(home)["BATTUTA_PROJECTS_ROOT_HEADER"]
@@ -20,7 +20,7 @@ def test_assignment_root_header_encodes_caller_home_without_creating_storage(tmp
 
 
 @pytest.mark.parametrize("role", ["cos", "manager", "worker"])
-@pytest.mark.parametrize("url", ["https://example.supabase.co", "http://127.0.0.1:54321", "http://localhost:54321/"])
+@pytest.mark.parametrize("url", ["https://example.supabase.co", "http://127.0.0.1:54321", "http://localhost:54321/"], ids=["hosted", "loopback-ip", "localhost-slash"])
 def test_assignment_mcp_preserves_custom_auth_and_role_appropriate_access(tmp_path, role, url):
     pi = tmp_path / ".pi"
     pi.mkdir()
@@ -55,7 +55,8 @@ def test_assignment_mcp_preserves_custom_auth_and_role_appropriate_access(tmp_pa
         assert "assignment-files" not in data["mcpServers"]
 
 
-@pytest.mark.parametrize("url", ["", "invalid", "http://example.com", "https://user:private-password@example.com", "https://example.com?secret=private-password", "https://example.com/#fragment", "https://example.com/path", "https://exa mple.com", "https://example.com\\path", "https://example.com/\n", "https://bad_host.example", "https://-bad.example"])
+@pytest.mark.parametrize("url", ["", "invalid", "http://example.com", "https://user:private-password@example.com", "https://example.com?secret=private-password", "https://example.com/#fragment", "https://example.com/path", "https://exa mple.com", "https://example.com\\path", "https://example.com/\n", "https://bad_host.example", "https://-bad.example"],
+                         ids=["empty", "no-scheme", "http-remote", "credentials", "query", "fragment", "path", "space", "backslash", "newline", "underscore-host", "leading-hyphen"])
 def test_bad_assignment_endpoint_fails_before_writes(tmp_path, url):
     with pytest.raises(click.ClickException) as error:
         configure_mcp(tmp_path, role="worker", supabase_url=url)

@@ -45,7 +45,7 @@ def test_github_step_passes_when_logged_in(tmp_path, monkeypatch, capsys):
     assert "octo-secret" not in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("profile,role", [("cos-bot", "cos"), ("worker", "worker")])
+@pytest.mark.parametrize("profile,role", [("cos-bot", "cos"), ("worker", "worker")], ids=["cos", "worker"])
 def test_github_step_is_manager_only(tmp_path, profile, role):
     text = (ROOT / "bots" / profile / "bot.toml").read_text()
     manifest = tmp_path / "bot.toml"

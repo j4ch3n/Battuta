@@ -184,14 +184,6 @@ def test_preflight_all_instances_before_any_write(deployment, conflict):
     assert not (home / ".battuta/pi-bots/cos-bot").exists()
 
 
-def test_signed_out_gh_stops_main_release_before_writes(deployment, tmp_path):
-    root, home, env_file = deployment
-    (tmp_path / "stub-bin/gh").write_text("#!/bin/sh\nexit 1\n")
-    with pytest.raises(click.ClickException, match="gh auth login"):
-        release.configure_release(root, env_file=env_file, home=home)
-    assert not (home / ".battuta/pi-bots").exists()
-
-
 def test_zero_workers(deployment):
     root, home, env_file = deployment
     env_file.write_text(env_file.read_text().replace("BATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=general\n", ""))
@@ -221,10 +213,18 @@ def test_influencer_release_configures_only_worker(deployment):
     assert servers["speech"] == {"enabled": False}
 
 
-@pytest.mark.parametrize("selection", ["", "BATTUTA_WORKER_1_TYPE=general\n", "BATTUTA_WORKER_1_TYPE=influencer\nBATTUTA_WORKER_2_TYPE=influencer\n"])
-def test_influencer_release_rejects_invalid_selection_before_writes(deployment, selection):
+@pytest.mark.parametrize("deployment_kwargs,selection,signed_in,match", [
+    ({}, None, False, "gh auth login"),
+    ({"deployment": "influencer"}, "", True, None),
+    ({"deployment": "influencer"}, "BATTUTA_WORKER_1_TYPE=general\n", True, None),
+    ({"deployment": "influencer"}, "BATTUTA_WORKER_1_TYPE=influencer\nBATTUTA_WORKER_2_TYPE=influencer\n", True, None),
+], ids=["signed-out-gh", "influencer-no-worker", "influencer-general-worker", "influencer-two-workers"])
+def test_rejected_release_fails_before_writes(deployment, tmp_path, deployment_kwargs, selection, signed_in, match):
     root, home, env_file = deployment
-    env_file.write_text(selection)
-    with pytest.raises(click.ClickException):
-        release.configure_release(root, env_file=env_file, home=home, deployment="influencer")
+    if selection is not None:
+        env_file.write_text(selection)
+    if not signed_in:
+        (tmp_path / "stub-bin/gh").write_text("#!/bin/sh\nexit 1\n")
+    with pytest.raises(click.ClickException, match=match):
+        release.configure_release(root, env_file=env_file, home=home, **deployment_kwargs)
     assert not home.exists()

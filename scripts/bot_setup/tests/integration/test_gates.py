@@ -3,10 +3,18 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
+import pytest
+
 from hermetic_git import git_env, run_git
+
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(shutil.which("git") is None or shutil.which("pnpm") is None, reason="git and pnpm are required"),
+]
 
 ROOT = Path(__file__).resolve().parents[4]
 

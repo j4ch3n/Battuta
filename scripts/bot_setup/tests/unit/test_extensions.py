@@ -27,30 +27,22 @@ def test_prepares_and_reconciles_only_owned_links(tmp_path: Path):
     assert custom.read_text() == "custom"
 
 
-def test_conflicting_file_is_not_overwritten(tmp_path: Path):
+@pytest.mark.parametrize("kind", ["custom-file", "matching-unowned-link"])
+def test_unowned_extension_entry_is_never_overwritten_or_adopted(tmp_path: Path, kind):
     source = tmp_path / "mail/index.ts"
     source.parent.mkdir()
     source.write_text("source")
     bot = tmp_path / "bots/manager-bot"
     target = bot / ".pi/extensions/mail.ts"
     target.parent.mkdir(parents=True)
-    target.write_text("custom")
+    if kind == "custom-file":
+        target.write_text("custom")
+    else:
+        target.symlink_to("../../../../mail/index.ts")
     with pytest.raises(click.ClickException):
         prepare_source_extensions(tmp_path, bot, [Extension(name="mail", source="mail/index.ts")])
-    assert target.read_text() == "custom"
-
-
-def test_matching_unowned_link_is_not_adopted(tmp_path: Path):
-    source = tmp_path / "mail/index.ts"
-    source.parent.mkdir()
-    source.write_text("source")
-    bot = tmp_path / "bots/manager-bot"
-    link = bot / ".pi/extensions/mail.ts"
-    link.parent.mkdir(parents=True)
-    link.symlink_to("../../../../mail/index.ts")
-    with pytest.raises(click.ClickException):
-        prepare_source_extensions(tmp_path, bot, [Extension(name="mail", source="mail/index.ts")])
-    assert link.resolve() == source
+    assert target.is_symlink() == (kind == "matching-unowned-link")
+    assert target.read_text() == ("custom" if kind == "custom-file" else "source")
     assert not (bot / ".pi/battuta-extensions.json").exists()
 
 
@@ -88,7 +80,7 @@ def test_missing_selection_does_not_remove_previously_owned_link(tmp_path: Path)
     assert (bot / ".pi/extensions/mail.ts").resolve() == source
 
 
-@pytest.mark.parametrize("name", ["../escape", "Upper", "space name"])
+@pytest.mark.parametrize("name", ["../escape", "Upper", "space name"], ids=["path-escape", "uppercase", "space"])
 def test_invalid_extension_names_are_rejected(name):
     with pytest.raises(ValueError):
         Extension(name=name, source="mail/index.ts")
@@ -142,7 +134,7 @@ def test_cos_manifest_selects_only_existing_non_cos_extensions():
     assert all((root / extension.source).is_file() for extension in manifest.extensions)
 
 
-@pytest.mark.parametrize("source", ["../other.ts", "/tmp/other.ts", "missing.ts"])
+@pytest.mark.parametrize("source", ["../other.ts", "/tmp/other.ts", "missing.ts"], ids=["parent-escape", "absolute", "missing-file"])
 def test_invalid_sources_do_not_create_extension_directory(tmp_path: Path, source: str):
     bot = tmp_path / "bots/manager-bot"
     with pytest.raises((click.ClickException, ValueError)):

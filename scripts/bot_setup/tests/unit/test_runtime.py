@@ -27,12 +27,12 @@ include = []
     ("cos", "cos-bot", "custom-cos/.pi", "custom-cos/.pi"),
     ("manager", "manager-bot", "manager-bot/.pi", "manager-bot/.pi"),
     ("worker", "worker-2", "workers/{instance}/.pi", "workers/worker-2/.pi"),
-])
+], ids=["cos-custom", "manager-default", "worker-instance"])
 def test_paths_use_manifest_under_fixed_base(tmp_path, role, instance, directory, want):
     assert resolve_agent_dir(manifest(directory, role), instance, tmp_path) == tmp_path / ".battuta/pi-bots" / want
 
 
-@pytest.mark.parametrize("directory", ["/outside/.pi", "../outside/.pi", "{unknown}/.pi", "cos-bot/../other/.pi"])
+@pytest.mark.parametrize("directory", ["/outside/.pi", "../outside/.pi", "{unknown}/.pi", "cos-bot/../other/.pi"], ids=["absolute", "parent-escape", "unknown-placeholder", "dot-dot-segment"])
 def test_invalid_paths_are_rejected(tmp_path, directory):
     with pytest.raises(click.ClickException):
         resolve_agent_dir(manifest(directory), "cos-bot", tmp_path)
@@ -100,7 +100,7 @@ def test_model_args_ignore_model_env(monkeypatch):
     assert model_args(Defaults(model="anthropic/claude-haiku-5-5", thinking="low")) == ["--model", "anthropic/claude-haiku-5-5"]
 
 
-@pytest.mark.parametrize("model", ["haiku", "anthropic/", "/x", "", "a b/c"])
+@pytest.mark.parametrize("model", ["haiku", "anthropic/", "/x", "", "a b/c"], ids=["no-provider", "no-id", "no-provider-slash", "empty", "space"])
 def test_defaults_model_must_be_provider_and_id(model):
     with pytest.raises(ValidationError):
         Defaults(model=model, thinking="low")

@@ -109,7 +109,7 @@ def test_other_bot_setup_preserves_prepared_worker_tool_restrictions(tmp_path, r
     assert (worker / ".pi/mcp.json").read_bytes() == before
 
 
-@pytest.mark.parametrize("values", ["", "COS_TELEGRAM_TOKEN=101:private-token\n", "COS_TELEGRAM_TOKEN=9007199254740993:private-token\nTELEGRAM_ALLOWED_USER_ID=123\n"])
+@pytest.mark.parametrize("values", ["", "COS_TELEGRAM_TOKEN=101:private-token\n", "COS_TELEGRAM_TOKEN=9007199254740993:private-token\nTELEGRAM_ALLOWED_USER_ID=123\n"], ids=["no-telegram-values", "missing-owner", "unsafe-bot-id"])
 def test_invalid_cos_input_has_no_configuration_writes(tmp_path, values):
     skill_catalog(tmp_path, "cos")
     bot = tmp_path / "bots/cos-bot"
@@ -138,7 +138,7 @@ def test_missing_assignment_credentials_prevents_source_writes(tmp_path, missing
     assert not (bot / ".pi").exists()
 
 
-@pytest.mark.parametrize("url", ["https://exa mple.com", "https://example.com\\path", "https://bad_host.example"])
+@pytest.mark.parametrize("url", ["https://exa mple.com", "https://example.com\\path", "https://bad_host.example"], ids=["space", "backslash", "underscore-host"])
 def test_bad_assignment_origin_prevents_source_writes(tmp_path, url):
     skill_catalog(tmp_path, "manager")
     bot = tmp_path / "bots/manager-bot"

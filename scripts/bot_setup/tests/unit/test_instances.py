@@ -30,7 +30,7 @@ def test_actual_worker_profiles_route_by_capability():
     ({}, []),
     ({"BATTUTA_WORKER_1_TYPE": "general"}, ["worker-1"]),
     ({"BATTUTA_WORKER_10_TYPE": "general", "BATTUTA_WORKER_2_TYPE": "general"}, ["worker-2", "worker-10"]),
-])
+], ids=["none", "single", "numeric-order"])
 def test_worker_names(tmp_path, values, expected):
     assert instances.worker_names(values, tmp_path / ".env") == expected
 
@@ -39,7 +39,7 @@ def test_worker_names(tmp_path, values, expected):
     ("BATTUTA_WORKER_0_TYPE", "general"), ("BATTUTA_WORKER_01_TYPE", "general"),
     ("BATTUTA_WORKER_١_TYPE", "general"), ("BATTUTA_WORKER_X_TYPE", "secret-sentinel"),
     ("BATTUTA_WORKER_1_TYPE", ""), ("BATTUTA_WORKER_1_TYPE", " "),
-])
+], ids=["zero", "leading-zero", "unicode-digit", "non-numeric", "empty-type", "blank-type"])
 def test_invalid_selections_do_not_expose_values(tmp_path, key, value):
     with pytest.raises(click.ClickException) as error:
         instances.worker_names({key: value}, tmp_path / ".env")
@@ -47,7 +47,7 @@ def test_invalid_selections_do_not_expose_values(tmp_path, key, value):
     assert "secret-sentinel" not in str(error.value)
 
 
-@pytest.mark.parametrize("bot,role,profile", [("cos-bot", "cos", "cos-bot"), ("manager-bot", "manager", "manager-bot"), ("worker-2", "worker", "worker")])
+@pytest.mark.parametrize("bot,role,profile", [("cos-bot", "cos", "cos-bot"), ("manager-bot", "manager", "manager-bot"), ("worker-2", "worker", "worker")], ids=["cos", "manager", "worker"])
 def test_instance_paths(tmp_path, bot, role, profile):
     root, home = tmp_path / "release", tmp_path / "home"
     directory = root / "bots" / profile
@@ -79,7 +79,7 @@ def test_worker_capabilities_follow_selected_profile(tmp_path):
     }
 
 
-@pytest.mark.parametrize("state,returncode", [("device\n", 0), ("offline\n", 0), ("", 1)])
+@pytest.mark.parametrize("state,returncode", [("device\n", 0), ("offline\n", 0), ("", 1)], ids=["ready", "offline", "no-device"])
 def test_mobile_device_preflight_requires_ready_device(monkeypatch, state, returncode):
     from types import SimpleNamespace
 

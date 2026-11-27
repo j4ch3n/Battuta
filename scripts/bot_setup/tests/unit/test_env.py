@@ -1,37 +1,29 @@
 """Environment-file syntax supported by bot configuration commands."""
 
-from pathlib import Path
-import sys
-import tempfile
-import unittest
-
 import click
+import pytest
 
-from bot_setup.env import read_env  # noqa: E402
+from bot_setup.env import read_env
 
 
-class EnvironmentTests(unittest.TestCase):
-    def test_assignment_quotes_exports_and_comment_handling(self):
-        cases = (
-            ("TOKEN=abc # rotated", "abc"),
-            ('TOKEN="abc # literal" # comment', "abc # literal"),
-            ("TOKEN='abc#literal'", "abc#literal"),
-            ("TOKEN=abc#literal", "abc#literal"),
-            ("export TOKEN='abc def'", "abc def"),
-            ("TOKEN= # unset", ""),
-        )
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / ".env"
-            for assignment, expected in cases:
-                with self.subTest(assignment=assignment):
-                    path.write_text("# heading\n\n" + assignment + "\n")
-                    self.assertEqual(read_env(path), {"TOKEN": expected})
+@pytest.mark.parametrize("assignment,expected", [
+    ("TOKEN=abc # rotated", "abc"),
+    ('TOKEN="abc # literal" # comment', "abc # literal"),
+    ("TOKEN='abc#literal'", "abc#literal"),
+    ("TOKEN=abc#literal", "abc#literal"),
+    ("export TOKEN='abc def'", "abc def"),
+    ("TOKEN= # unset", ""),
+], ids=["trailing-comment", "quoted-hash-then-comment", "single-quoted-hash", "unquoted-hash", "export-quoted-space", "empty-with-comment"])
+def test_assignment_quotes_exports_and_comment_handling(tmp_path, assignment, expected):
+    path = tmp_path / ".env"
+    path.write_text("# heading\n\n" + assignment + "\n")
+    assert read_env(path) == {"TOKEN": expected}
 
-    def test_invalid_quoting_reports_file_without_echoing_secret(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / ".env"
-            path.write_text('TOKEN="private-token\n')
-            with self.assertRaises(click.ClickException) as caught:
-                read_env(path)
-            self.assertIn(str(path), str(caught.exception))
-            self.assertNotIn("private-token", str(caught.exception))
+
+def test_invalid_quoting_reports_file_without_echoing_secret(tmp_path):
+    path = tmp_path / ".env"
+    path.write_text('TOKEN="private-token\n')
+    with pytest.raises(click.ClickException) as caught:
+        read_env(path)
+    assert str(path) in str(caught.value)
+    assert "private-token" not in str(caught.value)

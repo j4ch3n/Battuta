@@ -38,7 +38,7 @@ capabilities = ["test_two", "test_one"]
     ('[worker]\ncapabilities=[]\n[worker.types.general]\ncapabilities=[]', "missing"),
     ('[worker]\ncapabilities=["mobile_browse"]\n[worker.types.general]\ncapabilities=[]', "general"),
     ('[worker]\ncapabilities=[]\n[worker.types.general]\ncapabilities=["mobile_browse"]', "general"),
-])
+], ids=["type-not-defined", "unknown-worker-capability", "unknown-type-capability"])
 def test_bad_type_or_unknown_capability_refuses(tmp_path, extra, kind):
     root = profile(tmp_path, extra)
     with pytest.raises(click.ClickException):

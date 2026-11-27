@@ -6,9 +6,6 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-import tempfile
-import unittest
-from unittest.mock import patch
 
 from bot_setup.browser import configure_browser
 
@@ -27,15 +24,12 @@ def copy_scheduler_runtime(root):
     (client / "node_modules").symlink_to(dependencies, target_is_directory=True)
 
 
-class ConfigFixture(unittest.TestCase):
-    def setUp(self):
-        temporary = tempfile.TemporaryDirectory(prefix="battuta scripts ")
-        self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
-        self.home = self.root / "home"
-        home = patch.dict(os.environ, {"HOME": str(self.home)})
-        home.start()
-        self.addCleanup(home.stop)
+class ConfigEnv:
+    """A checkout copy with CoS/Manager manifests; the caller points HOME at `home`."""
+
+    def __init__(self, root):
+        self.root = root
+        self.home = root / "home"
         (self.root / "scripts").mkdir()
         for name in ("setup-memory.sh", "setup-artifacts.sh"):
             shutil.copy2(ROOT / "scripts" / name, self.root / "scripts" / name)
@@ -90,9 +84,11 @@ os.execv(sys.executable, [sys.executable, "-m", "bot_setup.cli", *args[args.inde
                                str(self.root / filename)], capture_output=True, text=True)
 
 
-class LauncherFixture(ConfigFixture):
-    def setUp(self):
-        super().setUp()
+class LauncherEnv(ConfigEnv):
+    """ConfigEnv plus the tmux/make launcher stubs."""
+
+    def __init__(self, root):
+        super().__init__(root)
         launcher = self.root / "scripts/bot_setup/run-dev.sh"
         launcher.parent.mkdir(parents=True)
         shutil.copy2(ROOT / "scripts/bot_setup/run-dev.sh", launcher)
@@ -128,7 +124,6 @@ if "-P" in args:
 ''')
         for name in ("supabase", "make"):
             self.executable(name, "")
-        self.home = self.root / "home"
         self.worker = self.home / ".battuta/pi-bots/worker-1"
         (self.worker / ".pi").mkdir(parents=True)
         for name in ("AGENTS.md", ".pi/settings.json", ".pi/mcp.json", ".pi/auth.json"):

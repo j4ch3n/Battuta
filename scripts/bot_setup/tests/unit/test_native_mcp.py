@@ -53,7 +53,7 @@ def test_native_configuration_preserves_custom_and_private_state(tmp_path, role)
 
 
 @pytest.mark.parametrize("role", ["cos", "manager"])
-@pytest.mark.parametrize("url", ["https://localhost/mcp", "http://example.com/mcp", "http://user:private-password@localhost/mcp", "invalid", ""])
+@pytest.mark.parametrize("url", ["https://localhost/mcp", "http://example.com/mcp", "http://user:private-password@localhost/mcp", "invalid", ""], ids=["https", "remote-host", "credentials", "not-a-url", "empty"])
 def test_invalid_endpoint_has_no_writes_or_secret_in_error(tmp_path, role, url):
     with pytest.raises(click.ClickException, match="loopback HTTP") as error:
         configure_mcp(tmp_path, role=role, memory_url=url, supabase_url="http://localhost:54321")
@@ -61,7 +61,8 @@ def test_invalid_endpoint_has_no_writes_or_secret_in_error(tmp_path, role, url):
     assert not (tmp_path / ".pi").exists()
 
 
-@pytest.mark.parametrize("name,value", [("mcp.json", "null"), ("mcp.json", "[]"), ("mcp.json", '{"mcpServers":null}'), ("mcp.json", '{"mcpServers":[]}'), ("mcp.json", '{"private":"secret-value",broken}'), ("settings.json", "null"), ("settings.json", '{"packages":{}}'), ("settings.json", '{"packages":null}')])
+@pytest.mark.parametrize("name,value", [("mcp.json", "null"), ("mcp.json", "[]"), ("mcp.json", '{"mcpServers":null}'), ("mcp.json", '{"mcpServers":[]}'), ("mcp.json", '{"private":"secret-value",broken}'), ("settings.json", "null"), ("settings.json", '{"packages":{}}'), ("settings.json", '{"packages":null}')],
+                         ids=["mcp-null", "mcp-array", "mcp-servers-null", "mcp-servers-array", "mcp-broken-secret", "settings-null", "settings-packages-object", "settings-packages-null"])
 def test_invalid_json_config_does_not_modify_either_file(tmp_path, name, value):
     pi = tmp_path / ".pi"
     pi.mkdir()
@@ -74,7 +75,7 @@ def test_invalid_json_config_does_not_modify_either_file(tmp_path, name, value):
     assert {file: (pi / file).read_text() for file in before} == before
 
 
-@pytest.mark.parametrize("url", [None, "http://127.0.0.1:8901/mcp", "http://localhost:8901/mcp", "http://[::1]:8901/mcp"])
+@pytest.mark.parametrize("url", [None, "http://127.0.0.1:8901/mcp", "http://localhost:8901/mcp", "http://[::1]:8901/mcp"], ids=["default", "loopback-ip", "localhost", "ipv6-loopback"])
 def test_loopback_endpoints_are_supported(tmp_path, url):
     configure_mcp(tmp_path, role="cos", memory_url=url, supabase_url="http://localhost:54321")
     assert (tmp_path / ".pi/mcp.json").is_file()
