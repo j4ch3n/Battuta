@@ -76,9 +76,7 @@ def test_staged_lint_routes_node_and_deno_files(runners):
     assert calls[1] == ["deno", str(function), ["lint", str(deno_file)]]
 
 
-@pytest.mark.parametrize("changed", ["skills-hub/project-management/SKILL.md", "skills-hub/execute-assignment/SKILL.md", "bots/worker/bot.toml"],
-                         ids=["project-skill", "execute-assignment-skill", "worker-manifest"])
-def test_project_skill_changes_select_mail_and_worker_contract_checks(runners, changed):
+def select_for(runners, changed):
     (runners.root / "supabase/functions/alpha").mkdir(parents=True)
     git = runners.bin / "git"
     git.write_text(f"#!{sys.executable}\nimport os, sys\nsys.stdout.write(os.environ['CHANGED_FILE'] + chr(0))\n")
@@ -86,6 +84,17 @@ def test_project_skill_changes_select_mail_and_worker_contract_checks(runners, c
     runners.env["CHANGED_FILE"] = changed
     result = runners.run("select-checks.mjs", "base", "head")
     assert result.returncode == 0, result.stderr
-    selected = json.loads(result.stdout)
+    return json.loads(result.stdout)
+
+
+@pytest.mark.parametrize("project", ["memory-service", "speech-service", "artifact-service", "project-context-cli", "doc-service"])
+def test_changed_python_project_selects_its_suite(runners, project):
+    assert project in select_for(runners, f"{project}/src/module.py")["python"]
+
+
+@pytest.mark.parametrize("changed", ["skills-hub/project-management/SKILL.md", "skills-hub/execute-assignment/SKILL.md", "bots/worker/bot.toml"],
+                         ids=["project-skill", "execute-assignment-skill", "worker-manifest"])
+def test_project_skill_changes_select_mail_and_worker_contract_checks(runners, changed):
+    selected = select_for(runners, changed)
     assert "agent-mail" in selected["node"]
     assert "assignment-worker" in selected["node"]
