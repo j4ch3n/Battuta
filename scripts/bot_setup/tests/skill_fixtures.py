@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 
 def manifest_text(role: str, names: list[str]) -> str:
     profile = "worker" if role == "worker" else f"{role}-bot"
@@ -69,3 +71,11 @@ def unselected_worker_checkout(tmp_path: Path, selection: str):
     env_file = root / ".env"
     env_file.write_text("SUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\n" + selection + "\n")
     return root, env_file
+
+
+UNSELECTED = [
+    pytest.param("", "worker-1", id="no-selection"),
+    pytest.param("BATTUTA_WORKER_0_TYPE=general", "worker-1", id="index-zero"),
+    pytest.param("BATTUTA_WORKER_1_TYPE=", "worker-1", id="empty-type"),
+    pytest.param("BATTUTA_WORKER_1_TYPE=general", "worker-2", id="other-worker-selected"),
+]

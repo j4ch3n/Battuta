@@ -8,7 +8,7 @@ from skill_fixtures import skill_catalog, manifest_text
 
 
 @pytest.mark.parametrize("role", ["cos", "manager"])
-@pytest.mark.parametrize("names", [["research", "note-taking"], []])
+@pytest.mark.parametrize("names", [["research", "note-taking"], []], ids=["two-skills", "empty"])
 def test_source_setup_links_selected_skills_idempotently(tmp_path, role, names):
     skill_catalog(tmp_path, role, names)
     bot = tmp_path / f"bots/{role}-bot"

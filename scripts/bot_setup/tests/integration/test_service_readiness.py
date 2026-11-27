@@ -3,13 +3,12 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import threading
 
 import pytest
 
-pytestmark = [pytest.mark.integration, pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")]
+pytestmark = pytest.mark.integration
 
 ROOT = Path(__file__).resolve().parents[4]
 

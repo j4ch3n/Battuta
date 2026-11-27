@@ -9,7 +9,7 @@ import pytest
 from bot_setup.source_launch import run_source_worker
 from bot_setup import source_launch
 from bot_setup import configure
-from skill_fixtures import manifest_text, unselected_worker_checkout
+from skill_fixtures import manifest_text, unselected_worker_checkout, UNSELECTED
 
 
 def test_source_setup_prepares_selected_influencer_profile(tmp_path, monkeypatch):
@@ -45,14 +45,6 @@ def test_influencer_source_launch_uses_selected_profile(tmp_path, monkeypatch):
     monkeypatch.setattr(os, "execve", lambda *args: None)
     run_source_worker(root, bot_dir=private, env_file=env_file, node=Path("/node"))
     assert selected == [root / "bots/worker-influencer"] * 2
-
-
-UNSELECTED = [
-    pytest.param("", "worker-1", id="no-selection"),
-    pytest.param("BATTUTA_WORKER_0_TYPE=general", "worker-1", id="index-zero"),
-    pytest.param("BATTUTA_WORKER_1_TYPE=", "worker-1", id="empty-type"),
-    pytest.param("BATTUTA_WORKER_1_TYPE=general", "worker-2", id="other-worker-selected"),
-]
 
 
 @pytest.mark.parametrize("selection,worker", UNSELECTED)

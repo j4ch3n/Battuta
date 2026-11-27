@@ -19,7 +19,7 @@ def test_invalid_manifest_is_rejected(tmp_path, text):
         skills.load_selection(manifest, hub)
 
 
-@pytest.mark.parametrize("names", [["note-taking", "research"], []])
+@pytest.mark.parametrize("names", [["note-taking", "research"], []], ids=["two-in-order", "empty"])
 def test_selection_preserves_order_and_accepts_empty(tmp_path, names):
     hub, manifest = manifest_catalog(tmp_path)
     manifest.write_text("[skills]\ninclude = " + json.dumps(names))

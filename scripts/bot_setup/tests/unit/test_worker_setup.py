@@ -175,24 +175,21 @@ def test_failed_setup_does_not_install_or_write(worker, case):
     assert not untouched.exists()
 
 
-def test_invalid_destination_configuration_fails_before_any_write(worker):
+@pytest.mark.parametrize("kind", ["invalid-content", "symlink"])
+def test_unsafe_destination_settings_fail_before_any_write(worker, kind):
     worker.prepare()
     (worker.bot / ".pi").mkdir(parents=True)
-    (worker.bot / ".pi/settings.json").write_text('{"extensions":"invalid"}')
+    settings = worker.bot / ".pi/settings.json"
+    private = worker.root / "private.json"
+    private.write_text("{}")
+    if kind == "invalid-content":
+        settings.write_text('{"extensions":"invalid"}')
+    else:
+        settings.symlink_to(private)
     with pytest.raises(click.ClickException):
         configure_worker(worker.root, bot_dir=worker.bot)
     assert not (worker.bot / "AGENTS.md").exists()
     assert not (worker.bot / ".pi/mcp.json").exists()
-
-
-def test_symlinked_destination_config_is_not_overwritten(worker):
-    worker.prepare()
-    (worker.bot / ".pi").mkdir(parents=True)
-    private = worker.root / "private.json"
-    private.write_text("{}")
-    (worker.bot / ".pi/settings.json").symlink_to(private)
-    with pytest.raises(click.ClickException):
-        configure_worker(worker.root, bot_dir=worker.bot)
     assert private.read_text() == "{}"
 
 
