@@ -79,6 +79,7 @@ def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
         assert memory["enabled"] is True
         assert memory["url"].endswith("/mcp") and not memory["url"].endswith("/read")
         assert "memory_forget" in memory["toolExposure"]
+        assert "memory_recall" not in memory["toolExposure"]
     elif role == "manager":
         assert memory["enabled"] is True
         assert memory["url"].endswith("/read")

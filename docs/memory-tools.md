@@ -62,6 +62,11 @@ The whole call is validated before anything is written. It fails with
 If a write fails part-way through (for example a concurrent change), the error
 is `invalid_request` and names the entries already applied.
 
+If an entry is forgotten but its ledger line cannot be written, the call stops
+there and still returns `data` with that result marked `audit_missing: true`
+and an `error`, plus top-level `applied`, `audit_missing`, `not_processed` (the
+later slugs, left unchanged) and `error`. The forget stays applied.
+
 Every actual forget (not a `no-op`) appends one line to the decisions ledger,
 `dream-reports/decisions.md`. The id is `forget:<slug>` and the verdict is
 `accepted`. The detail is one-line JSON with `action`, `invalid_at`,

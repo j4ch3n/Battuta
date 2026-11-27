@@ -150,6 +150,25 @@ class ForgetTests(unittest.TestCase):
         detail = json.loads(DecisionLedger(self.store.layout).decided()[f"forget:{slug}"].detail)
         self.assertEqual(detail["reason"], "line one\nline two — café")
 
+    def test_ledger_failure_reports_applied_with_missing_audit(self):
+        slug, later = self.add("acme-ltd"), self.add("beta-ltd")
+        path = self.store.find(slug).path
+        with mock.patch.object(DecisionLedger, "append", side_effect=OSError("disk full")):
+            reply = self.call([{"slug": slug}, {"slug": later}])
+        self.assertIsNotNone(self.store.find(slug).invalid_at)
+        self.assertTrue(path.exists())
+        self.assertTrue(self.store.find(later).is_active())
+        self.assertEqual(reply["applied"], [slug])
+        self.assertEqual(reply["audit_missing"], [slug])
+        self.assertEqual(reply["not_processed"], [later])
+        self.assertEqual(len(reply["results"]), 1)
+        result = reply["results"][0]
+        self.assertEqual((result["slug"], result["result"], result["audit_missing"]), (slug, "forgotten", True))
+        self.assertIn(slug, result["error"])
+        self.assertIn("OSError", result["error"])
+        self.assertIn("audit record is MISSING", reply["error"])
+        self.assertFalse(self.ledger_path.exists())
+
     def test_gc_never_called(self):
         slug, old, new = self.add("acme-ltd"), self.add("beta-old"), self.add("beta-new")
         with mock.patch.object(Store, "gc", side_effect=AssertionError("gc must not run")) as gc:

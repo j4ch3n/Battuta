@@ -80,8 +80,9 @@ continues from the distill watermarks. Read `dream.log` for the cause.
 | `/mcp/read` (stateless) | Manager, `battuta-project` | `memory_recall`, `memory_types`, `memory_project_overview`, `memory_project_descriptions`     |
 | `POST /archive`         | CoS memory client          | NDJSON conversation upload, at most 8 MiB, loopback only                                      |
 
-CoS's MCP entry uses `/mcp` but exposes only `memory_forget`, `memory_recall`,
-`memory_project_overview` and `memory_project_descriptions`. CoS calls
+CoS's MCP entry uses `/mcp` but exposes only `memory_forget`,
+`memory_project_overview` and `memory_project_descriptions`; the CoS memory
+client already provides `memory_recall` and `memory_types`. CoS calls
 `memory_forget` only on the owner's confirmation or instruction. Manager stays
 read-only on `/mcp/read`.
 

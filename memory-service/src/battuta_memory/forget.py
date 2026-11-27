@@ -56,7 +56,7 @@ def _validate(store, arguments: dict) -> tuple[list[dict], str, str]:
 def forget(store, arguments: dict) -> dict:
     plan, reason, confirmation = _validate(store, arguments)
     ledger, results, applied = DecisionLedger(store.layout), [], []
-    for entry in plan:
+    for index, entry in enumerate(plan):
         record, slug, successor = entry["record"], entry["slug"], entry["successor"]
         if not record.is_active():
             results.append({"slug": slug, "result": "no-op", "invalid_at": record.invalid_at})
@@ -69,10 +69,6 @@ def forget(store, arguments: dict) -> dict:
             else:
                 after = store.delete(slug, expected_source_hash=record.source_hash)
                 action = "forgotten"
-            detail = {"action": action, "invalid_at": after.invalid_at, "successor": successor, "reason": reason,
-                      "owner_confirmation": confirmation, "by": "cos"}
-            ledger.append(Decision(f"forget:{slug}", VERDICT_ACCEPTED, store.clock.now().isoformat(),
-                                   json.dumps(detail, ensure_ascii=False)))
         except MemoryStoreError as error:
             raise ValueError(f"forget stopped at {slug} ({type(error).__name__}); already applied: {', '.join(applied) or 'none'}") from error
         applied.append(slug)
@@ -80,4 +76,14 @@ def forget(store, arguments: dict) -> dict:
         if successor is not None:
             result["successor"] = successor
         results.append(result)
+        detail = {"action": action, "invalid_at": after.invalid_at, "successor": successor, "reason": reason,
+                  "owner_confirmation": confirmation, "by": "cos"}
+        try:
+            ledger.append(Decision(f"forget:{slug}", VERDICT_ACCEPTED, store.clock.now().isoformat(),
+                                   json.dumps(detail, ensure_ascii=False)))
+        except Exception as error:  # the store change is already applied; report it instead of losing it
+            message = f"{slug} was {action} but its audit record is MISSING ({type(error).__name__}); forget stopped"
+            result.update({"audit_missing": True, "error": message})
+            return {"results": results, "applied": applied, "audit_missing": [slug],
+                    "not_processed": [later["slug"] for later in plan[index + 1:]], "error": message}
     return {"results": results}

@@ -34,7 +34,7 @@ def test_native_configuration_preserves_custom_and_private_state(tmp_path, role)
                 "url": "http://localhost:8989/mcp",
                 "enabled": True,
                 "exposure": "hidden",
-                "toolExposure": {name: "codemode" for name in ("memory_forget", "memory_recall", "memory_project_overview", "memory_project_descriptions")},
+                "toolExposure": {name: "codemode" for name in ("memory_forget", "memory_project_overview", "memory_project_descriptions")},
                 "description": "Owner-confirmed memory forget plus project memory reads",
             }
             if role == "cos"
@@ -43,6 +43,7 @@ def test_native_configuration_preserves_custom_and_private_state(tmp_path, role)
         assert config["mcpServers"]["memory"] == expected_memory
         if role == "cos":
             assert "memory_forget" in config["mcpServers"]["memory"]["toolExposure"]
+            assert "memory_recall" not in config["mcpServers"]["memory"]["toolExposure"]
             assert not config["mcpServers"]["memory"]["url"].endswith("/read")
         elif role == "manager":
             assert "toolExposure" not in config["mcpServers"]["memory"]
