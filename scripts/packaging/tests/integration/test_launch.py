@@ -9,6 +9,7 @@ import sys
 import tomllib
 from urllib.parse import unquote
 
+import click
 import pytest
 
 from battuta_packaging.bundle import ENTRY_OUTPUTS, PROFILES
@@ -161,5 +162,5 @@ def test_maintenance_refuses_active_service(installed, monkeypatch):
     root, home, env_file, node = installed
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setattr(launch.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="active\n"))
-    with pytest.raises(Exception, match="inactive"):
+    with pytest.raises(click.ClickException, match="inactive"):
         launch.run_bot(root, bot="worker-2", env_file=env_file, node=node, mode="foreground-maintenance")

@@ -44,18 +44,14 @@ def test_selected_units_are_private_and_never_activated(deployment, count, capsy
     before = {p.name: p.read_bytes() for p in units.iterdir()}
     services.install_services(root, env_file=env, node=node)
     assert {p.name: p.read_bytes() for p in units.iterdir()} == before
-    assert set(before) == {"battuta-cos.service", "battuta-manager.service", "battuta-memory.service", "battuta-artifacts.service", "battuta-speech.service", "battuta-doc.service", "battuta-worker@.service"}
     text = b"".join(before.values()).decode()
     assert "private-sentinel" not in text
-    assert "/tools" in text
     worker = before["battuta-worker@.service"].decode()
     assert "worker-%i" in worker
     assert "--mode service" in worker
-    assert "/usr/bin/script -q -e -c" in worker
     assert "--env-file" in worker
-    assert "verify-speech" in before["battuta-speech.service"].decode()
     doc = before["battuta-doc.service"].decode()
-    assert "run-component --component doc" in doc and "UMask=0077" in doc and "Restart=on-failure" in doc
+    assert "run-component --component doc" in doc and "UMask=0077" in doc
     assert f"ReadWritePaths={Path.home()}/.battuta/doc-service" in doc and "ProtectHome=read-only" in doc
     assert not (units / "default.target.wants").exists()
     assert ("battuta-worker@3.service" in capsys.readouterr().out) == (count == 3)

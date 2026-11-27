@@ -42,10 +42,6 @@ def test_release_provenance_fails_closed(tmp_path):
     assert_provenance_fails_closed(tmp_path)
 
 
-def test_release_provenance_fails_closed(tmp_path):
-    assert_provenance_fails_closed(tmp_path)
-
-
 def test_release_provenance_ignores_outer_git_repository(tmp_path, monkeypatch):
     decoy = tmp_path / "decoy"
     run_git("init", "-q", "-b", "main", str(decoy), cwd=tmp_path, check=True)

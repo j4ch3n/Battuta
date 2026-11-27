@@ -43,8 +43,8 @@ def run_checks(tmp_path):
     log = tmp_path / "uv.log"
     base = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "UV_LOG": str(log)}
 
-    def run(*groups, **env):
-        result = subprocess.run(["node", "scripts/checks/check-support.mjs", *groups], cwd=tmp_path,
+    def run(**env):
+        result = subprocess.run(["node", "scripts/checks/check-support.mjs"], cwd=tmp_path,
                                 env={**base, **env}, capture_output=True, text=True, timeout=15)
         return result, [json.loads(line) for line in log.read_text().splitlines()]
 

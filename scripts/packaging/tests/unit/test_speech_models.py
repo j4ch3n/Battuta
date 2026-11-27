@@ -8,12 +8,16 @@ import pytest
 from battuta_packaging import speech_models as models
 
 
-def archive(name, content=b"weights"):
+def archive(name, content=b"weights", kind=tarfile.REGTYPE):
     result = io.BytesIO()
     with tarfile.open(fileobj=result, mode="w:bz2") as tar:
         entry = tarfile.TarInfo(name)
-        entry.size = len(content)
-        tar.addfile(entry, io.BytesIO(content))
+        entry.type = kind
+        if kind == tarfile.SYMTYPE:
+            entry.linkname = "../../outside"
+        else:
+            entry.size = len(content)
+        tar.addfile(entry, io.BytesIO(content) if kind == tarfile.REGTYPE else None)
     return result.getvalue()
 
 
@@ -28,12 +32,13 @@ def test_install_reuses_verified_assets(tmp_path, monkeypatch):
     models.install_models(tmp_path)
 
 
-@pytest.mark.parametrize("name", ["../escape", "/absolute", "model/../../escape"])
-def test_rejects_unsafe_archives(tmp_path, monkeypatch, name):
-    data = archive(name)
+@pytest.mark.parametrize("name,kind", [("../escape", tarfile.REGTYPE), ("/absolute", tarfile.REGTYPE), ("model/../../escape", tarfile.REGTYPE), ("model/link", tarfile.SYMTYPE)],
+                         ids=["parent-traversal", "absolute-path", "nested-traversal", "symlink-member"])
+def test_rejects_unsafe_archives(tmp_path, monkeypatch, name, kind):
+    data = archive(name, kind=kind)
     monkeypatch.setattr(models, "ASSETS", [models.Asset("model", "https://example.test/model", hashlib.sha256(data).hexdigest(), (name,))])
     monkeypatch.setattr(models, "download", lambda url, target: target.write_bytes(data))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unsafe model archive"):
         models.install_models(tmp_path)
     assert not (tmp_path / "escape").exists()
 
@@ -71,20 +76,6 @@ def test_interrupted_download_leaves_no_installation(tmp_path, monkeypatch):
         models.install_models(tmp_path)
     assert not (tmp_path / ".battuta/speech-service").exists()
     assert list((tmp_path / ".battuta").iterdir()) == []
-
-
-def test_rejects_archive_symlink(tmp_path, monkeypatch):
-    result = io.BytesIO()
-    with tarfile.open(fileobj=result, mode="w:bz2") as tar:
-        entry = tarfile.TarInfo("model/link")
-        entry.type = tarfile.SYMTYPE
-        entry.linkname = "../../outside"
-        tar.addfile(entry)
-    data = result.getvalue()
-    monkeypatch.setattr(models, "ASSETS", [models.Asset("model", "https://example.test/model", hashlib.sha256(data).hexdigest(), ("model/link",))])
-    monkeypatch.setattr(models, "download", lambda url, target: target.write_bytes(data))
-    with pytest.raises(ValueError, match="Unsafe"):
-        models.install_models(tmp_path)
 
 
 def private_directory(root):

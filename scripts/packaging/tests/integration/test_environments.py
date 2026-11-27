@@ -9,7 +9,7 @@ import pytest
 
 from hermetic_git import requires_git, run_git
 
-pytestmark = [pytest.mark.integration, requires_git]
+pytestmark = pytest.mark.integration
 
 ROOT = Path(__file__).resolve().parents[4]
 
@@ -22,6 +22,7 @@ def test_uv_uses_own_environment_despite_root_environment(tmp_path, project):
     assert Path(result.stdout.strip()) == directory / ".venv"
 
 
+@requires_git
 @pytest.mark.parametrize("project", ["bot_setup", "packaging"])
 def test_local_ignore_rules_work_without_root_gitignore(tmp_path, project):
     shutil.copyfile(ROOT / "scripts" / project / ".gitignore", tmp_path / ".gitignore")

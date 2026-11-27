@@ -213,24 +213,25 @@ def test_extracts_only_bots_from_archive_with_documentation(source, tmp_path):
     assert not list((target / "bots").rglob("skills-hub"))
 
 
-def test_stage_rejects_nonempty_and_symlink_targets(source, tmp_path):
+@pytest.mark.parametrize("via_symlink", [False, True], ids=["nonempty", "symlink"])
+def test_stage_rejects_nonempty_and_symlink_targets(source, tmp_path, via_symlink):
     target = tmp_path / "release"
     target.mkdir()
     (target / "private").write_text("keep")
-    for path in (target, tmp_path / "link"):
-        if path != target:
-            path.symlink_to(target)
-        with pytest.raises(click.ClickException):
-            bundle.stage_bots(source, path, tag="v1.2.3", tool_version="1.2.3+gabc1234")
+    destination = tmp_path / "link" if via_symlink else target
+    if via_symlink:
+        destination.symlink_to(target)
+    with pytest.raises(click.ClickException, match="empty regular directory"):
+        bundle.stage_bots(source, destination, tag="v1.2.3", tool_version="1.2.3+gabc1234")
     assert (target / "private").read_text() == "keep"
 
 
-@pytest.mark.parametrize("link", ["skills-hub/research/escape", "docs/escape.md"], ids=["skill-escape", "doc-symlink"])
-def test_source_symlink_escape_fails_before_writing(source, tmp_path, link):
+@pytest.mark.parametrize("link,message", [("skills-hub/research/escape", "must not be symlinks"), ("docs/escape.md", "must not contain symlinks")], ids=["skill-escape", "doc-symlink"])
+def test_source_symlink_escape_fails_before_writing(source, tmp_path, link, message):
     (tmp_path / "private").mkdir()
     (source / link).symlink_to(tmp_path / "private")
     target = tmp_path / "release"
-    with pytest.raises(click.ClickException):
+    with pytest.raises(click.ClickException, match=message):
         bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
     assert not target.exists()
 
