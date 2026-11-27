@@ -6,74 +6,36 @@ Errors never include internal paths or raw exceptions.
 
 ## Read tools (`/mcp` and `/mcp/read`)
 
-| Tool                          | Arguments                                                                  | `data`                                                                                                                       |
-| ----------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `memory_recall`               | `projects?: string[]`, `types?: string[]`, `query?: string`, `limit?: int` | `{status: "ok", memories: [{name, type, project, abstract, body, updated}]}` or `{status: "invalid", projects, types}`       |
-| `memory_types`                | none                                                                       | `{types: [{type, description}]}` (overview excluded)                                                                         |
-| `memory_project_overview`     | `project: string`                                                          | `{status: "ok", overview: {abstract, body, created}}`, `{status: "not_written"}`, or `{status: "unknown_project", projects}` |
-| `memory_project_descriptions` | `projects?: string[]`                                                      | `{descriptions: {<project>: abstract or null}}`                                                                              |
+| Tool                          | Description                                                                                                                                                                                | Arguments                                                                  | `data`                                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `memory_recall`               | `projects` alone returns each project's overview; with `query` it searches those projects, optionally narrowed by `types`; `query` alone searches everything. `limit` is 1–30, default 10. | `projects?: string[]`, `types?: string[]`, `query?: string`, `limit?: int` | `{status: "ok", memories: [{name, type, project, abstract, body, updated}]}` or `{status: "invalid", projects, types}`       |
+| `memory_types`                | Lists memory types and when each is written, for choosing recall `types`.                                                                                                                  | none                                                                       | `{types: [{type, description}]}` (overview excluded)                                                                         |
+| `memory_project_overview`     | Reads one project's overview.                                                                                                                                                              | `project: string`                                                          | `{status: "ok", overview: {abstract, body, created}}`, `{status: "not_written"}`, or `{status: "unknown_project", projects}` |
+| `memory_project_descriptions` | One-line descriptions of the requested (or all) projects; `null` when no overview exists yet.                                                                                              | `projects?: string[]`                                                      | `{descriptions: {<project>: abstract or null}}`                                                                              |
 
 `global` is a valid project for the owner's personal memories. Project names
 match the `battuta-project` catalog, ignoring case and spacing.
 
 ## CoS tools (`/mcp` only)
 
-| Tool                  | `data`                                                                                                                 |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `memory_profile`      | `{status: "ok", body}` (the global overview) or `{status: "not_written"}`                                              |
-| `memory_dream_start`  | `{status: "started"}` or `{status: "already_running"}`                                                                 |
-| `memory_dream_status` | `{status: idle \| running \| succeeded \| failed, step, started_at, finished_at, last_success_at, error, report}`      |
-| `memory_health`       | `{ready, projects}` (catalog size)                                                                                     |
-| `memory_forget`       | `{results: [{slug, result: forgotten \| superseded \| no-op, invalid_at, successor?}], message, warning?}` (see below) |
+| Tool                  | Description                                                                                                                                                                                                                                                                                                                                                                                                     | Arguments                                                       | `data`                                                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `memory_profile`      | Reads the owner card (the global overview).                                                                                                                                                                                                                                                                                                                                                                     | none                                                            | `{status: "ok", body}` or `{status: "not_written"}`                                                               |
+| `memory_dream_start`  | Starts the nightly dream in the background, after the conversation is uploaded.                                                                                                                                                                                                                                                                                                                                 | none                                                            | `{status: "started"}` or `{status: "already_running"}`                                                            |
+| `memory_dream_status` | Reports the current or last dream run.                                                                                                                                                                                                                                                                                                                                                                          | none                                                            | `{status: idle \| running \| succeeded \| failed, step, started_at, finished_at, last_success_at, error, report}` |
+| `memory_health`       | Checks that the store is ready.                                                                                                                                                                                                                                                                                                                                                                                 | none                                                            | `{ready, projects}` (catalog size)                                                                                |
+| `memory_forget`       | Only on the owner's confirmation or instruction. Marks memories obsolete: recall stops returning them, historical reads still find them, files are kept, and there is no undo. An entry without `successor` is `forgotten`; with one, it is `superseded` by that active memory; an already-invalid entry is a `no-op`. Up to 25 entries per call is recommended; larger calls still run and return a `warning`. | `entries: [{slug, successor?}]`, `reason`, `owner_confirmation` | `{results: [{slug, result: forgotten \| superseded \| no-op, invalid_at, successor?}], message, warning?}`        |
 
-### `memory_forget`
-
-CoS calls `memory_forget` only when the owner confirms or instructs it. It
-marks memories obsolete by ending their validity interval. The file is kept
-and is never deleted, and there is no undo tool. Recall stops returning the
-entry, but historical reads still find it.
-
-Arguments:
-
-- `entries`: at least one item `{slug, successor?}`, both non-empty strings.
-  Keep calls to 25 entries or fewer; a larger call still runs and adds a
-  `warning` to relay to the owner.
-  - Without `successor`, the entry is forgotten (`result: "forgotten"`).
-  - With `successor`, the entry is superseded by that active memory
-    (`result: "superseded"`, `superseded_by` set).
-- `reason`: why the entries are obsolete.
-- `owner_confirmation`: the owner's confirmation or instruction, quoted or
-  summarised.
-
-Each result has `invalid_at`, the ISO time the entry stopped being valid. An
-entry that was already invalid returns `no-op` with its existing `invalid_at`
-and is not changed. A successful call also returns `message`, a short
-summary of what changed to relay to the owner.
-
-The whole call is validated before anything is written. It fails with
-`invalid_request` and no writes when:
-
-- `entries` is not a non-empty list of `{slug, successor?}` items, or an item
-  has an empty value or extra keys;
-- `reason` or `owner_confirmation` is missing or blank;
-- a slug is repeated, a successor equals its own slug, or a successor is also
-  being forgotten in the same call;
-- a memory dream is running;
-- any slug is unknown (all unknown slugs are listed);
-- a successor is missing or no longer valid.
-
-If a write fails part-way through (for example a concurrent change), the error
-is `invalid_request` and names the entries already applied.
-
-If an entry is forgotten but its ledger line cannot be written, the call stops
-there and still returns `data` with that result marked `audit_missing: true`
-and an `error`, plus top-level `applied`, `audit_missing`, `not_processed` (the
-later slugs, left unchanged) and `error`. The forget stays applied.
-
-Every actual forget (not a `no-op`) appends one line to the decisions ledger,
-`dream-reports/decisions.md`. The id is `forget:<slug>` and the verdict is
-`accepted`. The detail is one-line JSON with `action`, `invalid_at`,
-`successor`, `reason`, `owner_confirmation` and `by: "cos"`.
+`memory_forget` validates the whole call before writing and returns
+`invalid_request` with no writes for malformed or blank arguments, repeated
+slugs, a successor that is its own slug or also being forgotten, unknown slugs
+(all listed), a missing or invalid successor, or a running dream. A write that
+fails part-way returns `invalid_request` naming the entries already applied.
+Each change appends `forget:<slug>` (`accepted`, with `action`, `invalid_at`,
+`successor`, `reason`, `owner_confirmation`, `by: "cos"`) to
+`dream-reports/decisions.md`; if that line cannot be written, the call stops
+and adds `audit_missing`, `applied`, `not_processed` and `error` to the reply,
+with the change still applied.
 
 ## CoS Pi tools
 
@@ -84,6 +46,9 @@ The CoS memory client registers these for CoS's model:
   it, and return `{status, step, error, uploaded, memories_written, consolidation,
 overviews_refreshed}`. The status is `already_running` or `still_running` when
   another run holds the dream or the 45-minute wait ends first.
+
+CoS's MCP entry adds `memory_forget`, `memory_project_overview` and
+`memory_project_descriptions` from the tables above.
 
 ## Archive upload
 

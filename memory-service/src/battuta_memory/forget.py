@@ -68,7 +68,8 @@ def forget(store, arguments: dict) -> dict:
     ledger, results, applied = DecisionLedger(store.layout), [], []
     extra = {}
     if len(plan) > SOFT_MAX_FORGET:
-        extra["warning"] = f"{len(plan)} entries exceeds the recommended {SOFT_MAX_FORGET} per call; please double-check the owner meant all of them"
+        extra["warning"] = f"{len(plan)} entries is over the recommended {SOFT_MAX_FORGET} per call; " \
+                           f"this call still proceeds, but keep future calls to {SOFT_MAX_FORGET} entries or fewer"
     for index, entry in enumerate(plan):
         record, slug, successor = entry["record"], entry["slug"], entry["successor"]
         if not record.is_active():
