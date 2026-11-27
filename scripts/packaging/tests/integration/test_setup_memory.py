@@ -9,8 +9,11 @@ import pytest
 
 from fixtures import ROOT
 
+pytestmark = pytest.mark.integration
 
-@pytest.mark.parametrize("failure,expected", [(None, ["native", "model", "doctor"]), ("native", ["native"]), ("model", ["native", "model"])])
+
+@pytest.mark.parametrize("failure,expected", [(None, ["native", "model", "doctor"]), ("native", ["native"]), ("model", ["native", "model"])],
+                         ids=["ready", "native-fails", "model-fails"])
 def test_release_memory_setup_checks_installed_environment_before_readiness(tmp_path, failure, expected):
     scripts = tmp_path / "scripts"
     scripts.mkdir()

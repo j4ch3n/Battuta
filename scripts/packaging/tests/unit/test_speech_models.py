@@ -38,16 +38,6 @@ def test_rejects_unsafe_archives(tmp_path, monkeypatch, name):
     assert not (tmp_path / "escape").exists()
 
 
-def test_rejects_unknown_existing_directory(tmp_path, monkeypatch):
-    target = tmp_path / ".battuta/speech-service"
-    target.mkdir(parents=True)
-    (target / "private").write_text("keep")
-    monkeypatch.setattr(models, "ASSETS", [])
-    with pytest.raises(ValueError):
-        models.install_models(tmp_path)
-    assert (target / "private").read_text() == "keep"
-
-
 def test_installs_and_verifies_reference_voice(tmp_path, monkeypatch):
     voice = b"reference audio"
     asset = models.Asset("voice", "https://example.test/voice", hashlib.sha256(voice).hexdigest(), ("voice.wav",), raw=True)
@@ -97,14 +87,26 @@ def test_rejects_archive_symlink(tmp_path, monkeypatch):
         models.install_models(tmp_path)
 
 
-def test_rejects_symlinked_battuta_directory(tmp_path, monkeypatch):
-    outside = tmp_path / "outside"
+def private_directory(root):
+    target = root / ".battuta/speech-service"
+    target.mkdir(parents=True)
+    (target / "private").write_text("keep")
+
+
+def symlinked_battuta(root):
+    outside = root / "outside"
     outside.mkdir()
-    (tmp_path / ".battuta").symlink_to(outside, target_is_directory=True)
+    (root / ".battuta").symlink_to(outside, target_is_directory=True)
+
+
+@pytest.mark.parametrize("prepare", [private_directory, symlinked_battuta], ids=["unknown-existing-directory", "symlinked-battuta"])
+def test_rejects_unsafe_install_root_without_touching_it(tmp_path, monkeypatch, prepare):
+    prepare(tmp_path)
     monkeypatch.setattr(models, "ASSETS", [])
+    before = {path: path.read_bytes() if path.is_file() else None for path in tmp_path.rglob("*")}
     with pytest.raises(ValueError):
         models.install_models(tmp_path)
-    assert not (outside / "speech-service").exists()
+    assert {path: path.read_bytes() if path.is_file() else None for path in tmp_path.rglob("*")} == before
 
 
 def test_rejects_installed_model_from_different_release(tmp_path, monkeypatch):

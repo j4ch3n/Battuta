@@ -1,6 +1,8 @@
+import pytest
 from click.testing import CliRunner
 
 from battuta_packaging.cli import main
+from battuta_packaging.wheel_metadata import PROJECTS
 
 
 def test_verify_speech_reports_missing_assets(tmp_path, monkeypatch):
@@ -10,13 +12,6 @@ def test_verify_speech_reports_missing_assets(tmp_path, monkeypatch):
     assert "missing or invalid" in result.output
 
 
-def test_doc_release_wheel_is_registered():
-    from battuta_packaging.wheel_metadata import PROJECTS
-
-    assert PROJECTS["battuta-doc"] == "doc-service"
-
-
-def test_speech_release_wheel_is_registered():
-    from battuta_packaging.wheel_metadata import PROJECTS
-
-    assert PROJECTS["battuta-speech"] == "speech-service"
+@pytest.mark.parametrize("wheel,project", [("battuta-doc", "doc-service"), ("battuta-speech", "speech-service")], ids=["doc", "speech"])
+def test_release_wheel_is_registered(wheel, project):
+    assert PROJECTS[wheel] == project

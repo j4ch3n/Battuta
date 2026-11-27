@@ -36,7 +36,7 @@ def test_unknown_type_fails_before_service_side_effects(deployment, monkeypatch)
     assert not units.exists()
 
 
-@pytest.mark.parametrize("count", [0, 1, 3])
+@pytest.mark.parametrize("count", [0, 1, 3], ids=lambda count: f"{count}-workers")
 def test_selected_units_are_private_and_never_activated(deployment, count, capsys):
     root, env, node, units = deployment
     env.write_text("".join(f"BATTUTA_WORKER_{n}_TYPE=general\n" for n in range(1, count + 1)) + "COS_TELEGRAM_TOKEN=private-sentinel\n")
@@ -61,7 +61,7 @@ def test_selected_units_are_private_and_never_activated(deployment, count, capsy
     assert ("battuta-worker@3.service" in capsys.readouterr().out) == (count == 3)
 
 
-@pytest.mark.parametrize("symlink", [False, True])
+@pytest.mark.parametrize("symlink", [False, True], ids=["custom-file", "symlink"])
 def test_conflicting_units_preflight_before_writes(deployment, symlink):
     root, env, node, units = deployment
     units.mkdir(parents=True)
@@ -102,7 +102,8 @@ def test_influencer_installs_only_worker_and_support_services(deployment, capsys
     assert "battuta-cos.service" not in output and "battuta-manager.service" not in output
 
 
-@pytest.mark.parametrize("selection", ["", "BATTUTA_WORKER_1_TYPE=general\n", "BATTUTA_WORKER_1_TYPE=influencer\nBATTUTA_WORKER_2_TYPE=influencer\n"])
+@pytest.mark.parametrize("selection", ["", "BATTUTA_WORKER_1_TYPE=general\n", "BATTUTA_WORKER_1_TYPE=influencer\nBATTUTA_WORKER_2_TYPE=influencer\n"],
+                         ids=["none", "general-type", "two-workers"])
 def test_influencer_rejects_invalid_service_selection(deployment, selection):
     root, env, node, units = deployment
     env.write_text(selection)

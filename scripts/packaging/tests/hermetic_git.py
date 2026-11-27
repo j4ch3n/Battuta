@@ -1,7 +1,12 @@
 """Run fixture Git commands isolated from any repository an outer Git process selected."""
 
 import os
+import shutil
 import subprocess
+
+import pytest
+
+requires_git = pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
 
 
 def git_env(**overrides):

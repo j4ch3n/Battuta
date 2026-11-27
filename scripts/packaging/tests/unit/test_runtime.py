@@ -44,7 +44,7 @@ def test_wrong_node_stops_before_install(tmp_path, monkeypatch):
     assert not (tmp_path / "bots/runtime.json").exists()
 
 
-@pytest.mark.parametrize("component,command", [("memory", "battuta-memory"), ("artifacts", "battuta-artifact")])
+@pytest.mark.parametrize("component,command", [("memory", "battuta-memory"), ("artifacts", "battuta-artifact")], ids=["memory", "artifacts"])
 def test_component_environment_is_loaded_and_scrubbed(tmp_path, component, command):
     tool = tmp_path / command
     tool.write_text(f"#!{sys.executable}\nimport json,os,sys\nprint(json.dumps({{'args':sys.argv[1:],'data':os.environ.get('BATTUTA_MEMORY_DATA_DIR'),'telegram':any('TELEGRAM' in key for key in os.environ)}}))\n")

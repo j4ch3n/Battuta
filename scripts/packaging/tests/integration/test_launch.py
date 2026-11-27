@@ -14,6 +14,8 @@ import pytest
 from battuta_packaging.bundle import ENTRY_OUTPUTS, PROFILES
 from skill_fixtures import manifest_text, write_delegate_templates
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture
 def installed(tmp_path):

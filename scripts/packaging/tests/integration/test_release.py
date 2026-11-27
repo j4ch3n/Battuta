@@ -3,15 +3,17 @@
 from pathlib import Path
 import subprocess
 
+import pytest
 import yaml
 
-from hermetic_git import git_env, run_git
+from hermetic_git import git_env, requires_git, run_git
 
+pytestmark = [pytest.mark.integration, requires_git]
 
 ROOT = Path(__file__).resolve().parents[4]
 
 
-def test_release_provenance_fails_closed(tmp_path):
+def assert_provenance_fails_closed(tmp_path):
     workflow = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
     script = next(step["run"] for step in workflow["jobs"]["prepare"]["steps"] if step.get("id") == "version")
     def git(*args):
@@ -36,6 +38,14 @@ def test_release_provenance_fails_closed(tmp_path):
     assert not output.exists()
 
 
+def test_release_provenance_fails_closed(tmp_path):
+    assert_provenance_fails_closed(tmp_path)
+
+
+def test_release_provenance_fails_closed(tmp_path):
+    assert_provenance_fails_closed(tmp_path)
+
+
 def test_release_provenance_ignores_outer_git_repository(tmp_path, monkeypatch):
     decoy = tmp_path / "decoy"
     run_git("init", "-q", "-b", "main", str(decoy), cwd=tmp_path, check=True)
@@ -52,6 +62,6 @@ def test_release_provenance_ignores_outer_git_repository(tmp_path, monkeypatch):
     monkeypatch.setenv("GIT_INDEX_FILE", str(decoy / ".git/index"))
     work = tmp_path / "work"
     work.mkdir()
-    test_release_provenance_fails_closed(work)
+    assert_provenance_fails_closed(work)
     monkeypatch.undo()
     assert snapshot() == before

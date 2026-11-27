@@ -7,7 +7,9 @@ import subprocess
 
 import pytest
 
-from hermetic_git import run_git
+from hermetic_git import requires_git, run_git
+
+pytestmark = [pytest.mark.integration, requires_git]
 
 ROOT = Path(__file__).resolve().parents[4]
 

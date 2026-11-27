@@ -189,21 +189,14 @@ def test_worker_releases_ship_the_claude_proxy(source, tmp_path, profile):
     assert (target / f"bots/{profile}/.pi/extensions/assignment-worker/dist/claude-proxy.js").is_file()
 
 
-def test_missing_worker_proxy_is_rejected(source, tmp_path):
+@pytest.mark.parametrize("missing", ["claude-proxy.js", "index.js"], ids=["worker-proxy", "built-extension"])
+def test_missing_worker_build_output_is_rejected(source, tmp_path, missing):
     target = tmp_path / "release"
     bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
-    (target / "bots/worker/.pi/extensions/assignment-worker/dist/claude-proxy.js").unlink()
+    (target / "bots/worker/.pi/extensions/assignment-worker/dist" / missing).unlink()
     with pytest.raises(click.ClickException) as error:
         bundle.validate_bundle(target)
-    assert "claude-proxy.js" in str(error.value.__cause__)
-
-
-def test_missing_built_extension_is_rejected(source, tmp_path):
-    target = tmp_path / "release"
-    bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
-    (target / "bots/worker/.pi/extensions/assignment-worker/dist/index.js").unlink()
-    with pytest.raises(click.ClickException):
-        bundle.validate_bundle(target)
+    assert missing in str(error.value.__cause__)
 
 
 def test_extracts_only_bots_from_archive_with_documentation(source, tmp_path):
@@ -232,16 +225,10 @@ def test_stage_rejects_nonempty_and_symlink_targets(source, tmp_path):
     assert (target / "private").read_text() == "keep"
 
 
-def test_skill_escape_fails_before_writing(source, tmp_path):
-    (source / "skills-hub/research/escape").symlink_to(tmp_path)
-    target = tmp_path / "release"
-    with pytest.raises(click.ClickException):
-        bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
-    assert not target.exists()
-
-
-def test_documentation_symlink_is_rejected(source, tmp_path):
-    (source / "docs/escape.md").symlink_to(tmp_path / "private")
+@pytest.mark.parametrize("link", ["skills-hub/research/escape", "docs/escape.md"], ids=["skill-escape", "doc-symlink"])
+def test_source_symlink_escape_fails_before_writing(source, tmp_path, link):
+    (tmp_path / "private").mkdir()
+    (source / link).symlink_to(tmp_path / "private")
     target = tmp_path / "release"
     with pytest.raises(click.ClickException):
         bundle.stage_bots(source, target, tag="v1.2.3", tool_version="1.2.3+gabc1234")
@@ -261,7 +248,7 @@ def test_archive_traversal_is_rejected_before_extraction(tmp_path, member):
     assert not target.exists()
 
 
-@pytest.mark.parametrize("kind", [tarfile.SYMTYPE, tarfile.LNKTYPE, tarfile.FIFOTYPE])
+@pytest.mark.parametrize("kind", [tarfile.SYMTYPE, tarfile.LNKTYPE, tarfile.FIFOTYPE], ids=["symlink", "hardlink", "fifo"])
 def test_documentation_special_members_are_rejected(tmp_path, kind):
     archive = tmp_path / "release.tar.gz"
     with tarfile.open(archive, "w:gz") as output:

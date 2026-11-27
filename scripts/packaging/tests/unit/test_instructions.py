@@ -41,6 +41,7 @@ def render(release, platform):
         ("oracle-ampere", PACKAGES, []),
         ("raspberry-pi", [p for p in PACKAGES if p not in ("battuta_memory", "battuta_speech", "battuta_doc")], ["battuta_memory", "battuta_speech", "battuta_doc"]),
     ],
+    ids=["oracle-ampere", "raspberry-pi"],
 )
 def test_each_bundle_lists_only_its_wheels_with_release_links_and_digests(release, platform, expected, absent):
     text = render(release, platform)
