@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 
 def manifest_text(role: str, names: list[str]) -> str:
     profile = "worker" if role == "worker" else f"{role}-bot"
@@ -43,3 +45,37 @@ def skill_catalog(root: Path, role: str, names=None) -> list[str]:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("export default () => {}")
     return names
+
+
+def manifest_catalog(tmp_path: Path):
+    """A two-skill catalog with one bot manifest selecting `research`; returns (hub, manifest)."""
+    hub = tmp_path / "skills-hub"
+    for name in ("research", "note-taking"):
+        source = hub / name
+        source.mkdir(parents=True)
+        (source / "SKILL.md").write_text(f"---\nname: {name}\n---\n")
+    manifest = tmp_path / "bots/example/bot.toml"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text('[skills]\ninclude = ["research"]\n')
+    return hub, manifest
+
+
+def unselected_worker_checkout(tmp_path: Path, selection: str):
+    """A source checkout whose .env selects workers per `selection`; returns (root, env_file)."""
+    root = tmp_path / "source"
+    cli = root / "assignment-worker/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
+    cli.parent.mkdir(parents=True)
+    cli.touch()
+    (root / "bots/worker").mkdir(parents=True)
+    (root / "bots/worker/bot.toml").write_text(manifest_text("worker", []))
+    env_file = root / ".env"
+    env_file.write_text("SUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\n" + selection + "\n")
+    return root, env_file
+
+
+UNSELECTED = [
+    pytest.param("", "worker-1", id="no-selection"),
+    pytest.param("BATTUTA_WORKER_0_TYPE=general", "worker-1", id="index-zero"),
+    pytest.param("BATTUTA_WORKER_1_TYPE=", "worker-1", id="empty-type"),
+    pytest.param("BATTUTA_WORKER_1_TYPE=general", "worker-2", id="other-worker-selected"),
+]

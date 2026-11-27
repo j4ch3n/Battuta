@@ -1,0 +1,150 @@
+"""Clean source configuration installs Telegram for CoS only."""
+
+import json
+import os
+import tomllib
+from pathlib import Path
+from unittest.mock import patch
+
+import click
+import pytest
+
+from bot_setup.configure import configure_source
+from skill_fixtures import copy_telegram_template, skill_catalog
+
+
+@pytest.fixture(autouse=True)
+def isolated_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    gh = tmp_path / "stub-bin/gh"
+    gh.parent.mkdir()
+    gh.write_text("#!/bin/sh\nexit 0\n")
+    gh.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{gh.parent}:{os.environ['PATH']}")
+
+
+@pytest.mark.parametrize("role", ["cos", "manager"])
+def test_source_configuration_has_role_appropriate_packages(tmp_path, role):
+    names = skill_catalog(
+        tmp_path,
+        role,
+        tomllib.loads((Path(__file__).parents[4] / "bots/manager-bot/bot.toml").read_text())["skills"]["include"]
+        if role == "manager"
+        else None,
+    )
+    bot = tmp_path / f"bots/{role}-bot"
+    (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
+    (bot / "AGENTS_dedicated.md").write_text("Dedicated")
+    (bot / "package.json").write_text("{}")
+    if role == "cos":
+        copy_telegram_template(bot)
+    env = tmp_path / ".env"
+    env.write_text("LINEAR_API_TOKEN=private-linear\nSUPABASE_URL=http://localhost:54321\nSUPABASE_SECRET_KEY=private-supabase\n" + ("COS_TELEGRAM_TOKEN=101:private-token\nTELEGRAM_ALLOWED_USER_ID=123\n" if role == "cos" else ""))
+    with patch("bot_setup.configure.run") as runtime, patch("bot_setup.install.run") as install:
+        for _ in range(2):
+            configure_source(tmp_path, role=role)
+    sources = [call.args[-1] for call in install.call_args_list if "install" in call.args and "-l" in call.args]
+    assert any("pi-telegram" in source for source in sources) == (role == "cos")
+    assert not any("pi-subagents" in source for source in sources)
+    assert any("pi-scheduler" in source for source in sources) == (role == "cos")
+    if role == "cos":
+        assert runtime.call_args_list[0].args[:2] == ("pnpm", "--dir")
+        dream = next(call for call in runtime.call_args_list if call.args[0] == "node")
+        assert dream.args == ("node", str(tmp_path / "memory-client/configure-dream.mjs"), str(bot))
+        assert dream.kwargs["env"]["PI_CODING_AGENT_DIR"] == str(tmp_path / "home/.battuta/pi-bots/cos-bot/.pi")
+    else:
+        assert all(call.args[0] == "pnpm" for call in runtime.call_args_list)
+    pi = bot / ".pi"
+    runtime_pi = tmp_path / f"home/.battuta/pi-bots/{role}-bot/.pi"
+    assert json.loads((runtime_pi / "settings.json").read_text())["defaultThinkingLevel"] == tomllib.loads((Path(__file__).parents[4] / f"bots/{role}-bot/bot.toml").read_text())["defaults"]["thinking"]
+    assert (runtime_pi / "telegram.json").exists() == (role == "cos")
+    if role == "cos":
+        telegram = json.loads((runtime_pi / "telegram.json").read_text())
+        assert telegram["outboundHandlers"][0]["output"] == "ogg"
+        assert telegram["profiles"]["default"]["botId"] == 101
+    assert all((pi / "skills" / name).is_symlink() for name in names)
+    assert json.loads((pi / "settings.json").read_text())["battutaMemoryCapture"]["enabled"] == (role == "cos")
+    if role == "cos":
+        browser = json.loads((runtime_pi / "settings.json").read_text()).get("pi-browser-use")
+        assert browser["userDataDir"] == str(tmp_path / "home/.battuta/pi-bots/cos-bot/.pi/browser-research")
+        project_browser = json.loads((pi / "settings.json").read_text())["pi-browser-use"]
+        assert "executablePath" not in project_browser
+        assert "userDataDir" not in project_browser
+    else:
+        assert "pi-browser-use" not in json.loads((pi / "settings.json").read_text())
+    servers = json.loads((runtime_pi / "mcp.json").read_text())["mcpServers"]
+    assert "assignments" in servers
+    memory = servers["memory"]
+    if role == "cos":
+        assert memory["enabled"] is True
+        assert memory["url"].endswith("/mcp") and not memory["url"].endswith("/read")
+        assert "memory_forget" in memory["toolExposure"]
+        assert "memory_recall" not in memory["toolExposure"]
+    elif role == "manager":
+        assert memory["enabled"] is True
+        assert memory["url"].endswith("/read")
+        assert "memory_forget" not in memory.get("toolExposure", {})
+    else:
+        assert memory["enabled"] is False
+    assert not (tmp_path / "bots/worker/.pi/mcp.json").exists()
+
+
+@pytest.mark.parametrize("role", ["cos", "manager"])
+def test_other_bot_setup_preserves_prepared_worker_tool_restrictions(tmp_path, role):
+    from bot_setup.mcp import configure_mcp
+
+    skill_catalog(tmp_path, role)
+    bot = tmp_path / f"bots/{role}-bot"
+    (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
+    (bot / "AGENTS_dedicated.md").write_text("Dedicated")
+    (bot / "package.json").write_text("{}")
+    if role == "cos":
+        copy_telegram_template(bot)
+    (tmp_path / ".env").write_text("LINEAR_API_TOKEN=private-linear\nSUPABASE_URL=http://localhost:54321\nSUPABASE_SECRET_KEY=private-supabase\nCOS_TELEGRAM_TOKEN=101:private-token\nTELEGRAM_ALLOWED_USER_ID=123\n")
+    worker = tmp_path / "bots/worker"
+    configure_mcp(worker, role="worker", supabase_url="http://localhost:54321")
+    before = (worker / ".pi/mcp.json").read_bytes()
+    with patch("bot_setup.configure.run"), patch("bot_setup.install.run"):
+        configure_source(tmp_path, role=role)
+    assert (worker / ".pi/mcp.json").read_bytes() == before
+
+
+@pytest.mark.parametrize("values", ["", "COS_TELEGRAM_TOKEN=101:private-token\n", "COS_TELEGRAM_TOKEN=9007199254740993:private-token\nTELEGRAM_ALLOWED_USER_ID=123\n"], ids=["no-telegram-values", "missing-owner", "unsafe-bot-id"])
+def test_invalid_cos_input_has_no_configuration_writes(tmp_path, values):
+    skill_catalog(tmp_path, "cos")
+    bot = tmp_path / "bots/cos-bot"
+    (bot / "package.json").write_text("{}")
+    (bot / "AGENTS_dedicated.md").write_text("Dedicated")
+    (tmp_path / "bots/AGENTS_shared.md").write_text("Shared")
+    (tmp_path / ".env").write_text("LINEAR_API_TOKEN=private-linear\nSUPABASE_URL=http://localhost:54321\nSUPABASE_SECRET_KEY=private-supabase\n" + values)
+    with patch("bot_setup.configure.run") as run, pytest.raises(click.ClickException):
+        configure_source(tmp_path, role="cos")
+    run.assert_not_called()
+    assert not (bot / "AGENTS.md").exists()
+    assert not (bot / ".pi").exists()
+
+
+@pytest.mark.parametrize("missing", ["SUPABASE_URL", "SUPABASE_SECRET_KEY"])
+def test_missing_assignment_credentials_prevents_source_writes(tmp_path, missing):
+    skill_catalog(tmp_path, "manager")
+    bot = tmp_path / "bots/manager-bot"
+    (bot / "package.json").write_text("{}")
+    values = {"LINEAR_API_TOKEN": "private-linear", "SUPABASE_URL": "https://example.com", "SUPABASE_SECRET_KEY": "private-supabase"}
+    values.pop(missing)
+    (tmp_path / ".env").write_text("".join(f"{key}={value}\n" for key, value in values.items()))
+    with pytest.raises(click.ClickException) as error:
+        configure_source(tmp_path, role="manager")
+    assert "private-" not in str(error.value)
+    assert not (bot / ".pi").exists()
+
+
+@pytest.mark.parametrize("url", ["https://exa mple.com", "https://example.com\\path", "https://bad_host.example"], ids=["space", "backslash", "underscore-host"])
+def test_bad_assignment_origin_prevents_source_writes(tmp_path, url):
+    skill_catalog(tmp_path, "manager")
+    bot = tmp_path / "bots/manager-bot"
+    (bot / "package.json").write_text("{}")
+    (tmp_path / ".env").write_text(f"LINEAR_API_TOKEN=private-linear\nSUPABASE_URL='{url}'\nSUPABASE_SECRET_KEY=private-supabase\n")
+    with pytest.raises(click.ClickException, match="SUPABASE_URL") as error:
+        configure_source(tmp_path, role="manager")
+    assert "private-" not in str(error.value)
+    assert not (bot / ".pi").exists()

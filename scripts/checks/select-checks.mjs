@@ -37,7 +37,13 @@ const all =
   );
 const worker = "assignment-worker";
 const node = ["agent-mail", "project-spec", "memory-client", worker];
-const python = ["memory-service", "artifact-service", "project-context-cli", "doc-service"];
+const python = [
+  "memory-service",
+  "speech-service",
+  "artifact-service",
+  "project-context-cli",
+  "doc-service",
+];
 const functions = readdirSync(resolve(root, "supabase/functions"), { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && !entry.name.startsWith("_"))
   .map((entry) => entry.name)

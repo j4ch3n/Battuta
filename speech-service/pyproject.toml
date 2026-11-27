@@ -23,3 +23,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/battuta_speech"]
+
+[tool.pytest.ini_options]
+addopts = "-p no:cacheprovider --import-mode=importlib"
+testpaths = ["tests"]
+pythonpath = ["tests"]
+filterwarnings = ["error", "ignore:Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.:starlette.exceptions.StarletteDeprecationWarning"]
+markers = ["integration: crosses packages or processes; lives in tests/integration/"]

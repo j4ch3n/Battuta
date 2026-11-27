@@ -35,7 +35,7 @@ embedding it inside the artifact wheel or bot archive. Provisioning invokes the
 installed `battuta-artifact setup`, which upgrades Alembic to head. Startup still
 never migrates.
 
-Installed-wheel resource acceptance runs with `uv run --project artifact-service --locked python artifact-service/tests/resources.it.py`. It uses disposable files, not bot/model calls or production state. Real browser/CDN behavior requires separate authored-artifact review; mocked/offline tests do not verify it.
+Installed-wheel resource acceptance runs with `uv run --project artifact-service --locked python -m pytest artifact-service/tests/integration/test_resources.py`. It uses disposable files, not bot/model calls or production state. Real browser/CDN behavior requires separate authored-artifact review; mocked/offline tests do not verify it.
 
 ## Serving behavior and security
 

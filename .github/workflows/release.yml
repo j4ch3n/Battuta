@@ -151,7 +151,7 @@ jobs:
             -e BATTUTA_RELEASE_ASSETS=/assets -e BATTUTA_RELEASE_TAG="$TAG" \
             -e BATTUTA_RELEASE_PLATFORM="${{ matrix.platform }}" \
             "battuta-verify-${{ matrix.platform }}" uv run --no-project --python 3.12 \
-            python /source/scripts/packaging/tests/release_install.it.py
+            --with "pytest>=8,<10" python -m pytest /source/scripts/packaging/tests/integration/test_release_install.py -q
 
   deploy-supabase:
     name: Deploy Supabase
