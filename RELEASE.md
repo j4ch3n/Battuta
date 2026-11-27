@@ -15,8 +15,8 @@ human acceptance, not agent-run setup checks.
 
 Ask the owner which bundle to set up if not specified. Each bundle has its own
 platform archive and install instructions: main uses `oracle-ampere`, influencer uses
-`raspberry-pi`. Each bundle installs only its wheels: main needs all six, and
-influencer needs all except `battuta-memory`. The bundle controls private
+`raspberry-pi`. Each bundle installs only its wheels: main needs all seven, and
+influencer omits `battuta-memory`, `battuta-speech` and `battuta-doc`. The bundle controls private
 configuration and generated services, not the files included in the archive.
 
 | Bundle             | `deployment` | Configured bots                        | Services to activate after approval                                  | Setup validation                                                                           |
@@ -32,8 +32,12 @@ services are not removed, disabled or stopped by choosing a bundle.
 ## Layout and ownership
 
 ```text
+/opt/battuta/                          # Owner-approved parent, owned by the bot user
+  latest/                              # <install-path>: the active release, always this path
+  vX.Y.Z/                              # Previous releases, renamed by tag on upgrade
+
 <install-path>/bots/
-  release.json                         # Versions and role selections
+  release.json                         # Tag, versions and role selections
   _shared/<component>/dist/             # Compiled shared extensions/helpers
   cos-bot/                             # Generated AGENTS.md, .pi/skills and extensions
   manager-bot/
@@ -70,6 +74,30 @@ Everything under the installation is replaceable. It must be empty for extractio
 setup never clears it automatically. Never clear `~/.battuta` or service data.
 Replacement requires stopping affected services and explicit owner approval; this
 guide does not migrate deployments or provide database rollback.
+
+**The active release is always `<parent>/latest`.** Pi continues a bot's session
+only from the same working directory (`<install-path>/bots/<profile>`), and CoS's
+Telegram connection and scheduled tasks are bound to that directory and session.
+A different path starts fresh sessions, so CoS must be reconnected with
+`/telegram-connect` from the Pi UI. Symlinks do not help: the working directory
+resolves to the link target. Private state under `~/.battuta`, including
+`.pi/telegram.json` and `.pi/tmp/pi-telegram/`, is preserved either way.
+
+To upgrade, after owner approval, stop the services and rename the active
+release to its own tag, then continue from step 1 with the same `install_path`:
+
+```bash
+set -euo pipefail
+install_path="<parent the owner approved>/latest"
+previous="$(uv run --no-project --python 3.12 python -c 'import json,sys; print(json.load(open(sys.argv[1]))["tag"])' "$install_path/bots/release.json")"
+[[ "$previous" =~ ^v[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.-]*$ ]] || { printf 'STOP: unexpected release tag.\n' >&2; exit 1; }
+test ! -e "${install_path%/latest}/$previous"
+systemctl --user stop 'battuta-*.service'
+mv "$install_path" "${install_path%/latest}/$previous"
+```
+
+To roll back, stop the services, rename the new `latest` to its tag the same way,
+and rename the previous tag directory back to `latest`.
 
 ## 1. Check prerequisites and download
 
@@ -111,15 +139,18 @@ directory, not the installation:
   `battuta-bot-setup`, and `battuta-packaging`; main also needs `battuta-memory`, `battuta-speech` and `battuta-doc`.
 - `python-tools-version.txt` and `python-tools-SHA256SUMS`.
 
-Set the real tag and platform. Ask the owner for the absolute installation path if it
-is not given; do not choose one. It must be new and empty, and service generation
+Set the real tag and platform. `install_path` is always `<parent>/latest`. For an
+upgrade, keep the previous parent after renaming `latest` as described above. For a
+first installation, ask the owner for the absolute parent if it is not given (for
+example `/opt/battuta`, created by an administrator and owned by the bot user); do
+not choose one. `latest` must not exist yet, and service generation
 rejects paths with spaces or systemd special characters. From the download directory:
 
 ```bash
 version=vX.Y.Z
 platform=oracle-ampere # raspberry-pi for the influencer bundle
 archive="battuta-$version-$platform-arm64.tar.gz"
-install_path="<absolute path the owner approved>"
+install_path="<parent the owner approved>/latest"
 sha256sum -c "$archive.sha256"
 sha256sum -c python-tools-SHA256SUMS
 tool_version="$(cat python-tools-version.txt)"
@@ -197,6 +228,11 @@ use it explicitly, not the user's interactive nvm default or shell startup files
 
 ## 4. Create private configuration
 
+The private environment is always `~/.battuta/.env.prod`; do not ask the owner
+where it is. Shell variables may not persist between agent commands, so every
+block below sets `env_file` itself. Check the file only with `test`; never `cat`,
+`grep`, trace, or otherwise print or inspect its values.
+
 ```bash
 umask 077
 mkdir -p "$HOME/.battuta"
@@ -205,13 +241,17 @@ if [[ -L "$env_file" ]]; then
   printf 'STOP: private environment must not be a symlink.\n' >&2
   exit 1
 fi
-if [[ ! -e "$env_file" ]]; then
+if [[ -f "$env_file" ]]; then
+  printf 'Using existing %s\n' "$env_file"
+else
   battuta-bot-setup env-example > "$env_file"
+  printf 'Created %s; the owner must fill it before continuing.\n' "$env_file"
 fi
 chmod 600 "$env_file"
 ```
 
-Have the owner fill credentials in a private editor, never chat: both bundles need
+If the file already existed, continue without asking for it. Otherwise have the
+owner fill credentials in a private editor, never chat: both bundles need
 the Supabase URL and secret key. The main bundle also needs the CoS Telegram token
 and allowed user ID and Linear token. Confirm the intended
 remote backend. Use literal shell-compatible values, quoted when needed; do not
@@ -231,22 +271,37 @@ Manager merges routine pull requests with `gh`, so for `main` it must be signed 
 service user to an account with merge rights on managed repositories. Configuration stops if
 `gh auth status` fails.
 
+Load the file and check required keys and worker selections by name only; values
+are never printed:
+
 ```bash
+env_file="$HOME/.battuta/.env.prod"
+test -f "$env_file"
+set -a
+source "$env_file"
+set +a
+required="SUPABASE_URL SUPABASE_SECRET_KEY"
+if [[ "${deployment:?Choose main or influencer}" == main ]]; then
+  required+=" COS_TELEGRAM_TOKEN TELEGRAM_ALLOWED_USER_ID LINEAR_API_TOKEN"
+fi
+for key in $required; do
+  [[ -n "${!key:-}" ]] || { printf 'STOP: %s is not set in %s\n' "$key" "$env_file" >&2; exit 1; }
+done
+workers="$(compgen -v | sed -nE 's/^BATTUTA_WORKER_([1-9][0-9]*)_TYPE$/worker-\1/p' | sort -V | xargs)"
+printf 'Selected workers: %s\n' "${workers:-none}"
 battuta-bot-setup configure-release --root "$install_path" --env-file "$env_file" \
-  --deployment "${deployment:?Choose main or influencer}"
-```
-
-Expected: separate flat private bot homes and role-appropriate generated files for
-the chosen bundle only. For an influencer selection of worker-1, verify the private
-files exist without displaying credentials:
-
-```bash
+  --deployment "$deployment"
 if [[ "$deployment" == influencer ]]; then
-  worker=worker-1 # Use the selected instance number.
-  test -f "$HOME/.battuta/pi-bots/$worker/.pi/settings.json"
-  test -f "$HOME/.battuta/pi-bots/$worker/.pi/mcp.json"
+  for worker in $workers; do
+    test -f "$HOME/.battuta/pi-bots/$worker/.pi/settings.json"
+    test -f "$HOME/.battuta/pi-bots/$worker/.pi/mcp.json"
+  done
 fi
 ```
+
+Expected: the selected workers match the owner's intent, and configuration creates
+separate flat private bot homes and role-appropriate generated files for the
+chosen bundle only.
 
 Setup does not copy or rewrite private model/authentication files or start bots.
 CoS alone receives Telegram configuration. Repeating configuration preserves
@@ -258,6 +313,8 @@ In the same trusted private shell, load the same environment used by services.
 For the main bundle provision memory; the influencer bundle does not use it:
 
 ```bash
+env_file="$HOME/.battuta/.env.prod"
+test -f "$env_file"
 set -a
 source "$env_file"
 set +a
@@ -279,6 +336,8 @@ authenticate Pi, or message bots as a setup check.
 ## 6. Install services; activation is separate
 
 ```bash
+env_file="$HOME/.battuta/.env.prod"
+test -f "$env_file"
 battuta-packaging install-services --root "$install_path" \
   --env-file "$env_file" --node "$node" \
   --deployment "${deployment:?Choose main or influencer}"

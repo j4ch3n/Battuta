@@ -13,6 +13,7 @@ Run commands from the repository root. Read [code checks](references/checks.md) 
 - Node code: run `pnpm lint:node`, `pnpm typecheck:node`, and `pnpm test:node`.
 - Edge Functions: run `pnpm lint:deno`, `pnpm typecheck:deno`, and `pnpm test:deno`.
 - Python, packaging, or shell changes: run `pnpm check:support`.
+- Release build, packaging, setup, or service-generation changes: commit, then run `make check-release` with Docker running. It builds and installs the committed tree in containers; never run release install steps on the host.
 - Database, mail transport, or cross-system behavior: run `pnpm test:integration` with Docker running. It uses an isolated Supabase stack; run only one integration check at a time.
 - Before pushing code, run `make check`; use `make check-all` when integration verification is required.
 

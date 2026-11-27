@@ -47,7 +47,8 @@ class ReleaseInstallation(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="battuta-release-install-", dir="/tmp") as directory:
             work = Path(directory)
             env = {key: value for key, value in os.environ.items() if key not in {"VIRTUAL_ENV", "PYTHONPATH", "UV_PROJECT_ENVIRONMENT", "UV_TOOL_DIR", "UV_TOOL_BIN_DIR", "UV_PYTHON_PREFERENCE"}}
-            env.update(HOME=str(work / "home"), UV_CACHE_DIR=str(work / "cache"), XDG_CONFIG_HOME=str(work / "config"), XDG_DATA_HOME=str(work / "data"), LINEAR_API_TOKEN="fixture")
+            # A provided cache only reuses downloads; tool environments stay fresh under the work directory.
+            env.update(HOME=str(work / "home"), UV_CACHE_DIR=os.environ.get("UV_CACHE_DIR", str(work / "cache")), XDG_CONFIG_HOME=str(work / "config"), XDG_DATA_HOME=str(work / "data"), LINEAR_API_TOKEN="fixture")
             Path(env["HOME"]).mkdir()
             # Third-party CLIs are stubbed: the clean image does not ship them and the check must not touch real accounts.
             stubs = work / "stubs"
@@ -59,6 +60,10 @@ class ReleaseInstallation(unittest.TestCase):
             gh = stubs / "gh"
             gh.write_text("#!/bin/sh\nexit 0\n")
             gh.chmod(0o755)
+            # No systemd in the image: report no existing units and never start one.
+            systemctl = stubs / "systemctl"
+            systemctl.write_text("#!/bin/sh\nexit 0\n")
+            systemctl.chmod(0o755)
             env["PATH"] = f"{stubs}{os.pathsep}{env['PATH']}"
             def run(*args, **kwargs):
                 return subprocess.run(args, env=kwargs.pop("env", env), cwd=work, check=True, text=True, **kwargs)
@@ -96,26 +101,35 @@ for value in data['requires']:
                 versions = run(str(python), "-c", "import importlib.metadata as m,json; print(json.dumps({d.metadata['Name'].lower().replace('_','-'):d.version for d in m.distributions()}))", capture_output=True).stdout
                 payload = json.dumps({"requires": metadata.get_all("Requires-Dist", []), "versions": json.loads(versions)})
                 run(str(installed["battuta-packaging"][1] / "bin/python"), "-c", check, input=payload)
-            root = work / "relocated-install"
-            run(str(installed["battuta-packaging"][0] / "battuta-packaging"), "extract-bots", "--archive", str(assets / archive), "--root", str(root))
+            root = work / "opt/battuta/latest"
+            packaging = str(installed["battuta-packaging"][0] / "battuta-packaging")
             node = shutil.which("node", path=env["PATH"])
-            run(str(installed["battuta-packaging"][0] / "battuta-packaging"), "install-runtime", "--root", str(root), "--node", node)
+            def install_bots():
+                run(packaging, "extract-bots", "--archive", str(assets / archive), "--root", str(root))
+                run(packaging, "install-runtime", "--root", str(root), "--node", node)
+            install_bots()
             entries = [str(path.relative_to(root)) for path in (root / "bots").glob("*/.pi/extensions/*/dist/index.js")]
             self.assertTrue(entries)
             code = "for (const name of " + json.dumps(entries) + ") { const m = await import(" + json.dumps(str(root) + "/") + "+name); if(typeof m.default !== 'function') throw new Error(name); }"
             run(node, "--input-type=module", "-e", code)
             env_file = work / ".env.prod"
             template = run(str(installed["battuta-bot-setup"][0] / "battuta-bot-setup"), "env-example", capture_output=True).stdout
+            deployment = "influencer" if influencer else "main"
+            services_env = tool_environment(env, work, "battuta-packaging")
+            units = Path(env["XDG_CONFIG_HOME"]) / "systemd/user"
+            def configure():
+                run(str(installed["battuta-bot-setup"][0] / "battuta-bot-setup"), "configure-release", "--root", str(root), "--env-file", str(env_file), "--deployment", deployment)
+                run(packaging, "install-services", "--root", str(root), "--env-file", str(env_file), "--node", node, "--deployment", deployment, env=services_env)
             if influencer:
                 env_file.write_text(template + "\nBATTUTA_WORKER_1_TYPE=influencer\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\nLINEAR_API_TOKEN=fixture\nCOS_TELEGRAM_TOKEN=101:fixture\nTELEGRAM_ALLOWED_USER_ID=123\n")
-                run(str(installed["battuta-bot-setup"][0] / "battuta-bot-setup"), "configure-release", "--root", str(root), "--env-file", str(env_file), "--deployment", "influencer")
+                configure()
                 self.assertFalse((root / "skills-hub").exists())
             else:
                 env_file.write_text(template + "\nBATTUTA_WORKER_1_TYPE=general\nBATTUTA_WORKER_2_TYPE=general\nSUPABASE_URL=https://example.com\nSUPABASE_SECRET_KEY=fixture\nLINEAR_API_TOKEN=fixture\nCOS_TELEGRAM_TOKEN=101:fixture\nTELEGRAM_ALLOWED_USER_ID=123\n")
                 agent = Path(env["HOME"]) / ".battuta/pi-bots/cos-bot/.pi"
                 agent.mkdir(parents=True)
                 (agent / "settings.json").write_text("{}")
-                run(str(installed["battuta-bot-setup"][0] / "battuta-bot-setup"), "configure-release", "--root", str(root), "--env-file", str(env_file), "--deployment", "main")
+                configure()
                 self.assertIn("mcp add-json --scope user battuta-doc", claude_log.read_text())
                 self.assertTrue((Path(env["HOME"]) / ".battuta/pi-bots/worker-2/.pi/mcp.json").is_file())
                 self.assertFalse((root / "skills-hub").exists())
@@ -124,6 +138,17 @@ for value in data['requires']:
                 self.assertNotIn("extensions", settings)
                 self.assertTrue((root / "bots/cos-bot/.pi/extensions/dream/dist/index.js").is_file())
                 run(str(installed["battuta-memory"][1] / "bin/python"), "-c", "import sqlite3, onnxruntime, tokenizers, jieba; c=sqlite3.connect(':memory:'); c.execute('create virtual table t using fts5(x)'); c.close(); assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()")
+            self.assertIn(f"WorkingDirectory={root}/bots/worker\n", (units / "battuta-worker@.service").read_text())
+            # Upgrade: rename latest to its tag and reinstall at the same path, so units and private state carry over.
+            private = {path: path.read_bytes() for path in (Path(env["HOME"]) / ".battuta/pi-bots").rglob("*.json")}
+            service_files = {path: path.read_text() for path in units.iterdir()}
+            previous = root.parent / json.loads((root / "bots/release.json").read_text())["tag"]
+            root.rename(previous)
+            install_bots()
+            configure()
+            self.assertTrue((previous / "bots/release.json").is_file())
+            self.assertEqual({path: path.read_text() for path in units.iterdir()}, service_files)
+            self.assertEqual({path: path.read_bytes() for path in private}, private)
 
 
 if __name__ == "__main__":
