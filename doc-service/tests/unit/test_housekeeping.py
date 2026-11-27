@@ -52,7 +52,7 @@ def test_page_image_renders_once_and_reuses_file(mgr, tmp_path):
     ("pdf", 0, 1.5, "invalid_option", "page"),
     ("pdf", 3, 1.5, "invalid_option", "available pages: 1-2"),
     ("pdf", 1, 4, "invalid_option", "scale"),
-    ("docx", 1, 1.5, "unsupported_format", ""),
+    ("docx", 1, 1.5, "unsupported_format", "only available for PDF"),
 ], ids=["page-zero", "page-beyond-document", "scale-too-large", "non-pdf-source"])
 def test_page_image_validation(mgr, tmp_path, suffix, page, scale, code, message):
     source = tmp_path / f"a.{suffix}"
@@ -81,9 +81,10 @@ def run(mgr, name, args):
 def test_status_reports_models_queue_limits_and_cache_size(mgr, tmp_path):
     make_pdf(tmp_path / "a.pdf")
     convert(mgr, tmp_path / "a.pdf")
+    mgr.settings = replace(mgr.settings, max_queue=7)
     out = run(mgr, "doc_service_status", {})
     assert out["ready"] and out["jobs"] == {"running": [], "queued": []} and out["cache_bytes"] > 0
-    assert out["limits"]["max_queue"] == 4
+    assert out["limits"]["max_queue"] == 7
 
 
 def test_list_and_delete(mgr, tmp_path):

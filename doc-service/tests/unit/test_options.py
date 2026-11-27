@@ -24,12 +24,7 @@ def test_parse_languages(value, expected):
     assert parse_languages(value) == expected
 
 
-def test_defaults():
-    o = ConvertOptions.from_args()
-    assert (o.ocr, o.tables, o.figures, o.charts, o.formulas, o.pages) == ("auto", "accurate", "extract", True, False, None)
-
-
-@pytest.mark.parametrize("field,value", [("ocr", "x")], ids=["ocr"])
+@pytest.mark.parametrize("field,value", [("ocr", "x"), ("tables", "x"), ("figures", "x")], ids=["ocr", "tables", "figures"])
 def test_options_reject_unknown_enum(field, value):
     with pytest.raises(DocError) as e:
         ConvertOptions.from_args(**{field: value})

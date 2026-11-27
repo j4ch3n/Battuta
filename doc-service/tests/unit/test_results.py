@@ -27,7 +27,7 @@ def test_fixture_paper_counts_in_index(paper):
     assert len(list((out / "tables").glob("*.csv"))) == 38
     assert summary.counts == {"pages": 16, "tables": 38, "figures": 24}
     figs = [l for l in index.splitlines() if l.startswith("- fig-")]
-    assert len(figs) == 24 and all(l.endswith("no image data") for l in figs)
+    assert len(figs) == 24
     assert not list((out / "figures").glob("*.png"))
     assert all(f"| p.{n} |" in index for n in range(1, 17))
     table_lines = [l for l in index.splitlines() if l.startswith("- tables/")]

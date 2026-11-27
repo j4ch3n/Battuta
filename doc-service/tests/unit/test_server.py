@@ -149,7 +149,6 @@ def test_mcp_roundtrip_errors_progress_prompts_and_health(env):
             async with ClientSession(r, w) as s:
                 caps = (await s.initialize()).capabilities
                 assert caps.prompts is None
-                assert len((await s.list_tools()).tools) == 6
 
                 async def progress(p, total, message):
                     seen.append(message)

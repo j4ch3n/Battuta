@@ -1,6 +1,7 @@
 import asyncio
 import socket
 
+import pytest
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 import uvicorn
@@ -27,11 +28,8 @@ def test_dispatch_returns_transcript_and_ogg():
 
 def test_dispatch_rejects_unexpected_arguments():
     service = SpeechService(Engine())
-    try:
+    with pytest.raises(ValueError):
         asyncio.run(dispatch(service, "transcribe_audio", {"audio": "YQ==", "path": "/secret"}))
-    except ValueError:
-        return
-    assert False, "unexpected arguments accepted"
 
 
 def test_two_mcp_clients_share_engine():

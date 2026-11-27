@@ -163,7 +163,7 @@ def test_recover_marks_leftover_running_as_failed_service_restarted_and_rerun_su
     assert again.status == "done" and conv2.calls == 1
 
 
-def test_delete_refuses_running_job_and_rejects_bad_ids(tmp_path):
+def test_delete_refuses_running_job(tmp_path):
     gate = threading.Event()
     m, _ = setup(tmp_path, FakeConverter(gate), max_wait=0.1)
 
@@ -178,9 +178,13 @@ def test_delete_refuses_running_job_and_rejects_bad_ids(tmp_path):
         assert not (m.docs_dir / status.doc_id).exists()
 
     asyncio.run(go())
-    for bad in ("../x", "zz"):
-        with pytest.raises(DocError):
-            m.delete(bad)
+
+
+@pytest.mark.parametrize("bad", ["../x", "zz"], ids=["path-traversal", "malformed"])
+def test_delete_rejects_bad_ids(tmp_path, bad):
+    m, _ = setup(tmp_path)
+    with pytest.raises(DocError):
+        m.delete(bad)
 
 
 def test_sweep_removes_only_expired_folders(tmp_path):
