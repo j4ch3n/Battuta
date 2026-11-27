@@ -20,7 +20,6 @@ from battuta_memory.config import MemoryConfig
 pytestmark = pytest.mark.integration
 
 
-
 @unittest.skipUnless(os.environ.get("BATTUTA_MEMORY_INTEGRATION") == "1", "Real model integration is opt-in")
 class RealModelTests(unittest.IsolatedAsyncioTestCase):
     async def test_archive_then_recall_over_http_with_real_embedder(self):

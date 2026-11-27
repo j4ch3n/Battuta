@@ -1,12 +1,11 @@
 import hashlib
 import json
-import tempfile
-import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
 import numpy as np
+import pytest
 
 from battuta_memory import model_setup
 from battuta_memory.embedder import QUERY_INSTRUCTION, QwenEmbedder
@@ -42,53 +41,57 @@ class FakeSession:
         return [hidden]
 
 
-class EmbedderTests(unittest.TestCase):
-    def test_query_has_instruction_and_documents_do_not(self):
-        tokenizer = FakeTokenizer()
-        embedder = QwenEmbedder(Path("/unused"), session=FakeSession(), tokenizer=tokenizer)
-        embedder.embed_documents(["Acme is the client"])
-        embedder.embed_query("who is the client")
-        self.assertEqual(tokenizer.seen, ["Acme is the client", QUERY_INSTRUCTION + "who is the client"])
-
-    def test_last_token_pooling_normalised_with_empty_cache(self):
-        session = FakeSession()
-        vector = QwenEmbedder(Path("/unused"), session=session, tokenizer=FakeTokenizer()).embed_query("hello")
-        self.assertEqual([round(value, 6) for value in vector], [0.6, 0.0, 0.8])
-        feeds = session.feeds[0]
-        self.assertEqual(feeds["past_key_values.0.key"].shape, (1, 2, 0, 4))
-        self.assertEqual(feeds["position_ids"].tolist()[0], list(range(feeds["input_ids"].shape[1])))
+def test_query_has_instruction_and_documents_do_not():
+    tokenizer = FakeTokenizer()
+    embedder = QwenEmbedder(Path("/unused"), session=FakeSession(), tokenizer=tokenizer)
+    embedder.embed_documents(["Acme is the client"])
+    embedder.embed_query("who is the client")
+    assert tokenizer.seen == ["Acme is the client", QUERY_INSTRUCTION + "who is the client"]
 
 
-class ModelSetupTests(unittest.TestCase):
-    def setUp(self):
-        directory = tempfile.TemporaryDirectory()
-        self.addCleanup(directory.cleanup)
-        self.root = Path(directory.name)
-        self.source = self.root / "source"
-        for name in model_setup.FILES:
-            (self.source / name).parent.mkdir(parents=True, exist_ok=True)
-            (self.source / name).write_bytes(name.encode())
-        self.digests = {name: hashlib.sha256(name.encode()).hexdigest() for name in model_setup.FILES}
-
-    def test_install_from_directory_then_verify(self):
-        with mock.patch.object(model_setup, "FILES", self.digests):
-            manifest = model_setup.install_model(self.root / "home", self.source)
-            self.assertEqual(model_setup.verify_model(self.root / "home"), manifest)
-            self.assertEqual(json.loads((model_setup.model_folder(self.root / "home") / "battuta-manifest.json").read_text())["revision"], model_setup.REVISION)
-
-    def test_install_rejects_checksum_mismatch(self):
-        wrong = {name: "0" * 64 for name in model_setup.FILES}
-        with mock.patch.object(model_setup, "FILES", wrong), self.assertRaises(RuntimeError):
-            model_setup.install_model(self.root / "home", self.source)
-        self.assertFalse(model_setup.model_folder(self.root / "home").exists())
-
-    def test_verify_rejects_tampered_file(self):
-        with mock.patch.object(model_setup, "FILES", self.digests):
-            model_setup.install_model(self.root / "home", self.source)
-            (model_setup.model_folder(self.root / "home") / "tokenizer.json").write_text("tampered")
-            with self.assertRaises(RuntimeError):
-                model_setup.verify_model(self.root / "home")
+def test_last_token_pooling_normalised_with_empty_cache():
+    session = FakeSession()
+    vector = QwenEmbedder(Path("/unused"), session=session, tokenizer=FakeTokenizer()).embed_query("hello")
+    assert [round(value, 6) for value in vector] == [0.6, 0.0, 0.8]
+    feeds = session.feeds[0]
+    assert feeds["past_key_values.0.key"].shape == (1, 2, 0, 4)
+    assert feeds["position_ids"].tolist()[0] == list(range(feeds["input_ids"].shape[1]))
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.fixture
+def source(tmp_path):
+    source = tmp_path / "source"
+    for name in model_setup.FILES:
+        (source / name).parent.mkdir(parents=True, exist_ok=True)
+        (source / name).write_bytes(name.encode())
+    return source
+
+
+@pytest.fixture
+def digests():
+    return {name: hashlib.sha256(name.encode()).hexdigest() for name in model_setup.FILES}
+
+
+def test_install_from_directory_then_verify(tmp_path, source, digests):
+    home = tmp_path / "home"
+    with mock.patch.object(model_setup, "FILES", digests):
+        manifest = model_setup.install_model(home, source)
+        assert model_setup.verify_model(home) == manifest
+        assert json.loads((model_setup.model_folder(home) / "battuta-manifest.json").read_text())["revision"] == model_setup.REVISION
+
+
+def test_install_rejects_checksum_mismatch(tmp_path, source):
+    home = tmp_path / "home"
+    wrong = {name: "0" * 64 for name in model_setup.FILES}
+    with mock.patch.object(model_setup, "FILES", wrong), pytest.raises(RuntimeError):
+        model_setup.install_model(home, source)
+    assert not model_setup.model_folder(home).exists()
+
+
+def test_verify_rejects_tampered_file(tmp_path, source, digests):
+    home = tmp_path / "home"
+    with mock.patch.object(model_setup, "FILES", digests):
+        model_setup.install_model(home, source)
+        (model_setup.model_folder(home) / "tokenizer.json").write_text("tampered")
+        with pytest.raises(RuntimeError):
+            model_setup.verify_model(home)
