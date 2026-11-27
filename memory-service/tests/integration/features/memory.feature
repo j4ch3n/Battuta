@@ -12,10 +12,12 @@ Feature: Remembering and recalling what the owner tells the chief of staff
 
   Scenario: A superseded memory points to its successor
     Given the owner told the CoS "MockTest's client is Acme Ltd" in project "mocktest"
-    And the owner told the CoS "MockTest launches on 2027-04-15" in project "mocktest"
     And the nightly dream has run
-    When the CoS replaces "MockTest's client is Acme Ltd" with "MockTest launches on 2027-04-15"
-    Then the old memory is reported superseded by the new one
+    And the owner told the CoS "MockTest's client is Globex Ltd" in project "mocktest"
+    And the nightly dream has run
+    When the CoS replaces "MockTest's client is Acme Ltd" with "MockTest's client is Globex Ltd"
+    Then the old memory is reported superseded
+    And recalling "who is the client" in project "mocktest" returns "MockTest's client is Globex Ltd"
     And recalling "who is the client" in project "mocktest" does not return "MockTest's client is Acme Ltd"
 
   Scenario: The nightly dream writes a project overview
