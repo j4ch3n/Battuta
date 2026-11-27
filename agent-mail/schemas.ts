@@ -13,7 +13,7 @@ export { validateCoverage, type MessageContent } from "./content.ts";
 Format.Set("uuid", Format.IsUuid);
 Format.Set("date-time", Format.IsDateTime);
 
-// Mailbox names: cos, manager, or the worker bot name (worker-1 to worker-6).
+// Mailbox names: cos, manager, or a selected worker bot name (worker-N from BATTUTA_WORKER_<N>_TYPE).
 export const BotName = Type.String({ pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$" });
 const Delivery = Type.Union([Type.Literal("queue"), Type.Literal("steer")]);
 export const MessageRef = MessageReferenceSchema;

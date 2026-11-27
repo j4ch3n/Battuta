@@ -15,8 +15,8 @@ human acceptance, not agent-run setup checks.
 
 Ask the owner which bundle to set up if not specified. Each bundle has its own
 platform archive and install instructions: main uses `oracle-ampere`, influencer uses
-`raspberry-pi`. Each bundle installs only its wheels: main needs all six, and
-influencer needs all except `battuta-memory`. The bundle controls private
+`raspberry-pi`. Each bundle installs only its wheels: main needs all seven, and
+influencer omits `battuta-memory`, `battuta-speech` and `battuta-doc`. The bundle controls private
 configuration and generated services, not the files included in the archive.
 
 | Bundle             | `deployment` | Configured bots                        | Services to activate after approval                                  | Setup validation                                                                           |
