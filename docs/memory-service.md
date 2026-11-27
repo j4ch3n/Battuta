@@ -67,7 +67,7 @@ recorded in `battuta-dream.json` as `step`:
 | `distill`      | For each archive day past its watermark, Claude Code proposes memories; the store validates and writes them                |
 | `consolidate`  | The library's review merges, supersedes, or reweights memories; overview targets and cross-project proposals are dropped   |
 | `overview`     | For each project whose memories changed (and `global`), Claude Code writes a new overview that supersedes the previous one |
-| `housekeeping` | Delete memories retired more than 30 days ago, their index and embedding rows, and folders left empty; no model call       |
+| `housekeeping` | Delete memories retired more than 30 days ago with their index rows and empty folders; reports obsolete and deleted counts |
 
 Only one dream runs at a time; a second start reports `already_running`. A crashed
 worker shows as `failed` on the next status read. A failed dream leaves

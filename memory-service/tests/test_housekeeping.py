@@ -43,6 +43,16 @@ class PurgeRetiredTests(unittest.TestCase):
             return {table: connection.execute(f"SELECT count(*) FROM {table} WHERE path = ?", (relative,)).fetchone()[0]
                     for table in ("files", "records", "vector_files", "vector_chunks")}
 
+    def test_counts_obsolete_and_deleted(self):
+        old, recent = self.add("acme-ltd"), self.add("beta-ltd")
+        self.add("gamma-ltd")
+        self.store.delete(old)
+        self.store.clock.advance(days=20)
+        self.store.delete(recent)
+        self.store.clock.advance(days=11)
+        report = purge_retired(self.store)
+        self.assertEqual((report["obsolete"], report["deleted"], report["purged"]), (2, 1, [old]))
+
     def test_purged_memory_leaves_search_and_embedding_index(self):
         slug = self.add("acme-ltd")
         path = self.store.find(slug).path
@@ -72,7 +82,7 @@ class PurgeRetiredTests(unittest.TestCase):
         self.store.clock.advance(days=31)
         self.assertEqual(purge_retired(self.store)["purged"], [slug])
         before = self.names()
-        self.assertEqual(purge_retired(self.store), {"purged": [], "dangling_links": []})
+        self.assertEqual(purge_retired(self.store), {"obsolete": 0, "deleted": 0, "purged": [], "dangling_links": []})
         self.assertEqual(self.names(), before)
 
     def test_reports_links_left_pointing_at_purged_memory(self):

@@ -11,10 +11,13 @@ RETENTION = dt.timedelta(days=30)
 def purge_retired(store) -> dict:
     """Like the core's gc, but only for memories retired before the retention cutoff."""
     cutoff = store.clock.now() - RETENTION
-    purged = []
+    purged, obsolete = [], 0
     with store_lock(store.layout):
         for record in store.records(include_invalid=True):
-            if record.is_active() or record.path is None or timestamp.parse(record.invalid_at) >= cutoff:
+            if record.is_active() or record.path is None:
+                continue
+            obsolete += 1
+            if timestamp.parse(record.invalid_at) >= cutoff:
                 continue
             record.path.unlink(missing_ok=True)
             purged.append(record.name)
@@ -23,5 +26,5 @@ def purge_retired(store) -> dict:
                 folder.rmdir()
                 folder = folder.parent
     report = store.sync_index()  # drops the purged files' search and embedding rows
-    return {"purged": sorted(purged),
+    return {"obsolete": obsolete, "deleted": len(purged), "purged": sorted(purged),
             "dangling_links": [[source, target] for source, target in report.dangling_links if target in purged]}
