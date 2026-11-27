@@ -197,6 +197,11 @@ use it explicitly, not the user's interactive nvm default or shell startup files
 
 ## 4. Create private configuration
 
+The private environment is always `~/.battuta/.env.prod`; do not ask the owner
+where it is. Shell variables may not persist between agent commands, so every
+block below sets `env_file` itself. Check the file only with `test`; never `cat`,
+`grep`, trace, or otherwise print or inspect its values.
+
 ```bash
 umask 077
 mkdir -p "$HOME/.battuta"
@@ -205,13 +210,17 @@ if [[ -L "$env_file" ]]; then
   printf 'STOP: private environment must not be a symlink.\n' >&2
   exit 1
 fi
-if [[ ! -e "$env_file" ]]; then
+if [[ -f "$env_file" ]]; then
+  printf 'Using existing %s\n' "$env_file"
+else
   battuta-bot-setup env-example > "$env_file"
+  printf 'Created %s; the owner must fill it before continuing.\n' "$env_file"
 fi
 chmod 600 "$env_file"
 ```
 
-Have the owner fill credentials in a private editor, never chat: both bundles need
+If the file already existed, continue without asking for it. Otherwise have the
+owner fill credentials in a private editor, never chat: both bundles need
 the Supabase URL and secret key. The main bundle also needs the CoS Telegram token
 and allowed user ID and Linear token. Confirm the intended
 remote backend. Use literal shell-compatible values, quoted when needed; do not
@@ -231,22 +240,37 @@ Manager merges routine pull requests with `gh`, so for `main` it must be signed 
 service user to an account with merge rights on managed repositories. Configuration stops if
 `gh auth status` fails.
 
+Load the file and check required keys and worker selections by name only; values
+are never printed:
+
 ```bash
+env_file="$HOME/.battuta/.env.prod"
+test -f "$env_file"
+set -a
+source "$env_file"
+set +a
+required="SUPABASE_URL SUPABASE_SECRET_KEY"
+if [[ "${deployment:?Choose main or influencer}" == main ]]; then
+  required+=" COS_TELEGRAM_TOKEN TELEGRAM_ALLOWED_USER_ID LINEAR_API_TOKEN"
+fi
+for key in $required; do
+  [[ -n "${!key:-}" ]] || { printf 'STOP: %s is not set in %s\n' "$key" "$env_file" >&2; exit 1; }
+done
+workers="$(compgen -v | sed -nE 's/^BATTUTA_WORKER_([1-9][0-9]*)_TYPE$/worker-\1/p' | sort -V | xargs)"
+printf 'Selected workers: %s\n' "${workers:-none}"
 battuta-bot-setup configure-release --root "$install_path" --env-file "$env_file" \
-  --deployment "${deployment:?Choose main or influencer}"
-```
-
-Expected: separate flat private bot homes and role-appropriate generated files for
-the chosen bundle only. For an influencer selection of worker-1, verify the private
-files exist without displaying credentials:
-
-```bash
+  --deployment "$deployment"
 if [[ "$deployment" == influencer ]]; then
-  worker=worker-1 # Use the selected instance number.
-  test -f "$HOME/.battuta/pi-bots/$worker/.pi/settings.json"
-  test -f "$HOME/.battuta/pi-bots/$worker/.pi/mcp.json"
+  for worker in $workers; do
+    test -f "$HOME/.battuta/pi-bots/$worker/.pi/settings.json"
+    test -f "$HOME/.battuta/pi-bots/$worker/.pi/mcp.json"
+  done
 fi
 ```
+
+Expected: the selected workers match the owner's intent, and configuration creates
+separate flat private bot homes and role-appropriate generated files for the
+chosen bundle only.
 
 Setup does not copy or rewrite private model/authentication files or start bots.
 CoS alone receives Telegram configuration. Repeating configuration preserves
@@ -258,6 +282,8 @@ In the same trusted private shell, load the same environment used by services.
 For the main bundle provision memory; the influencer bundle does not use it:
 
 ```bash
+env_file="$HOME/.battuta/.env.prod"
+test -f "$env_file"
 set -a
 source "$env_file"
 set +a
@@ -279,6 +305,8 @@ authenticate Pi, or message bots as a setup check.
 ## 6. Install services; activation is separate
 
 ```bash
+env_file="$HOME/.battuta/.env.prod"
+test -f "$env_file"
 battuta-packaging install-services --root "$install_path" \
   --env-file "$env_file" --node "$node" \
   --deployment "${deployment:?Choose main or influencer}"
