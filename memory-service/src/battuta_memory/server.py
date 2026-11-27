@@ -39,7 +39,7 @@ TOOLS = {
     "health": ("Check that the memory store is ready.", EMPTY),
     "forget": ("CoS only, and only on the owner's confirmation or instruction: mark memories obsolete (end their validity; the file is kept). "
                "Optional successor supersedes the entry with an active memory. All-or-nothing validation; each forget is logged in the decisions ledger. "
-               f"Keep batches to {SOFT_MAX_FORGET} entries or fewer; larger batches run but return a warning to relay to the owner.",
+               f"Keep batches to {SOFT_MAX_FORGET} entries or fewer.",
                {"type": "object", "required": ["entries", "reason", "owner_confirmation"], "additionalProperties": False,
                 "properties": {"entries": {"type": "array", "minItems": 1,
                                            "items": {"type": "object", "required": ["slug"], "additionalProperties": False,
