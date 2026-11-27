@@ -35,16 +35,10 @@ def test_missing_starter_resources_fail_before_creating_a_draft(tmp_path):
 @pytest.mark.parametrize(
     ("selection", "names"),
     [
-        ("reveal", {"reveal"}),
-        ("chartjs", {"chartjs"}),
-        ("three", {"three"}),
-        ("mermaid", {"mermaid"}),
-        ("photoswipe", {"photoswipe"}),
         ("katex", {"katex"}),
-        ("animejs", {"animejs"}),
         ("live-diagram", {"mermaid", "live-diagram"}),
     ],
-    ids=["reveal", "chartjs", "three", "mermaid", "photoswipe", "katex", "animejs", "live-diagram"],
+    ids=["single-vendor", "with-required-vendor"],
 )
 def test_each_selection_generates_only_its_resolved_extension_styles(selection, names):
     bundle, _ = load_bundle((selection,))

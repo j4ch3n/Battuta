@@ -51,17 +51,20 @@ def test_slow_client_changes_coalesce_and_close_removes_subscription(path, regis
         events = CatalogEvents(path, interval=0.01)
         await events.start()
         stream = events.stream()
-        await anext(stream)
-        register(registry)
-        await asyncio.sleep(0.04)
-        registry.update_metadata("demo", title="Changed")
-        await asyncio.sleep(0.04)
-        assert len(events.subscribers) == 1
-        assert next(iter(events.subscribers)).qsize() == 1
-        await stream.aclose()
-        assert len(events.subscribers) == 0
-        await events.stop()
-        await events.stop()
+        try:
+            await anext(stream)
+            register(registry)
+            await asyncio.sleep(0.04)
+            registry.update_metadata("demo", title="Changed")
+            await asyncio.sleep(0.04)
+            assert len(events.subscribers) == 1
+            assert next(iter(events.subscribers)).qsize() == 1
+            await stream.aclose()
+            assert len(events.subscribers) == 0
+        finally:
+            await stream.aclose()
+            await events.stop()
+        await events.stop()  # Stopping twice is safe.
 
     asyncio.run(scenario())
 

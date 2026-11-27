@@ -148,22 +148,20 @@ def test_artifacts_without_a_project_never_follow_links(link):
         assert client.get("/artifacts/a/standalone/linked.txt").status_code == 404
 
 
-def test_links_are_disabled_without_a_project(bundle):
-    assert files.allowed_link_root(None) is None
-    bundle.registry.assert_not_called()
-
-
-@pytest.mark.parametrize("error", [click.ClickException("missing"), OSError("io"), ValueError("bad")],
-                         ids=["unknown-project", "io-error", "invalid-context"])
-def test_registry_failures_disable_links(bundle, error):
+@pytest.mark.parametrize(
+    ("project", "failure"),
+    [(None, None), ("procurement", click.ClickException("missing")), ("procurement", OSError("io")),
+     ("procurement", ValueError("bad"))],
+    ids=["no-project", "unknown-project", "io-error", "invalid-context"],
+)
+def test_registry_failures_disable_links(bundle, project, failure):
     assert files.allowed_link_root("procurement") == bundle.code.resolve()
-    bundle.registry.return_value.load.side_effect = error
+    bundle.registry.reset_mock()
+    bundle.registry.return_value.load.side_effect = failure
 
-    assert files.allowed_link_root("procurement") is None
-
-
-def test_unregistered_project_disables_links(bundle):
-    assert files.allowed_link_root("unknown") is None
+    assert files.allowed_link_root(project) is None
+    if project is None:
+        bundle.registry.assert_not_called()
 
 
 @pytest.fixture

@@ -20,7 +20,9 @@ def vendor(name, *, imports=None, requires=(), style=None, licenses=None):
 
 
 def test_catalog_vendors_summarize_purpose_imports_and_local_stylesheet():
-    for loaded in load_vendors():
+    vendors = load_vendors()
+    assert vendors
+    for loaded in vendors:
         summary = loaded.summary()
         assert summary["purpose"]
         assert summary["imports"]
