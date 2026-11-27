@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["httpx2", "pytest>=8,<10"]
+dev = ["httpx2", "pytest>=8,<9", "pytest-bdd>=8,<9"]
 
 [tool.uv.sources]
 battuta-project = { path = "../project-context-cli" }
