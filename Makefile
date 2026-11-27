@@ -1,6 +1,6 @@
 SUPABASE_DIR := supabase
 
-.PHONY: help db-diff functions-serve setup-bot setup-cos-bot setup-manager-bot refresh-telegram dev prod setup-checks format check check-all
+.PHONY: help db-diff functions-serve setup-bot setup-cos-bot setup-manager-bot refresh-telegram dev prod setup-checks format check check-all check-release
 
 help:
 	@printf '%s\n' \
@@ -9,6 +9,7 @@ help:
 		'  make format           Format repository-owned TypeScript and supported files' \
 		'  make check            Format, lint, type-check, unit and supporting-code checks' \
 		'  make check-all        Full checks including isolated local Supabase integration' \
+		'  make check-release    Build the committed tree and test release install in Docker' \
 		'  make db-diff NAME=name Create a migration from local schema changes' \
 		'  make functions-serve   Serve Edge Functions with supabase/.env loaded' \
 		'  make setup-cos-bot     Install Pi, Telegram, and project-management MCP' \
@@ -58,3 +59,6 @@ check:
 
 check-all:
 	pnpm check:all
+
+check-release:
+	bash scripts/packaging/dev-release.sh
