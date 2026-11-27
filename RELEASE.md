@@ -32,7 +32,7 @@ services are not removed, disabled or stopped by choosing a bundle.
 ## Layout and ownership
 
 ```text
-/opt/battuta/                          # Owner-approved parent, owned by the bot user
+~/battuta/                             # Release parent in the bot user's home
   latest/                              # <install-path>: the active release, always this path
   vX.Y.Z/                              # Previous releases, renamed by tag on upgrade
 
@@ -75,7 +75,7 @@ setup never clears it automatically. Never clear `~/.battuta` or service data.
 Replacement requires stopping affected services and explicit owner approval; this
 guide does not migrate deployments or provide database rollback.
 
-**The active release is always `<parent>/latest`.** Pi continues a bot's session
+**The active release is always `~/battuta/latest`.** Pi continues a bot's session
 only from the same working directory (`<install-path>/bots/<profile>`), and CoS's
 Telegram connection and scheduled tasks are bound to that directory and session.
 A different path starts fresh sessions, so CoS must be reconnected with
@@ -88,7 +88,7 @@ release to its own tag, then continue from step 1 with the same `install_path`:
 
 ```bash
 set -euo pipefail
-install_path="<parent the owner approved>/latest"
+install_path="$HOME/battuta/latest"
 previous="$(uv run --no-project --python 3.12 python -c 'import json,sys; print(json.load(open(sys.argv[1]))["tag"])' "$install_path/bots/release.json")"
 [[ "$previous" =~ ^v[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.-]*$ ]] || { printf 'STOP: unexpected release tag.\n' >&2; exit 1; }
 test ! -e "${install_path%/latest}/$previous"
@@ -139,18 +139,16 @@ directory, not the installation:
   `battuta-bot-setup`, and `battuta-packaging`; main also needs `battuta-memory`, `battuta-speech` and `battuta-doc`.
 - `python-tools-version.txt` and `python-tools-SHA256SUMS`.
 
-Set the real tag and platform. `install_path` is always `<parent>/latest`. For an
-upgrade, keep the previous parent after renaming `latest` as described above. For a
-first installation, ask the owner for the absolute parent if it is not given (for
-example `/opt/battuta`, created by an administrator and owned by the bot user); do
-not choose one. `latest` must not exist yet, and service generation
-rejects paths with spaces or systemd special characters. From the download directory:
+Set the real tag and platform. `install_path` is always `~/battuta/latest`, owned
+by the bot user. For an upgrade, rename `latest` as described above first.
+`latest` must not exist yet, and service generation rejects paths with spaces or
+systemd special characters. From the download directory:
 
 ```bash
 version=vX.Y.Z
 platform=oracle-ampere # raspberry-pi for the influencer bundle
 archive="battuta-$version-$platform-arm64.tar.gz"
-install_path="<parent the owner approved>/latest"
+install_path="$HOME/battuta/latest"
 sha256sum -c "$archive.sha256"
 sha256sum -c python-tools-SHA256SUMS
 tool_version="$(cat python-tools-version.txt)"
