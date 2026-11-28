@@ -9,6 +9,8 @@ const MAX_AUDIO_BYTES = 10_000_000;
 const TRANSCRIBE_TIMEOUT_MS = 180_000;
 const AUDIO_EXTENSIONS = new Set([".ogg", ".oga", ".opus", ".mp3", ".m4a", ".wav", ".flac"]);
 const ATTACHMENTS_HEADER = /^\[attachments(?:\|[^\]]*)?\](?: (.+))?$/;
+// pi-telegram's delivery marker on voice-tagged prompts, e.g. "[voice] delivery: automatic voice".
+const VOICE_MARKER = /^\[voice\](?: .*)?$/;
 
 export async function transcribeTelegramVoice(text: string): Promise<string | undefined> {
   const lines = text.split("\n");
@@ -27,14 +29,18 @@ export async function transcribeTelegramVoice(text: string): Promise<string | un
   return [...lines.slice(0, start), ...transcripts, ...attachments, ...lines.slice(end)].join("\n");
 }
 
-// Chat-only view of a stored prompt: drops the attachment listing and transcription failure notes.
+// Chat-only view of a stored prompt: drops the attachment listing, transcription failure notes
+// and the voice delivery marker.
 export function chatText(text: string): string {
   const lines = text.split("\n");
   const kept: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     if (ATTACHMENTS_HEADER.test(lines[i])) {
       while (lines[i + 1]?.startsWith("- ")) i++;
-    } else if (!lines[i].startsWith("[voice message could not be transcribed:"))
+    } else if (
+      !lines[i].startsWith("[voice message could not be transcribed:") &&
+      !VOICE_MARKER.test(lines[i])
+    )
       kept.push(lines[i]);
   }
   return kept.join("\n");

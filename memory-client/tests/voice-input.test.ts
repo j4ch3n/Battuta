@@ -16,7 +16,7 @@ vi.mock("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
   StreamableHTTPClientTransport: class {},
 }));
 
-const { transcribeTelegramVoice } = await import("../voice-input.ts");
+const { chatText, transcribeTelegramVoice } = await import("../voice-input.ts");
 
 let dir: string;
 
@@ -110,5 +110,20 @@ describe("transcribeTelegramVoice", () => {
     await expect(transcribeTelegramVoice(text)).resolves.toBe(
       "[voice message could not be transcribed: audio file could not be read]",
     );
+  });
+});
+
+describe("chatText", () => {
+  it.each([
+    [
+      "the voice delivery marker",
+      "hello\n[voice] delivery: automatic voice\n[time] now",
+      "hello\n[time] now",
+    ],
+    ["a bare voice marker", "hello\n[voice]", "hello"],
+    ["a mid-line mention", "say [voice] twice", "say [voice] twice"],
+    ["a similar tag", "[voiceover] notes", "[voiceover] notes"],
+  ])("handles %s", (_name, input, expected) => {
+    expect(chatText(input)).toBe(expected);
   });
 });
