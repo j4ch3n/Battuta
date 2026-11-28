@@ -39,7 +39,7 @@ def render(release, platform):
     "platform,expected,absent",
     [
         ("oracle-ampere", PACKAGES, []),
-        ("raspberry-pi", [p for p in PACKAGES if p not in ("battuta_memory", "battuta_speech", "battuta_doc")], ["battuta_memory", "battuta_speech", "battuta_doc"]),
+        ("raspberry-pi", ["battuta_project", "battuta_bot_setup", "battuta_packaging"], ["battuta_artifacts", "battuta_memory", "battuta_speech", "battuta_doc"]),
     ],
     ids=["oracle-ampere", "raspberry-pi"],
 )

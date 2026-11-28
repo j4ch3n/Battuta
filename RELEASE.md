@@ -16,13 +16,13 @@ human acceptance, not agent-run setup checks.
 Ask the owner which bundle to set up if not specified. Each bundle has its own
 platform archive and install instructions: main uses `oracle-ampere`, influencer uses
 `raspberry-pi`. Each bundle installs only its wheels: main needs all seven, and
-influencer omits `battuta-memory`, `battuta-speech` and `battuta-doc`. The bundle controls private
+influencer omits `battuta-artifacts`, `battuta-memory`, `battuta-speech` and `battuta-doc`. The bundle controls private
 configuration and generated services, not the files included in the archive.
 
 | Bundle             | `deployment` | Configured bots                        | Services to activate after approval                                  | Setup validation                                                                           |
 | ------------------ | ------------ | -------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | Main machine       | `main`       | CoS, Manager, selected general workers | memory, artifacts, speech, documents, CoS, Manager, selected workers | Bundle validation, private configuration and named service status                          |
-| Influencer machine | `influencer` | Exactly one influencer worker          | artifacts, selected worker                                           | Bundle validation, worker private configuration, ADB availability and named service status |
+| Influencer machine | `influencer` | Exactly one influencer worker          | selected worker                                                      | Bundle validation, worker private configuration, ADB availability and named service status |
 
 Set `deployment=main` or `deployment=influencer` in the trusted shell before
 continuing. Pass that same value to both configuration and service generation.
@@ -135,8 +135,8 @@ Download these assets from the selected GitHub Release into a separate download
 directory, not the installation:
 
 - `battuta-vX.Y.Z-<platform>-arm64.tar.gz` and its `.sha256`, for your platform.
-- Wheels for your bundle (filenames use underscores): `battuta-project`, `battuta-artifacts`,
-  `battuta-bot-setup`, and `battuta-packaging`; main also needs `battuta-memory`, `battuta-speech` and `battuta-doc`.
+- Wheels for your bundle (filenames use underscores): `battuta-project`, `battuta-bot-setup`,
+  and `battuta-packaging`; main also needs `battuta-artifacts`, `battuta-memory`, `battuta-speech` and `battuta-doc`.
 - `python-tools-version.txt` and `python-tools-SHA256SUMS`.
 
 Set the real tag and platform. `install_path` is always `~/battuta/latest`, owned
@@ -170,19 +170,22 @@ source installations, or `--with` arguments.
 ```bash
 case "$deployment" in
   main) packages="battuta-project battuta-artifacts battuta-memory battuta-speech battuta-doc battuta-bot-setup battuta-packaging" ;;
-  influencer) packages="battuta-project battuta-artifacts battuta-bot-setup battuta-packaging" ;;
+  influencer) packages="battuta-project battuta-bot-setup battuta-packaging" ;;
 esac
 for package in $packages; do
   wheel="${package//-/_}-$tool_version-py3-none-any.whl"
   uv tool install --managed-python --python 3.12 --no-build "./$wheel"
 done
 export PATH="$(uv tool dir --bin):$PATH"
-for package in $packages; do
+command -v battuta-project >/dev/null
+for package in ${packages/battuta-project /}; do
   "${package/battuta-artifacts/battuta-artifact}" --help >/dev/null
 done
 ```
 
-All commands must succeed. A direct wheel URL also works with
+All commands must succeed. `battuta-project` needs `LINEAR_API_TOKEN` even for
+`--help`, so it is only located here and run in step 4 after loading the private
+environment. A direct wheel URL also works with
 `uv tool install --managed-python --python 3.12 "<wheel-url>"`; the procedure above
 additionally verifies the downloaded top-level wheel checksums and refuses native
 source compilation. Pins are not a dependency hash lock or an offline wheelhouse.
@@ -285,6 +288,9 @@ fi
 for key in $required; do
   [[ -n "${!key:-}" ]] || { printf 'STOP: %s is not set in %s\n' "$key" "$env_file" >&2; exit 1; }
 done
+if [[ -n "${LINEAR_API_TOKEN:-}" ]]; then
+  battuta-project --help >/dev/null
+fi
 workers="$(compgen -v | sed -nE 's/^BATTUTA_WORKER_([1-9][0-9]*)_TYPE$/worker-\1/p' | sort -V | xargs)"
 printf 'Selected workers: %s\n' "${workers:-none}"
 battuta-bot-setup configure-release --root "$install_path" --env-file "$env_file" \
@@ -308,7 +314,8 @@ existing private files.
 ## 5. Provision application services
 
 In the same trusted private shell, load the same environment used by services.
-For the main bundle provision memory; the influencer bundle does not use it:
+For the main bundle provision memory, speech and artifacts; the influencer bundle
+uses none of them:
 
 ```bash
 env_file="$HOME/.battuta/.env.prod"
@@ -322,8 +329,8 @@ if [[ "${deployment:?Choose main or influencer}" == main ]]; then
   battuta-memory doctor --json
   battuta-packaging install-speech
   battuta-packaging verify-speech
+  battuta-artifact setup
 fi
-battuta-artifact setup
 ```
 
 These provision the selected memory model/data, artifact schema, and (main only) speech assets without starting bots.
@@ -342,8 +349,8 @@ battuta-packaging install-services --root "$install_path" \
 ```
 
 The main bundle writes CoS, Manager, memory, artifact, speech, document, and
-`battuta-worker@.service` definitions. The influencer bundle writes only artifact
-and `battuta-worker@.service` definitions. Confirm the printed activation
+`battuta-worker@.service` definitions. The influencer bundle writes only the
+`battuta-worker@.service` definition. Confirm the printed activation
 list matches the table above before proceeding.
 It prints the exact reload/activation commands for the configured count, but does
 not execute them. Conflicting units, symlinks, and excess running workers stop setup.
