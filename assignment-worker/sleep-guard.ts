@@ -1,7 +1,7 @@
 /** The longest shell sleep a worker may take while a Claude run is active. */
 export const MAX_SLEEP_SECONDS = 60;
 
-export const LONG_SLEEP = `While a Claude run is active, sleep at most ${MAX_SLEEP_SECONDS} seconds at a time: Claude's requests and the run's result reach you only after this command ends. End your turn to wait, or repeat short sleeps, and never send delegate_status alongside a sleep.`;
+export const LONG_SLEEP = `While a Claude run is active, sleep at most ${MAX_SLEEP_SECONDS} seconds at a time: Claude's requests and the run's result reach you only after this command ends. End your turn to wait, and never send delegate_status alongside a sleep.`;
 
 const SLEEP = /(?:^|[;&|(\n]|\bdo\b|\bthen\b|\belse\b)\s*sleep\b([^;&|)\n]*)/g;
 const UNIT: Record<string, number> = { "": 1, s: 1, m: 60, h: 3600, d: 86400 };
