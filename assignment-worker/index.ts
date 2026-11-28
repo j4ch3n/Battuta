@@ -5,8 +5,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { createClient } from "@supabase/supabase-js";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { Type } from "typebox";
 import { sendProgrammaticMail } from "@battuta/agent-mail/transport";
 import { createAssignmentClient } from "./client.ts";
@@ -371,8 +370,9 @@ export default async function worker(pi: ExtensionAPI) {
   });
   // Last: everything above registers synchronously, and loading the delegate package awaits.
   delegation.runs = await registerProjectDelegate(pi, {
-    // dist/index.js sits in <profile>/.pi/extensions/assignment-worker/dist, so the profile's .pi directory is three levels up.
-    profileDir: join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."),
+    // Pi runs in the bot profile and installs its project packages under <cwd>/.pi/npm; this file's own path is
+    // no guide, since a source profile links it from the checkout.
+    profileDir: join(process.cwd(), ".pi"),
     projectsRoot: join(homedir(), ".battuta", "projects"),
     log: diagnostic,
   });
