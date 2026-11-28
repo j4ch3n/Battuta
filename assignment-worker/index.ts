@@ -16,6 +16,7 @@ import { delegationPromptSection } from "./delegation.ts";
 import { createCoordinator } from "./coordinator.ts";
 import { ExecutionResultParameters, currentBinding, parseAbilities } from "./contracts.ts";
 import { guardWorktreeCommand } from "./worktree-guard.ts";
+import { LONG_SLEEP, isLongSleep } from "./sleep-guard.ts";
 import { registerProjectDelegate } from "./project-delegate.ts";
 import { createNotifier } from "./notify.ts";
 import { ensureAssignmentWorkspace } from "./workspace.ts";
@@ -124,6 +125,9 @@ export default async function worker(pi: ExtensionAPI) {
   });
   pi.on("tool_call", (event, ctx) => {
     if (event.toolName !== "bash" || typeof event.input.command !== "string") return;
+    // Pi delivers Claude's requests only after the current tool call, so a long sleep leaves them waiting.
+    if (delegation.runs?.isRunActive() && isLongSleep(event.input.command))
+      return { block: true, reason: LONG_SLEEP };
     const guard = guardWorktreeCommand(event.input.command, currentBinding(ctx)?.project);
     if (!guard) return;
     if ("block" in guard) return { block: true, reason: guard.block };
