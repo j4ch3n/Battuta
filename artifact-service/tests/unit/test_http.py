@@ -86,8 +86,9 @@ def assert_error_page(response, heading, *absent):
 
 @pytest.mark.parametrize(
     "url",
-    ["/artifacts/a/demo/nope.txt", "/artifacts/a/missing/", "/artifacts/a/demo/secret.txt"],
-    ids=["unknown-file", "unknown-artifact", "unlisted-file"],
+    ["/artifacts/a/demo/nope.txt", "/artifacts/a/missing/", "/artifacts/a/demo/secret.txt", "/artifacts/111",
+     "/elsewhere", "/artifacts/fonts/inter-latin.woff2"],
+    ids=["unknown-file", "unknown-artifact", "unlisted-file", "unknown-route", "outside-artifacts", "unknown-font"],
 )
 def test_unknown_path_returns_styled_404_page(http, url):
     assert_error_page(http.client().get(url), "Nothing here to read", "nope", "private", str(http.source))

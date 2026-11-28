@@ -133,6 +133,11 @@ def create_app(path: Path | None = None) -> FastAPI:
                           "This link doesn't point to a published work. It may be mistyped, or the work may have "
                           "been withdrawn.")
 
+    @app.exception_handler(404)
+    async def unmatched(request, error):
+        # Unknown routes and rejected fonts get the same page as unknown works.
+        return not_found()
+
     def hidden():
         return error_page("Hidden files stay hidden",
                           "Files whose names start with a dot are never shared from an artifact.")
