@@ -25,8 +25,9 @@ dev = ["pytest>=8,<10", "pytest-bdd>=9,<10"]
 battuta-memory = "battuta_memory.cli:main"
 
 [tool.uv.sources]
-# battuta_memory.manage.BattutaManage overrides private core Manage hooks: _delete, _supersede,
-# _write_report, proposals, sleep (relied on to call them) and _caps (relied on for the review caps).
+# battuta_memory.manage.BattutaManage overrides private core Manage hooks: proposals, _delete, _supersede,
+# _merge, _merge_exact_duplicates and _write_report; sleep (relied on to call them) and _caps (relied on for
+# the review caps) are used unchanged.
 # Keep this rev exact; on any core bump, re-read those hooks and update tests/unit/test_retire.py's signature guard.
 agent-memory-core = { git = "https://github.com/tigerless-labs/agent-memory", rev = "2648ba02d3c0364f9787f0e8fb49f69f47d2e3f7", subdirectory = "packages/core" }
 agent-memory-executor = { git = "https://github.com/tigerless-labs/agent-memory", rev = "2648ba02d3c0364f9787f0e8fb49f69f47d2e3f7", subdirectory = "packages/executor" }
