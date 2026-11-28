@@ -1,20 +1,21 @@
-<!doctype html>
+{% from "parts.html" import topbar, footer %}<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ heading }}</title>
-    <link rel="stylesheet" href="/artifacts/catalog.css" />
+    <link rel="stylesheet" href="/artifacts/theme.css" />
   </head>
   <body>
-    <header class="page-width hero">
-      <div class="hero-heading">
+    {{ topbar() }}
+    <main class="page lost">
+      <div class="tumble" aria-hidden="true"><span>4</span><span>0</span><span>4</span></div>
+      <div>
         <h1>{{ heading }}</h1>
+        <p>{{ message }}</p>
+        <a class="button" href="/artifacts/">Browse all artifacts</a>
       </div>
-      <p class="hero-description">{{ message }}</p>
-    </header>
-    <main class="page-width library">
-      <a href="/artifacts/">All artifacts</a>
     </main>
+    {{ footer() }}
   </body>
 </html>

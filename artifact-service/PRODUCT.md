@@ -20,13 +20,14 @@ Browse registered documents and demos, read their descriptions and open their or
 - Explicitly allowlisted HTML bundles and rendered Markdown; originals remain in place.
 - Live catalog refresh, metadata updates and non-destructive deregistration remain unchanged.
 - Native links, keyboard-focus retention, readable dates, no-JavaScript content and mobile reflow.
-- No image or avatar content, card grid, or format grouping on the index.
-- No top navigation or long introduction; retain a small hero and work count.
+- Index shows projects as rows of tiles with a deck for older work; no images, avatars or format grouping.
+- No top navigation or long introduction on the index; retain a small hero and work count.
 - Footer credit: © 2026 Fiscum Technology.
 
 ## Brand Commitments
 
-The owner selected Astro Sienna as the visual reference for this index after rejecting
-the cobalt design. This choice applies only to the artifact index, not to Battuta's
-other pages or product identity. Local sample entries are synthetic preview fixtures,
+The owner selected MINI's design language (solid paint colours, chunky rounded tiles,
+white page, black type) for the artifact pages and new artifact bundles, after rejecting
+the Sienna look as dated. This choice applies only to the artifact service, not to
+Battuta's other pages or product identity. Local sample entries are synthetic preview fixtures,
 not claims about actual project outputs.

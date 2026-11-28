@@ -1,27 +1,47 @@
 {
   "schemaVersion": 2,
-  "title": "Design System: Artifact index",
+  "title": "Design System: Artifact pages",
   "extensions": {
     "motion": [
       {
-        "name": "title-underline",
-        "value": "text-decoration-color 160ms ease-out",
-        "purpose": "Rust title feedback; disabled with reduced motion."
+        "name": "deck-deal",
+        "value": "grid grows 260ms, then cards fly 620ms staggered 70ms, cubic-bezier(.2,.8,.2,1)",
+        "purpose": "Opening a project deals its stacked works; disabled with reduced motion."
+      },
+      {
+        "name": "deck-gather",
+        "value": "cards gather 480ms staggered 60ms, then grid shrinks 320ms",
+        "purpose": "Stacking a project; rows never stretch while the grid height animates."
+      },
+      {
+        "name": "tumble",
+        "value": "404 tiles drop 700ms once on load",
+        "purpose": "Error page moment; disabled with reduced motion."
       }
     ],
-    "breakpoints": [{ "name": "narrow-max", "value": "45rem" }]
+    "breakpoints": [
+      { "name": "catalog-narrow-max", "value": "45rem" },
+      { "name": "article-narrow-max", "value": "52rem" }
+    ]
   },
   "components": [],
   "narrative": {
-    "northStar": "Sienna working library",
-    "overview": "Small hero, warm paper, Newsreader content, Inter metadata and a continuous date timeline. Local to the artifact index.",
+    "northStar": "MINI paint-chip library",
+    "overview": "White page, black Gabarito type, one solid paint colour per project, chunky rounded tiles, a fanned deck for older work and magazine-style articles.",
     "keyCharacteristics": [
-      "Compact hero without navigation, images or avatars.",
-      "Desktop date rail becomes dates above content on mobile.",
-      "Quiet © 2026 Fiscum Technology footer."
+      "Project chip, two newest works and a deck per row; four columns on desktop, two on phones.",
+      "Twelve stable project paints with black or white text at 4.5:1 or better; unassigned is black.",
+      "Huge black article titles, plain drop cap, yellow pull quotes, hand-of-chips back link."
     ],
     "rules": [],
-    "dos": ["Preserve live updates, native links and meaningful keyboard focus."],
-    "donts": ["No cards, format grouping, external font requests or project-wide branding changes."]
+    "dos": [
+      "Preserve live updates, native links and meaningful keyboard focus.",
+      "Keep colour in solid tiles and small accents on a white page."
+    ],
+    "donts": [
+      "No gradients, glass, glow, pastels or coloured page backgrounds.",
+      "No colour bands behind headline words or the drop cap.",
+      "No external font requests or project-wide branding changes."
+    ]
   }
 }

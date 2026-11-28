@@ -38,8 +38,9 @@ def test_installed_resources_generate_selected_styles_and_notices(tmp_path):
                             cwd=tmp_path, capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stdout + result.stderr
     output = json.loads(result.stdout)
-    assert output["served"] == ["index.html", "index.js", "styles.css", "vendor/live-diagram.css", "vendor/mermaid.css"]
-    assert len(output["paths"]) == 7
+    assert output["served"] == ["fonts/gabarito-latin.woff2", "index.html", "index.js", "styles.css", "theme.css",
+                                "vendor/live-diagram.css", "vendor/mermaid.css"]
+    assert len(output["paths"]) == 9
     assert [vendor["name"] for vendor in output["vendors"]] == ["mermaid", "live-diagram"]
     assert not output["vendors"][0]["selected"]
     assert output["notice"] and output["styles"]

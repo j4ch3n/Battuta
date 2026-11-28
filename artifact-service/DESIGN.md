@@ -1,61 +1,72 @@
 ---
-name: Artifact index
-description: A Sienna-inspired working library with a small hero and collapsible project timelines.
+name: Artifact pages
+description: A MINI-inspired paint-chip library, white page, black type and one solid colour per project.
 colors:
-  canvas: "hsl(37deg 47% 93%)"
-  ink: "hsl(28deg 16% 13%)"
-  muted: "hsl(25deg 14% 26%)"
-  accent: "hsl(17deg 60% 34%)"
-  rule: "#d9cfb9"
+  page: "#ffffff"
+  ink: "#000000"
+  muted: "#5c5c5c"
+  surface: "#f3f3f1"
+  rule: "#e2e2df"
+  pull-quote: "#f6c800"
 typography:
   display:
-    fontFamily: '"Newsreader", "Iowan Old Style", Georgia, serif'
-    fontSize: "clamp(2.5rem, 6vw, 3.5rem)"
-    fontWeight: 500
+    fontFamily: '"Gabarito", "Helvetica Neue", Arial, sans-serif'
+    fontSize: "clamp(2.75rem, 7vw, 5.75rem)"
+    fontWeight: 900
   title:
-    fontFamily: '"Newsreader", "Iowan Old Style", Georgia, serif'
-    fontSize: "1.375rem"
-    fontWeight: 500
+    fontFamily: '"Gabarito", "Helvetica Neue", Arial, sans-serif'
+    fontSize: "1.1875rem"
+    fontWeight: 700
   body:
-    fontFamily: '"Newsreader", "Iowan Old Style", Georgia, serif'
-    fontSize: "1.125rem"
-    lineHeight: 1.6
-  metadata:
-    fontFamily: '"Inter", system-ui, sans-serif'
-    fontSize: "0.75rem"
+    fontFamily: '"Gabarito", "Helvetica Neue", Arial, sans-serif'
+    fontSize: "1.15625rem"
+    lineHeight: 1.62
+  code:
+    fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
 ---
 
-# Artifact index design
+# Artifact page design
 
-Local to this index, not project-wide branding. The owner selected
-[Astro Sienna](https://anjay-goel.github.io/astro-sienna/) after rejecting the cobalt design.
-Its palette and timeline styling are adapted under MIT; the pinned source and license
-are retained in [SIENNA-LICENSE.txt](src/battuta_artifacts/SIENNA-LICENSE.txt).
+Covers the home catalog, rendered Markdown, error pages and the starter that `init` copies into new
+bundles. Local to the artifact service, not Battuta's product identity. The owner chose MINI's design
+language as the reference after rejecting the Sienna look as dated, and rejected gradients, glass,
+pastels and coloured page backgrounds as artificial.
 
-## Composition
+## Colour
 
-- Warm paper canvas, brown-black serif content and restrained rust interactions.
-- A compact hero contains “Artifacts,” one short context line and the live work count.
-- No navigation menu, long introduction, images, avatars, cards or format groups.
-- A 46rem column carries alphabetically sorted project disclosures, collapsed initially. Each opens a timeline with a 7rem date rail and 2.25rem gap.
-- Within each project, newest updates come first; equal or missing dates use slug order, with undated work last. Unassociated work appears under “Unassigned.”
-- At 45rem and below, dates sit above content, timeline dots disappear and fine horizontal rules separate entries.
-- Every item title is 1.375rem, with no featured-item sizing. Descriptions remain complete.
-- A quiet footer reads “© 2026 Fiscum Technology,” separated by a fine rule. It stays at the bottom on short pages without covering content.
+- White page, black type, light surface and fine rules; colour arrives as solid paint, never gradients.
+- Each project owns one of twelve paints (Chili Red, Sunny Yellow, Ocean Green, Blazing Blue, Volcanic
+  Orange, Zesty Lime, Rooftop Pink, Caribbean Aqua, Enigmatic Violet, Racing Green, Burgundy, Lilac),
+  chosen from its name and paired with black or white text at 4.5:1 or better. Unassigned work is black.
+- The project paint fills its home-page chip and, on its Markdown pages, the project pill swatch,
+  section bars, bullets and link underlines. Pull quotes are always Sunny Yellow.
+- No colour behind headline words or the drop cap.
+
+## Home catalog
+
+- Small header: "Artifacts", one context line, a work-count pill. Quiet footer "© 2026 Fiscum Technology".
+- Projects sorted alphabetically; each is one grid of tiles (four columns, two on phones): the paint
+  chip, the two newest works, then a fanned deck holding the rest with "+N Show all".
+- The deck or the chip opens a project: the row grows, then cards fly out of the deck. The chip
+  stacks them again: cards gather into the deck, then the empty rows close. Rows never stretch.
+- No JavaScript: every work shows, no deck. Reduced motion: no flight.
+
+## Markdown and starter pages
+
+- Magazine layout: top bar with the hand-of-chips "All artifacts" link, project and date pills, huge
+  heavy black title with the description as a standfirst, a contents panel for three or more headings,
+  a plain black drop cap, tilted yellow pull quotes, code on black tiles, tables in rounded frames.
+- The starter uses the same header and article styles without the server top bar.
+
+## Error pages
+
+- Three tumbling "4 0 4" tiles in Chili Red, Sunny Yellow and Blazing Blue drop in once; plain black
+  heading, one sentence, a black "Browse all artifacts" button. Never reveal drafts.
 
 ## Interaction and ownership
 
-Native links and disclosure controls, visible rust focus outlines, underline feedback,
-reduced-motion and forced-color support remain. Project entrances use a short fade/shift;
-disclosures animate height and opacity over 200ms, with instant native toggles for reduced
-motion or without JavaScript. Live updates reuse nodes and retain disclosure state and
-meaningful keyboard focus through changes, removal and repopulation.
-
-The public catalog includes only project labels, never source paths. Explicit project
-metadata takes precedence; older registrations inside canonical project-owned workspaces
-use the owning directory name. Other registrations remain unassigned. No registry writes,
-artifact destination changes or CLI behavior changes are involved.
-
-[catalog.css](src/battuta_artifacts/assets/catalog.css) owns the actual tokens and
-responsive rules. Newsreader and Inter are self-hosted; font sources and licenses
-are recorded under [fonts](src/battuta_artifacts/assets/fonts/).
+Native links and buttons, visible black focus outlines, `aria-expanded` on the chip and deck, reduced
+motion and forced colours. Live updates reuse nodes and keep open state and meaningful focus.
+[theme.css](src/battuta_artifacts/assets/theme.css) owns tokens and shared styles;
+[catalog.css](src/battuta_artifacts/assets/catalog.css) owns the home grid and deck. Gabarito is
+self-hosted; its source and licence are recorded under [fonts](src/battuta_artifacts/assets/fonts/).

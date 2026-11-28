@@ -4,7 +4,7 @@
     { "path": "index.html", "purpose": "Semantic reading page and import map.", "serve": true },
     {
       "path": "styles.css",
-      "purpose": "Base reading layout and accessibility styles.",
+      "purpose": "Page-specific styles layered on the shared theme.",
       "serve": true
     },
     { "path": "index.js", "purpose": "Inert module entry for authored imports.", "serve": true },

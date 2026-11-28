@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="{{ description }}" />
     <title>{{ title }}</title>
+    <link rel="stylesheet" href="theme.css" />
     <link rel="stylesheet" href="styles.css" />
     {% for stylesheet in stylesheets %}
     <link rel="stylesheet" href="{{ stylesheet }}" />
@@ -14,16 +15,18 @@
     </script>
     <script type="module" src="index.js"></script>
   </head>
-  <body>
-    <main>
-      <header>
-        <h1>{{ title }}</h1>
-        <p>{{ description }}</p>
-      </header>
-      <section aria-labelledby="start-here">
-        <h2 id="start-here">Start here</h2>
-        <p>Replace this placeholder with the explanation your reader needs.</p>
-      </section>
-    </main>
+  <body style="--paint: {{ colour.paint }}; --ink: {{ colour.ink }}">
+    <header class="page article-head">
+      <h1 class="headline">{{ title }}</h1>
+      <p class="standfirst">{{ description }}</p>
+    </header>
+    <div class="page article-body">
+      <main class="prose">
+        <section aria-labelledby="start-here">
+          <h2 id="start-here">Start here</h2>
+          <p>Replace this placeholder with the explanation your reader needs.</p>
+        </section>
+      </main>
+    </div>
   </body>
 </html>

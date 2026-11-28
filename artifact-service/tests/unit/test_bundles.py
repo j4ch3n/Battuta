@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sqlite3
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -9,8 +10,11 @@ from click.testing import CliRunner
 
 from battuta_artifacts.bundles import load_bundle
 from battuta_artifacts.cli import main
+from battuta_artifacts.palette import project_colour
 from battuta_artifacts.registry import ArtifactError, Registry
 from battuta_artifacts.vendors import select_vendors
+
+ASSETS = Path(__file__).parents[2] / "src/battuta_artifacts/assets"
 
 
 @pytest.mark.parametrize("args", [(), ("--vendor", "unknown")], ids=["no-vendor", "unknown-vendor"])
@@ -116,6 +120,8 @@ def test_live_diagram_bundle_links_resolved_css_and_matching_import_maps(bundle)
         "vendor/importmap.json",
         "vendor/mermaid.css",
         "vendor/live-diagram.css",
+        "theme.css",
+        "fonts/gabarito-latin.woff2",
         "NOTICE.txt",
     }
     assert [vendor["name"] for vendor in payload["vendors"]] == ["mermaid", "live-diagram"]
@@ -123,7 +129,11 @@ def test_live_diagram_bundle_links_resolved_css_and_matching_import_maps(bundle)
     assert payload["vendors"][1]["selected"]
     assert payload["vendors"][0]["stylesheets"] == ["vendor/mermaid.css"]
     html = (bundle.directory / "index.html").read_text()
-    assert html.index('href="styles.css"') < html.index('href="vendor/mermaid.css"')
+    assert html.index('href="theme.css"') < html.index('href="styles.css"') < html.index('href="vendor/mermaid.css"')
+    assert (bundle.directory / "theme.css").read_bytes() == (ASSETS / "theme.css").read_bytes()
+    assert (bundle.directory / "fonts/gabarito-latin.woff2").read_bytes()[:4] == b"wOF2"
+    assert "SIL Open Font License" in (bundle.directory / "NOTICE.txt").read_text()
+    assert f'--paint: {project_colour("procurement")["paint"]}' in html
     assert html.index('href="vendor/mermaid.css"') < html.index('href="vendor/live-diagram.css"')
     inline_map = json.loads(re.search(r'<script type="importmap">(.*?)</script>', html, re.DOTALL).group(1))
     assert inline_map == json.loads((bundle.directory / "vendor/importmap.json").read_text())
