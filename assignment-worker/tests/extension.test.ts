@@ -559,3 +559,15 @@ test("session shutdown removes the worker's signal handlers, so replaced session
   await shutdown();
   expect(process.listenerCount("SIGTERM") + process.listenerCount("SIGINT")).toBe(before);
 });
+
+test("a long sleep is refused only while a delegate run is active", async () => {
+  const { handlers, ctx } = await bootWorker();
+  const toolCall = (command: string) =>
+    handlers.get("tool_call")!({ toolName: "bash", input: { command } }, ctx);
+  delegate.active = true;
+  expect(await toolCall("sleep 600")).toMatchObject({ block: true });
+  expect(await toolCall("sleep 60")).toBeUndefined();
+  delegate.active = false;
+  expect(await toolCall("sleep 600")).toBeUndefined();
+  await handlers.get("session_shutdown")!({}, ctx);
+});

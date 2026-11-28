@@ -90,6 +90,10 @@ not model actions.
      run can be active at a time.
    - While it runs, keep handling mail and follow-ups. Check progress with
      `delegate_status` and pass it on to Manager when it matters.
+   - To wait for the run, end your turn: each request and the result start a
+     new turn. A shell `sleep` holds them back until it ends, so never sleep
+     longer than 60 seconds while a run is active (longer sleeps are refused),
+     and never send `delegate_status` in the same batch as a sleep.
    - Claude's questions and permission requests arrive as messages. Answer each
      with `delegate_reply` and its `requestId`. Ask Manager first when the answer
      needs authority you do not have, and deny anything outside the commission.

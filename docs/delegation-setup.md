@@ -90,7 +90,9 @@ The worker starts Claude Code through a small proxy shipped beside its extension
 package runs in place of the `claude` executable. The proxy takes the same arguments and prints the same
 stream output, and connects back to its own worker. A `delegate` call returns once the run has started.
 The worker keeps working while the run continues, and receives its questions, permission requests and
-result as messages. Each worker runs at most one Claude run at a time. `/delegate` typed by a person has
+result as messages. Each message starts a new turn when the worker is idle. Pi delivers it only after the
+worker's current tool calls end, so while a run is active the worker refuses a shell `sleep` longer than
+60 seconds. Each worker runs at most one Claude run at a time. `/delegate` typed by a person has
 no worker to answer it, so any request that needs approval is denied at once, as with `claude -p`.
 
 ## Permissions

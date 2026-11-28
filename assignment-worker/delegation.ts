@@ -38,6 +38,7 @@ export function renderDelegationSection(entries: CatalogEntry[]): string {
     "Tiers are independent of the assignment's difficulty, which is only the Manager's advice; hail-mary work uses max.",
     "Modes: plan, research, review and security-audit are read-only; implement, docs and general edit files. Never use danger.",
     "A run starts in the background, one at a time; keep handling mail and follow-ups while it runs.",
+    "To wait for a run, end your turn: its requests and result start a new turn. A shell sleep delays them until it ends, so sleep at most 60 seconds at a time and never send delegate_status alongside one.",
     "Claude's questions, permission requests and the run's result arrive as messages: answer with delegate_reply, check with delegate_status, stop with delegate_stop.",
   );
   return lines.join("\n");

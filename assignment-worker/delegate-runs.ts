@@ -222,7 +222,7 @@ export async function createDelegateRuns(
       });
       const session = run.sessionId ? `session ${run.sessionId}` : "session id not reported yet";
       return text(
-        `Claude run started in ${cwd} (${session}). Questions and the result arrive as messages; use delegate_status, delegate_reply or delegate_stop meanwhile.`,
+        `Claude run started in ${cwd} (${session}). Questions and the result arrive as messages; use delegate_status, delegate_reply or delegate_stop meanwhile, and end your turn to wait for them.`,
       );
     },
 

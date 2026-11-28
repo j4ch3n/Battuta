@@ -5,8 +5,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { createClient } from "@supabase/supabase-js";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { Type } from "typebox";
 import { sendProgrammaticMail } from "@battuta/agent-mail/transport";
 import { createAssignmentClient } from "./client.ts";
@@ -17,6 +16,7 @@ import { delegationPromptSection } from "./delegation.ts";
 import { createCoordinator } from "./coordinator.ts";
 import { ExecutionResultParameters, currentBinding, parseAbilities } from "./contracts.ts";
 import { guardWorktreeCommand } from "./worktree-guard.ts";
+import { LONG_SLEEP, isLongSleep } from "./sleep-guard.ts";
 import { registerProjectDelegate } from "./project-delegate.ts";
 import { createNotifier } from "./notify.ts";
 import { ensureAssignmentWorkspace } from "./workspace.ts";
@@ -125,6 +125,9 @@ export default async function worker(pi: ExtensionAPI) {
   });
   pi.on("tool_call", (event, ctx) => {
     if (event.toolName !== "bash" || typeof event.input.command !== "string") return;
+    // Pi delivers Claude's requests only after the current tool call, so a long sleep leaves them waiting.
+    if (delegation.runs?.isRunActive() && isLongSleep(event.input.command))
+      return { block: true, reason: LONG_SLEEP };
     const guard = guardWorktreeCommand(event.input.command, currentBinding(ctx)?.project);
     if (!guard) return;
     if ("block" in guard) return { block: true, reason: guard.block };
@@ -371,8 +374,9 @@ export default async function worker(pi: ExtensionAPI) {
   });
   // Last: everything above registers synchronously, and loading the delegate package awaits.
   delegation.runs = await registerProjectDelegate(pi, {
-    // dist/index.js sits in <profile>/.pi/extensions/assignment-worker/dist, so the profile's .pi directory is three levels up.
-    profileDir: join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."),
+    // Pi runs in the bot profile and installs its project packages under <cwd>/.pi/npm; this file's own path is
+    // no guide, since a source profile links it from the checkout.
+    profileDir: join(process.cwd(), ".pi"),
     projectsRoot: join(homedir(), ".battuta", "projects"),
     log: diagnostic,
   });
