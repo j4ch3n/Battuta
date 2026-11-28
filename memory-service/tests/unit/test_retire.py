@@ -3,6 +3,7 @@ import datetime as dt
 import inspect
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 import pytest
@@ -10,7 +11,8 @@ from agent_memory.core import reasoning
 from agent_memory.core.ledger import VERDICT_ACCEPTED, VERDICT_REJECTED, Decision
 from agent_memory.core.manage import ACTION_DUPLICATE_MERGED, Action, DreamReport, Manage, Proposal
 from agent_memory.core.store import Store
-from battuta_memory.manage import BattutaManage, DeclaredProposal
+from battuta_memory.layout import OVERVIEW
+from battuta_memory.manage import BattutaManage, DeclaredProposal, _newer
 
 TODAY = dt.datetime.now(dt.UTC).date()
 
@@ -46,35 +48,223 @@ def deletes(proposals):
     return {proposal.targets[0]: proposal for proposal in proposals if proposal.kind == reasoning.PROPOSAL_DELETE}
 
 
-def test_declaration_drafts_only_active_named_slugs(store, manage):
-    active = write(store, "fact", "old-pricing", "Pricing is 10 GBP", days=5)
-    gone = write(store, "fact", "older-pricing", "Pricing is 8 GBP", days=5)
-    store.delete(gone.name)
-    declaration = write(store, "fact", "pricing-review", "Pricing review",
-                        f"The owner said {active.name} is obsolete. Also {gone.name} and battuta-fact-never-existed are stale. "
-                        "battuta-fact-pricing-review supersedes them.")
-    assert declaration.name == "battuta-fact-pricing-review"
-    drafted = deletes(manage.proposals())
-    assert active.name in drafted
-    assert not {gone.name, "battuta-fact-never-existed", declaration.name} & drafted.keys()
-    assert drafted[active.name].reason == f"The owner said {active.name} is obsolete."
-    assert drafted[active.name].evidence == f"declared by {declaration.name}; slug {active.name}"
+def retire(*names, reason="obsolete"):
+    return "".join(f"Retire: {name} - {reason}\n" for name in names)
 
 
-def test_declaration_without_cue_drafts_nothing(store, manage):
-    target = write(store, "fact", "office", "The office is in Leeds", days=5)
-    write(store, "fact", "office-note", "Office note", f"See {target.name} for the address.")
-    assert target.name not in deletes(manage.proposals())
+def declared(manage):
+    return {target for proposal in manage.proposals() if isinstance(proposal, DeclaredProposal) for target in proposal.targets}
 
 
-@pytest.mark.parametrize("kind", ["preference", "decision"])
-def test_preference_and_decision_drafted_only_by_declaration(store, manage, kind):
+@pytest.fixture
+def target(store):
+    return write(store, "fact", "target-entry", "Entry target", days=10)
+
+
+def slugs(store, *subjects, kind="fact", days=5, project="battuta"):
+    return [write(store, kind, subject, f"Entry {subject}", days=days, project=project).name for subject in subjects]
+
+
+# S2: a valid Retire line drafts exactly its slug.
+@pytest.mark.parametrize("kind", ["preference", "decision", "event"])
+def test_retire_line_drafts_exactly_its_slug(store, manage, kind):
     named = write(store, kind, "named", f"Named {kind}", days=90)
     quiet = write(store, kind, "quiet", f"Quiet {kind}", days=90)
-    write(store, "fact", "cleanup", "Cleanup", f"{named.name} is no longer true.")
+    note = write(store, "fact", "note", "Cleanup", f"The owner approved this.\n{retire(named.name, reason='superseded by the new plan')}")
     drafted = deletes(manage.proposals())
-    assert named.name in drafted
+    assert declared(manage) == {named.name}
     assert quiet.name not in drafted
+    assert drafted[named.name].reason == "superseded by the new plan"
+    assert drafted[named.name].evidence == f"declared by {note.name}"
+
+
+@pytest.mark.parametrize("bullet", ["", "- ", "* "])
+@pytest.mark.parametrize("separator", [" - ", " — ", ": "])
+def test_retire_line_forms(store, manage, target, bullet, separator):
+    write(store, "fact", "note", "Note", f"{bullet}Retire: {target.name}{separator}old plan\n")
+    assert declared(manage) == {target.name}
+    assert deletes(manage.proposals())[target.name].reason == "old plan"
+
+
+# S2 rejections, one test each.
+def test_unknown_slug_drafts_nothing(store, manage, target):
+    write(store, "fact", "note", "Note", retire("battuta-fact-never-existed"))
+    assert declared(manage) == set()
+
+
+def test_inactive_slug_drafts_nothing(store, manage, target):
+    store.delete(target.name)
+    write(store, "fact", "note", "Note", retire(target.name))
+    assert declared(manage) == set()
+
+
+def test_self_declaration_drafts_nothing(store, manage):
+    note = write(store, "fact", "note", "Note", retire("battuta-fact-note"))
+    assert note.name == "battuta-fact-note"
+    assert declared(manage) == set()
+
+
+def test_inactive_declarer_drafts_nothing(store, manage, target):
+    note = write(store, "fact", "note", "Note", retire(target.name))
+    store.delete(note.name)
+    assert declared(manage) == set()
+
+
+def test_overview_declarer_drafts_nothing(store, manage, target):
+    note = write(store, "fact", "note", "Note", retire(target.name))
+    assert [proposal.targets for proposal in manage._propose_declared([note, target])] == [(target.name,)]
+    assert manage._propose_declared([dataclasses.replace(note, type=OVERVIEW), target]) == []
+
+
+def test_other_project_target_drafts_nothing(store, manage):
+    (other,) = slugs(store, "x-entry", days=10, project="mocktest")
+    write(store, "fact", "note", "Note", retire(other))
+    assert declared(manage) == set()
+
+
+@pytest.mark.parametrize("target_days", [5, -5])
+def test_target_not_strictly_older_drafts_nothing(store, manage, target_days):
+    (x,) = slugs(store, "x-entry", days=target_days)
+    write(store, "fact", "note", "Note", retire(x), days=5)
+    assert declared(manage) == set()
+
+
+@pytest.mark.parametrize("fence", ["```", "~~~"])
+def test_retire_line_inside_fence_drafts_nothing(store, manage, fence):
+    x, y = slugs(store, "x-entry", "y-entry")
+    write(store, "fact", "note", "Note", f"Example:\n{fence}\n{retire(x)}{fence}\n{retire(y)}")
+    assert declared(manage) == {y}
+
+
+@pytest.mark.parametrize("quote", ["> ", ">", "> - "])
+def test_retire_line_inside_blockquote_drafts_nothing(store, manage, target, quote):
+    write(store, "fact", "note", "Note", f"The owner wrote:\n{quote}{retire(target.name)}")
+    assert declared(manage) == set()
+
+
+@pytest.mark.parametrize("line", [
+    "Retire: {upper} - obsolete",
+    "retire: {t} - obsolete",
+    "RETIRE: {t} - obsolete",
+    "Retire:{t} - obsolete",
+    "Retire:  {t} - obsolete",
+    "  Retire: {t} - obsolete",
+    "Retire: `{t}` - obsolete",
+    "Retire: {t} {y} - obsolete",
+    "Retire: {t}-old - obsolete",
+    "Retire: {t} obsolete",
+    "+ Retire: {t} - obsolete",
+    "1. Retire: {t} - obsolete",
+    "Please Retire: {t} - obsolete",
+])
+def test_malformed_retire_line_drafts_nothing(store, manage, target, line):
+    (y,) = slugs(store, "y-entry")
+    # A leading line keeps the store's body strip from removing the indentation case's spaces.
+    write(store, "fact", "note", "Note", "Cleanup:\n" + line.format(t=target.name, upper=target.name.upper(), y=y) + "\n")
+    assert declared(manage) == set()
+
+
+@pytest.mark.parametrize("line", ["Retire: {t}", "Retire: {t} - ", "Retire: {t} -    ", "Retire: {t} — ", "Retire: {t}: "])
+def test_retire_line_without_reason_drafts_nothing(store, manage, target, line):
+    write(store, "fact", "note", "Note", line.format(t=target.name) + "\n")
+    assert declared(manage) == set()
+
+
+def test_two_retire_lines_draft_both(store, manage):
+    x, y = slugs(store, "x-entry", "y-entry")
+    write(store, "fact", "note", "Note", retire(x, y))
+    assert declared(manage) == {x, y}
+
+
+def test_caps_apply_three_deletes_and_withhold_the_rest(store, manage):
+    events = {write(store, "event", f"meeting-{index}", f"Meeting number {index} took place", days=60).name for index in range(5)}
+    write(store, "fact", "meetings-cleanup", "These meetings are obsolete.",
+          "".join(f"- Retire: {name} - meeting is over\n" for name in sorted(events)))
+    ids = [proposal.id for proposal in manage.proposals() if proposal.kind == reasoning.PROPOSAL_DELETE]
+    assert len(ids) == 5
+    report = manage.sleep(accepting(ids))
+    assert len([decision for decision in report.decisions if decision.verdict == VERDICT_ACCEPTED]) == 3
+    assert len(report.withheld) == 2
+    assert len([record for record in store.records() if record.name in events]) == 2
+
+
+# S1/S3: prose never drafts a retirement.
+@pytest.mark.parametrize(("abstract", "body"), [
+    ("Note", "Never forget {x}. {y} is not obsolete and still holds."),
+    ("Never forget {x}. {y} is not obsolete and still holds.", ""),
+    ("Note", "{x} remains in force. {y} is stale."),
+    ("Note", "{y} replaced {x}."),
+    ("Note", "{x} was replaced by {y}."),
+    ("Note", "{x} was superseded by {y}."),
+    ("Note", "{x} is obsolete, replaced by {y}."),
+    ("Note", "Replace {x} with {y}."),
+    ("Note", "{y} replaced {x}, which is obsolete."),
+    ("Note", "{y} is current; the old {x} is stale."),
+    ("Note", "It is not, as far as anyone knows, true that {x} is obsolete."),
+    ("Note", "The owner asked whether {x} is obsolete."),
+    ("Note", 'I asked "is {x} outdated?" and the owner said no.'),
+    ("These entries are not obsolete.", "- {x}"),
+    ("Obsolete memory entries approved for retirement.", "Approved:\n- {y}\n- {x} (unsure, left alone)"),
+    ("Note", "{x} is obsolete."),
+    ("Note", "{x} is no longer true."),
+    ("Note", "Retire {x} - obsolete"),
+])
+def test_prose_drafts_nothing(store, manage, abstract, body):
+    x, y = slugs(store, "x-entry", "y-entry", kind="decision")
+    write(store, "fact", "note", abstract.format(x=x, y=y), body.format(x=x, y=y))
+    assert declared(manage) == set()
+
+
+# Shaped like the 2026-11-26 owner declaration: a cued abstract, per-type bullet lists of slugs, an unsure line.
+LIVE_NAME = "battuta-event-2026-11-26-47-obsolete-memory-entries-approved-for-retirement"
+LIVE_ABSTRACT = ("2026-11-26: Owner approved retiring 47 obsolete Battuta memory entries (the audit's 46 plus FIS-178 Langfuse "
+                 "commitment) through the next dream; 17 unsure entries left alone.")
+LIVE_LISTS = {
+    "Commitments (15)": (
+        "battuta-commitment-fis-157-manager-self-delivery", "battuta-commitment-fis-158-model-selection-investigation",
+        "battuta-commitment-fis-160-voice-delivery-runtime-check", "battuta-commitment-fis-170-recall-status-wording",
+        "battuta-commitment-fis-179-check-before-closing", "battuta-commitment-fis-179-draft-pr-opened",
+        "battuta-commitment-fis-180-worktree-location-research", "battuta-commitment-fis-182-brief-delegation-draft-pr",
+        "battuta-commitment-fis-187-restart-test-and-root-cause-report", "battuta-commitment-fis-187-ticket-and-pr-report",
+        "battuta-commitment-fis-193-design-and-pr", "battuta-commitment-fis-194-pr-110-report-delivered-2026-11-22",
+        "battuta-commitment-fis-194-reclaim-path-confirmation-and-pr-body-edit",
+        "battuta-commitment-fis-178-langfuse-prompt-scope (plus FIS-170 and FIS-179 as listed in the audit)"),
+    "Decisions": ("battuta-decision-fis-193-kept-open-as-design-task", "battuta-decision-worktree-location-stays-until-fis-180"),
+    "Entities": ("battuta-entity-battuta-manager", "battuta-entity-pi-harness-delegate"),
+    "Experiences (13)": ("artifact-built-as-plain-html", "dream-same-slot-cached-error"),
+    "Procedure": ("battuta-procedure-debug-nightly-memory-dream-failure",),
+}
+LIVE_UNSURE = "battuta-decision-bot-prompt-storage-in-langfuse"
+LIVE_BODY = ("The owner said to tell the next dream they are superseded, with no per-entry confirmation needed.\n\n"
+             "The 47 entries, by type:\n"
+             + "".join(f"- {label}: {', '.join(names)}.\n" for label, names in LIVE_LISTS.items())
+             + f"\nNot touched: the 17 unsure entries (including {LIVE_UNSURE}), and dated history events.\n")
+LIVE_LISTED = [name.split(" ")[0] for names in LIVE_LISTS.values() for name in names if name.startswith("battuta-")]
+
+
+def live_store(store, body):
+    for name in (*LIVE_LISTED, LIVE_UNSURE):
+        store.record(type=name.split("-")[1], name=name, fields={"project": "battuta", "subject": name},
+                     abstract=f"Entry {name}", body=f"Entry {name}", valid_from="2026-11-01T00:00:00Z")
+    store.record(type="event", name=LIVE_NAME, abstract=LIVE_ABSTRACT, body=body, valid_from="2026-11-26T22:11:32Z",
+                 fields={"project": "battuta", "subject": "47-obsolete-memory-entries-approved-for-retirement",
+                         "date": "2026-11-26"})
+
+
+def test_26_nov_free_text_declaration_drafts_nothing(store, manage):
+    # The 26 Nov declaration has no Retire lines, so the dream drafts nothing from it.
+    # CoS retired its 47 entries through memory_forget on 28 Nov instead.
+    live_store(store, LIVE_BODY)
+    assert declared(manage) == set()
+
+
+def test_live_shaped_retire_lines_draft_exactly_the_listed_slugs(store, manage):
+    chosen = LIVE_LISTED[:3]
+    live_store(store, LIVE_BODY + "\n" + "".join(f"- Retire: {name} - closed in the 26 Nov audit\n" for name in chosen))
+    drafted = {name: proposal for name, proposal in deletes(manage.proposals()).items() if isinstance(proposal, DeclaredProposal)}
+    assert set(drafted) == set(chosen)
+    assert {proposal.reason for proposal in drafted.values()} == {"closed in the 26 Nov audit"}
+    assert {proposal.evidence for proposal in drafted.values()} == {f"declared by {LIVE_NAME}"}
 
 
 @pytest.mark.parametrize("kind", ["event", "commitment", "experience"])
@@ -85,23 +275,12 @@ def test_old_never_recalled_entry_without_declaration_is_not_drafted(store, mana
     assert record.name not in deletes(manage.proposals(records=store.records(), hits={record.name: 1}))
 
 
-def test_caps_apply_three_deletes_and_withhold_the_rest(store, manage):
-    events = {write(store, "event", f"meeting-{index}", f"Meeting number {index} took place", days=60).name for index in range(5)}
-    write(store, "fact", "meetings-cleanup", "These meetings are obsolete.", "".join(f"- {name}\n" for name in sorted(events)))
-    ids = [proposal.id for proposal in manage.proposals() if proposal.kind == reasoning.PROPOSAL_DELETE]
-    assert len(ids) == 5
-    report = manage.sleep(accepting(ids))
-    assert len([decision for decision in report.decisions if decision.verdict == VERDICT_ACCEPTED]) == 3
-    assert len(report.withheld) == 2
-    assert len([record for record in store.records() if record.name in events]) == 2
-
-
 def test_ledger_detail_carries_reason_and_evidence(store, manage):
     target = write(store, "fact", "old-plan", "The old plan", days=5)
-    write(store, "fact", "plan-change", "Plan change", f"{target.name} is outdated.")
+    write(store, "fact", "plan-change", "Plan change", retire(target.name, reason="the plan changed"))
     proposal = deletes(manage.proposals())[target.name]
     decision = manage.decide(proposal.id, accept=True)
-    expected = f"marked {target.name} invalid - {target.name} is outdated. [declared by battuta-fact-plan-change; slug {target.name}]"
+    expected = f"marked {target.name} invalid - the plan changed [declared by battuta-fact-plan-change]"
     assert decision.detail == expected
     ledger = (store.layout.dream_reports / "decisions.md").read_text(encoding="utf-8")
     assert f"- {proposal.id} accepted {decision.at} — {expected}\n" in ledger
@@ -114,14 +293,14 @@ def test_supersede_detail_carries_reason_on_one_line(store, manage):
     assert manage._supersede(supersede, {}) == f"kept {keeper.name} - same fact [near duplicate]"
 
 
-def test_multiline_declaration_reason_is_one_line(store, manage):
+def test_retire_line_reason_is_one_line(store, manage):
     target = write(store, "fact", "old-office", "Old office", days=5)
-    write(store, "fact", "office-move", "Office move", f"Per the owner  {target.name}\tis   no longer valid.\n\nNext line.")
+    write(store, "fact", "office-move", "Office move", f"Retire: {target.name} - per the owner\t  no longer   valid\n\nNext line.")
     proposal = deletes(manage.proposals())[target.name]
-    assert proposal.reason == f"Per the owner {target.name} is no longer valid."
+    assert proposal.reason == "per the owner no longer valid"
     decision = manage.decide(proposal.id, accept=True)
     assert "\n" not in decision.detail
-    assert "is no longer valid." in decision.detail
+    assert "per the owner no longer valid" in decision.detail
 
 
 def test_retired_section_lists_accepted_retirements(manage):
@@ -156,16 +335,16 @@ def test_retired_section_says_none_when_nothing_retired(manage):
 
 def test_sleep_report_names_the_retirement(store, manage):
     target = write(store, "event", "retro", "Retro happened", days=60)
-    write(store, "fact", "retro-note", "Retro note", f"{target.name} is stale.")
+    write(store, "fact", "retro-note", "Retro note", retire(target.name, reason="retro is done"))
     proposal = deletes(manage.proposals())[target.name]
     report = manage.sleep(accepting([proposal.id]))
     text = Path(report.path).read_text(encoding="utf-8")
-    assert f"- delete {target.name} — {proposal.reason} [{proposal.evidence}] (proposal {proposal.id}, decided " in text
+    assert f"- delete {target.name} — retro is done [declared by battuta-fact-retro-note] (proposal {proposal.id}, decided " in text
 
 
 def test_retired_file_is_retained_with_invalid_at(store, manage):
     target = write(store, "event", "offsite", "Offsite happened", days=60)
-    write(store, "fact", "offsite-note", "Offsite note", f"{target.name} is stale.")
+    write(store, "fact", "offsite-note", "Offsite note", retire(target.name))
     proposal = deletes(manage.proposals())[target.name]
     with mock.patch.object(Store, "gc") as gc:
         report = manage.sleep(accepting([proposal.id]))
@@ -191,6 +370,7 @@ def test_retired_file_is_retained_with_invalid_at(store, manage):
     (Manage, "_entry", "(self, name: 'str') -> 'MemoryRecord'"),
     (Manage, "_merge", "(self, proposal: 'Proposal', verdict: 'reasoning.Verdict', expected: 'dict[str, str]') -> 'str'"),
     (Manage, "_merge_exact_duplicates", "(self, records: 'list[MemoryRecord]') -> 'list[Action]'"),
+    (Manage, "_add_cooccurrence_links", "(self, records: 'list[MemoryRecord]') -> 'list[Action]'"),
     (Manage, "_propose_deletions", "(self, records: 'list[MemoryRecord]', hits: 'dict[str, int]') -> 'list[Proposal]'"),
     (Manage, "_propose_merges", "(self, records: 'list[MemoryRecord]') -> 'list[Proposal]'"),
     (Manage, "_propose_splits", "(self, records: 'list[MemoryRecord]') -> 'list[Proposal]'"),
@@ -219,118 +399,6 @@ def test_core_dataclass_fields_unchanged(owner, fields):
 def test_manage_keeps_the_attributes_battuta_reads(manage):
     for attribute in ("_clock", "_config", "_store"):
         assert hasattr(manage, attribute)
-
-
-# Probes for declaration-driven retirement (revised A2).
-def slugs(store, *subjects, kind="fact", days=5, project="battuta"):
-    return [write(store, kind, subject, f"Entry {subject}", days=days, project=project).name for subject in subjects]
-
-
-@pytest.mark.parametrize("where", ["abstract", "body"])
-def test_probe_never_forget_and_not_obsolete_draft_nothing(store, manage, where):
-    x, y = slugs(store, "x-entry", "y-entry")
-    text = f"Never forget {x}. {y} is not obsolete and still holds."
-    write(store, "fact", "note", text if where == "abstract" else "Note", text)
-    assert not {x, y} & deletes(manage.proposals()).keys()
-
-
-@pytest.mark.parametrize("where", ["abstract", "body"])
-def test_probe_remains_in_force_keeps_a_and_drafts_b(store, manage, where):
-    a, b = slugs(store, "a-entry", "b-entry")
-    text = f"{a} remains in force. {b} is stale."
-    write(store, "fact", "note", text if where == "abstract" else "Note", text if where == "body" else "")
-    drafted = deletes(manage.proposals())
-    assert b in drafted
-    assert a not in drafted
-
-
-def test_probe_replaced_drafts_only_the_object(store, manage):
-    pg, mysql = slugs(store, "pg", "mysql", kind="decision")
-    write(store, "fact", "db-note", "Database change", f"{pg} replaced {mysql}")
-    drafted = deletes(manage.proposals())
-    assert mysql in drafted
-    assert pg not in drafted
-
-
-@pytest.mark.parametrize("text", [
-    "{mysql} was replaced by {pg}.",
-    "{pg} replaced {mysql}.",
-])
-def test_replaced_drafts_only_the_retired_entry(store, manage, text):
-    pg, mysql = slugs(store, "pg", "mysql", kind="decision")
-    write(store, "fact", "old-db-note", "Database change", text.format(pg=pg, mysql=mysql))
-    drafted = deletes(manage.proposals())
-    assert mysql in drafted
-    assert pg not in drafted
-
-
-@pytest.mark.parametrize("text", [
-    "{mysql} was superseded by {pg}.",
-    "{mysql} is obsolete, replaced by {pg}.",
-    "Replace {mysql} with {pg}.",
-    "{pg} replaced {mysql}.",
-    "{mysql} was replaced by {pg}.",
-])
-def test_replacement_is_never_drafted_whatever_the_other_cues(store, manage, text):
-    pg, mysql = slugs(store, "pg", "mysql", kind="decision")
-    write(store, "fact", "old-db-note", "Database change", text.format(pg=pg, mysql=mysql))
-    assert {pg, mysql} & deletes(manage.proposals()).keys() == {mysql}
-
-
-@pytest.mark.parametrize("text", [
-    "{mysql}, {pg}: the pair was swapped out in the change.",
-    "Obsolete now, {pg} replaces {mysql}.",
-])
-def test_unrecognised_two_slug_replacement_drafts_nothing(store, manage, text):
-    pg, mysql = slugs(store, "pg", "mysql", kind="decision")
-    write(store, "fact", "old-db-note", "Database change", text.format(pg=pg, mysql=mysql))
-    assert not {pg, mysql} & deletes(manage.proposals()).keys()
-
-
-@pytest.mark.parametrize("abstract", ["Database change", "Obsolete entries approved for retirement."])
-def test_replacement_in_list_line_is_never_drafted(store, manage, abstract):
-    pg, mysql = slugs(store, "pg", "mysql", kind="decision")
-    write(store, "fact", "old-db-note", abstract, f"- {mysql} replaced by {pg}")
-    assert pg not in deletes(manage.proposals())
-
-
-@pytest.mark.parametrize("text", [
-    "{mysql} was replaced by {pg}, which replaced {sqlite}.",
-    "Replaced by {pg}.",
-])
-def test_ambiguous_replacing_sentence_drafts_nothing(store, manage, text):
-    pg, mysql, sqlite = slugs(store, "pg", "mysql", "sqlite", kind="decision")
-    write(store, "fact", "old-db-note", "Database change", text.format(pg=pg, mysql=mysql, sqlite=sqlite))
-    assert not {pg, mysql, sqlite} & deletes(manage.proposals()).keys()
-
-
-def test_probe_quoted_question_drafts_nothing(store, manage):
-    (x,) = slugs(store, "x-entry")
-    write(store, "fact", "note", "Note", f'I asked "is {x} outdated?" and the owner said no.')
-    assert x not in deletes(manage.proposals())
-
-
-def test_probe_negated_abstract_with_list_drafts_nothing(store, manage):
-    (x,) = slugs(store, "x-entry")
-    write(store, "fact", "note", "These entries are not obsolete.", f"- {x}")
-    assert x not in deletes(manage.proposals())
-
-
-def test_probe_abstract_cue_with_list_skips_unsure_line(store, manage):
-    x, y, z, w = slugs(store, "x-entry", "y-entry", "z-entry", "w-entry")
-    abstract = "Obsolete memory entries approved for retirement."
-    write(store, "event", "cleanup", abstract, f"Approved:\n- {y}\n- {z}\n- {x} (unsure, left alone)\nAlso {w}; {z}")
-    drafted = deletes(manage.proposals())
-    assert {y, z, w} <= drafted.keys()
-    assert x not in drafted
-    assert drafted[y].reason == abstract
-
-
-@pytest.mark.parametrize(("days", "project"), [(-5, "battuta"), (5, "mocktest")])
-def test_probe_older_or_other_project_declaration_drafts_nothing(store, manage, days, project):
-    (x,) = slugs(store, "x-entry", days=days, project=project)
-    write(store, "fact", "note", "Note", f"{x} is obsolete.")
-    assert x not in deletes(manage.proposals())
 
 
 def accept_all(manage):
@@ -376,9 +444,22 @@ def test_core_merge_and_supersede_of_preferences(store, manage, kind, keeper_day
         assert (proposal.id in {drafted.id for drafted in manage.proposals()}) is kept
 
 
+# P2: through sleep(), an older keeper is dropped and a newer keeper stands.
+@pytest.mark.parametrize(("keeper_days", "other_days", "applied"), [(1, 10, True), (10, 1, False)])
+def test_sleep_supersedes_preference_only_with_newer_keeper(store, manage, keeper_days, other_days, applied):
+    keeper, other = pair(store, "preference", keeper_days, other_days)
+    proposal = Proposal(reasoning.PROPOSAL_SUPERSEDE, (keeper.name, other.name), "abstracts overlap", "similarity=0.9")
+    with mock.patch.object(Manage, "proposals", return_value=[proposal]):
+        report = manage.sleep(accepting([proposal.id]))
+    active = {record.name for record in store.records()}
+    assert keeper.name in active
+    assert (other.name not in active) is applied
+    assert (proposal.id in {decision.proposal_id for decision in report.decisions}) is applied
+
+
 def test_declared_delete_wins_over_core_draft_for_the_same_target(store, manage):
     target = floor_entry(store, manage, "fact", "quiet")
-    write(store, "fact", "note", "Note", f"{target.name} is obsolete.")
+    write(store, "fact", "note", "Note", retire(target.name))
     drafted = [proposal for proposal in manage.proposals(records=store.records(), hits={})
                if target.name in proposal.targets and proposal.kind == reasoning.PROPOSAL_DELETE]
     assert len(drafted) == 1
@@ -402,29 +483,29 @@ def test_exact_duplicates(store, manage, kind, merged):
 
 def test_rejected_declaration_does_not_block_a_later_one(store, manage):
     (x,) = slugs(store, "x-entry", days=10)
-    write(store, "fact", "first-note", "First note", f"{x} is obsolete.", days=3)
+    write(store, "fact", "first-note", "First note", retire(x), days=3)
     rejected = deletes(manage.proposals())[x]
     manage.decide(rejected.id, accept=False)
     assert x not in deletes(manage.proposals())
-    write(store, "fact", "second-note", "Second note", f"{x} is stale now.")
+    write(store, "fact", "second-note", "Second note", retire(x, reason="stale now"))
     drafted = deletes(manage.proposals())[x]
-    assert drafted.evidence == f"declared by battuta-fact-second-note; slug {x}"
-    assert rejected.evidence == f"declared by battuta-fact-first-note; slug {x}"
+    assert drafted.evidence == "declared by battuta-fact-second-note"
+    assert rejected.evidence == "declared by battuta-fact-first-note"
     assert rejected.id not in {proposal.id for proposal in manage.proposals()}
 
 
 def test_already_inactive_target_is_a_no_change(store, manage):
-    (x,) = slugs(store, "x-entry")
-    write(store, "fact", "note", "Note", f"{x} is obsolete.")
+    x, successor = slugs(store, "x-entry", "x-successor")
+    write(store, "fact", "note", "Note", retire(x))
     proposal = deletes(manage.proposals())[x]
     opened = manage._open
 
-    def forget_first(proposal_id):
+    def supersede_first(proposal_id):
         found = opened(proposal_id)
-        store.delete(x)  # CoS forgets X between drafting and the decision.
+        store.supersede(x, successor)  # X is retired between drafting and the decision, and stays on disk.
         return found
 
-    with mock.patch.object(manage, "_open", side_effect=forget_first):
+    with mock.patch.object(manage, "_open", side_effect=supersede_first):
         decision = manage.decide(proposal.id, accept=True)
     assert decision.detail == f"no change: {x} already inactive"
     assert f"marked {x} invalid" not in (store.layout.dream_reports / "decisions.md").read_text(encoding="utf-8")
@@ -445,39 +526,42 @@ def test_accepted_merge_is_listed_with_its_reason(store, manage):
     assert section.startswith(f"- merge {keeper.name}, {other.name} — abstracts overlap [similarity=0.9] (proposal {proposal.id}")
 
 
-# Shaped like the 2026-11-26 owner declaration: a cued abstract, per-type bullet lists of slugs, an unsure line.
-LIVE_ABSTRACT = ("2026-11-26: Owner approved retiring 47 obsolete Battuta memory entries (the audit's 46 plus FIS-178 Langfuse "
-                 "commitment) through the next dream; 17 unsure entries left alone.")
-LIVE_LISTS = {
-    "Commitments (15)": (
-        "battuta-commitment-fis-157-manager-self-delivery", "battuta-commitment-fis-158-model-selection-investigation",
-        "battuta-commitment-fis-160-voice-delivery-runtime-check", "battuta-commitment-fis-170-recall-status-wording",
-        "battuta-commitment-fis-179-check-before-closing", "battuta-commitment-fis-179-draft-pr-opened",
-        "battuta-commitment-fis-180-worktree-location-research", "battuta-commitment-fis-182-brief-delegation-draft-pr",
-        "battuta-commitment-fis-187-restart-test-and-root-cause-report", "battuta-commitment-fis-187-ticket-and-pr-report",
-        "battuta-commitment-fis-193-design-and-pr", "battuta-commitment-fis-194-pr-110-report-delivered-2026-11-22",
-        "battuta-commitment-fis-194-reclaim-path-confirmation-and-pr-body-edit",
-        "battuta-commitment-fis-178-langfuse-prompt-scope (plus FIS-170 and FIS-179 as listed in the audit)"),
-    "Decisions": ("battuta-decision-fis-193-kept-open-as-design-task", "battuta-decision-worktree-location-stays-until-fis-180"),
-    "Entities": ("battuta-entity-battuta-manager", "battuta-entity-pi-harness-delegate"),
-    "Experiences (13)": ("artifact-built-as-plain-html", "dream-same-slot-cached-error"),
-    "Procedure": ("battuta-procedure-debug-nightly-memory-dream-failure",),
-}
-LIVE_UNSURE = "battuta-decision-bot-prompt-storage-in-langfuse"
-LIVE_BODY = ("The owner said to tell the next dream they are superseded, with no per-entry confirmation needed.\n\n"
-             "The 47 entries, by type:\n"
-             + "".join(f"- {label}: {', '.join(names)}.\n" for label, names in LIVE_LISTS.items())
-             + f"\nNot touched: the 17 unsure entries (including {LIVE_UNSURE}), and dated history events.\n")
+# S6: a merge whose source went inactive is a no change, directly and through sleep().
+def test_merge_with_already_inactive_source_is_a_no_change(store, manage):
+    keeper, other = pair(store, "fact", 5, 5)
+    (successor,) = slugs(store, "successor")
+    proposal = Proposal(reasoning.PROPOSAL_MERGE, (keeper.name, other.name), "abstracts overlap", "similarity=0.9")
+    store.supersede(other.name, successor)
+    verdict = reasoning.Verdict(proposal.id, True, abstract="Merged fact", body="Merged body.")
+    assert manage._merge(proposal, verdict, {}) == f"no change: {other.name} already inactive"
 
 
-def test_live_shaped_declaration_drafts_every_listed_slug_and_no_unsure_entry(store, manage):
-    listed = [name.split(" ")[0] for names in LIVE_LISTS.values() for name in names if name.startswith("battuta-")]
-    for name in (*listed, LIVE_UNSURE):
-        store.record(type=name.split("-")[1], name=name, fields={"project": "battuta", "subject": name},
-                     abstract=f"Entry {name}", body=f"Entry {name}", valid_from="2026-11-01T00:00:00Z")
-    store.record(type="event", name="battuta-event-2026-11-26-obsolete-entries-approved", abstract=LIVE_ABSTRACT, body=LIVE_BODY,
-                 valid_from="2026-11-26T22:11:32Z",
-                 fields={"project": "battuta", "subject": "obsolete-entries-approved", "date": "2026-11-26"})
-    drafted = {name: proposal for name, proposal in deletes(manage.proposals()).items() if isinstance(proposal, DeclaredProposal)}
-    assert set(drafted) == set(listed)
-    assert {proposal.reason for proposal in drafted.values()} == {LIVE_ABSTRACT}
+def test_sleep_merge_with_source_retired_first_writes_no_misleading_line(store, manage):
+    keeper, other = pair(store, "fact", 5, 5)
+    (successor,) = slugs(store, "successor")
+    proposal = Proposal(reasoning.PROPOSAL_MERGE, (keeper.name, other.name), "abstracts overlap", "similarity=0.9")
+    opened = manage._open
+
+    def supersede_first(proposal_id):
+        found = opened(proposal_id)
+        store.supersede(keeper.name, successor)
+        return found
+
+    with mock.patch.object(Manage, "proposals", return_value=[proposal]), \
+            mock.patch.object(manage, "_open", side_effect=supersede_first):
+        report = manage.sleep(accepting([proposal.id]))
+    # Core's reviewed-source check rejects the inactive keeper before _merge runs, so sleep() withholds it.
+    assert report.decisions == ()
+    assert report.withheld == (proposal.id,)
+    section = Path(report.path).read_text(encoding="utf-8").split("## retired\n\n", 1)[1]
+    assert "marked " not in section
+    assert f"- merge {keeper.name}" not in section
+    assert other.name in {record.name for record in store.records()}
+
+
+@pytest.mark.parametrize("bad", [None, "not-a-date"])
+def test_newer_is_false_for_missing_or_malformed_dates(bad):
+    good = SimpleNamespace(valid_from="2026-11-01T00:00:00Z", created="2026-11-01T00:00:00Z")
+    broken = SimpleNamespace(valid_from=bad, created=bad)
+    assert _newer(broken, good) is False
+    assert _newer(good, broken) is False

@@ -1,10 +1,13 @@
 """The library's Manage layer, minus proposals and links that would touch overviews or cross projects.
 
-Retirement is declaration-driven: a preference or decision only retires when a newer entry in
-the same project genuinely declares it retired by slug, or when a strictly newer entry supersedes
-it. Battuta never retires an entry for age alone, and core deletes, merges and exact-duplicate
-merges never touch a preference or decision. Every draft still passes core review, decide and the
-per-kind caps, and a retirement ends the interval while keeping the file.
+Retirement is declaration-driven and structured: an active, non-overview entry retires another entry
+only through a body line "Retire: <exact full slug> - <reason>" (optionally bulleted with "- " or "* ";
+the separator may also be " — " or ": "), naming an active entry in the same project that is strictly
+older than the declarer. Prose never drafts a retirement, and lines in fenced code blocks or blockquotes
+are ignored. Core may also supersede an entry with a strictly newer keeper. Battuta never retires an
+entry for age alone, and core deletes, merges and exact-duplicate merges never touch a preference or
+decision. Every draft still passes core review, decide and the per-kind caps, and a retirement ends
+the interval while keeping the file.
 """
 import dataclasses
 import hashlib
@@ -25,119 +28,28 @@ RETIRING_KINDS = (reasoning.PROPOSAL_DELETE, reasoning.PROPOSAL_SUPERSEDE, reaso
 PROTECTED_TYPES = ("preference", "decision")
 NO_CHANGE = "no change"
 REASON_CHARS = 240
-_SLUG = re.compile(r"(?<![A-Za-z0-9])[a-z0-9]+(?:-[a-z0-9]+)+(?![A-Za-z0-9])")
-_CUE = re.compile(r"\b(?:stale|obsolete|outdated|out of date|superseded|supersedes|supersede|retired|retire|invalid"
-                  r"|no longer|replaced|replace|forget)\b", re.IGNORECASE)
-_REPLACING = frozenset({"replaced", "replace", "supersede", "supersedes"})
-_NEGATOR = re.compile(r"(?:\b(?:not|never|nor|cannot|without)\b|\bno\b(?!\s+longer)|n't\b)", re.IGNORECASE)
-_KEEP = re.compile(r"\b(?:remains|in force|still holds|still valid|keep|kept|not obsolete|not stale|unsure|left alone"
-                   r"|never forget)\b", re.IGNORECASE)
-_QUOTED = re.compile(r'"[^"\n]*"|\u201c[^\u201d\n]*\u201d')
-_BULLET = re.compile(r"^\s*(?:[-*+\u2022]|\d+[.)])\s+")
-_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
-_NEGATION_WINDOW = 3
+_RETIRE = re.compile(r"^(?:[-*] )?Retire: ([a-z0-9]+(?:-[a-z0-9]+)+)(?: - | — |: )(.*\S.*)$")
+_FENCES = ("```", "~~~")
 
 
 def one_line(text) -> str:
     return " ".join(str(text or "").split())
 
 
-def units(text):
-    """Sentences and list lines: split on newlines, then on [.!?] followed by whitespace; a bullet line stays whole."""
-    found = []
-    for line in str(text or "").splitlines():
-        if not line.strip():
+def retire_lines(body):
+    """(slug, reason) for each structured Retire line, skipping fenced code blocks and blockquotes."""
+    found, fence = [], None
+    for line in str(body or "").splitlines():
+        marker = line.lstrip()[:3]
+        if marker in _FENCES:
+            fence = marker if fence is None else (None if marker == fence else fence)
             continue
-        if _BULLET.match(line):
-            found.append(line.strip())
-        else:
-            found.extend(part.strip() for part in _SENTENCE_END.split(line) if part.strip())
+        if fence is not None or line.lstrip().startswith(">"):
+            continue
+        match = _RETIRE.match(line)
+        if match:
+            found.append((match.group(1), match.group(2).strip()))
     return found
-
-
-def _valid_cues(unit):
-    """Cues that are neither negated, quoted nor inside a question."""
-    quoted = [match.span() for match in _QUOTED.finditer(unit)]
-    cues = []
-    for cue in _CUE.finditer(unit):
-        if any(start <= cue.start() < end for start, end in quoted):
-            continue
-        ending = re.search(r"[.!?]", unit[cue.end():])
-        if ending and ending.group() == "?":
-            continue
-        before = re.findall(r"[A-Za-z']+", unit[:cue.start()])[-_NEGATION_WINDOW:]
-        if _NEGATOR.search(" ".join(before)):
-            continue
-        cues.append(cue)
-    return cues
-
-
-def _by(unit, position):
-    """Whether the word right before a position is 'by' or 'with', so the slug there is a replacement."""
-    return bool(re.search(r"\b(?:by|with)\W*$", unit[:position], re.IGNORECASE))
-
-
-def _replacing(unit, cue):
-    """Whether a cue is a replacing verb; 'superseded' replaces only in passive form ('S superseded by R')."""
-    word = cue.group().lower()
-    return word in _REPLACING or (word == "superseded" and bool(re.match(r"\s+by\b", unit[cue.end():], re.IGNORECASE)))
-
-
-def _replacement(unit, slug):
-    """Whether a valid replacing verb in the unit names the slug as the replacement ('replaced by slug',
-    'replace S with slug')."""
-    return any(_replacing(unit, cue) for cue in _valid_cues(unit)) and any(
-        match.group() == slug and _by(unit, match.start()) for match in _SLUG.finditer(unit))
-
-
-_REPLACE_WORD = re.compile(r"\b(?:replace[sd]?|supersed(?:e|es|ed))\b", re.IGNORECASE)
-_S = _SLUG.pattern
-# The only replacement phrasings honoured: active 'D replaced S', passive 'S was/is replaced by R' or
-# 'S superseded by R', imperative 'replace S with R'.
-_RECOGNISED = (re.compile(_S + r"[`'\"*]*\s+replaced\s+[`'\"*]*" + _S),
-               re.compile(_S + r".*\b(?:replaced|superseded)\s+by\s+[`'\"*]*" + _S, re.IGNORECASE),
-               re.compile(r"\breplace\s+[`'\"*]*" + _S + r"[`'\"*]*\s+with\s+[`'\"*]*" + _S, re.IGNORECASE))
-
-
-def _unrecognised(unit, active):
-    """Fail-safe: a unit holding two or more active slugs and a replace or supersede word in any other
-    phrasing than the recognised ones drafts nothing."""
-    replacing = _REPLACE_WORD.findall(unit)
-    if not replacing or len({slug for slug in _SLUG.findall(unit) if slug in active}) < 2:
-        return False
-    return len(replacing) > 1 or not any(pattern.search(unit) for pattern in _RECOGNISED)
-
-
-def _names(unit, slug, cues):
-    """Whether a valid cue in the unit names the slug. A replacing verb names the slugs after it ('D replaced
-    S'), or in passive form the slugs before it ('S was replaced by R'); a slug right after 'by' or 'with' is
-    never named, and a unit with more than one replacing verb, or a passive one with no slug before it, names none."""
-    replacing = [cue for cue in cues if _replacing(unit, cue)]
-    if len(replacing) > 1:
-        return False
-    positions = [match.start() for match in _SLUG.finditer(unit)
-                 if match.group() == slug and not (replacing and _by(unit, match.start()))]
-    for cue in cues:
-        if cue not in replacing:
-            return bool(positions)
-        if re.match(r"\s+by\b", unit[cue.end():], re.IGNORECASE):
-            if any(position < cue.start() for position in positions):
-                return True
-        elif any(position >= cue.end() for position in positions):
-            return True
-    return False
-
-
-def _listed(unit, slug):
-    if _BULLET.match(unit):
-        return True
-    escaped = re.escape(slug)
-    return bool(re.search(escaped + r"[`'\")\]*]*\s*[,;]", unit)
-                or re.search(r"[,;]\s*(?:(?:and|or)\s+)?[`'\"(\[*]*" + escaped, unit))
-
-
-def _kept(unit):
-    return bool(_KEEP.search(_SLUG.sub(" ", unit)))
 
 
 def _dated(record):
@@ -147,7 +59,7 @@ def _dated(record):
 def _newer(first, second):
     try:
         return _dated(first) > _dated(second)
-    except (ValueError, OverflowError):
+    except (ValueError, OverflowError, TypeError):
         return False
 
 
@@ -206,39 +118,26 @@ class BattutaManage(Manage):
         return all(_newer(keeper, target) for target in targets if target.name != keeper.name)
 
     def _propose_declared(self, records):
-        """A newer, non-overview entry in the same project declares a named active slug retired when the
-        slug's sentence or list line carries a retirement cue that is not negated, quoted or asked, or
-        when the declarer's abstract carries such a cue and the slug is a body list entry. A slug whose
-        own sentence or line says to keep it (remains, still holds, unsure, ...) is never drafted.
-        This is the only Battuta rule that drafts a retirement."""
+        """An active, non-overview entry D drafts a delete of slug S for each body line
+        "Retire: S - reason" (see retire_lines) when S is active, is not D, is in D's project and is
+        strictly older than D. Anything else, prose included, drafts nothing. This is the only Battuta
+        rule that drafts a retirement."""
         active = {record.name: record for record in records if record.is_active()}
         drafted = []
         for declaration in active.values():
             if declaration.type == OVERVIEW:
                 continue
-            abstract_units = units(declaration.abstract)
-            body_units = units(declaration.body)
-            abstract_cued = any(_valid_cues(unit) for unit in abstract_units)
-            every = [*abstract_units, *body_units]
             seen = set()
-            for slug in _SLUG.findall(f"{declaration.abstract}\n{declaration.body}"):
+            for slug, reason in retire_lines(declaration.body):
                 target = active.get(slug)
-                if slug in seen or target is None or target.type == OVERVIEW or slug == declaration.name:
+                if slug in seen or target is None or slug == declaration.name:
                     continue
-                seen.add(slug)
                 if project_of(target) != project_of(declaration) or not _newer(declaration, target):
                     continue
-                own = [unit for unit in every if slug in _SLUG.findall(unit)]
-                if any(_kept(unit) or _replacement(unit, slug) or _unrecognised(unit, active) for unit in own):
-                    continue
-                reason = next((unit for unit in own if _names(unit, slug, _valid_cues(unit))), None)
-                if reason is None and abstract_cued and any(_listed(unit, slug) for unit in body_units if unit in own):
-                    reason = declaration.abstract
-                if reason is None:
-                    continue
+                seen.add(slug)
                 drafted.append(DeclaredProposal(kind=reasoning.PROPOSAL_DELETE, targets=(slug,),
                                                 reason=one_line(reason)[:REASON_CHARS],
-                                                evidence=f"declared by {declaration.name}; slug {slug}",
+                                                evidence=f"declared by {declaration.name}",
                                                 declarer=declaration.name))
         return drafted
 
@@ -260,7 +159,7 @@ class BattutaManage(Manage):
         return self._inactive(proposal) or self._with_reason(super()._supersede(proposal, expected), proposal)
 
     def _merge(self, proposal, verdict, expected):
-        return self._with_reason(super()._merge(proposal, verdict, expected), proposal)
+        return self._inactive(proposal) or self._with_reason(super()._merge(proposal, verdict, expected), proposal)
 
     @staticmethod
     def _with_reason(detail, proposal):
