@@ -66,7 +66,7 @@ RestartSec=5
 [Install]
 WantedBy=default.target
 '''
-    components = ("memory", "artifacts", "speech", "doc") if deployment == "main" else ("artifacts",)
+    components = ("memory", "artifacts", "speech", "doc") if deployment == "main" else ()
     for component in components:
         # The memory dream runs Claude Code, which needs its own state under HOME.
         extra = "" if component == "memory" else "NoNewPrivileges=true\nProtectSystem=strict\nProtectHome=read-only\n"

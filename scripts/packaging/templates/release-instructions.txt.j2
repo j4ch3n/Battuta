@@ -1,8 +1,16 @@
+{% if deployment == "main" -%}
 Battuta {{ tag }} install instructions: Oracle Ampere (main machine)
 ==================================================================
 
-Bundle:        main (CoS, Manager, general workers, memory, artifacts, speech)
+Bundle:        main (CoS, Manager, general workers, memory, artifacts, speech, documents)
 Platform:      Oracle Linux 9 on AArch64 (OCI Ampere A1)
+{%- else -%}
+Battuta {{ tag }} install instructions: Raspberry Pi (influencer machine)
+========================================================================
+
+Bundle:        influencer (one influencer worker)
+Platform:      Raspberry Pi OS 13 (Debian trixie) on 64-bit ARM (AArch64)
+{%- endif %}
 Tool version:  {{ tool_version }}
 Release page:  {{ release_url }}
 Repository:    {{ repo_url }}
@@ -26,6 +34,10 @@ Download into a new, empty directory outside the installation path.
     {{ wheel.url }}
     SHA-256: {{ wheel.sha256 }}
 {% endfor %}
+{%- if deployment != "main" %}
+The influencer bundle does not use `battuta-artifacts`, `battuta-memory`,
+`battuta-speech`, or `battuta-doc`.
+{% endif %}
 
 2. Verify checksums
 -------------------
@@ -34,7 +46,9 @@ Every check must report OK. Never extract or install an unverified download.
 
   version={{ tag }}
   platform={{ platform }}
+  deployment={{ deployment }}
   archive="{{ archive_name }}"
+  install_path="$HOME/battuta/latest"
   sha256sum -c "$archive.sha256"
   sha256sum -c python-tools-SHA256SUMS
   tool_version="$(cat python-tools-version.txt)"
@@ -50,13 +64,16 @@ of the same tool, which is how upgrades are applied.
   uv tool install --managed-python --python 3.12 --no-build --force "./{{ wheel.filename }}"
 {% endfor %}
   export PATH="$(uv tool dir --bin):$PATH"
-  battuta-project --help >/dev/null
-  battuta-artifact --help >/dev/null
-  battuta-memory --help >/dev/null
-  battuta-speech --help >/dev/null
-  battuta-doc --help >/dev/null
-  battuta-bot-setup --help >/dev/null
-  battuta-packaging --help >/dev/null
+{%- for wheel in wheels %}
+{%- if wheel.package == "battuta-project" %}
+  command -v battuta-project >/dev/null
+{%- else %}
+  {{ wheel.command }} --help >/dev/null
+{%- endif %}
+{%- endfor %}
+
+`battuta-project` needs `LINEAR_API_TOKEN` even for `--help`, so it is only
+located here; RELEASE.md step 4 runs it after loading the private environment.
 
 4. Extract the release and read RELEASE.md
 ------------------------------------------
@@ -66,31 +83,39 @@ Unpack the archive to read the guide; the installation is extracted separately.
   mkdir release && tar -xzf "$archive" -C release
   less release/RELEASE.md
 
-Ask the owner for the absolute installation path to use. It must be new and empty,
-and must not contain spaces. Never reuse a path, and never clear ~/.battuta or service
-data. If the owner has not given a path, stop and ask rather than choosing one.
+The installation path is always `~/battuta/latest`; do not ask the owner for
+another path. For a fresh install, `latest` must not exist yet. For an upgrade,
+follow section 5 first. Never clear ~/.battuta or service data.
+{%- if deployment != "main" %}
 
-  install_path="<absolute path the owner approved>"
-  deployment={{ deployment }}
+ADB is required on this machine: the owner provides an authorized Android device
+with USB debugging, and ADBKeyboard for Unicode input. Confirm `command -v adb`
+succeeds. Device readiness is checked on launch, not during setup.
+{%- endif %}
 
-Then follow RELEASE.md from "Choose the installation bundle" through step 6,
-using the same archive and `install_path`. Sections 1 to 3 above cover RELEASE.md
-steps 1 and 2, so start at RELEASE.md step 3 with `battuta-packaging extract-bots`.
+Run the prerequisite check in RELEASE.md step 1, then follow RELEASE.md from
+step 3 through step 6 with the same `archive`, `deployment`, and `install_path`.
+Sections 1 to 3 above cover the downloads and RELEASE.md step 2, so start at
+RELEASE.md step 3 with `battuta-packaging extract-bots`.
 
 5. Upgrade
 ----------
 
-Install a new release into a new, empty path that the owner approves.
-Stop affected services and get owner approval before switching the running
-installation. Existing `~/.battuta` configuration is kept.
+After owner approval, stop the services and rename the active release to its
+tag as described in RELEASE.md "Layout and ownership", then repeat sections 1
+to 4 with the same `install_path`. Existing `~/.battuta` configuration and
+sessions are kept. To roll back, rename the releases back the same way.
 
 6. Launch the server
 --------------------
 
 Launch is an owner decision. After setup validation passes, generate the
-services and review the printed activation command, which covers memory,
-artifacts, speech, CoS, Manager, and the selected workers. Activate it only with
-owner approval.
+services and review the printed activation command, which covers
+{%- if deployment == "main" %} memory,
+artifacts, speech, documents, CoS, Manager, and the selected workers.
+{%- else %} only the
+influencer worker.
+{%- endif %} Activate it only with owner approval.
 
   battuta-packaging install-services --root "$install_path" \
     --env-file "$HOME/.battuta/.env.prod" --node "$node" --deployment "$deployment"
