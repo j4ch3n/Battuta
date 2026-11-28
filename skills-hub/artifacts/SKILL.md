@@ -56,7 +56,10 @@ Read only the selected capabilities:
 - [KaTeX](references/dependencies/katex.md): mathematical notation.
 - [Anime.js](references/dependencies/animejs.md): author-owned explanatory motion.
 
-Base CSS loads first, then each selected/required extension's local CSS once.
+The shared theme loads first, then base CSS, then each selected/required extension's local CSS once.
+The theme supplies the article layout (`page`, `article-head`, `headline`, `standfirst`,
+`article-body`, `prose`) and the project colour as `--paint`/`--ink`; build on them rather than
+replacing them.
 These editable files provide scoped host styles and pinned upstream CSS imports
 where needed. CSS/fonts may load eagerly; JS stays lazy. Do not add duplicate
 upstream links or global SVG/canvas overrides. Keep the inline import map and its

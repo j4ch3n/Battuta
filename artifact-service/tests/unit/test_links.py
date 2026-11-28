@@ -113,7 +113,7 @@ def test_hidden_symlink_target_is_rejected_at_serve_and_publish(link):
 
     response = link.get()
     assert response.status_code == 404
-    assert "Hidden file warning" in response.text
+    assert "Hidden files stay hidden" in response.text
     assert "TOKEN" not in response.text
     with pytest.raises(ArtifactError) as raised:
         assemble_files(link.directory, "index.html", ("linked.txt",), project="procurement")

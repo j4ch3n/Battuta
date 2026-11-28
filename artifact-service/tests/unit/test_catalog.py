@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from battuta_artifacts.app import catalog_groups, catalog_project
+from battuta_artifacts.palette import project_colour
 
 
 class Elements(HTMLParser):
@@ -52,8 +53,13 @@ def test_project_disclosures_sort_without_javascript_and_preserve_destinations(h
         response = client.get("/artifacts/")
         payload = client.get("/artifacts/catalog").json()
     assert response.status_code == 200
-    assert response.text.count('<details class="project-disclosure">') == 4  # Includes inert template.
-    assert "<details class=\"project-disclosure\" open" not in response.text
+    assert response.text.count('class="project"') == 4  # Includes inert template.
+    assert 'class="project open"' not in response.text
+    # Beyond the two newest works, the rest are marked for the deck; the HTML still contains them all.
+    assert 'class="artifact extra" data-slug="tie-z"' in response.text
+    assert 'class="artifact" data-slug="tie-a"' in response.text
+    assert payload["artifacts"][0]["colour"] == project_colour("zeta")
+    assert next(item for item in payload["artifacts"] if item["slug"] == "unassigned")["colour"] == project_colour(None)
     assert "Date unavailable" in response.text
     assert str(http.source) not in json.dumps(payload)
     assert payload["artifacts"][0]["project"] == "zeta"
@@ -93,8 +99,8 @@ def test_project_names_are_escaped_and_do_not_collide_with_unassigned(http):
 
 @pytest.mark.parametrize(
     ("path", "media"),
-    [("catalog.css", "text/css"), ("fonts/newsreader-latin.woff2", "font/woff2"), ("fonts/inter-latin.woff2", "font/woff2")],
-    ids=["stylesheet", "newsreader-font", "inter-font"],
+    [("catalog.css", "text/css"), ("theme.css", "text/css"), ("fonts/gabarito-latin.woff2", "font/woff2")],
+    ids=["catalog-stylesheet", "theme-stylesheet", "font"],
 )
 def test_packaged_stylesheet_and_fonts_are_served(http, path, media):
     response = http.client().get(f"/artifacts/{path}")
@@ -105,7 +111,8 @@ def test_packaged_stylesheet_and_fonts_are_served(http, path, media):
     assert response.headers["x-content-type-options"] == "nosniff"
 
 
-@pytest.mark.parametrize("path", ["fonts/OFL.txt", "assets/../registry.py"], ids=["font-license", "package-source"])
+@pytest.mark.parametrize("path", ["fonts/Gabarito-OFL.txt", "fonts/inter-latin.woff2", "assets/../registry.py"],
+                         ids=["font-license", "removed-font", "package-source"])
 def test_unlisted_packaged_assets_are_not_served(http, path):
     assert http.client().get(f"/artifacts/{path}").status_code == 404
 

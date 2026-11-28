@@ -9,4 +9,4 @@ A read-only web catalog for project-owned presentations and existing Markdown. A
 
 See [runtime behavior](../docs/artifact-service.md) and the [component setup index](../RELEASE.md#extension-and-skill-setup-index).
 
-The index's visual conventions are recorded in [index design](DESIGN.md).
+Visual conventions for the pages and new bundles are recorded in [page design](DESIGN.md).

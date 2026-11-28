@@ -13,8 +13,8 @@ def test_publication_allows_only_the_generated_runtime_files(bundle):
 
     assert result.exit_code == 0, result.output
     published = json.loads(result.output)["artifact"]
-    assert set(published["files"]) == {"index.html", "styles.css", "index.js", "vendor/mermaid.css",
-                                       "vendor/live-diagram.css"}
+    assert set(published["files"]) == {"index.html", "styles.css", "index.js", "theme.css", "fonts/gabarito-latin.woff2",
+                                       "vendor/mermaid.css", "vendor/live-diagram.css"}
     with TestClient(create_app(bundle.store.path)) as client:
         for path in published["files"]:
             assert client.get("/artifacts/a/sizing/" + path).status_code == 200, path

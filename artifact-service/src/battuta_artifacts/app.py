@@ -16,6 +16,7 @@ from .config import database_path
 from .files import HiddenPathError, SourceResponse, allowed_link_root, open_source
 from .events import CatalogEvents
 from .markdown import render_markdown
+from .palette import project_colour
 from .registry import ArtifactError, Registry
 
 
@@ -80,9 +81,10 @@ def create_app(path: Path | None = None) -> FastAPI:
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
     def catalog():
-        return [{**{key: row[key] for key in ("slug", "title", "description", "format", "revision", "updated_at")},
+        rows = [{**{key: row[key] for key in ("slug", "title", "description", "format", "revision", "updated_at")},
                  "project": catalog_project(row),
                  "url": f"/artifacts/a/{row['slug']}/"} for row in registry.list(published_only=True)]
+        return [{**row, "colour": project_colour(row["project"])} for row in rows]
 
     @app.get("/artifacts/")
     def index():
@@ -99,14 +101,21 @@ def create_app(path: Path | None = None) -> FastAPI:
         return FileResponse(Path(__file__).parent / "assets/catalog.js", media_type="text/javascript",
                              headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
+    def stylesheet(name: str):
+        return FileResponse(Path(__file__).parent / "assets" / name, media_type="text/css",
+                            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+
     @app.get("/artifacts/catalog.css")
     def catalog_styles():
-        return FileResponse(Path(__file__).parent / "assets/catalog.css", media_type="text/css",
-                            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+        return stylesheet("catalog.css")
+
+    @app.get("/artifacts/theme.css")
+    def theme_styles():
+        return stylesheet("theme.css")
 
     @app.get("/artifacts/fonts/{font_name}")
     def catalog_font(font_name: str):
-        if font_name not in {"newsreader-latin.woff2", "inter-latin.woff2"}:
+        if font_name != "gabarito-latin.woff2":
             raise HTTPException(404, "Font not found")
         return FileResponse(Path(__file__).parent / "assets/fonts" / font_name, media_type="font/woff2",
                             headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
@@ -120,10 +129,13 @@ def create_app(path: Path | None = None) -> FastAPI:
                             status_code=404, headers={"Cache-Control": "no-store"})
 
     def not_found():
-        return error_page("Artifact file not found", "This artifact does not include that file.")
+        return error_page("Nothing here to read",
+                          "This link doesn't point to a published work. It may be mistyped, or the work may have "
+                          "been withdrawn.")
 
     def hidden():
-        return error_page("Hidden file warning", "Hidden files are never served from artifacts.")
+        return error_page("Hidden files stay hidden",
+                          "Files whose names start with a dot are never shared from an artifact.")
 
     @app.get("/artifacts/a/{slug}/")
     @app.get("/artifacts/a/{slug}/{path:path}")
@@ -143,10 +155,15 @@ def create_app(path: Path | None = None) -> FastAPI:
             if Path(selected).suffix.lower() in (".md", ".markdown"):
                 with source:
                     try:
-                        rendered = render_markdown(source.read())
+                        rendered, headings = render_markdown(source.read())
                     except UnicodeDecodeError as exc:
                         raise HTTPException(422, "Markdown must use UTF-8 encoding") from exc
-                return HTMLResponse(templates.get_template("markdown.html").render(title=item["title"], content=rendered),
+                project = catalog_project(item)
+                page = templates.get_template("markdown.html").render(
+                    title=item["title"], description=item["description"], updated_at=item["updated_at"],
+                    project=project, colour=project_colour(project), content=rendered,
+                    headings=headings if len(headings) >= 3 else [])
+                return HTMLResponse(page,
                                     headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
             return SourceResponse(source, item["files"][selected])
         except HiddenPathError:

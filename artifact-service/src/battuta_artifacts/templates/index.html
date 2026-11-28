@@ -1,33 +1,52 @@
-{% macro artifact_row(artifact={}) -%}
-<li class="artifact" data-slug="{{ artifact.slug | default('') }}">
+{% macro artifact_row(artifact={}, extra=false) -%}
+<li class="artifact{{ ' extra' if extra }}" data-slug="{{ artifact.slug | default('') }}">
   <a class="artifact-link" href="{{ artifact.url | default('') }}">
-    <span class="artifact-updated">
-      <span>Updated</span>
-      <time datetime="{{ artifact.updated_at | default('', true) }}"
-        >{{ artifact.updated_at | default('') | catalog_date }}</time
-      >
-    </span>
     <div class="artifact-copy">
       <h3 class="artifact-title">{{ artifact.title | default('') }}</h3>
       <p class="artifact-description">{{ artifact.description | default('') }}</p>
     </div>
+    <time datetime="{{ artifact.updated_at | default('', true) }}"
+      >{{ artifact.updated_at | default('') | catalog_date }}</time
+    >
   </a>
 </li>
-{%- endmacro %} {% macro project_group(group={}) -%}
-<li class="project" data-project="{{ group.key | default('') }}">
-  <details class="project-disclosure">
-    <summary class="project-summary">
+{%- endmacro %} {% macro project_group(group={}) -%} {% set works = group.artifacts | default([]) %}
+{% set hide = '' if works | length > 2 else 'hidden' %} {% set colour = (works | first |
+default({})).colour | default({'paint': '#000000', 'ink': '#FFFFFF'}) %}
+<li
+  class="project"
+  data-project="{{ group.key | default('') }}"
+  style="--paint: {{ colour.paint }}; --ink: {{ colour.ink }}"
+>
+  <ul class="tiles" role="list">
+    <li class="chip">
       <h2 class="project-name">{{ group.name | default('') }}</h2>
-      {% set total = group.artifacts | default([]) | length %}
-      <span class="project-count">{{ total }} {{ 'work' if total == 1 else 'works' }}</span>
-      <span class="project-chevron" aria-hidden="true"></span>
-    </summary>
-    <div class="project-panel">
-      <ul class="artifact-list" role="list">
-        {% for artifact in group.artifacts | default([]) %}{{ artifact_row(artifact) }}{% endfor %}
-      </ul>
-    </div>
-  </details>
+      <span class="project-count"
+        >{{ works | length }} {{ 'work' if works | length == 1 else 'works' }}</span
+      >
+      <button
+        class="chip-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-label="All {{ works | length }} {{ group.name | default('') }} works"
+        {{hide}}
+      ></button>
+    </li>
+    {% for artifact in works %}{{ artifact_row(artifact, loop.index > 2) }}{% endfor %}
+    <li class="deck-tile" {{hide}}>
+      <button class="deck" type="button" aria-expanded="false">
+        <span class="deck-layer" aria-hidden="true"></span>
+        <span class="deck-layer" aria-hidden="true"></span>
+        <span class="deck-top">
+          <span class="deck-peek">
+            <span class="deck-title">{{ (works[2] | default({})).title | default('') }}</span>
+            <span class="deck-title">{{ (works[3] | default({})).title | default('') }}</span>
+          </span>
+          <span class="deck-count"><b>+{{ [works | length - 2, 0] | max }}</b> Show all</span>
+        </span>
+      </button>
+    </li>
+  </ul>
 </li>
 {%- endmacro %}
 <!doctype html>
@@ -35,29 +54,33 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f6f0e5" />
+    <meta name="theme-color" content="#ffffff" />
     <title>Artifacts</title>
     <link
       rel="preload"
-      href="/artifacts/fonts/newsreader-latin.woff2"
+      href="/artifacts/fonts/gabarito-latin.woff2"
       as="font"
       type="font/woff2"
       crossorigin
     />
+    <link rel="stylesheet" href="/artifacts/theme.css" />
     <link rel="stylesheet" href="/artifacts/catalog.css" />
+    <script>
+      document.documentElement.classList.add("js");
+    </script>
     <script src="/artifacts/catalog.js" defer></script>
   </head>
   <body>
-    <header class="page-width hero">
-      <div class="hero-heading">
+    <header class="page hero">
+      <div>
         <h1>Artifacts</h1>
-        <p id="artifact-count" class="artifact-count" aria-live="polite">
-          {{ artifacts | length }} {{ 'work' if artifacts | length == 1 else 'works' }}
-        </p>
+        <p class="hero-description">Documents, demos and work in progress.</p>
       </div>
-      <p class="hero-description">Documents, demos, and work in progress.</p>
+      <p id="artifact-count" class="pill" aria-live="polite">
+        {{ artifacts | length }} {{ 'work' if artifacts | length == 1 else 'works' }}
+      </p>
     </header>
-    <main class="page-width library" aria-label="Artifact library">
+    <main class="page library" aria-label="Artifact library">
       <ul id="artifacts" class="project-list" role="list" aria-label="Projects" tabindex="-1">
         {% for group in groups %}{{ project_group(group) }}{% endfor %}
       </ul>
@@ -66,7 +89,7 @@
       </p>
       <p id="status" class="connection-status" role="status"></p>
     </main>
-    <footer class="page-width site-footer">
+    <footer class="page site-footer">
       <p>© 2026 Fiscum Technology</p>
     </footer>
     <template id="artifact-template">{{ artifact_row() }}</template>

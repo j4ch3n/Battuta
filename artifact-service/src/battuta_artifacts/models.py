@@ -33,7 +33,7 @@ def media_type(path: str) -> str:
     suffix = Path(path).suffix.lower()
     return {".md": "text/markdown", ".markdown": "text/markdown", ".js": "text/javascript",
             ".mjs": "text/javascript", ".css": "text/css", ".html": "text/html",
-            ".htm": "text/html"}.get(suffix) or mimetypes.guess_type(path)[0] or "application/octet-stream"
+            ".htm": "text/html", ".woff2": "font/woff2"}.get(suffix) or mimetypes.guess_type(path)[0] or "application/octet-stream"
 
 
 def assemble_files(root: Path | None, entry: str, files: tuple[str, ...], *, project: str | None = None) -> dict:

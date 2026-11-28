@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
 from .files import open_source
 from .models import Metadata, assemble_files, relative_path
+from .palette import project_colour
 from .registry import ArtifactError, Conflict
 from .vendors import Vendor, import_map, select_vendors
 
@@ -57,9 +58,18 @@ def _style(vendor: Vendor) -> bytes:
     return (imports + ("\n" if imports else "")).encode() + _resource(root, vendor.style)
 
 
+THEME_FILES = (
+    BundleFile(path="theme.css", purpose="Shared artifact theme: colours, type and article styles.", serve=True),
+    BundleFile(path="fonts/gabarito-latin.woff2", purpose="Gabarito font used by the theme.", serve=True),
+)
+
+
 def _notice(vendors: tuple[Vendor, ...]) -> bytes:
     root = Path(__file__).parent / "authoring"
-    sections = ["Third-party dependencies\n"]
+    fonts = Path(__file__).parent / "assets/fonts"
+    sections = ["Third-party dependencies\n",
+                "Gabarito font (theme)\nSource: https://github.com/naipefoundry/gabarito\n",
+                _resource(fonts, "Gabarito-OFL.txt").decode("utf-8").strip() + "\n"]
     included = set()
     for vendor in vendors:
         sections.append(f"{vendor.name} {vendor.version}\nSource: {vendor.source}\n")
@@ -95,9 +105,12 @@ def load_bundle(vendors: tuple[str, ...], *, starter: Path | None = None):
         for vendor in resolved
     ]
     contents.update({entry.path: _style(vendor) for entry, vendor in zip(extension_files, resolved, strict=True)})
+    # Bundles keep their own copy of the theme so later redesigns never restyle published work.
+    assets = Path(__file__).parent / "assets"
+    contents.update({entry.path: _resource(assets, entry.path) for entry in THEME_FILES})
     contents["NOTICE.txt"] = _notice(resolved)
     notice = BundleFile(path="NOTICE.txt", purpose="Selected dependency provenance and licenses.", serve=False)
-    return Bundle(entry=bundle.entry, files=[*bundle.files, notice, *extension_files]), contents
+    return Bundle(entry=bundle.entry, files=[*bundle.files, *THEME_FILES, notice, *extension_files]), contents
 
 
 def open_directory(path: Path):
@@ -131,6 +144,7 @@ def initialize(store, *, project: str, name: str, slug: str, title: str, descrip
             description=description,
             import_map=Markup(serialized_map),
             stylesheets=[f"vendor/{vendor.name}.css" for vendor in resolved],
+            colour=project_colour(project),
         ).encode("utf-8")
     contents["vendor/importmap.json"] = json.dumps(mapping, indent=2).encode() + b"\n"
     if any(item["slug"] == slug or (item["project"], item["name"]) == (project, name) for item in store.list()):

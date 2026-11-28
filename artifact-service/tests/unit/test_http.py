@@ -77,7 +77,8 @@ def assert_error_page(response, heading, *absent):
     assert response.headers["content-type"] == "text/html; charset=utf-8"
     assert response.headers["cache-control"] == "no-store"
     assert heading in response.text
-    assert '<link rel="stylesheet" href="/artifacts/catalog.css"' in response.text
+    assert '<link rel="stylesheet" href="/artifacts/theme.css"' in response.text
+    assert 'href="/artifacts/"' in response.text
     assert "<script" not in response.text
     for text in absent:
         assert text not in response.text
@@ -89,7 +90,7 @@ def assert_error_page(response, heading, *absent):
     ids=["unknown-file", "unknown-artifact", "unlisted-file"],
 )
 def test_unknown_path_returns_styled_404_page(http, url):
-    assert_error_page(http.client().get(url), "Artifact file not found", "nope", "private", str(http.source))
+    assert_error_page(http.client().get(url), "Nothing here to read", "nope", "private", str(http.source))
 
 
 @pytest.mark.parametrize("path", [".env", "sub/.git/config", ".git/config", "sub/.hidden"],
@@ -103,7 +104,7 @@ def test_hidden_request_paths_return_warning_page_without_bytes(http, slug, path
                            source_root=str(http.source), entry_path="index.html", format="html",
                            files={"index.html": "text/html", ".env": "text/plain", "sub/.git/config": "text/plain"})
 
-    assert_error_page(http.client().get(f"/artifacts/a/{slug}/{path}"), "Hidden file warning", "SECRET", path)
+    assert_error_page(http.client().get(f"/artifacts/a/{slug}/{path}"), "Hidden files stay hidden", "SECRET", path)
 
 
 def test_front_page_title_has_no_divider(http):
